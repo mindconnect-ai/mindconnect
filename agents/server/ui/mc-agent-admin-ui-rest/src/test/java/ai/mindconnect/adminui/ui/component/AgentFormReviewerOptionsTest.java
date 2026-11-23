@@ -2,9 +2,8 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -24,22 +23,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AgentFormReviewerOptionsTest {
 
-    private static AgentDefinition agent(String name, String group, List<String> reviewers) {
-        return agent(name, group, reviewers, AgentDefinitionStatus.ACTIVE);
+    private static ManagedAgent agent(String name, String group, List<String> reviewers) {
+        return agent(name, group, reviewers, ManagedAgent.Status.ACTIVE);
     }
 
-    private static AgentDefinition agent(String name, String group, List<String> reviewers,
-                                         AgentDefinitionStatus status) {
-        return new AgentDefinition(AgentId.random(), name, "d", group, null, "prompt", null, "cfg", 5,
-                null, status, List.of(), reviewers, null, null, null, null);
+    private static ManagedAgent agent(String name, String group, List<String> reviewers,
+                                      ManagedAgent.Status status) {
+        return new ManagedAgent(ai.mindconnect.agent.management.api.AgentId.of(AgentId.random().value()),
+                new ai.mindconnect.agent.runtime.api.domain.AgentDefinition(name, "d", "prompt",
+                        ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel("cfg"), List.of(), 5,
+                        java.util.Map.of(ResponseReviewPlugin.REVIEWERS, reviewers)),
+                group, null, null, status, null, null, 0);
     }
 
     /** The values the picker offers, read off the rendered form. */
-    private static List<String> reviewerOptions(AgentDefinition edited, AgentDefinition... all) {
-        var repo = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
-        for (AgentDefinition a : all) repo.save(a);
+    private static List<String> reviewerOptions(ManagedAgent edited, ManagedAgent... all) {
         var rendered = (UiStack) new AgentFormComponent(edited, new InMemoryLlmConfigRepository(ScopeSupplier.local()),
-                repo, new ObjectMapper()).render();
+                List.of(all), new ObjectMapper()).render();
         UiForm form = rendered.getChildren().stream()
                 .filter(UiForm.class::isInstance).map(UiForm.class::cast).findFirst().orElseThrow();
         UiField field = form.getFields().stream()
@@ -49,17 +49,17 @@ class AgentFormReviewerOptionsTest {
 
     @Test
     void onlyAgentsInTheReviewerGroupAreOffered() {
-        AgentDefinition edited = agent("scout", "assistants", List.of());
-        AgentDefinition tone = agent("tone-reviewer", "reviewer", List.of());
-        AgentDefinition helper = agent("web-researcher", "sub-agents", List.of());
+        ManagedAgent edited = agent("scout", "assistants", List.of());
+        ManagedAgent tone = agent("tone-reviewer", "reviewer", List.of());
+        ManagedAgent helper = agent("web-researcher", "sub-agents", List.of());
 
         assertThat(reviewerOptions(edited, edited, tone, helper)).containsExactly("tone-reviewer");
     }
 
     @Test
     void theAgentItselfIsNotOfferedEvenWhenFiledAsAReviewer() {
-        AgentDefinition edited = agent("tone-reviewer", "reviewer", List.of());
-        AgentDefinition other = agent("style-reviewer", "reviewer", List.of());
+        ManagedAgent edited = agent("tone-reviewer", "reviewer", List.of());
+        ManagedAgent other = agent("style-reviewer", "reviewer", List.of());
 
         assertThat(reviewerOptions(edited, edited, other)).containsExactly("style-reviewer");
     }
@@ -70,9 +70,9 @@ class AgentFormReviewerOptionsTest {
         // out of the group since: the form must still show it ticked, not
         // silently drop it on the next save. It comes first — the field keeps
         // the ticked rows in their stored order — the candidates after it by name.
-        AgentDefinition edited = agent("scout", "assistants", List.of("verifier"));
-        AgentDefinition tone = agent("tone-reviewer", "reviewer", List.of());
-        AgentDefinition verifier = agent("verifier", "sub-agents", List.of());
+        ManagedAgent edited = agent("scout", "assistants", List.of("verifier"));
+        ManagedAgent tone = agent("tone-reviewer", "reviewer", List.of());
+        ManagedAgent verifier = agent("verifier", "sub-agents", List.of());
 
         assertThat(reviewerOptions(edited, edited, tone, verifier)).containsExactly("verifier", "tone-reviewer");
     }
@@ -81,25 +81,25 @@ class AgentFormReviewerOptionsTest {
     void aReviewerWhoseAgentIsGoneIsDropped() {
         // The agent was deleted: keeping its name would have every turn try
         // it and log a failed reviewer, with no way to clear it but unticking.
-        AgentDefinition edited = agent("scout", "assistants", List.of("tone-reviewer"));
+        ManagedAgent edited = agent("scout", "assistants", List.of("tone-reviewer"));
 
         assertThat(reviewerOptions(edited, edited)).isEmpty();
     }
 
     @Test
     void aDeprecatedReviewerIsNotOffered() {
-        AgentDefinition edited = agent("scout", "assistants", List.of());
-        AgentDefinition old = agent("old-reviewer", "reviewer", List.of(), AgentDefinitionStatus.DEPRECATED);
-        AgentDefinition tone = agent("tone-reviewer", "reviewer", List.of());
+        ManagedAgent edited = agent("scout", "assistants", List.of());
+        ManagedAgent old = agent("old-reviewer", "reviewer", List.of(), ManagedAgent.Status.DEPRECATED);
+        ManagedAgent tone = agent("tone-reviewer", "reviewer", List.of());
 
         assertThat(reviewerOptions(edited, edited, old, tone)).containsExactly("tone-reviewer");
     }
 
     @Test
     void aNewAgentSeesTheReviewerGroupByName() {
-        AgentDefinition tone = agent("tone-reviewer", "reviewer", List.of());
-        AgentDefinition alpha = agent("alpha-reviewer", "reviewer", List.of());
-        AgentDefinition helper = agent("planner", "sub-agents", List.of());
+        ManagedAgent tone = agent("tone-reviewer", "reviewer", List.of());
+        ManagedAgent alpha = agent("alpha-reviewer", "reviewer", List.of());
+        ManagedAgent helper = agent("planner", "sub-agents", List.of());
 
         assertThat(reviewerOptions(null, tone, alpha, helper)).containsExactly("alpha-reviewer", "tone-reviewer");
     }

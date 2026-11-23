@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
@@ -56,12 +57,34 @@ public final class AgentDefinitionMapper {
                 stored.systemPrompt() == null ? "" : stored.systemPrompt(),
                 // The name of an LLM configuration is the model's name to the gateway.
                 stored.llmConfigName() == null ? ModelSettings.NONE : ModelSettings.ofModel(stored.llmConfigName()),
-                stored.tools().stream().map(AgentDefinitionMapper::binding).toList(),
+                stored.tools().stream().filter(AgentTool::enabled).map(AgentDefinitionMapper::binding).toList(),
                 stored.maxIterations() > 0 ? stored.maxIterations() : DEFAULT_MAX_ROUNDS,
                 metadata);
     }
 
-    private static ToolBinding binding(AgentTool tool) {
+    /**
+     * The agent as the administration pages write it: its id in the
+     * definition, where the tools read whose agent calls them, and no copy
+     * of what the earlier runtime wrote — whoever still reads the earlier
+     * way gets it derived from the definition, not from a copy gone stale.
+     */
+    public static ManagedAgent written(ManagedAgent agent) {
+        AgentDefinition definition = agent.definition();
+        Map<String, Object> metadata = new HashMap<>(definition.metadata());
+        metadata.put(AGENT_ID, agent.id().value());
+        metadata.remove(EarlierAgentConverter.EARLIER);
+        return agent.withDefinition(new AgentDefinition(definition.name(), definition.description(),
+                definition.instructions(), definition.modelSettings(), definition.tools(), definition.maxRounds(),
+                metadata));
+    }
+
+    /** A tool as an agent's tool page edits it, from how the agent's definition binds it. */
+    public static AgentTool agentTool(ToolBinding binding) {
+        return RegistryToolResolver.agentTool(binding);
+    }
+
+    /** How an agent's definition binds a tool, from what the agent's tool page set for it. */
+    public static ToolBinding binding(AgentTool tool) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put(RegistryToolResolver.TOOL_ID, tool.id().value());
         metadata.put(RegistryToolResolver.OVERRIDES, tool.overrides());
@@ -70,9 +93,6 @@ public final class AgentDefinitionMapper {
         }
         if (tool.maxResultChars() != null) {
             metadata.put(RegistryToolResolver.MAX_RESULT_CHARS, tool.maxResultChars());
-        }
-        if (!tool.enabled()) {
-            metadata.put(ToolBinding.ENABLED, false);
         }
         if (tool.needsApproval()) {
             metadata.put(PermissionPlugin.NEEDS_APPROVAL, true);

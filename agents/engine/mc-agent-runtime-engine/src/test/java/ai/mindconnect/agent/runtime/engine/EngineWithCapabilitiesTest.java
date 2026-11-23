@@ -437,22 +437,6 @@ class EngineWithCapabilitiesTest {
     }
 
     @Test
-    void a_tool_the_agent_has_switched_off_is_neither_offered_nor_run() throws InterruptedException {
-        AgentDefinition careful = new AgentDefinition("careful", "Is careful.", "You are careful.",
-                ModelSettings.ofModel("big"),
-                List.of(new ToolBinding("read_pdf", false, Map.of(ToolBinding.ENABLED, false))), 5, Map.of());
-        model.script.add(call("c1", "read_pdf", Map.of()));
-        model.script.add(TurnMessage.assistant("Could not read it."));
-
-        Turn ended = awaitRest(turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Read it.")), careful, Map.of())));
-
-        assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
-        assertThat(model.requests.get(0).tools()).extracting(ToolDefinition::name).doesNotContain("read_pdf");
-        assertThat(toolResults(ended.id())).noneMatch(result -> result.contains("ran read_pdf"));
-    }
-
-    @Test
     void reviewers_read_the_answer_one_after_the_other_and_the_session_keeps_what_they_left()
             throws InterruptedException {
         AgentDefinition advisor = new AgentDefinition("advisor", "Advises.", "You advise.",

@@ -49,7 +49,14 @@ record MemoryConfig(Strategy strategy, double maxConversationRatio, int maxMessa
     }
 
     static MemoryConfig of(AgentDefinition agent) {
-        if (!(agent.metadata().get(MemoryPlugin.MEMORY) instanceof Map<?, ?> memory)) {
+        return of(agent.metadata().get(MemoryPlugin.MEMORY));
+    }
+
+    /**
+     * @throws IllegalArgumentException for a strategy or a summary placement there is none of
+     */
+    static MemoryConfig of(Object setting) {
+        if (!(setting instanceof Map<?, ?> memory)) {
             return DEFAULT;
         }
         return new MemoryConfig(

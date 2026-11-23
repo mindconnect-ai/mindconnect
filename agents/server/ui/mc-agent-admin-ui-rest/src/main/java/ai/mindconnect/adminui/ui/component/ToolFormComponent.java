@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -43,12 +43,12 @@ public final class ToolFormComponent implements UiComponent {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
 
     /** Pass {@code null} for the new-tool form. */
-    public ToolFormComponent(AgentDefinition agent, AgentTool tool, ToolRegistry toolRegistry) {
+    public ToolFormComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
@@ -81,7 +81,7 @@ public final class ToolFormComponent implements UiComponent {
         // delegation tools, a deferred tool brings tool_search. A definition
         // drops them on the way in, so a row for one would never save.
         toolRegistry.toolNamesByGroup().forEach((g, names) -> names.stream()
-                .filter(n -> !AgentDefinition.DERIVED_TOOLS.contains(n))
+                .filter(n -> !AgentSetting.DERIVED_TOOLS.contains(n))
                 .forEach(n -> byGroup.computeIfAbsent(g, k -> new java.util.TreeSet<>()).add(n)));
         List<UiField.Option> builtinOptions = new ArrayList<>();
         LinkedHashSet<String> registered = new LinkedHashSet<>();
@@ -137,8 +137,6 @@ public final class ToolFormComponent implements UiComponent {
                                 + "{\"network\":\"bridge\"} (code_execute). "
                                 + "{\"params\":{...}} pins tool parameters: pinned values are hidden "
                                 + "from the LLM and always enforced, e.g. {\"params\":{\"language\":\"python\"}}"))
-                .field(UiField.bool("enabled", "Enabled",
-                        isNew || tool.enabled()).asEditable())
                 .field(UiField.bool("deferred", "Deferred (via tool search only)",
                         !isNew && tool.deferred())
                         .asEditable()

@@ -1,5 +1,8 @@
 package ai.mindconnect.adminui.namespaces;
 
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import java.util.function.UnaryOperator;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
@@ -36,6 +39,53 @@ import java.util.Optional;
 public final class GuardedRepositories {
 
     private GuardedRepositories() {
+    }
+
+    /**
+     * The agents as the agent pages reach them, through the runtime: the
+     * same question at the same writes, or going that way would go round it.
+     */
+    public record ManagedAgents(AgentManagement delegate, NamespaceWriteGuard guard) implements AgentManagement {
+
+        @Override
+        public ManagedAgent create(ManagedAgent agent) {
+            guard.requireAdmin("an agent");
+            return delegate.create(agent);
+        }
+
+        @Override
+        public ManagedAgent update(ai.mindconnect.agent.management.api.AgentId id, long expectedVersion,
+                                   UnaryOperator<ManagedAgent> change) {
+            guard.requireAdmin("an agent");
+            return delegate.update(id, expectedVersion, change);
+        }
+
+        @Override
+        public ManagedAgent copy(ai.mindconnect.agent.management.api.AgentId id) {
+            guard.requireAdmin("an agent");
+            return delegate.copy(id);
+        }
+
+        @Override
+        public void delete(ai.mindconnect.agent.management.api.AgentId id) {
+            guard.requireAdmin("an agent");
+            delegate.delete(id);
+        }
+
+        @Override
+        public List<ManagedAgent> list() {
+            return delegate.list();
+        }
+
+        @Override
+        public Optional<ManagedAgent> find(ai.mindconnect.agent.management.api.AgentId id) {
+            return delegate.find(id);
+        }
+
+        @Override
+        public Optional<ManagedAgent> findByName(String name) {
+            return delegate.findByName(name);
+        }
     }
 
     /** Agents: created, renamed, given tools and deleted by admins. */

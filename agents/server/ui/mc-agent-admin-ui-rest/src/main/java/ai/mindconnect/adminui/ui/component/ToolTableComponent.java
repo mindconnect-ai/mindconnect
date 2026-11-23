@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
@@ -26,14 +26,14 @@ public final class ToolTableComponent implements UiComponent {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentToolId selectedToolId;
 
-    public ToolTableComponent(AgentDefinition agent) {
+    public ToolTableComponent(ManagedAgent agent) {
         this(agent, null);
     }
 
-    public ToolTableComponent(AgentDefinition agent, AgentToolId selectedToolId) {
+    public ToolTableComponent(ManagedAgent agent, AgentToolId selectedToolId) {
         this.agent = agent;
         this.selectedToolId = selectedToolId;
     }
@@ -53,7 +53,6 @@ public final class ToolTableComponent implements UiComponent {
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("description", "Description"))
                 .column(UiTable.Column.text("overrides", "Overrides"))
-                .column(UiTable.Column.text("enabled", "Enabled"))
                 .column(UiTable.Column.text("deferred", "Deferred"))
                 .column(UiTable.Column.text("needsApproval", "Approval"))
                 .rowAction(UiAction.secondary("view", "View").icon("show")
@@ -64,13 +63,12 @@ public final class ToolTableComponent implements UiComponent {
                         .confirm("Delete this tool?")
                         .onClick(trigger(on(AgentUiController.class).deleteTool(agent.id().value(), ROW_ID.toString(), null))));
 
-        for (AgentTool t : agent.tools()) {
+        for (AgentTool t : AgentSetting.tools(agent)) {
             table.row(Map.of(
                 "id",          t.id().value(),
                 "name",        t.name(),
                 "description", t.description() != null ? t.description() : "",
                 "overrides",   overridesSummary(t),
-                "enabled",     t.enabled() ? "✓" : "—",
                 "deferred",    t.deferred() ? "✓" : "—",
                 "needsApproval", t.needsApproval() ? "✓" : "—"
             ));

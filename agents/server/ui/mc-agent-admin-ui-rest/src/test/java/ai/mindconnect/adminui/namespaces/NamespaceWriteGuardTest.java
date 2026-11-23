@@ -105,6 +105,52 @@ class NamespaceWriteGuardTest {
     }
 
     @Test
+    void theAgentsTheRuntimeGivesOutAreGuardedTheSame_aUserReadsAndDoesNotWrite() {
+        List<String> reached = new ArrayList<>();
+        var managed = new ai.mindconnect.agent.management.api.AgentManagement() {
+            @Override public List<ai.mindconnect.agent.management.api.ManagedAgent> list() {
+                reached.add("list");
+                return List.of();
+            }
+            @Override public Optional<ai.mindconnect.agent.management.api.ManagedAgent> find(
+                    ai.mindconnect.agent.management.api.AgentId id) { return Optional.empty(); }
+            @Override public Optional<ai.mindconnect.agent.management.api.ManagedAgent> findByName(String name) {
+                return Optional.empty();
+            }
+            @Override public ai.mindconnect.agent.management.api.ManagedAgent create(
+                    ai.mindconnect.agent.management.api.ManagedAgent agent) {
+                reached.add("create");
+                return agent;
+            }
+            @Override public ai.mindconnect.agent.management.api.ManagedAgent update(
+                    ai.mindconnect.agent.management.api.AgentId id, long expectedVersion,
+                    java.util.function.UnaryOperator<ai.mindconnect.agent.management.api.ManagedAgent> change) {
+                reached.add("update");
+                return null;
+            }
+            @Override public ai.mindconnect.agent.management.api.ManagedAgent copy(
+                    ai.mindconnect.agent.management.api.AgentId id) {
+                reached.add("copy");
+                return null;
+            }
+            @Override public void delete(ai.mindconnect.agent.management.api.AgentId id) {
+                reached.add("delete");
+            }
+        };
+        var guarded = new GuardedRepositories.ManagedAgents(managed,
+                new NamespaceWriteGuard(namespaces, ScopeSupplier.fixed(Scope.of(ACME, ALICE))));
+        var id = ai.mindconnect.agent.management.api.AgentId.of("a1");
+
+        assertThat(guarded.list()).isEmpty();
+        assertThatThrownBy(() -> guarded.create(null)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guarded.update(id, 1, agent -> agent)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guarded.copy(id)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guarded.delete(id)).isInstanceOf(AccessDeniedException.class);
+
+        assertThat(reached).containsExactly("list");
+    }
+
+    @Test
     void readingIsUntouched_aUserChatsWithTheAgentsOfTheirNamespace() {
         AgentDefinitionRepository guarded = guardedFor(Scope.of(ACME, ALICE));
 

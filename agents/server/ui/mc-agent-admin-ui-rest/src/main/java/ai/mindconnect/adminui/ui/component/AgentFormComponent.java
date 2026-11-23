@@ -1,15 +1,17 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
+import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.ui.model.UiAction;
@@ -28,38 +30,42 @@ import java.util.List;
  * and "edit" (existing agent) modes — defaults switch on the null
  * check, the submit target becomes POST vs PUT.
  *
- * <p>The form pulls LLM configs and reviewer-candidate agents from
- * repositories at render time so the dropdown options stay current
- * without the component caching anything.
+ * <p>The form pulls the LLM configs from their repository at render time
+ * and is handed every agent there is, for the group names and for the
+ * candidates of the roster and the reviewers.
  */
 public final class AgentFormComponent implements UiComponent {
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
+    /** What the runtime runs; null with {@link #agent}. */
+    private final AgentDefinition definition;
     private final LlmConfigRepository llmConfigRepository;
-    private final AgentDefinitionRepository agentRepository;
+    private final List<ManagedAgent> all;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     /** What the skills picker offers; null when this host wires no catalog. */
     private final SkillCatalog skillCatalog;
 
     /**
      * @param agent {@code null} for the new-agent form, an existing
-     *              {@link AgentDefinition} for the edit form
+     *              agent for the edit form
+     * @param all   every agent there is, the edited one included
      */
-    public AgentFormComponent(AgentDefinition agent,
+    public AgentFormComponent(ManagedAgent agent,
                               LlmConfigRepository llmConfigRepository,
-                              AgentDefinitionRepository agentRepository,
+                              List<ManagedAgent> all,
                               com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
-        this(agent, llmConfigRepository, agentRepository, objectMapper, null);
+        this(agent, llmConfigRepository, all, objectMapper, null);
     }
 
-    public AgentFormComponent(AgentDefinition agent,
+    public AgentFormComponent(ManagedAgent agent,
                               LlmConfigRepository llmConfigRepository,
-                              AgentDefinitionRepository agentRepository,
+                              List<ManagedAgent> all,
                               com.fasterxml.jackson.databind.ObjectMapper objectMapper,
                               SkillCatalog skillCatalog) {
         this.agent = agent;
+        this.definition = agent == null ? null : agent.definition();
         this.llmConfigRepository = llmConfigRepository;
-        this.agentRepository = agentRepository;
+        this.all = all;
         this.objectMapper = objectMapper;
         this.skillCatalog = skillCatalog;
     }
@@ -78,10 +84,6 @@ public final class AgentFormComponent implements UiComponent {
                         c.name() + " (" + c.provider() + " / " + c.model() + ")"))
                 .toList();
 
-        // Every agent once: the group names, the reviewer candidates and the
-        // roster candidates are all read off the same list.
-        List<AgentDefinition> all = agentRepository.findAll();
-
         // The rubrics that exist, read off the agents themselves — there is no
         // group registry, and inventing one for a value only the list groups by
         // would be a table to keep in sync for nothing. The seeded ones are
@@ -91,19 +93,20 @@ public final class AgentFormComponent implements UiComponent {
         // is the last agent holding it, so opening the form cannot silently
         // refile the agent.
         java.util.SortedSet<String> groupNames = new java.util.TreeSet<>(
-                List.of("assistants", "sub-agents", "utilities", AgentDefinition.REVIEWER_GROUP));
-        all.forEach(other -> groupNames.add(other.groupOrDefault()));
-        if (!isNew) groupNames.add(agent.groupOrDefault());
+                List.of("assistants", "sub-agents", "utilities", AgentSetting.REVIEWER_GROUP));
+        all.forEach(other -> groupNames.add(AgentSetting.group(other)));
+        if (!isNew) groupNames.add(AgentSetting.group(agent));
         List<UiField.Option> groupOptions = groupNames.stream()
                 .map(g -> UiField.Option.of(g, ToolCatalogComponent.displayGroup(g)))
                 .toList();
 
         // Reviewer candidates: the agents filed under the reviewer group.
-        // Roster candidates: the agents that let themselves be called.
-        List<UiField.Option> reviewerOptions = candidates(all, AgentDefinition::filedAsReviewer,
-                isNew ? List.of() : agent.effectiveResponseReviewers());
-        List<UiField.Option> rosterOptions = candidates(all, AgentDefinition::mayBeCalledByAgents,
-                isNew ? List.of() : agent.effectiveCallableAgents());
+        // Roster candidates: every other agent.
+        List<String> reviewers = isNew ? List.of() : AgentSetting.names(definition, ResponseReviewPlugin.REVIEWERS);
+        List<String> roster = isNew ? List.of() : AgentSetting.names(definition, SubAgentPlugin.SUB_AGENTS);
+        List<UiField.Option> reviewerOptions = candidates(
+                other -> AgentSetting.REVIEWER_GROUP.equals(AgentSetting.group(other)), reviewers);
+        List<UiField.Option> rosterOptions = candidates(other -> true, roster);
 
         // Same bar as the list and the detail page. A form's title is a plain
         // escaped string, so the icon has to come from a header-only UiList
@@ -111,24 +114,25 @@ public final class AgentFormComponent implements UiComponent {
         // twice in a row. A new agent has no icon yet, so it gets the generic
         // one, which is what it will be drawn with until someone picks another.
         var header = UiList.of(id() + "-header",
-                        isNew ? "New Agent" : "Edit Agent: " + agent.name())
-                .icon(isNew ? AgentDefinition.DEFAULT_ICON : agent.iconOrDefault());
+                        isNew ? "New Agent" : "Edit Agent: " + definition.name())
+                .icon(isNew ? AgentSetting.DEFAULT_ICON : AgentSetting.icon(agent));
 
-        var skills = isNew ? AgentDefinition.SkillsConfig.ALL : agent.skillsOrDefault();
+        String skillsMode = isNew ? AgentSetting.ALL : AgentSetting.skillsMode(definition);
+        List<String> skillNames = isNew ? List.of() : AgentSetting.names(definition, SkillPlugin.SKILLS);
         var form = UiForm.of(id(), null)
-                .field(UiField.text("name", "Name", isNew ? null : agent.name())
+                .field(UiField.text("name", "Name", isNew ? null : definition.name())
                         .asEditable().asRequired())
                 // The version this form was opened with: a hidden input, submitted
                 // with the rest — the save is refused if the agent was saved since.
                 .field(UiField.hidden("version",
-                        isNew || agent.version() == null ? "0" : agent.version().toString()))
-                .field(UiField.text("description", "Description", isNew ? null : agent.description())
+                        isNew ? "0" : Long.toString(agent.version())))
+                .field(UiField.text("description", "Description", isNew ? null : definition.description())
                         .asEditable())
                 // The rubric this agent is filed under in the list. A choice
                 // among the rubrics in use; js/group-picker.js adds the button
                 // that turns it into a field for naming a new one.
                 .field(UiField.select("group", "Group",
-                        isNew ? AgentDefinition.DEFAULT_GROUP : agent.groupOrDefault(), groupOptions)
+                        isNew ? AgentSetting.DEFAULT_GROUP : AgentSetting.group(agent), groupOptions)
                         .asEditable())
                 // A Lucide name. js/icon-picker.js grows a searchable grid out
                 // of this field; typed by hand it works just the same.
@@ -137,32 +141,33 @@ public final class AgentFormComponent implements UiComponent {
                         .placeholder("bot, telescope, wand-sparkles, …")
                         .hint("Shown next to the agent in the list, the chat and the history"))
                 .field(UiField.textarea("systemPrompt", "System Prompt",
-                        isNew ? null : agent.systemPrompt())
+                        isNew ? null : definition.instructions())
                         .asEditable())
                 .field(UiField.text("welcomeMessage", "Welcome Message",
                         isNew ? null : agent.welcomeMessage())
                         .asEditable())
                 .field(UiField.select("llmConfigName", "LLM Config",
-                        isNew ? null : agent.llmConfigName(), llmOptions)
+                        isNew ? null : definition.modelSettings().model(), llmOptions)
                         .asEditable().asRequired())
                 .field(UiField.number("maxIterations", "Max Iterations",
-                        isNew ? 10 : agent.maxIterations())
+                        isNew ? 10 : definition.maxRounds())
                         .asEditable()
                         .hint("Maximum tool-call rounds per turn (defaults to 10, raise to 30+ for deep research)"))
                 .field(UiField.textarea("memoryConfig", "Memory (JSON)",
-                        isNew ? null : memoryConfigJson(agent))
+                        isNew ? null : memoryJson())
                         .asEditable()
-                        .hint("Memory strategy of this agent. \"kind\": summarizing_window "
-                                + "(default — summaries + tool-result compression; "
-                                + "\"compressToolResults\" is the on/off switch), "
-                                + "full, windowed, auto_compact, none. "
+                        .hint("How the history is fitted into the model's context. \"strategy\": window "
+                                + "(default — the newest turns that fit), compact (as window, what is left "
+                                + "out is summarised first), full, none. Also \"maxConversationRatio\" "
+                                + "(share of the context window, 0.8), \"maxMessages\" (window only), "
+                                + "\"summaryPlacement\": system_prompt or user_message. "
                                 + "Leave blank to keep the current setting"))
                 // Skills: the switch, then which of them. Empty is "all of
                 // them" — a skill added later is then in reach without
                 // touching every agent.
                 // Which skills the agent may load. The picker under the mode
                 // is shown for SPECIFIC only — the mode change swaps it in place.
-                .field(UiField.select(SKILLS_MODE, "Skills", skills.mode().name(), List.of(
+                .field(UiField.select(SKILLS_MODE, "Skills", skillsMode, List.of(
                                 UiField.Option.of("NONE", "None"),
                                 UiField.Option.of("ALL", "All skills"),
                                 UiField.Option.of("SPECIFIC", "Specific skills")))
@@ -171,30 +176,24 @@ public final class AgentFormComponent implements UiComponent {
                                 + "All: every skill the installation, the user and the project have, "
                                 + "one added later included. Specific: only the ones ticked below")
                         .onChange(UiTrigger.api("POST", skillsFieldUrl(), id())))
-                .field(skillsField(skills.mode(), skills.names()))
+                .field(skillsField(skillsMode, skillNames))
                 // The roster this agent delegates to — and the only thing
                 // that gives it run_agent and list_agents, so the hint says so.
                 // A checkbox per candidate: the roster is a set, its order says nothing.
                 .field(UiField.multiselect("callableAgents", "Callable Agents",
-                        isNew ? List.of() : agent.effectiveCallableAgents(), rosterOptions)
+                        roster, rosterOptions)
                         .asCheckboxes()
                         .asEditable()
                         .hint("The agents this one may hand work to. Naming any gives it run_agent, "
                                 + "run_agents and list_agents; naming none leaves it without"))
-                .field(UiField.bool("callableByAgents", "Callable by other agents",
-                        isNew || agent.mayBeCalledByAgents())
-                        .asEditable()
-                        .hint("Off for agents the runtime calls on its own, like a title generator "
-                                + "or a summarizer: they are not offered in any roster and "
-                                + "run_agent refuses them"))
                 // Checkboxes whose ticked rows move up and down: the reviewers
                 // run in the order they stand in.
                 .field(UiField.multiselect("responseReviewers", "Response Reviewers",
-                        isNew ? List.of() : agent.effectiveResponseReviewers(), reviewerOptions)
+                        reviewers, reviewerOptions)
                         .orderable()
                         .asEditable()
                         .hint("Agents that review and may rewrite the response, in order. "
-                                + "Offered: the agents in the '" + AgentDefinition.REVIEWER_GROUP
+                                + "Offered: the agents in the '" + AgentSetting.REVIEWER_GROUP
                                 + "' group — file an agent there to make it a candidate"))
                 .action(UiAction.primary("save", "Save").icon("save")
                         .onClick(isNew
@@ -225,38 +224,33 @@ public final class AgentFormComponent implements UiComponent {
      * agents are not offered, as in the chat's picker, and neither is the
      * agent itself.
      */
-    private List<UiField.Option> candidates(List<AgentDefinition> all,
-                                            java.util.function.Predicate<AgentDefinition> eligible,
+    private List<UiField.Option> candidates(java.util.function.Predicate<ManagedAgent> eligible,
                                             List<String> alreadyNamed) {
-        java.util.Set<String> existing = all.stream().map(AgentDefinition::name)
+        java.util.Set<String> existing = all.stream().map(other -> other.definition().name())
                 .collect(java.util.stream.Collectors.toSet());
         var names = new java.util.LinkedHashSet<String>();
         alreadyNamed.stream().filter(existing::contains).filter(n -> !isSelf(n)).forEach(names::add);
         all.stream()
-                .filter(other -> !isSelf(other.name()))
-                .filter(other -> other.status() != AgentDefinitionStatus.DEPRECATED)
+                .filter(other -> !isSelf(other.definition().name()))
+                .filter(other -> other.status() != ManagedAgent.Status.DEPRECATED)
                 .filter(eligible)
-                .map(AgentDefinition::name)
+                .map(other -> other.definition().name())
                 .sorted()
                 .forEach(names::add);
         return names.stream().map(n -> UiField.Option.of(n, n)).toList();
     }
 
     private boolean isSelf(String name) {
-        return agent != null && agent.name().equals(name);
+        return agent != null && definition.name().equals(name);
     }
 
     /** The form field carrying the skills mode. */
     public static final String SKILLS_MODE = "skillsMode";
 
-    /** The mode a form submitted, or ALL for anything it did not name. */
-    public static AgentDefinition.SkillsConfig.Mode skillsMode(String raw) {
-        if (raw == null || raw.isBlank()) return AgentDefinition.SkillsConfig.Mode.ALL;
-        try {
-            return AgentDefinition.SkillsConfig.Mode.valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            return AgentDefinition.SkillsConfig.Mode.ALL;
-        }
+    /** The mode a form submitted, or {@link AgentSetting#ALL} for anything it did not name. */
+    public static String skillsMode(String raw) {
+        String mode = raw == null ? "" : raw.trim().toUpperCase(java.util.Locale.ROOT);
+        return AgentSetting.NONE.equals(mode) || AgentSetting.SPECIFIC.equals(mode) ? mode : AgentSetting.ALL;
     }
 
     /** Where the mode select posts the form to get the picker re-rendered. */
@@ -270,7 +264,7 @@ public final class AgentFormComponent implements UiComponent {
      * more — hidden unless the mode is SPECIFIC, where it is the only thing
      * that decides. Hidden, it still submits, and the config drops the names.
      */
-    public UiField skillsField(AgentDefinition.SkillsConfig.Mode mode, List<String> ticked) {
+    public UiField skillsField(String mode, List<String> ticked) {
         List<String> picked = ticked == null ? List.of() : ticked;
         java.util.SortedSet<String> names = new java.util.TreeSet<>(picked);
         if (skillCatalog != null) {
@@ -281,19 +275,20 @@ public final class AgentFormComponent implements UiComponent {
                 .asCheckboxes()
                 .asEditable()
                 .hint("The skills this agent may load — none ticked is none");
-        return mode == AgentDefinition.SkillsConfig.Mode.SPECIFIC ? field : field.<UiField>hidden();
+        return AgentSetting.SPECIFIC.equals(mode) ? field : field.<UiField>hidden();
     }
 
     /**
-     * The EFFECTIVE memory config, serialised WITH its {@code kind} tag —
-     * pre-filling the field with the real current state (system default
-     * included) makes the knobs discoverable instead of doc-only knowledge.
+     * The memory setting the agent carries, or the one an agent that
+     * carries none gets — pre-filling the field with the real current state
+     * makes the knobs discoverable instead of doc-only knowledge.
      */
-    private String memoryConfigJson(AgentDefinition agent) {
+    private String memoryJson() {
+        Object memory = definition.metadata().get(MemoryPlugin.MEMORY);
         try {
-            return objectMapper.writerFor(MemoryConfig.class)
-                    .withDefaultPrettyPrinter()
-                    .writeValueAsString(agent.effectiveMemoryConfig());
+            return objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(memory instanceof java.util.Map<?, ?> ? memory
+                            : java.util.Map.of("strategy", "window"));
         } catch (Exception e) {
             return "";
         }

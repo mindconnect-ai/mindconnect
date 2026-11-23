@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.AgentListComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import java.util.List;
 import ai.mindconnect.ui.model.UiPage;
 
@@ -12,14 +12,14 @@ import ai.mindconnect.ui.model.UiPage;
  */
 public final class AgentListPage extends AdminPage {
 
-    private final List<AgentDefinition> agents;
+    private final List<ManagedAgent> agents;
     private final String query;
 
-    public AgentListPage(List<AgentDefinition> agents) {
+    public AgentListPage(List<ManagedAgent> agents) {
         this(agents, null);
     }
 
-    public AgentListPage(List<AgentDefinition> agents, String query) {
+    public AgentListPage(List<ManagedAgent> agents, String query) {
         this.agents = agents;
         this.query = query;
     }

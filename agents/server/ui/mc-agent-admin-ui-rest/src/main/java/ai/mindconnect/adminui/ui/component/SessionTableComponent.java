@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 
@@ -31,17 +31,17 @@ public final class SessionTableComponent implements UiComponent {
     private static final DateTimeFormatter DT_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 
-    private final AgentDefinition agent;
+    private final AgentId agent;
     private final String userId;
     private final AgentSessionRepository sessionRepository;
     private final SessionId selectedSessionId;
 
-    public SessionTableComponent(AgentDefinition agent, String userId,
+    public SessionTableComponent(AgentId agent, String userId,
                                   AgentSessionRepository sessionRepository) {
         this(agent, userId, sessionRepository, null);
     }
 
-    public SessionTableComponent(AgentDefinition agent, String userId,
+    public SessionTableComponent(AgentId agent, String userId,
                                   AgentSessionRepository sessionRepository,
                                   SessionId selectedSessionId) {
         this.agent = agent;
@@ -52,17 +52,17 @@ public final class SessionTableComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "session-table-" + agent.id().value();
+        return "session-table-" + agent.value();
     }
 
     @Override
     public UiTable render() {
         List<AgentSession> sessions = sessionRepository
-                .findByAgent(agent.id(), UserId.of(userId));
+                .findByAgent(agent, UserId.of(userId));
 
         var table = UiTable.of(id(), "Sessions").stackOnMobile(true)
                 .action(UiAction.primary("new-session", "New Session").icon("add")
-                        .onClick(trigger(on(ChatUiController.class).startSession(agent.id().value(), null))))
+                        .onClick(trigger(on(ChatUiController.class).startSession(agent.value(), null))))
                 .column(UiTable.Column.text("title", "Title").asSortable())
                 .column(UiTable.Column.text("status", "Status"))
                 .column(UiTable.Column.text("userId", "User"))
@@ -73,7 +73,7 @@ public final class SessionTableComponent implements UiComponent {
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this session?")
                         .onClick(trigger(on(AgentUiController.class)
-                                .deleteSession(agent.id().value(), ROW_ID.toString(), null))));
+                                .deleteSession(agent.value(), ROW_ID.toString(), null))));
 
         for (AgentSession s : sessions) {
             table.row(Map.of(

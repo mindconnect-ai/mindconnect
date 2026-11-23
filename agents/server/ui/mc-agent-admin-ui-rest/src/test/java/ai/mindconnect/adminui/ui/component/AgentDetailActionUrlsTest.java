@@ -1,7 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.AgentId;
@@ -28,10 +27,12 @@ class AgentDetailActionUrlsTest {
 
     private static final AgentId AGENT_ID = AgentId.of("11111111-2222-3333-4444-555555555555");
 
-    private static AgentDefinition agent() {
-        return new AgentDefinition(AGENT_ID, "Scout", "A test agent",
-                "assistants", "bot", "prompt", null, "cfg", 5, null,
-                AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null);
+    private static ManagedAgent agent() {
+        return new ManagedAgent(ai.mindconnect.agent.management.api.AgentId.of(AGENT_ID.value()),
+                new ai.mindconnect.agent.runtime.api.domain.AgentDefinition("Scout", "A test agent", "prompt",
+                        ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel("cfg"), List.of(), 5,
+                        java.util.Map.of()),
+                "assistants", "bot", null, ManagedAgent.Status.ACTIVE, null, null, 0);
     }
 
     /** Renders without a database: the detail header only asks for the session list. */
@@ -85,7 +86,7 @@ class AgentDetailActionUrlsTest {
      */
     @Test
     void theSessionTableReachesBothControllers() throws Exception {
-        String out = json(new SessionTableComponent(agent(), "u", NO_SESSIONS).render());
+        String out = json(new SessionTableComponent(AGENT_ID, "u", NO_SESSIONS).render());
 
         assertThat(out).contains("\"url\":\"/chat/api/agents/" + AGENT_ID.value() + "/sessions\"");
         assertThat(out).contains("\"url\":\"/chat/api/sessions/{id}\"");

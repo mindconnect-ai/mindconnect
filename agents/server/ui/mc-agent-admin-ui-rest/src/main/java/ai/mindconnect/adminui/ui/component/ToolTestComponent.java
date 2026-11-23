@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -36,13 +36,13 @@ public final class ToolTestComponent implements UiComponent {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
     private final String previousJson;
     private final ToolTestService.Result result;
 
-    public ToolTestComponent(AgentDefinition agent,
+    public ToolTestComponent(ManagedAgent agent,
                               AgentTool tool,
                               ToolRegistry toolRegistry,
                               String previousJson,

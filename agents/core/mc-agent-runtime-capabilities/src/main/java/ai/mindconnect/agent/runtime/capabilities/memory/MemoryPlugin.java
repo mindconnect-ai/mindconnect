@@ -47,6 +47,17 @@ public final class MemoryPlugin implements Plugin {
 
     private final SummaryStore summaries;
 
+    /**
+     * For whoever lets a person edit an agent's memory setting: refuses a
+     * setting no turn could run with, at the time it is saved instead of in
+     * the agent's next turn.
+     *
+     * @throws IllegalArgumentException for a strategy or a summary placement there is none of
+     */
+    public static void check(Map<String, Object> setting) {
+        MemoryConfig.of(setting);
+    }
+
     public MemoryPlugin(SummaryStore summaries) {
         this.summaries = summaries;
     }

@@ -54,7 +54,6 @@ final class RegistryToolResolver implements ToolResolver {
     public List<ToolDefinition> tools(AgentDefinition agent, Session session) {
         ToolCallScope scope = scope(agent, session);
         return agent.tools().stream()
-                .filter(ToolBinding::enabled)
                 .map(binding -> registry.resolve(agentTool(binding), scope))
                 .flatMap(Optional::stream)
                 .map(RegistryToolResolver::definition)
@@ -96,7 +95,7 @@ final class RegistryToolResolver implements ToolResolver {
                 binding.name(),
                 (String) metadata.get(DESCRIPTION),
                 metadata.get(OVERRIDES) instanceof Map<?, ?> overrides ? (Map<String, Object>) overrides : Map.of(),
-                binding.enabled(),
+                true,
                 binding.deferred(),
                 Boolean.TRUE.equals(metadata.get(PermissionPlugin.NEEDS_APPROVAL)),
                 metadata.get(MAX_RESULT_CHARS) instanceof Number limit ? limit.intValue() : null);

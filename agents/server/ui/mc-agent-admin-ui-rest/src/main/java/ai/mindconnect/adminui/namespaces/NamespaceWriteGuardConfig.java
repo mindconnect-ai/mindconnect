@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.namespaces;
 
+import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
@@ -55,6 +56,7 @@ public class NamespaceWriteGuardConfig {
             @Override
             public Object postProcessAfterInitialization(Object bean, String name) throws BeansException {
                 if (bean instanceof GuardedRepositories.Agents
+                        || bean instanceof GuardedRepositories.ManagedAgents
                         || bean instanceof GuardedRepositories.LlmConfigs
                         || bean instanceof GuardedRepositories.LlmPrices
                         || bean instanceof GuardedRepositories.Skills
@@ -64,6 +66,9 @@ public class NamespaceWriteGuardConfig {
                 }
                 if (bean instanceof AgentDefinitionRepository agents) {
                     return new GuardedRepositories.Agents(agents, guard());
+                }
+                if (bean instanceof AgentManagement managed) {
+                    return new GuardedRepositories.ManagedAgents(managed, guard());
                 }
                 if (bean instanceof LlmConfigRepository configs) {
                     return new GuardedRepositories.LlmConfigs(configs, guard());

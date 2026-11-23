@@ -11,35 +11,43 @@ import ai.mindconnect.adminui.ui.page.AgentFormPage;
 import ai.mindconnect.adminui.ui.page.AgentListPage;
 import ai.mindconnect.adminui.ui.page.ToolDetailPage;
 import ai.mindconnect.adminui.ui.page.ToolFormPage;
-import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.adminui.ui.component.AgentSetting;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentPatch;
-import ai.mindconnect.agent.runtime.domain.AgentSpec;
+import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
+import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.agent.starter.runtime.bridge.AgentDefinitionMapper;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
-import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
-import ai.mindconnect.common.StaleVersionException;
+import ai.mindconnect.common.DomainException;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.val;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 /**
  * The agent screens. Ids in paths are their plain values.
@@ -50,8 +58,11 @@ public class AgentUiController {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AgentRegistryService registryService;
-    private final AgentDefinitionRepository repository;
+    /** How often a change to an agent's tools is made again when another save came in between. */
+    private static final int ATTEMPTS = 3;
+
+    /** The runtime's: the pages keep no way of their own to the agents. */
+    private final AgentManagement agents;
     private final AgentSessionRepository sessionRepository;
     private final LlmConfigRepository llmConfigRepository;
     private final ToolRegistry toolRegistry;
@@ -64,8 +75,7 @@ public class AgentUiController {
     /** The "Memory" tab — what the agent keeps about its users; optional like the memory itself. */
     private final org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi;
 
-    public AgentUiController(AgentRegistryService registryService,
-                                AgentDefinitionRepository repository,
+    public AgentUiController(AgentRuntime runtime,
                                 AgentSessionRepository sessionRepository,
                                 LlmConfigRepository llmConfigRepository,
                                 ToolRegistry toolRegistry,
@@ -75,8 +85,7 @@ public class AgentUiController {
                                         ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog,
                                 org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi) {
         this.memoryUi = memoryUi;
-        this.registryService = registryService;
-        this.repository = repository;
+        this.agents = runtime.service(AgentManagement.class);
         this.sessionRepository = sessionRepository;
         this.llmConfigRepository = llmConfigRepository;
         this.toolRegistry = toolRegistry;
@@ -87,8 +96,7 @@ public class AgentUiController {
 
     @GetMapping
     public UiPage list(@RequestParam(required = false) String q) {
-        List<AgentDefinition> all = filterAgents(registryService.list(), q);
-        return new AgentListPage(all, q).render();
+        return new AgentListPage(filterAgents(agents.list(), q), q).render();
     }
 
     /** The search field posts its form here; the response is the filtered list. */
@@ -98,18 +106,23 @@ public class AgentUiController {
     }
 
     /** Case-insensitive contains on name and description. */
-    private static List<AgentDefinition> filterAgents(List<AgentDefinition> all, String q) {
+    private static List<ManagedAgent> filterAgents(List<ManagedAgent> all, String q) {
         if (q == null || q.isBlank()) return all;
         String needle = q.toLowerCase();
         return all.stream()
-                .filter(a -> (a.name() != null && a.name().toLowerCase().contains(needle))
-                        || (a.description() != null && a.description().toLowerCase().contains(needle)))
+                .filter(a -> a.definition().name().toLowerCase().contains(needle)
+                        || a.definition().description().toLowerCase().contains(needle))
                 .toList();
     }
 
     @GetMapping("/new")
     public UiPage newForm() {
-        return new AgentFormPage(null, llmConfigRepository, repository, objectMapper, skills()).render();
+        return form(null).render();
+    }
+
+    /** The form of an agent, or of a new one for {@code null}, with every agent there is to pick from. */
+    private AgentFormPage form(ManagedAgent agent) {
+        return new AgentFormPage(agent, llmConfigRepository, agents.list(), objectMapper, skills());
     }
 
     @GetMapping("/{id}")
@@ -117,36 +130,34 @@ public class AgentUiController {
                                          @RequestParam(required = false) String section,
                                          @RequestParam(required = false) String row,
                                          @AuthenticationPrincipal OidcUser user) {
-        AgentId id = AgentId.of(idValue);
         String userId = user.getPreferredUsername();
-        return registryService.find(id)
+        return agents.find(AgentId.of(idValue))
                 .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository, section, row)
                         .memoryTab(memoryTab(a)).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    private ai.mindconnect.ui.model.UiNode memoryTab(AgentDefinition agent) {
+    private ai.mindconnect.ui.model.UiNode memoryTab(ManagedAgent agent) {
         MemoryAdminUiController memory = memoryUi.getIfAvailable();
-        return memory == null ? null : memory.agentTab(agent).orElse(null);
+        return memory == null ? null : memory.agentTab(ai.mindconnect.agent.AgentId.of(agent.id().value()),
+                AgentSetting.tools(agent)).orElse(null);
     }
 
     @DeleteMapping("/{id}/sessions/{sessionId}")
     public ResponseEntity<UiPatch> deleteSession(@PathVariable("id") String idValue,
                                                  @PathVariable("sessionId") String sessionIdValue,
                                                  @AuthenticationPrincipal OidcUser user) {
-        AgentId id = AgentId.of(idValue);
         String userId = user.getPreferredUsername();
         sessionRepository.deleteById(SessionId.of(sessionIdValue));
-        return registryService.find(id)
+        return agents.find(AgentId.of(idValue))
                 .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository).refreshSessions()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}/edit")
     public ResponseEntity<UiPage> editForm(@PathVariable("id") String idValue) {
-        AgentId id = AgentId.of(idValue);
-        return registryService.find(id)
-                .map(a -> ResponseEntity.ok(new AgentFormPage(a, llmConfigRepository, repository, objectMapper, skills()).render()))
+        return agents.find(AgentId.of(idValue))
+                .map(a -> ResponseEntity.ok(form(a).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -154,29 +165,20 @@ public class AgentUiController {
     public ResponseEntity<UiPage> create(@RequestBody Map<String, Object> raw,
                                          @AuthenticationPrincipal OidcUser user) {
         var body = new FormBody(raw);
-        AgentSpec spec = new AgentSpec(
-                body.str("name"), body.str("description"),
-                body.str("systemPrompt"), body.str("welcomeMessage"),
-                body.str("llmConfigName"));
-        var agent = registryService.create(spec);
-        // responseReviewers, maxIterations, the roster and memoryConfig are
-        // applied as a follow-up patch (AgentSpec doesn't carry them yet).
-        // Default maxIterations = whatever create() picked (10).
-        AgentPatch patch = AgentPatch.of()
-                .withGroup(body.str("group"))
-                .withIcon(body.str("icon"))
-                .withMaxIterations(body.num("maxIterations", agent.maxIterations()))
-                .withResponseReviewers(body.strList("responseReviewers"))
-                .withCallableAgents(body.strList("callableAgents"))
-                .withCallableByAgents(Boolean.TRUE.equals(body.bool("callableByAgents")))
-                .withSkills(skillsFromForm(body));
+        String name = body.str("name");
+        if (name == null || name.isBlank()) {
+            throw DomainException.invalid("An agent needs a name");
+        }
+        ManagedAgent created;
         try {
-            patch = withMemoryConfig(patch, body);
+            created = agents.create(fromForm(ManagedAgent.of(new AgentDefinition(name, "", "",
+                    ModelSettings.NONE, List.of(), 10, Map.of())), body));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
-        val def = registryService.update(agent.id(), patch);
-        return detail(def.id().value(), null, null, user);
+        // Only now is there an id to write into the definition.
+        agents.update(created.id(), created.version(), AgentDefinitionMapper::written);
+        return detail(created.id().value(), null, null, user);
     }
 
     /**
@@ -189,64 +191,84 @@ public class AgentUiController {
                                     @AuthenticationPrincipal OidcUser user) {
         AgentId id = AgentId.of(idValue);
         var body = new FormBody(raw);
-        AgentDefinition existing = registryService.find(id).orElse(null);
+        ManagedAgent existing = agents.find(id).orElse(null);
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        AgentPatch patch = AgentPatch.of()
-                .withName(body.str("name"))
-                .withDescription(body.str("description"))
-                .withGroup(body.str("group"))
-                .withIcon(body.str("icon"))
-                .withSystemPrompt(body.str("systemPrompt"))
-                .withWelcomeMessage(body.str("welcomeMessage"))
-                .withLlmConfigName(body.str("llmConfigName"))
-                .withMaxIterations(body.num("maxIterations", existing.maxIterations()))
-                .withResponseReviewers(body.strList("responseReviewers"))
-                .withCallableAgents(body.strList("callableAgents"))
-                .withCallableByAgents(Boolean.TRUE.equals(body.bool("callableByAgents")))
-                .withSkills(skillsFromForm(body));
+        ManagedAgent changed;
         try {
-            patch = withMemoryConfig(patch, body);
+            changed = AgentDefinitionMapper.written(fromForm(existing, body));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
+        // A form without a version is one that checks nothing: it saves over what is stored now.
+        Long opened = VersionedForms.version(body);
         try {
-            val def = registryService.update(id, patch, VersionedForms.version(body));
-            return detail(def.id().value(), null, null, user);
-        } catch (StaleVersionException e) {
-            return ResponseEntity.ok(VersionedForms.changedMeanwhile("Agent '" + existing.name() + "'"));
+            agents.update(id, opened == null ? existing.version() : opened, stored -> changed);
+            return detail(idValue, null, null, user);
+        } catch (ConcurrentModificationException e) {
+            return ResponseEntity.ok(VersionedForms.changedMeanwhile("Agent '" + existing.definition().name() + "'"));
         }
     }
 
     /**
-     * The form's Memory (JSON) field: blank keeps the stored config, content
-     * must parse into a {@link MemoryConfig}
-     * (the {@code kind} tag picks the strategy, the record validates its
-     * ranges).
+     * The agent with what the form says. A field the form did not send is
+     * left as it is; the tools are not the form's.
      *
-     * @throws IllegalArgumentException on unparseable JSON or invalid values
+     * @throws IllegalArgumentException for a memory setting that is no JSON
+     *         object or names a strategy there is none of
      */
-    private AgentPatch withMemoryConfig(AgentPatch patch, FormBody body) {
+    private ManagedAgent fromForm(ManagedAgent agent, FormBody body) {
+        AgentDefinition stored = agent.definition();
+        Map<String, Object> metadata = new HashMap<>(stored.metadata());
+        metadata.put(SubAgentPlugin.SUB_AGENTS, body.strList("callableAgents"));
+        metadata.put(ResponseReviewPlugin.REVIEWERS, body.strList("responseReviewers"));
+        // Every skill is no entry at all, none is an empty list, and the ones ticked are the list.
+        switch (AgentFormComponent.skillsMode(body.str(AgentFormComponent.SKILLS_MODE))) {
+            case AgentSetting.NONE -> metadata.put(SkillPlugin.SKILLS, List.of());
+            case AgentSetting.SPECIFIC -> metadata.put(SkillPlugin.SKILLS, body.strList("skills"));
+            default -> metadata.remove(SkillPlugin.SKILLS);
+        }
+        memoryFromForm(body).ifPresent(memory -> metadata.put(MemoryPlugin.MEMORY, memory));
+        ModelSettings model = stored.modelSettings();
+        String llm = body.str("llmConfigName");
+        AgentDefinition definition = new AgentDefinition(
+                sent(body.str("name"), stored.name()),
+                sent(body.str("description"), stored.description()),
+                sent(body.str("systemPrompt"), stored.instructions()),
+                // The name of an LLM configuration is the model's name to the gateway.
+                llm == null ? model : new ModelSettings(llm.isBlank() ? null : llm, model.temperature(),
+                        model.maxOutputTokens(), model.reasoningEffort(), model.extra()),
+                stored.tools(),
+                body.num("maxIterations", stored.maxRounds()),
+                metadata);
+        String group = body.str("group");
+        String icon = body.str("icon");
+        return agent.withDefinition(definition).shownAs(
+                group == null ? agent.group() : AgentSetting.machineName(group),
+                icon == null ? agent.icon() : AgentSetting.machineName(icon),
+                sent(body.str("welcomeMessage"), agent.welcomeMessage()));
+    }
+
+    private static String sent(String value, String otherwise) {
+        return value == null ? otherwise : value;
+    }
+
+    /**
+     * The form's Memory (JSON) field: blank keeps the stored setting, content
+     * must be a JSON object the memory capability can read.
+     */
+    private Optional<Map<String, Object>> memoryFromForm(FormBody body) {
         String json = body.str("memoryConfig");
-        if (json == null || json.isBlank()) return patch;
+        if (json == null || json.isBlank()) return Optional.empty();
+        Map<String, Object> memory;
         try {
-            return patch.withMemoryConfig(objectMapper.readValue(json,
-                    MemoryConfig.class));
+            memory = objectMapper.readValue(json, new TypeReference<>() {});
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid memory config: " + e.getMessage(), e);
         }
-    }
-
-
-    /**
-     * The form's two skills fields: the mode, and the names that count only
-     * in SPECIFIC — the config drops them otherwise.
-     */
-    private static AgentDefinition.SkillsConfig skillsFromForm(FormBody body) {
-        return new AgentDefinition.SkillsConfig(
-                AgentFormComponent.skillsMode(body.str(AgentFormComponent.SKILLS_MODE)),
-                body.strList("skills"));
+        MemoryPlugin.check(memory);
+        return Optional.of(memory);
     }
 
     /**
@@ -258,9 +280,9 @@ public class AgentUiController {
     public UiPatch skillsField(@RequestParam(value = "id", required = false) String idValue,
                                @RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
-        AgentDefinition agent = idValue == null || idValue.isBlank() ? null
-                : registryService.find(AgentId.of(idValue)).orElse(null);
-        var form = new AgentFormComponent(agent, llmConfigRepository, repository, objectMapper, skills());
+        ManagedAgent agent = idValue == null || idValue.isBlank() ? null
+                : agents.find(AgentId.of(idValue)).orElse(null);
+        var form = new AgentFormComponent(agent, llmConfigRepository, agents.list(), objectMapper, skills());
         return UiPatch.of().patch(UiPatch.Operation.replace("skills",
                 form.skillsField(AgentFormComponent.skillsMode(body.str(AgentFormComponent.SKILLS_MODE)),
                         body.strList("skills"))));
@@ -274,20 +296,20 @@ public class AgentUiController {
     @PostMapping("/{id}/copy")
     public ResponseEntity<UiPage> copy(@PathVariable("id") String idValue) {
         AgentId id = AgentId.of(idValue);
-        return registryService.find(id)
-                .map(existing -> {
-                    var copy = registryService.copy(id);
-                    return ResponseEntity.ok(new AgentFormPage(copy, llmConfigRepository, repository, objectMapper, skills()).render());
-                })
-                .orElse(ResponseEntity.notFound().build());
+        if (agents.find(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        ManagedAgent copy = agents.copy(id);
+        // The copy is an agent of its own: its id in its definition, not the original's.
+        return ResponseEntity.ok(form(agents.update(copy.id(), copy.version(), AgentDefinitionMapper::written))
+                .render());
     }
 
     // ── Tool endpoints ──────────────────────────────────────────────────────
 
     @GetMapping("/{id}/tools/new")
     public ResponseEntity<UiPage> newToolForm(@PathVariable("id") String idValue) {
-        AgentId id = AgentId.of(idValue);
-        return registryService.find(id)
+        return agents.find(AgentId.of(idValue))
                 .map(a -> ResponseEntity.ok(new ToolFormPage(a, null, toolRegistry).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -295,8 +317,7 @@ public class AgentUiController {
     /** The form that adds tools by the set — a group, a subgroup, everything on a connection. */
     @GetMapping("/{id}/tools/new-group")
     public ResponseEntity<UiPage> newToolBundleForm(@PathVariable("id") String idValue) {
-        AgentId id = AgentId.of(idValue);
-        return registryService.find(id)
+        return agents.find(AgentId.of(idValue))
                 .map(a -> ResponseEntity.ok(new ToolBundleFormPage(a, bundles()).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -315,9 +336,9 @@ public class AgentUiController {
         List<String> names = bundles().expand(body.strList("bundles"));
         boolean needsApproval = Boolean.TRUE.equals(body.bool("needsApproval"));
         boolean deferred = Boolean.TRUE.equals(body.bool("deferred"));
-        return registryService.find(id)
+        return agents.find(id)
                 .map(a -> {
-                    registryService.updateTools(id, tools -> {
+                    updateTools(id, tools -> {
                         Set<String> present = new java.util.HashSet<>();
                         tools.forEach(t -> present.add(t.name()));
                         List<AgentTool> next = new ArrayList<>(tools);
@@ -335,7 +356,7 @@ public class AgentUiController {
     }
 
     private ToolBundles bundles() {
-        return ToolBundles.of(toolRegistry, name -> !AgentDefinition.DERIVED_TOOLS.contains(name));
+        return ToolBundles.of(toolRegistry, name -> !AgentSetting.DERIVED_TOOLS.contains(name));
     }
 
     @GetMapping("/{id}/tools/{toolId}")
@@ -343,10 +364,10 @@ public class AgentUiController {
                                            @PathVariable("toolId") String toolIdValue) {
         AgentId id = AgentId.of(idValue);
         AgentToolId toolId = AgentToolId.of(toolIdValue);
-        var agentOpt = registryService.find(id);
+        var agentOpt = agents.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
-        var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
+        var tool = AgentSetting.tools(a).stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
         if (tool == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(new ToolDetailPage(a, tool, toolRegistry).render());
     }
@@ -356,10 +377,10 @@ public class AgentUiController {
                                                @PathVariable("toolId") String toolIdValue) {
         AgentId id = AgentId.of(idValue);
         AgentToolId toolId = AgentToolId.of(toolIdValue);
-        var agentOpt = registryService.find(id);
+        var agentOpt = agents.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
-        var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
+        var tool = AgentSetting.tools(a).stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
         if (tool == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(new ToolFormPage(a, tool, toolRegistry).render());
     }
@@ -374,10 +395,10 @@ public class AgentUiController {
                                                   @PathVariable("toolId") String toolIdValue) {
         AgentId id = AgentId.of(idValue);
         AgentToolId toolId = AgentToolId.of(toolIdValue);
-        var agentOpt = registryService.find(id);
+        var agentOpt = agents.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
-        var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
+        var tool = AgentSetting.tools(a).stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
         if (tool == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(toolTestDialog(a, tool, null, null));
     }
@@ -393,14 +414,14 @@ public class AgentUiController {
                                                @RequestBody Map<String, Object> raw) {
         AgentId id = AgentId.of(idValue);
         AgentToolId toolId = AgentToolId.of(toolIdValue);
-        var agentOpt = registryService.find(id);
+        var agentOpt = agents.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
-        var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
+        var tool = AgentSetting.tools(a).stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
         if (tool == null) return ResponseEntity.notFound().build();
         var body = new FormBody(raw);
         String argsJson = body.str("arguments");
-        ToolTestService.Result result = toolTestService.test(a, tool, argsJson);
+        ToolTestService.Result result = toolTestService.test(tool, argsJson);
         return ResponseEntity.ok(toolTestDialog(a, tool, argsJson, result));
     }
 
@@ -410,7 +431,7 @@ public class AgentUiController {
      * open and replaces the modal in place on a re-render; a null close-href
      * just removes the overlay without navigating.
      */
-    private UiPatch toolTestDialog(AgentDefinition agent, AgentTool tool,
+    private UiPatch toolTestDialog(ManagedAgent agent, AgentTool tool,
                                    String previousJson,
                                    ToolTestService.Result result) {
         var component = new ToolTestComponent(agent, tool, toolRegistry, previousJson, result);
@@ -426,10 +447,10 @@ public class AgentUiController {
                                           @RequestBody Map<String, Object> raw,
                                           @AuthenticationPrincipal OidcUser user) {
         AgentId id = AgentId.of(idValue);
-        return registryService.find(id)
+        return agents.find(id)
                 .map(a -> {
                     AgentTool tool = toolFromBody(AgentToolId.random(), new FormBody(raw));
-                    registryService.updateTools(id, tools -> {
+                    updateTools(id, tools -> {
                         List<AgentTool> next = new ArrayList<>(tools);
                         next.add(tool);
                         return next;
@@ -446,10 +467,10 @@ public class AgentUiController {
                                              @AuthenticationPrincipal OidcUser user) {
         AgentId id = AgentId.of(idValue);
         AgentToolId toolId = AgentToolId.of(toolIdValue);
-        return registryService.find(id)
+        return agents.find(id)
                 .map(a -> {
                     AgentTool updated = toolFromBody(toolId, new FormBody(raw));
-                    registryService.updateTools(id, tools -> tools.stream()
+                    updateTools(id, tools -> tools.stream()
                             .map(t -> t.id().equals(toolId) ? updated : t)
                             .toList());
                     return detail(idValue, "tools", toolId.value(), user);
@@ -464,15 +485,30 @@ public class AgentUiController {
         AgentId id = AgentId.of(idValue);
         AgentToolId toolId = AgentToolId.of(toolIdValue);
         String userId = user.getPreferredUsername();
-        return registryService.find(id)
+        return agents.find(id)
                 .map(a -> {
-                    registryService.updateTools(id, tools -> tools.stream()
+                    ManagedAgent updated = updateTools(id, tools -> tools.stream()
                             .filter(t -> !t.id().equals(toolId)).toList());
-                    return registryService.find(id)
-                            .map(updated -> ResponseEntity.ok(new AgentDetailPage(updated, userId, sessionRepository).refreshTools()))
-                            .orElse(ResponseEntity.<UiPatch>notFound().build());
+                    return ResponseEntity.ok(new AgentDetailPage(updated, userId, sessionRepository).refreshTools());
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Replaces the agent's tools with what {@code change} makes of the stored
+     * list — adding, editing or removing one tool without dropping a tool
+     * that was added meanwhile. {@code change} may run more than once.
+     */
+    private ManagedAgent updateTools(AgentId id, UnaryOperator<List<AgentTool>> change) {
+        for (int attempt = 1; ; attempt++) {
+            ManagedAgent read = agents.find(id).orElseThrow(() -> DomainException.notFound("Agent", id.value()));
+            try {
+                return agents.update(id, read.version(), stored -> AgentDefinitionMapper.written(
+                        AgentSetting.withTools(stored, change.apply(AgentSetting.tools(stored)))));
+            } catch (ConcurrentModificationException e) {
+                if (attempt >= ATTEMPTS) throw e;
+            }
+        }
     }
 
     /** The tool the form describes, under {@code toolId} — a fresh id for a new tool. */
@@ -501,7 +537,6 @@ public class AgentUiController {
             overrides = new java.util.LinkedHashMap<>(overrides);
             overrides.put("tool", builtin);
         }
-        boolean enabled = Boolean.TRUE.equals(body.bool("enabled"));
         boolean deferred = Boolean.TRUE.equals(body.bool("deferred"));
         boolean needsApproval = Boolean.TRUE.equals(body.bool("needsApproval"));
         // Blank/invalid → null → no per-tool cap (the runtime safety cap still applies).
@@ -514,18 +549,18 @@ public class AgentUiController {
             } catch (NumberFormatException ignored) {
             }
         }
-        return new AgentTool(toolId, name, body.str("description"), overrides, enabled, deferred,
+        // A tool an agent names is one it may use: there is no switching one off, only removing it.
+        return new AgentTool(toolId, name, body.str("description"), overrides, true, deferred,
                 needsApproval, maxResultChars);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<UiPage> delete(@PathVariable("id") String idValue) {
         AgentId id = AgentId.of(idValue);
-        return registryService.find(id)
+        return agents.find(id)
                 .map(existing -> {
-                    registryService.delete(id);
-                    List<AgentDefinition> all = registryService.list();
-                    return ResponseEntity.ok(new AgentListPage(all).render());
+                    agents.delete(id);
+                    return ResponseEntity.ok(new AgentListPage(agents.list()).render());
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

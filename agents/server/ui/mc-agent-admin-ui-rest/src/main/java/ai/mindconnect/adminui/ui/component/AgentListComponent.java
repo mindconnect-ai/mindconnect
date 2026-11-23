@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 
@@ -25,7 +25,7 @@ import java.util.Map;
 /**
  * Top-level list of agents: a search field, per-row Chat / Copy / Delete
  * actions and a header "New Agent" action, with the rows filed under their
- * {@link AgentDefinition#group()} the same way the tool catalog files tools
+ * {@link ManagedAgent#group()} the same way the tool catalog files tools
  * under theirs.
  *
  * <p>No pagination. The list is short by design — a handful of assistants, the
@@ -41,16 +41,16 @@ public final class AgentListComponent implements UiComponent {
      * the runtime calls on its own. Anything else follows, alphabetically.
      */
     private static final List<String> GROUP_ORDER = List.of("assistants", "sub-agents", "utilities",
-            AgentDefinition.REVIEWER_GROUP);
+            AgentSetting.REVIEWER_GROUP);
 
-    private final List<AgentDefinition> agents;
+    private final List<ManagedAgent> agents;
     private final String query;
 
-    public AgentListComponent(List<AgentDefinition> agents) {
+    public AgentListComponent(List<ManagedAgent> agents) {
         this(agents, null);
     }
 
-    public AgentListComponent(List<AgentDefinition> agents, String query) {
+    public AgentListComponent(List<ManagedAgent> agents, String query) {
         this.agents = agents;
         this.query = query;
     }
@@ -92,10 +92,10 @@ public final class AgentListComponent implements UiComponent {
             return list;
         }
 
-        for (Map.Entry<String, List<AgentDefinition>> e : byGroup().entrySet()) {
+        for (Map.Entry<String, List<ManagedAgent>> e : byGroup().entrySet()) {
             String gid = "agent-group-" + e.getKey().toLowerCase().replaceAll("\\W+", "-");
             var groupList = UiList.of(gid + "-list", "");
-            for (AgentDefinition a : e.getValue()) {
+            for (ManagedAgent a : e.getValue()) {
                 groupList.item(row(a));
             }
             // Closed by default, like the tool catalog: the rubrics are the
@@ -112,25 +112,25 @@ public final class AgentListComponent implements UiComponent {
     }
 
     /** Agents by rubric: the seeded order first, then any other rubric alphabetically. */
-    private Map<String, List<AgentDefinition>> byGroup() {
-        Map<String, List<AgentDefinition>> byGroup = new LinkedHashMap<>();
+    private Map<String, List<ManagedAgent>> byGroup() {
+        Map<String, List<ManagedAgent>> byGroup = new LinkedHashMap<>();
         agents.stream()
                 .sorted(Comparator
-                        .comparingInt((AgentDefinition a) -> {
-                            int i = GROUP_ORDER.indexOf(a.groupOrDefault());
+                        .comparingInt((ManagedAgent a) -> {
+                            int i = GROUP_ORDER.indexOf(AgentSetting.group(a));
                             return i < 0 ? GROUP_ORDER.size() : i;
                         })
-                        .thenComparing(AgentDefinition::groupOrDefault)
-                        .thenComparing(a -> a.name() == null ? "" : a.name(),
+                        .thenComparing(AgentSetting::group)
+                        .thenComparing(a -> a.definition().name(),
                                 String.CASE_INSENSITIVE_ORDER))
-                .forEach(a -> byGroup.computeIfAbsent(a.groupOrDefault(), g -> new ArrayList<>()).add(a));
+                .forEach(a -> byGroup.computeIfAbsent(AgentSetting.group(a), g -> new ArrayList<>()).add(a));
         return byGroup;
     }
 
-    private static UiList.Item row(AgentDefinition a) {
-        return UiList.Item.of(a.id().value(), a.name())
+    private static UiList.Item row(ManagedAgent a) {
+        return UiList.Item.of(a.id().value(), a.definition().name())
                 .labelNode(headerNode(a))
-                .description(a.description())
+                .description(a.definition().description())
                 .href("/admin/agents/" + a.id().value())
                 // Straight into a conversation: starts a fresh session
                 // with this agent and lands on its chat page.
@@ -139,7 +139,7 @@ public final class AgentListComponent implements UiComponent {
                 .action(UiAction.secondary("copy", "Copy").icon("copy")
                         .onClick(trigger(on(AgentUiController.class).copy(a.id().value()))))
                 .action(UiAction.danger("delete", "Delete").icon("delete")
-                        .confirm("Delete agent '" + a.name() + "'?")
+                        .confirm("Delete agent '" + a.definition().name() + "'?")
                         .onClick(trigger(on(AgentUiController.class).delete(a.id().value()))));
     }
 
@@ -149,8 +149,8 @@ public final class AgentListComponent implements UiComponent {
      * class; the whole header is a horizontal {@link UiStack} so name and badge
      * sit on one line. When no config is set, just the plain name node.
      */
-    private static UiStack headerNode(AgentDefinition a) {
-        var name = UiText.of("agent-name-" + a.id().value(), a.name())
+    private static UiStack headerNode(ManagedAgent a) {
+        var name = UiText.of("agent-name-" + a.id().value(), a.definition().name())
                 .<UiText>withCssClass("agent-name");
         var stack = UiStack.of("agent-head-" + a.id().value())
                 .direction(UiStack.Direction.HORIZONTAL)
@@ -158,9 +158,9 @@ public final class AgentListComponent implements UiComponent {
                 .<UiStack>withCssClass("agent-head")
                 // The item's own icon slot goes unrendered once a labelNode
                 // takes over the label, so the icon rides in the node itself.
-                .child(UiIcon.of("agent-icon-" + a.id().value(), a.iconOrDefault()))
+                .child(UiIcon.of("agent-icon-" + a.id().value(), AgentSetting.icon(a)))
                 .child(name);
-        String llm = a.llmConfigName();
+        String llm = a.definition().modelSettings().model();
         if (llm != null && !llm.isBlank()) {
             stack.child(UiText.of("agent-llm-" + a.id().value(), llm)
                     .<UiText>withCssClass("agent-llm-badge"));

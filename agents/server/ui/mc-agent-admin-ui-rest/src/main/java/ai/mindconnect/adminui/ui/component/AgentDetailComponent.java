@@ -1,13 +1,16 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
+import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -33,7 +36,9 @@ import ai.mindconnect.agent.tool.AgentToolId;
  */
 public final class AgentDetailComponent implements UiComponent {
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
+    /** What the runtime runs: name, model, tools, and in its metadata what the capabilities read. */
+    private final AgentDefinition definition;
     private final String userId;
     private final AgentSessionRepository sessionRepository;
     private final String initialSection;
@@ -41,15 +46,16 @@ public final class AgentDetailComponent implements UiComponent {
     /** The "Memory" tab — what this agent keeps about its users; null leaves it out. */
     private UiNode memoryTab;
 
-    public AgentDetailComponent(AgentDefinition agent, String userId,
+    public AgentDetailComponent(ManagedAgent agent, String userId,
                                  AgentSessionRepository sessionRepository) {
         this(agent, userId, sessionRepository, null, null);
     }
 
-    public AgentDetailComponent(AgentDefinition agent, String userId,
+    public AgentDetailComponent(ManagedAgent agent, String userId,
                                  AgentSessionRepository sessionRepository,
                                  String initialSection, String selectedRowId) {
         this.agent = agent;
+        this.definition = agent.definition();
         this.userId = userId;
         this.sessionRepository = sessionRepository;
         this.initialSection = initialSection;
@@ -78,18 +84,19 @@ public final class AgentDetailComponent implements UiComponent {
                 ? SessionId.of(selectedRowId) : null;
 
         var toolTable    = new ToolTableComponent(agent, selectedToolId).render();
-        var sessionTable = new SessionTableComponent(agent, userId, sessionRepository, selectedSessId).render();
+        var sessionTable = new SessionTableComponent(ai.mindconnect.agent.AgentId.of(agent.id().value()), userId,
+                sessionRepository, selectedSessId).render();
 
         // The section's own title is a plain string — the renderer escapes it,
         // so an icon cannot go in it. A header-only UiList draws the same bar
         // the agent list and the workflow detail page carry, and that one does
         // take an icon. The section then goes untitled: with the bar above it,
         // a title would say the agent's name twice in a row.
-        var header = UiList.of(id() + "-header", agent.name()).icon(agent.iconOrDefault());
+        var header = UiList.of(id() + "-header", definition.name()).icon(AgentSetting.icon(agent));
 
         var section = UiSection.of(id(), null)
                 .section("details",  "Details", details)
-                .section("tools",    "Tools (" + agent.tools().size() + ")", toolTable)
+                .section("tools",    "Tools (" + definition.tools().size() + ")", toolTable)
                 .section("sessions", "Sessions", sessionTable);
         if (memoryTab != null) section.section("memory", "Memory", memoryTab);
         if (initialSection != null) section.initialSection(initialSection);
@@ -98,24 +105,22 @@ public final class AgentDetailComponent implements UiComponent {
     }
 
     private UiDetail buildDetailsTab() {
-        return UiDetail.of("agent-detail-" + agent.id().value(), agent.name())
-                .field(UiField.text("name", "Name", agent.name()))
-                .field(UiField.text("description", "Description", agent.description()))
+        return UiDetail.of("agent-detail-" + agent.id().value(), definition.name())
+                .field(UiField.text("name", "Name", definition.name()))
+                .field(UiField.text("description", "Description", definition.description()))
                 // Capitalised like the list heading it corresponds to — this
                 // view only reads. The edit form shows the stored machine name.
                 .field(UiField.text("group", "Group",
-                        ToolCatalogComponent.displayGroup(agent.groupOrDefault())))
+                        ToolCatalogComponent.displayGroup(AgentSetting.group(agent))))
                 // The name only. UiDetail does not draw a field's icon, and
                 // the header above the tabs already shows the symbol itself.
-                .field(UiField.text("icon", "Icon", agent.iconOrDefault()))
+                .field(UiField.text("icon", "Icon", AgentSetting.icon(agent)))
                 .field(UiField.text("callableAgents", "Callable Agents", callableAgentsSummary()))
                 .field(UiField.text("skills", "Skills", skillsSummary()))
-                .field(UiField.text("callableByAgents", "Callable by other agents",
-                        agent.mayBeCalledByAgents() ? "yes" : "no"))
-                .field(UiField.text("llmConfigName", "LLM Config", agent.llmConfigName()))
+                .field(UiField.text("llmConfigName", "LLM Config", definition.modelSettings().model()))
                 .field(UiField.text("status", "Status",
                         agent.status() != null ? agent.status().name() : null))
-                .field(UiField.number("maxIterations", "Max Iterations", agent.maxIterations()))
+                .field(UiField.number("maxIterations", "Max Iterations", definition.maxRounds()))
                 .field(UiField.text("memory", "Memory", memorySummary()))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
                         .onClick(trigger(on(AgentUiController.class).editForm(agent.id().value()))))
@@ -123,34 +128,29 @@ public final class AgentDetailComponent implements UiComponent {
                 // a link squeezed between the buttons just read as a third,
                 // differently-styled action.
                 .action(UiAction.danger("delete", "Delete").icon("delete")
-                        .confirm("Delete agent '" + agent.name() + "'?")
+                        .confirm("Delete agent '" + definition.name() + "'?")
                         .onClick(trigger(on(AgentUiController.class).delete(agent.id().value()))));
     }
 
     /** Which skills the agent may load: none, all, or the ones named. */
     private String skillsSummary() {
-        var skills = agent.skillsOrDefault();
-        return switch (skills.mode()) {
-            case NONE -> "none";
-            case ALL -> "all skills";
-            case SPECIFIC -> skills.names().isEmpty() ? "none picked" : String.join(", ", skills.names());
+        return switch (AgentSetting.skillsMode(definition)) {
+            case AgentSetting.NONE -> "none";
+            case AgentSetting.ALL -> "all skills";
+            default -> String.join(", ", AgentSetting.names(definition, SkillPlugin.SKILLS));
         };
     }
 
     /** The roster, or the word for having none — which means no other agent. */
     private String callableAgentsSummary() {
-        var roster = agent.effectiveCallableAgents();
+        var roster = AgentSetting.names(definition, SubAgentPlugin.SUB_AGENTS);
         return roster.isEmpty() ? "none" : String.join(", ", roster);
     }
 
-    /** The effective strategy kind, plus the compression switch where it exists. */
+    /** The strategy the agent names, or the one an agent that names none gets. */
     private String memorySummary() {
-        var config = agent.effectiveMemoryConfig();
-        if (config instanceof SummarizingWindowConfig sw) {
-            return config.kind() + " (tool-result compression "
-                    + (sw.compressToolResults() ? "on" : "off") + ")";
-        }
-        return config.kind();
+        return definition.metadata().get(MemoryPlugin.MEMORY) instanceof java.util.Map<?, ?> memory
+                && memory.get("strategy") != null ? String.valueOf(memory.get("strategy")) : "window (default)";
     }
 
     /** Whether a deep-linked row is a well-formed id value; anything else selects nothing. */

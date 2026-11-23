@@ -50,13 +50,13 @@ public record AgentDefinition(
         return new AgentDefinition(name, description, instructions, settings, tools, maxRounds, metadata);
     }
 
-    /** Whether the agent may use the tool now, offered at once or not. */
+    /** Whether the agent may use the tool at all, offered at once or not. */
     public boolean uses(String toolName) {
         return binding(toolName).isPresent();
     }
 
-    /** How this agent uses the tool; empty when it does not name it or has it switched off. */
+    /** How this agent uses the tool; empty when it does not name it. */
     public Optional<ToolBinding> binding(String toolName) {
-        return tools.stream().filter(tool -> tool.name().equals(toolName)).filter(ToolBinding::enabled).findFirst();
+        return tools.stream().filter(tool -> tool.name().equals(toolName)).findFirst();
     }
 }

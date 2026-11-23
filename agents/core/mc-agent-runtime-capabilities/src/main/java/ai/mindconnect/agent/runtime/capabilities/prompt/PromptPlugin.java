@@ -77,7 +77,7 @@ public final class PromptPlugin implements Plugin {
         variables.put("current_datetime", local.toInstant().toString());
         variables.put("current_time", TIME_OF_DAY.format(local));
         variables.put("time_zone", local.getZone().getId());
-        variables.put("tools", agent.tools().stream().filter(tool -> tool.enabled())
+        variables.put("tools", agent.tools().stream()
                 .map(tool -> Map.of("name", tool.name(),
                         "description", tool.metadata().get("description") instanceof String text ? text : ""))
                 .toList());

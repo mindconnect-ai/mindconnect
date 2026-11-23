@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -31,11 +31,11 @@ public final class ToolDetailComponent implements UiComponent {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
 
-    public ToolDetailComponent(AgentDefinition agent, AgentTool tool, ToolRegistry toolRegistry) {
+    public ToolDetailComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
@@ -70,7 +70,6 @@ public final class ToolDetailComponent implements UiComponent {
                 .field(UiField.text("name",        "Name",        tool.name()))
                 .field(UiField.text("description", "Description", tool.description()))
                 .field(UiField.textarea("overrides", "Overrides (JSON)", overridesJson))
-                .field(UiField.text("enabled",     "Enabled",     tool.enabled() ? "Yes" : "No"))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
                         .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id().value(), tool.id().value()))))
                 .action(UiAction.secondary("test", "Test").icon("flash")

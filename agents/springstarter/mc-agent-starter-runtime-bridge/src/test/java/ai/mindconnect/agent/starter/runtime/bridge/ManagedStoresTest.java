@@ -80,9 +80,7 @@ class ManagedStoresTest {
         ManagedAgent managed = managedAgents.find(
                 ai.mindconnect.agent.management.api.AgentId.of(LIBRARIAN.id().value())).orElseThrow();
         assertThat(managed.definition().name()).isEqualTo("librarian");
-        assertThat(managed.definition().tools()).extracting(binding -> binding.name())
-                .containsExactly("search_catalog", "switched_off");
-        assertThat(managed.definition().uses("switched_off")).isFalse();
+        assertThat(managed.definition().tools()).extracting(binding -> binding.name()).containsExactly("search_catalog");
         assertThat(managed.group()).isEqualTo("assistants");
         // What the runtime's definition has no place for comes back too: the tool switched off, the reviewers.
         AgentDefinition read = agents.findById(LIBRARIAN.id()).orElseThrow();
