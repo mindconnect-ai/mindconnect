@@ -57,12 +57,14 @@ public final class LlmChatModelGateway implements ModelGateway {
 
     private final LlmChat chat;
     private final ObjectMapper json;
+    private final LlmCallTraceListener traces;
     /** The calls underway, each with the handle that closes its connection. */
     private final Map<TurnId, Cancellation> inFlight = new ConcurrentHashMap<>();
 
-    public LlmChatModelGateway(LlmChat chat, ObjectMapper json) {
+    public LlmChatModelGateway(LlmChat chat, ObjectMapper json, LlmCallTraceListener traces) {
         this.chat = chat;
         this.json = json;
+        this.traces = traces;
     }
 
     @Override
@@ -71,7 +73,8 @@ public final class LlmChatModelGateway implements ModelGateway {
         inFlight.put(request.turnId(), cancellation);
         StreamedAnswer answer = new StreamedAnswer(request.turnId().value(), events);
         try {
-            chat.chatStreaming(llmRequest(request), answer::accept, cancellation);
+            chat.chatStreaming(llmRequest(request), answer::accept, cancellation,
+                    event -> traces.onCall(request.turnId(), event));
         } catch (RuntimeException e) {
             // A closed connection surfaces as a failed call; for a call that
             // was told to stop it is the expected end, and what arrived

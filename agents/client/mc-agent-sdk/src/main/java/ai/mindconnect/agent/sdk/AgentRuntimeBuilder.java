@@ -35,6 +35,7 @@ import ai.mindconnect.agent.runtime.capabilities.toolsearch.InMemoryToolActivati
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolSearchPlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.LoggingTraceSink;
 import ai.mindconnect.agent.runtime.capabilities.trace.TracePlugin;
+import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmGatewayModelPlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
@@ -76,7 +77,7 @@ public final class AgentRuntimeBuilder {
 
     /** The model, through the LLM gateway. */
     public AgentRuntimeBuilder model(LlmChat chat) {
-        this.model = new LlmGatewayModelPlugin(chat);
+        this.model = new LlmGatewayModelPlugin(chat, LlmCallTraceListener.NONE);
         return this;
     }
 

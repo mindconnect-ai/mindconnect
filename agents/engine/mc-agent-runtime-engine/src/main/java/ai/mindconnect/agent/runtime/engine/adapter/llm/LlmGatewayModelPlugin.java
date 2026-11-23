@@ -11,9 +11,12 @@ import ai.mindconnect.plugin.PluginRegistry;
 public final class LlmGatewayModelPlugin implements Plugin {
 
     private final LlmChat chat;
+    private final LlmCallTraceListener traces;
 
-    public LlmGatewayModelPlugin(LlmChat chat) {
+    /** @param traces who hears every provider call; {@link LlmCallTraceListener#NONE} for nobody */
+    public LlmGatewayModelPlugin(LlmChat chat, LlmCallTraceListener traces) {
         this.chat = chat;
+        this.traces = traces;
     }
 
     @Override
@@ -23,6 +26,6 @@ public final class LlmGatewayModelPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
-        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat, new ObjectMapper()));
+        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat, new ObjectMapper(), traces));
     }
 }
