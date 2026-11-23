@@ -5,11 +5,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import ai.mindconnect.agent.chat.stream.SessionFrame;
-import ai.mindconnect.agent.chat.stream.SessionFrameChannels;
-import ai.mindconnect.agent.chat.stream.StreamAttachment;
-import ai.mindconnect.agent.chat.stream.TurnFrame;
-import ai.mindconnect.agent.chat.stream.TurnFrameTranslator;
+import ai.mindconnect.agentrest.stream.SessionFrame;
+import ai.mindconnect.agentrest.stream.SessionFrameChannels;
+import ai.mindconnect.agentrest.stream.StreamAttachment;
+import ai.mindconnect.agentrest.stream.TurnFrame;
+import ai.mindconnect.agentrest.stream.TurnFrameTranslator;
 import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;

@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.chat.stream;
+package ai.mindconnect.agentrest.stream;
 
 import ai.mindconnect.channel.Subscription;
 

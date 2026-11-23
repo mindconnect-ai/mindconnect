@@ -34,11 +34,11 @@ final class OpenApprovalRecorder {
 
     private final ToolApprovalRepository approvals;
     private final Supplier<SessionStore> sessions;
-    private final ChatStreams streams;
+    private final UserEventFeed streams;
     private final ObjectMapper json = new ObjectMapper();
 
     /** @param streams where the user's clients hear that a question was answered */
-    OpenApprovalRecorder(ToolApprovalRepository approvals, Supplier<SessionStore> sessions, ChatStreams streams) {
+    OpenApprovalRecorder(ToolApprovalRepository approvals, Supplier<SessionStore> sessions, UserEventFeed streams) {
         this.approvals = approvals;
         this.sessions = sessions;
         this.streams = streams;

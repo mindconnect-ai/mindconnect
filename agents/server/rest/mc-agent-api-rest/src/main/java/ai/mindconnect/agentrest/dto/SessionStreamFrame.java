@@ -6,5 +6,5 @@ package ai.mindconnect.agentrest.dto;
  * is what a client hands back as {@code afterSeq} on reconnect; {@code
  * turnId}/{@code run} let it filter one turn out of the shared stream.
  */
-public record SessionStreamFrame(long seq, String turnId, int run, ai.mindconnect.agent.chat.stream.TurnFrame event) {
+public record SessionStreamFrame(long seq, String turnId, int run, ai.mindconnect.agentrest.stream.TurnFrame event) {
 }

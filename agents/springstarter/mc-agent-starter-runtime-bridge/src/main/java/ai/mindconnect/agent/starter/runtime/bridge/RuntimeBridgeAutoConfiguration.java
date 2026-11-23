@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
-import ai.mindconnect.agent.chat.stream.SessionFrameChannels;
 import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.management.api.SessionCleanup;
@@ -62,8 +61,8 @@ public class RuntimeBridgeAutoConfiguration {
 
     @Bean
     OpenApprovalRecorder openApprovalRecorder(ToolApprovalRepository approvals, ObjectProvider<SessionStore> sessions,
-                                              ChatStreams chatStreams) {
-        return new OpenApprovalRecorder(approvals, sessions::getObject, chatStreams);
+                                              UserEventFeed userFeed) {
+        return new OpenApprovalRecorder(approvals, sessions::getObject, userFeed);
     }
 
     @Bean
@@ -76,7 +75,7 @@ public class RuntimeBridgeAutoConfiguration {
     @Bean
     Plugin applicationSourcePlugin(AgentDefinitionRepository agents, AgentDefinitionMapper mapper,
                                    SkillRepository skills, ToolRegistry tools, OpenApprovalRecorder openApprovals,
-                                   ChatStreams chatStreams) {
+                                   UserEventFeed userFeed) {
         return new Plugin() {
             @Override
             public String name() {
@@ -95,7 +94,7 @@ public class RuntimeBridgeAutoConfiguration {
                 // Heard and not hooked in before or after: a call the permission check stops is still heard.
                 registry.listen(RuntimeHook.TOOL_CALL, openApprovals::called);
                 registry.listen(RuntimeHook.TURN_END, (context, turn) -> openApprovals.ended(context));
-                registry.contribute(SessionEventListener.class, chatStreams);
+                registry.contribute(SessionEventListener.class, userFeed);
             }
         };
     }
@@ -176,17 +175,9 @@ public class RuntimeBridgeAutoConfiguration {
         return new RepositoryLlmCallTraceListener(traces, turns::getObject, sessions::getObject);
     }
 
-    /** After the runtime's own services: it calls them. */
-    /** The stream of a session a client reconnects to, fed from every turn of the runtime. */
     @Bean
-    @ConditionalOnMissingBean
-    SessionFrameChannels sessionFrameChannels() {
-        return SessionFrameChannels.standalone();
-    }
-
-    @Bean
-    ChatStreams chatStreams(SessionFrameChannels sessionFrames, UserChannels userChannels,
-                            ObjectProvider<TurnService> turns, ObjectProvider<SessionStore> sessions) {
-        return new ChatStreams(sessionFrames, userChannels, turns::getObject, sessions::getObject);
+    UserEventFeed userEventFeed(UserChannels userChannels, ObjectProvider<TurnService> turns,
+                                ObjectProvider<SessionStore> sessions) {
+        return new UserEventFeed(userChannels, turns::getObject, sessions::getObject);
     }
 }

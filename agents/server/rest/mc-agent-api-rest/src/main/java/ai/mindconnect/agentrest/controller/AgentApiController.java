@@ -16,7 +16,7 @@ import ai.mindconnect.agentrest.dto.AttachedFrame;
 import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agentrest.dto.IncompleteFrame;
-import ai.mindconnect.agent.chat.stream.TurnFrame;
+import ai.mindconnect.agentrest.stream.TurnFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
