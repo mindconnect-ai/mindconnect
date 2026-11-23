@@ -1,0 +1,4 @@
+ai.mindconnect.workflow.admin.ui.WorkflowAdminUiController has more than 30 methods
+ai.mindconnect.workflow.execution.BaseStepContainerInstance has more than 30 methods
+ai.mindconnect.workflow.execution.WorkflowContext has more than 30 methods
+ai.mindconnect.workflow.swing.ui.WorkflowDesignerFrame has more than 30 methods

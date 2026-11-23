@@ -1,0 +1,8 @@
+package ai.mindconnect.workflow.admin.run depends on ai.mindconnect.workflow.admin.ui, which leads back to it
+package ai.mindconnect.workflow.admin.service depends on ai.mindconnect.workflow.admin.run, which leads back to it
+package ai.mindconnect.workflow.admin.ui depends on ai.mindconnect.workflow.admin.run, which leads back to it
+package ai.mindconnect.workflow.admin.ui depends on ai.mindconnect.workflow.admin.service, which leads back to it
+package ai.mindconnect.workflow.execution depends on ai.mindconnect.workflow.scripting, which leads back to it
+package ai.mindconnect.workflow.scripting depends on ai.mindconnect.workflow.execution, which leads back to it
+package ai.mindconnect.workflow.swing.step depends on ai.mindconnect.workflow.swing.ui, which leads back to it
+package ai.mindconnect.workflow.swing.ui depends on ai.mindconnect.workflow.swing.step, which leads back to it
