@@ -1,11 +1,17 @@
 package ai.mindconnect.agent.runtime.engine.adapter.store;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
@@ -22,28 +28,42 @@ import ai.mindconnect.message.domain.ParticipantType;
  * back. A turn message is what a turn needs of a message; the stored one
  * also says who sent it, when, and where it stands in the conversation.
  *
- * <p>The text goes into the message's content. Everything a turn message
- * holds beyond text — media parts, tool calls — goes into two metadata
- * entries of its own, so it comes back exactly as it was written.
+ * <p>It is written the way the message repository has always held a
+ * conversation, so whatever reads conversations there — a chat page built
+ * from history, an export — reads these too, and a conversation written
+ * before this runtime existed can be continued: a tool call is JSON with
+ * its {@code toolCalls} and the model's {@code thinkingBlocks}, a tool
+ * result JSON with its {@code result}; the ids pairing them are metadata,
+ * which a turn message carries under the same keys.
  */
 final class SessionMessageMapper {
 
+    /** Metadata of a stored message that says more than text: its media parts, exactly as written. */
     private static final String CONTENT = "turn.content";
-    private static final String TOOL_CALLS = "turn.toolCalls";
+    /** Metadata of a turn message: the thinking the model wants handed back with its tool calls. */
+    private static final String THINKING_BLOCKS = "llm.thinkingBlocks";
     /** The sender of what an agent wrote in a session that names no agent. */
     private static final String UNNAMED_AGENT = "agent";
+    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() { };
 
     private final TurnMessageConverter turnMessages = new TurnMessageConverter();
+    private final ObjectMapper json = new ObjectMapper();
 
+    /**
+     * The conversation a session's messages are in: the one its metadata
+     * names, else one under the session's own id. A session that continues
+     * a conversation begun elsewhere names it.
+     */
     static ConversationId conversationOf(Session session) {
-        return ConversationId.of(session.id().value());
+        return ConversationId.of(session.metadata().get(RepositorySessionStore.CONVERSATION_ID) instanceof String id
+                ? id : session.id().value());
     }
 
     Message message(Session session, TurnMessage written, int sequenceNumber) {
-        Map<String, Object> json = turnMessages.toJson(written);
         Map<String, Object> metadata = new LinkedHashMap<>(written.metadata());
-        metadata.put(CONTENT, json.get("content"));
-        metadata.put(TOOL_CALLS, json.get("toolCalls"));
+        if (written.content().stream().anyMatch(part -> !(part instanceof ContentPart.Text))) {
+            metadata.put(CONTENT, turnMessages.toJson(written).get("content"));
+        }
         boolean fromUser = written.type() == TurnMessage.Type.USER;
         return compressedAsItsMetadataSays(new Message(MessageId.random(), conversationOf(session),
                 fromUser ? session.userId().value()
@@ -55,15 +75,40 @@ final class SessionMessageMapper {
                     case TOOL_DISPATCHED -> MessageType.TOOL_DISPATCHED;
                     case TOOL_RESULT -> MessageType.TOOL_RESULT;
                 },
-                written.text(), metadata, sequenceNumber, Instant.now(), false, null, null, null, null,
+                content(written), metadata, sequenceNumber, Instant.now(), false, null, null, null, null,
                 written.turnId() == null ? null : ChatTurnId.of(written.turnId()), null, null));
+    }
+
+    private String content(TurnMessage written) {
+        return switch (written.type()) {
+            case TOOL_CALL -> {
+                Map<String, Object> content = new LinkedHashMap<>();
+                content.put("toolCalls", written.toolCalls().stream().map(call -> {
+                    Map<String, Object> entry = new LinkedHashMap<>();
+                    entry.put("id", call.callId());
+                    entry.put("name", call.name());
+                    entry.put("arguments", call.arguments());
+                    return entry;
+                }).toList());
+                if (written.metadata().containsKey(THINKING_BLOCKS)) {
+                    content.put("thinkingBlocks", written.metadata().get(THINKING_BLOCKS));
+                }
+                yield written(content);
+            }
+            case TOOL_RESULT -> written(Map.of(
+                    "toolCallId", String.valueOf(written.metadata().get("callId")),
+                    "toolName", String.valueOf(written.metadata().getOrDefault("toolName", "")),
+                    "result", written.text()));
+            default -> written.text();
+        };
     }
 
     /** The stored message with other metadata of the turn message; what it holds beyond text stays. */
     Message withTurnMetadata(Message stored, Map<String, Object> turnMetadata) {
         Map<String, Object> metadata = new LinkedHashMap<>(turnMetadata);
-        metadata.put(CONTENT, stored.metadata().get(CONTENT));
-        metadata.put(TOOL_CALLS, stored.metadata().get(TOOL_CALLS));
+        if (stored.metadata().containsKey(CONTENT)) {
+            metadata.put(CONTENT, stored.metadata().get(CONTENT));
+        }
         return compressedAsItsMetadataSays(stored.withMetadata(metadata));
     }
 
@@ -78,6 +123,7 @@ final class SessionMessageMapper {
     }
 
     /** Empty for a message no turn wrote: a note of the system, an approval of the earlier runtime. */
+    @SuppressWarnings("unchecked")
     Optional<TurnMessage> turnMessage(Message stored) {
         Optional<TurnMessage.Type> type = switch (stored.type()) {
             case CHAT -> Optional.of(stored.senderType() == ParticipantType.USER
@@ -89,17 +135,62 @@ final class SessionMessageMapper {
         };
         return type.map(turnType -> {
             Map<String, Object> metadata = new LinkedHashMap<>(stored.metadata());
-            Map<String, Object> json = new LinkedHashMap<>();
-            json.put("id", stored.id().value());
-            json.put("turnId", stored.turnId() == null ? null : stored.turnId().value());
-            json.put("type", turnType.name());
-            json.put("content", metadata.containsKey(CONTENT) ? metadata.remove(CONTENT) : List.of());
-            json.put("toolCalls", metadata.containsKey(TOOL_CALLS) ? metadata.remove(TOOL_CALLS) : List.of());
             if (stored.compressed() && stored.compressedContent() != null) {
                 metadata.put(SessionStore.COMPRESSED, stored.compressedContent());
             }
-            json.put("metadata", metadata);
-            return turnMessages.fromJson(json);
+            String turnId = stored.turnId() == null ? null : stored.turnId().value();
+            String text = stored.content() == null ? "" : stored.content();
+            return switch (turnType) {
+                case TOOL_CALL -> new TurnMessage(stored.id().value(), turnId, turnType, List.of(),
+                        toolCalls(read(text)), metadata);
+                case TOOL_RESULT -> new TurnMessage(stored.id().value(), turnId, turnType,
+                        List.of(new ContentPart.Text(String.valueOf(read(text).getOrDefault("result", text)))),
+                        List.of(), metadata);
+                case TOOL_DISPATCHED -> new TurnMessage(stored.id().value(), turnId, turnType, List.of(), List.of(),
+                        metadata);
+                case USER, ASSISTANT -> {
+                    Map<String, Object> message = new LinkedHashMap<>();
+                    message.put("id", stored.id().value());
+                    message.put("turnId", turnId);
+                    message.put("type", turnType.name());
+                    message.put("content", metadata.containsKey(CONTENT)
+                            ? metadata.remove(CONTENT) : List.of(Map.of("kind", "text", "text", text)));
+                    message.put("toolCalls", List.of());
+                    message.put("metadata", metadata);
+                    yield turnMessages.fromJson(message);
+                }
+            };
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<TurnMessage.ToolCall> toolCalls(Map<String, Object> content) {
+        List<TurnMessage.ToolCall> calls = new ArrayList<>();
+        if (content.get("toolCalls") instanceof List<?> stored) {
+            for (Object entry : stored) {
+                Map<String, Object> call = (Map<String, Object>) entry;
+                calls.add(new TurnMessage.ToolCall(String.valueOf(call.get("id")), String.valueOf(call.get("name")),
+                        call.get("arguments") instanceof Map<?, ?> arguments
+                                ? (Map<String, Object>) arguments : Map.of()));
+            }
+        }
+        return calls;
+    }
+
+    private String written(Map<String, Object> content) {
+        try {
+            return json.writeValueAsString(content);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("A message's content cannot be written as JSON", e);
+        }
+    }
+
+    /** The content as JSON; an empty object for content that is none — a result stored as plain text reads as its text. */
+    private Map<String, Object> read(String content) {
+        try {
+            return json.readValue(content, JSON_OBJECT);
+        } catch (JsonProcessingException e) {
+            return Map.of();
+        }
     }
 }

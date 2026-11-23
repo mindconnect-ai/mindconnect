@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -16,6 +17,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
@@ -26,6 +29,13 @@ import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageType;
+import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.message.port.out.MessageRepository;
 
 /** The same store over both kinds of repository: what goes in comes back as it was. */
 class RepositorySessionStoreTest {
@@ -67,6 +77,34 @@ class RepositorySessionStoreTest {
         assertThat(stored).extracting(TurnMessage::id).doesNotContainNull().doesNotHaveDuplicates();
         assertThat(store.messages(ID)).isEqualTo(stored);
         assertThat(stored).usingRecursiveFieldByFieldElementComparatorIgnoringFields("id").isEqualTo(written);
+    }
+
+    @Test
+    void messages_are_stored_the_way_the_message_repository_has_always_held_a_conversation() {
+        MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
+        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages);
+        // A session that continues a conversation begun before it: the conversation's id is not its own.
+        Session session = new Session(SessionId.of("s3"), UserId.of("ada"), null, null,
+                Map.of(RepositorySessionStore.CONVERSATION_ID, "c9"), Instant.EPOCH);
+        store.create(session);
+        ConversationId conversation = ConversationId.of("c9");
+        // What the earlier runtime left there: a result as JSON, paired to its call by metadata.
+        messages.append(conversation, sequence -> Message.of(conversation, "ada", ParticipantType.USER,
+                MessageType.CHAT, "An earlier question", sequence));
+
+        store.append(session.id(), List.of(
+                TurnMessage.toolCalls(List.of(new TurnMessage.ToolCall("c1", "bash", Map.of("command", "ls")))),
+                TurnMessage.toolResult("c1", "bash", "a.png", false)));
+
+        List<Message> stored = messages.findByConversation(conversation, new PageRequest(0, 10));
+        assertThat(stored).extracting(Message::type)
+                .containsExactly(MessageType.CHAT, MessageType.TOOL_CALL, MessageType.TOOL_RESULT);
+        assertThat(stored.get(1).content())
+                .isEqualTo("{\"toolCalls\":[{\"id\":\"c1\",\"name\":\"bash\",\"arguments\":{\"command\":\"ls\"}}]}");
+        assertThat(stored.get(1).metadata()).containsEntry("callIds", List.of("c1"));
+        assertThat(stored.get(2).content()).contains("\"toolCallId\":\"c1\"", "\"result\":\"a.png\"");
+        assertThat(store.messages(session.id())).extracting(TurnMessage::text)
+                .containsExactly("An earlier question", "", "a.png");
     }
 
     @ParameterizedTest

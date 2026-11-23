@@ -21,6 +21,7 @@ import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.port.out.MessageRepository;
 
@@ -32,6 +33,18 @@ import ai.mindconnect.message.port.out.MessageRepository;
  * Postgres; the runtime keeps no messages of its own.
  */
 public final class RepositorySessionStore implements SessionStore {
+
+    /**
+     * The key in a session's metadata that names the conversation its
+     * messages are in, where that is not the one under the session's own
+     * id: a session that continues a conversation begun elsewhere.
+     */
+    public static final String CONVERSATION_ID = "conversationId";
+
+    /** The conversation in the message repository that holds a session's messages. */
+    public static ConversationId conversationOf(Session session) {
+        return SessionMessageMapper.conversationOf(session);
+    }
 
     private static final PageRequest EVERYTHING = new PageRequest(0, Integer.MAX_VALUE);
 
