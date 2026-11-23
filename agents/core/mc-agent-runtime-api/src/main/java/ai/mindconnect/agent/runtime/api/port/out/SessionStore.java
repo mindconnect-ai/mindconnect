@@ -20,7 +20,12 @@ import ai.mindconnect.agent.runtime.api.domain.TurnId;
  */
 public interface SessionStore {
 
-    void save(Session session);
+    /**
+     * Keeps a new session.
+     *
+     * @throws IllegalStateException if a session of that id exists already
+     */
+    void create(Session session);
 
     Optional<Session> find(SessionId sessionId);
 

@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import ai.mindconnect.agent.cli.local.file.FileApprovalMemory;
-import ai.mindconnect.agent.cli.local.file.FileSessionStore;
 import ai.mindconnect.agent.cli.local.file.FileSourcePlugin;
 import ai.mindconnect.agent.cli.local.file.FileAgentResolver;
 import ai.mindconnect.agent.cli.local.file.HarnessDirectories;
@@ -18,8 +17,10 @@ import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.sdk.AgentRuntimeBuilder;
 import ai.mindconnect.plugin.Plugin;
@@ -35,6 +36,9 @@ public final class LocalRuntime {
 
     /** The agent used when none is named: enough to look around a project and change it. */
     public static final String DEFAULT_AGENT = "assistant";
+
+    /** One user on one machine: everything the harness keeps is in one namespace. */
+    private static final String NAMESPACE = "default";
 
     private static final AgentDefinition BUILT_IN = new AgentDefinition(DEFAULT_AGENT,
             "A coding assistant working in the project directory.",
@@ -54,8 +58,10 @@ public final class LocalRuntime {
     public AgentRuntimeBuilder builder() {
         ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
         HarnessDirectories directories = new HarnessDirectories(home);
-        FileSessionStore sessions = new FileSessionStore(home.resolve(".mc").resolve("sessions"), json);
+        NamespaceProvider namespaces = NamespaceProvider.fixed(NAMESPACE);
+        SessionStore sessions = RepositorySessionStore.onFiles(home.resolve(".mc").resolve("data"), json, namespaces);
         return AgentRuntime.builder()
+                .namespaces(namespaces)
                 .sessionStore(provides("session-store-file", registry ->
                         registry.provide(SessionStore.class, () -> sessions)))
                 .approvalMemory(new FileApprovalMemory(() -> sessions, directories, json))

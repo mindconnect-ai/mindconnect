@@ -40,6 +40,22 @@
             <artifactId>mc-llm-gateway</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Where sessions keep their messages: the message repository, in memory or on files. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-message-repository-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-message-repository</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-repo</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>

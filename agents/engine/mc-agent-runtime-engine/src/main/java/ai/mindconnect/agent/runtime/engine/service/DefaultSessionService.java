@@ -35,7 +35,7 @@ public final class DefaultSessionService implements SessionService {
     public Session open(SessionSpec spec) {
         Session session = new Session(newId(), spec.userId(), spec.parentId(),
                 spec.agent(), spec.metadata(), Instant.now());
-        sessions.save(session);
+        sessions.create(session);
         return session;
     }
 
@@ -79,7 +79,7 @@ public final class DefaultSessionService implements SessionService {
     private Session copyOf(Session source, SessionId parentId) {
         Session copy = new Session(newId(), source.userId(), parentId, source.agent(),
                 source.metadata(), Instant.now());
-        sessions.save(copy);
+        sessions.create(copy);
         List<TurnMessage> said = wholeTurns(sessions.messages(source.id()));
         if (!said.isEmpty()) {
             sessions.append(copy.id(), said);

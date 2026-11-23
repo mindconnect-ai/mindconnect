@@ -95,7 +95,7 @@ class NamespaceIsolationTest {
         turns = registry.get(TurnService.class);
         for (String namespace : List.of("a", "b")) {
             in(namespace, () -> {
-                registry.get(SessionStore.class).save(new Session(SAME_ID, UserId.of("ada"), null, LEAD,
+                registry.get(SessionStore.class).create(new Session(SAME_ID, UserId.of("ada"), null, LEAD,
                         Map.of(), Instant.EPOCH));
                 return null;
             });
