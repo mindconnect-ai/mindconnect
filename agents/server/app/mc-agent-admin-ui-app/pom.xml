@@ -120,6 +120,12 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-runtime</artifactId>
         </dependency>
+        <!-- The runtime on the plugin kernel, beside the earlier one until the chat has moved over. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-bridge</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-file</artifactId>
