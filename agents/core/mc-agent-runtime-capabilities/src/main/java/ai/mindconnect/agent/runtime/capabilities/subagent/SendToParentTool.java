@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 import ai.mindconnect.agent.loop.domain.ContentPart;
-import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
@@ -55,7 +54,7 @@ final class SendToParentTool implements Tool {
             TurnId turnId = turns.get().submit(new TurnRequest(session.parentId(),
                     List.of(new ContentPart.Text("[Message from sub-session " + session.id().value() + "]\n"
                             + message)),
-                    null, ModelSettings.NONE));
+                    null));
             return ToolOutput.ok("The message was delivered; the other session answers it in turn "
                     + turnId.value() + ".");
         } catch (IllegalArgumentException e) {

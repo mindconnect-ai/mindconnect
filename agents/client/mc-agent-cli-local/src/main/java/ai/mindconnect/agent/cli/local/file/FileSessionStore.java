@@ -17,11 +17,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.runtime.engine.service.AgentDefinitionConverter;
 import ai.mindconnect.agent.runtime.engine.service.TurnMessageConverter;
 
 /**
@@ -37,6 +37,7 @@ public final class FileSessionStore implements SessionStore {
     private final Path sessionsDirectory;
     private final ObjectMapper json;
     private final TurnMessageConverter messages = new TurnMessageConverter();
+    private final AgentDefinitionConverter agents = new AgentDefinitionConverter();
 
     public FileSessionStore(Path sessionsDirectory, ObjectMapper json) {
         this.sessionsDirectory = sessionsDirectory;
@@ -49,8 +50,7 @@ public final class FileSessionStore implements SessionStore {
         content.put("id", session.id().value());
         content.put("userId", session.userId().value());
         content.put("parentId", session.parentId() == null ? null : session.parentId().value());
-        content.put("defaultAgent", session.defaultAgent());
-        content.put("modelSettings", modelSettingsToJson(session.modelSettings()));
+        content.put("agent", session.agent() == null ? null : agents.toJson(session.agent()));
         content.put("metadata", session.metadata());
         content.put("createdAt", session.createdAt().toString());
         try {
@@ -73,8 +73,7 @@ public final class FileSessionStore implements SessionStore {
                     sessionId,
                     UserId.of((String) content.get("userId")),
                     content.get("parentId") == null ? null : SessionId.of((String) content.get("parentId")),
-                    (String) content.get("defaultAgent"),
-                    modelSettingsFromJson((Map<String, Object>) content.get("modelSettings")),
+                    content.get("agent") instanceof Map<?, ?> agent ? agents.fromJson((Map<String, Object>) agent) : null,
                     (Map<String, Object>) content.get("metadata"),
                     Instant.parse((String) content.get("createdAt"))));
         } catch (IOException e) {
@@ -129,25 +128,5 @@ public final class FileSessionStore implements SessionStore {
 
     private Path messagesFile(SessionId sessionId) {
         return folder(sessionId).resolve("messages.jsonl");
-    }
-
-    private static Map<String, Object> modelSettingsToJson(ModelSettings settings) {
-        Map<String, Object> content = new LinkedHashMap<>();
-        content.put("model", settings.model());
-        content.put("temperature", settings.temperature());
-        content.put("maxOutputTokens", settings.maxOutputTokens());
-        content.put("reasoningEffort", settings.reasoningEffort());
-        content.put("extra", settings.extra());
-        return content;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static ModelSettings modelSettingsFromJson(Map<String, Object> content) {
-        return new ModelSettings(
-                (String) content.get("model"),
-                content.get("temperature") instanceof Number temperature ? temperature.doubleValue() : null,
-                content.get("maxOutputTokens") instanceof Number limit ? limit.intValue() : null,
-                (String) content.get("reasoningEffort"),
-                (Map<String, Object>) content.get("extra"));
     }
 }

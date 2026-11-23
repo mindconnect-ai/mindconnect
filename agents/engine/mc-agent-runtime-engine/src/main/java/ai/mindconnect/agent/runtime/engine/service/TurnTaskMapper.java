@@ -10,11 +10,8 @@ import java.util.Set;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.loop.domain.Usage;
-import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
-import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
@@ -38,10 +35,11 @@ final class TurnTaskMapper {
 
     static final String TYPE = "turn";
 
+    private static final AgentDefinitionConverter AGENTS = new AgentDefinitionConverter();
+
     private static final String SESSION_ID = "sessionId";
     private static final String USER_MESSAGE = "userMessage";
     private static final String AGENT = "agent";
-    private static final String MODEL_SETTINGS = "modelSettings";
     /** Payload: the turn of the same session this one has to wait for; absent for the first. */
     private static final String AFTER = "after";
 
@@ -76,7 +74,7 @@ final class TurnTaskMapper {
         payload.put(NamespaceBoundWorker.NAMESPACE, namespace);
         payload.put(SESSION_ID, turn.sessionId().value());
         payload.put(USER_MESSAGE, MESSAGES.toJson(accepted.userMessage()));
-        payload.put(AGENT, agentToJson(turn.agent()));
+        payload.put(AGENT, AGENTS.toJson(turn.agent()));
         return TaskSubmission.of(TYPE, payload).withId(turn.id().value());
     }
 
@@ -127,7 +125,7 @@ final class TurnTaskMapper {
         SessionId sessionId = SessionId.of((String) task.payload().get(SESSION_ID));
         List<Interruption> interruptions = interruptions(task);
         return new Turn(turnId, sessionId,
-                agentFromJson((Map<String, Object>) task.payload().get(AGENT)),
+                AGENTS.fromJson((Map<String, Object>) task.payload().get(AGENT)),
                 status(task, interruptions),
                 interruptions,
                 task.state().get(OUTCOME) instanceof Map<?, ?> outcome
@@ -184,50 +182,6 @@ final class TurnTaskMapper {
     }
 
     // ── values as data ──────────────────────────────────────────────────────
-
-    private static Map<String, Object> agentToJson(AgentDefinition agent) {
-        Map<String, Object> json = new LinkedHashMap<>();
-        json.put("name", agent.name());
-        json.put("description", agent.description());
-        json.put("instructions", agent.instructions());
-        json.put(MODEL_SETTINGS, settingsToJson(agent.modelSettings()));
-        json.put("tools", agent.tools().stream()
-                .map(tool -> Map.<String, Object>of("name", tool.name(), "deferred", tool.deferred())).toList());
-        json.put("maxRounds", agent.maxRounds());
-        json.put("metadata", agent.metadata());
-        return json;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static AgentDefinition agentFromJson(Map<String, Object> json) {
-        return new AgentDefinition((String) json.get("name"), (String) json.get("description"),
-                (String) json.get("instructions"),
-                settingsFromJson((Map<String, Object>) json.get(MODEL_SETTINGS)),
-                ((List<Map<String, Object>>) json.get("tools")).stream()
-                        .map(tool -> new ToolBinding((String) tool.get("name"), Boolean.TRUE.equals(tool.get("deferred"))))
-                        .toList(),
-                ((Number) json.get("maxRounds")).intValue(),
-                json.get("metadata") instanceof Map<?, ?> metadata ? (Map<String, Object>) metadata : Map.of());
-    }
-
-    private static Map<String, Object> settingsToJson(ModelSettings settings) {
-        Map<String, Object> json = new LinkedHashMap<>();
-        json.put("model", settings.model());
-        json.put("temperature", settings.temperature());
-        json.put("maxOutputTokens", settings.maxOutputTokens());
-        json.put("reasoningEffort", settings.reasoningEffort());
-        json.put("extra", settings.extra());
-        return json;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static ModelSettings settingsFromJson(Map<String, Object> json) {
-        return new ModelSettings((String) json.get("model"),
-                json.get("temperature") instanceof Number temperature ? temperature.doubleValue() : null,
-                json.get("maxOutputTokens") instanceof Number limit ? limit.intValue() : null,
-                (String) json.get("reasoningEffort"),
-                (Map<String, Object>) json.get("extra"));
-    }
 
     private static TurnOutcome outcomeFromJson(Map<String, Object> json) {
         return new TurnOutcome(

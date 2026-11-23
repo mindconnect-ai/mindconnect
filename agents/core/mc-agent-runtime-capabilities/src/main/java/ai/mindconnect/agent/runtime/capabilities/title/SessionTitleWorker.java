@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import ai.mindconnect.agent.loop.domain.LlmAnswer;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
@@ -57,7 +58,7 @@ final class SessionTitleWorker implements BackgroundWorker {
                 .limit(2)
                 .toList();
         LlmAnswer answer = model.get().ask(new ModelRequest(TurnId.of(NAME + "-" + sessionId.value()),
-                session.modelSettings(), INSTRUCTIONS, exchange, List.of()), event -> { });
+                session.agent() == null ? ModelSettings.NONE : session.agent().modelSettings(), INSTRUCTIONS, exchange, List.of()), event -> { });
         String title = answer.messages().stream().map(TurnMessage::text).findFirst().orElse("").strip();
         if (title.isEmpty()) {
             return;
@@ -65,7 +66,7 @@ final class SessionTitleWorker implements BackgroundWorker {
         Map<String, Object> metadata = new HashMap<>(session.metadata());
         metadata.put(TITLE, title);
         sessions.get().save(new Session(session.id(), session.userId(), session.parentId(),
-                session.defaultAgent(), session.modelSettings(), metadata, session.createdAt()));
+                session.agent(), metadata, session.createdAt()));
         // A list of sessions on screen wants the title when it is there, not at the next reload.
         events.get().publish(new SessionEvent.Notice(sessionId, null, TITLE_FOUND, Map.of(TITLE, title)));
     }

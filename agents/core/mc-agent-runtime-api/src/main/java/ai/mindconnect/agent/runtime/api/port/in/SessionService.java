@@ -26,7 +26,7 @@ public interface SessionService {
      * A new session that starts where this one stands: with everything said
      * so far, and from then on on its own — what is said in either is not
      * seen in the other. It is the same kind of session as its source: the
-     * same user, agent, settings and metadata, under the same parent.
+     * same user, agent and metadata, under the same parent.
      *
      * <p>A turn of the source that is still underway is not taken along. A
      * conversation that ends in the middle of a tool call cannot be

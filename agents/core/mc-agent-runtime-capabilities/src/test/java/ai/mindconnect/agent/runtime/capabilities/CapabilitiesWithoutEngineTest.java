@@ -49,8 +49,8 @@ import org.junit.jupiter.api.Test;
  */
 class CapabilitiesWithoutEngineTest {
 
-    private static final Session SESSION = new Session(SessionId.of("s1"), UserId.of("ada"), null, "lead",
-            ModelSettings.NONE, Map.of(), Instant.EPOCH);
+    private static final Session SESSION = new Session(SessionId.of("s1"), UserId.of("ada"), null, null,
+            Map.of(), Instant.EPOCH);
     private static final AgentDefinition RESEARCHER = new AgentDefinition("researcher", "Looks things up.",
             "You research.", ModelSettings.NONE, List.of(), 5, Map.of());
     private static final AgentDefinition LEAD = new AgentDefinition("lead", "Leads.", "You lead.",

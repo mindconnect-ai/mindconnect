@@ -16,7 +16,6 @@ import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.hook.TurnAdmission;
 import ai.mindconnect.agent.runtime.api.hook.TurnInput;
-import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.ModelSettingsResolver;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 
@@ -32,14 +31,12 @@ final class TurnAcceptor {
     record Accepted(Turn turn, TurnMessage userMessage) { }
 
     private final SessionStore sessions;
-    private final AgentResolver agents;
     private final Supplier<List<ModelSettingsResolver>> modelSettings;
     private final HookRunner hooks;
 
-    TurnAcceptor(SessionStore sessions, AgentResolver agents,
+    TurnAcceptor(SessionStore sessions,
                  Supplier<List<ModelSettingsResolver>> modelSettings, HookRunner hooks) {
         this.sessions = sessions;
-        this.agents = agents;
         this.modelSettings = modelSettings;
         this.hooks = hooks;
     }
@@ -56,26 +53,26 @@ final class TurnAcceptor {
         TurnRequest request = ((TurnAdmission.Admitted) admission).request();
         AgentDefinition agent = agentOf(request, session);
         Turn turn = new Turn(TurnId.of(UUID.randomUUID().toString()), session.id(),
-                agent.withModelSettings(modelSettingsOf(request, session, agent)),
+                agent.withModelSettings(modelSettingsOf(session, agent)),
                 TurnStatus.QUEUED, List.of(), null, null);
         return new Accepted(turn, TurnMessage.user(request.input()));
     }
 
     /** The request's agent, else the session's; a turn without either cannot run. */
-    private AgentDefinition agentOf(TurnRequest request, Session session) {
-        String agentName = request.agentName() != null ? request.agentName() : session.defaultAgent();
-        if (agentName == null) {
-            throw new IllegalArgumentException(
-                    "The request names no agent and session " + session.id().value() + " has no default");
+    private static AgentDefinition agentOf(TurnRequest request, Session session) {
+        if (request.agent() != null) {
+            return request.agent();
         }
-        return agents.resolve(agentName, session).orElseThrow(() ->
-                new IllegalArgumentException("There is no agent " + agentName));
+        if (session.agent() == null) {
+            throw new IllegalArgumentException(
+                    "The request brings no agent and session " + session.id().value() + " has none");
+        }
+        return session.agent();
     }
 
-    /** The layers laid over each other, strongest first: request, session, agent, then what the resolvers add. */
-    private ModelSettings modelSettingsOf(TurnRequest request, Session session, AgentDefinition agent) {
-        List<ModelSettings> layers = new ArrayList<>(
-                List.of(request.modelSettings(), session.modelSettings(), agent.modelSettings()));
+    /** The layers laid over each other, strongest first: the agent's, then what the resolvers add. */
+    private ModelSettings modelSettingsOf(Session session, AgentDefinition agent) {
+        List<ModelSettings> layers = new ArrayList<>(List.of(agent.modelSettings()));
         modelSettings.get().forEach(resolver -> layers.addAll(resolver.layers(session)));
         ModelSettings effective = ModelSettings.NONE;
         for (ModelSettings layer : layers.reversed()) {

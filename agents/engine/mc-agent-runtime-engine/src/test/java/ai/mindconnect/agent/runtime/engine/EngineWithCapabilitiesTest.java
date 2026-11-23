@@ -155,7 +155,7 @@ class EngineWithCapabilitiesTest {
         registry.start();
         sessions = registry.get(SessionService.class);
         turns = registry.get(TurnService.class);
-        session = sessions.open(new SessionSpec(UserId.of("ada"), null, "lead", ModelSettings.NONE, Map.of()));
+        session = sessions.open(new SessionSpec(UserId.of("ada"), null, LEAD, Map.of()));
     }
 
     @AfterEach
@@ -250,17 +250,15 @@ class EngineWithCapabilitiesTest {
                 "operator".equals(name) ? Optional.of(new AgentDefinition("operator", "Runs commands.",
                         "You operate.", ModelSettings.NONE, ToolBinding.allOf("bash"), 5, Map.of()))
                         : Optional.empty());
-        registry.contribute(AgentResolver.class, (name, in) ->
-                "boss".equals(name) ? Optional.of(new AgentDefinition("boss", "Delegates.",
-                        "You delegate.", ModelSettings.NONE, List.of(), 5, Map.of(SubAgentPlugin.SUB_AGENTS, List.of("operator"))))
-                        : Optional.empty());
+        AgentDefinition boss = new AgentDefinition("boss", "Delegates.", "You delegate.", ModelSettings.NONE,
+                List.of(), 5, Map.of(SubAgentPlugin.SUB_AGENTS, List.of("operator")));
         model.script.add(call("c1", "operator", Map.of("task", "Run it.")));
         model.script.add(call("c2", "bash", Map.of()));
         model.script.add(TurnMessage.assistant("Ran."));
         model.script.add(TurnMessage.assistant("The operator ran it."));
 
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Go")), "boss", ModelSettings.NONE));
+                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Go")), boss));
         Turn interrupted = awaitRest(turnId);
         assertThat(interrupted.status()).isEqualTo(TurnStatus.INTERRUPTED);
         Interruption interruption = interrupted.interruptions().get(0);

@@ -122,7 +122,7 @@ class LocalCliTest {
     }
 
     private void converse(String agent, String typed) {
-        Session session = runtime.sessions().open(LocalRuntime.sessionIn(project, UserId.of("ada"), agent));
+        Session session = runtime.sessions().open(new LocalRuntime(home).sessionIn(project, UserId.of("ada"), agent));
         new LocalCli(runtime, session, new BufferedReader(new StringReader(typed)),
                 new PrintStream(printed, true, StandardCharsets.UTF_8)).converse();
     }

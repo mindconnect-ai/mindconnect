@@ -34,7 +34,7 @@ public final class DefaultSessionService implements SessionService {
     @Override
     public Session open(SessionSpec spec) {
         Session session = new Session(newId(), spec.userId(), spec.parentId(),
-                spec.defaultAgent(), spec.modelSettings(), spec.metadata(), Instant.now());
+                spec.agent(), spec.metadata(), Instant.now());
         sessions.save(session);
         return session;
     }
@@ -77,8 +77,8 @@ public final class DefaultSessionService implements SessionService {
      * are the same messages, in another session.
      */
     private Session copyOf(Session source, SessionId parentId) {
-        Session copy = new Session(newId(), source.userId(), parentId, source.defaultAgent(),
-                source.modelSettings(), source.metadata(), Instant.now());
+        Session copy = new Session(newId(), source.userId(), parentId, source.agent(),
+                source.metadata(), Instant.now());
         sessions.save(copy);
         List<TurnMessage> said = wholeTurns(sessions.messages(source.id()));
         if (!said.isEmpty()) {

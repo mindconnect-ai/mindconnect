@@ -1,7 +1,6 @@
 package ai.mindconnect.agent.cli.local.file;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,10 +38,13 @@ public final class HarnessDirectories {
 
     /** The {@code .mc} folders that apply, strongest first: the working directory's, then the home's. */
     public List<Path> configDirectories(Session session) {
-        List<Path> directories = new ArrayList<>();
-        workingDirectory(session).ifPresent(cwd -> directories.add(cwd.resolve(CONFIG_FOLDER)));
-        directories.add(home.resolve(CONFIG_FOLDER));
-        return directories;
+        return workingDirectory(session).map(this::configDirectories)
+                .orElseGet(() -> List.of(home.resolve(CONFIG_FOLDER)));
+    }
+
+    /** The same for a working directory no session has yet: where the agent of a new session is looked up. */
+    public List<Path> configDirectories(Path workingDirectory) {
+        return List.of(workingDirectory.resolve(CONFIG_FOLDER), home.resolve(CONFIG_FOLDER));
     }
 
     /** The strongest {@code .mc} folder — where something this session decides is written. */

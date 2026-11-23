@@ -61,7 +61,7 @@ class AgentRuntimeTest {
                 .without(SessionTitlePlugin.class)
                 .build()) {
             Session session = runtime.sessions().open(
-                    new SessionSpec(UserId.of("ada"), null, "assistant", ModelSettings.NONE, Map.of()));
+                    new SessionSpec(UserId.of("ada"), null, ASSISTANT, Map.of()));
             TurnId turnId = runtime.turns().submit(TurnRequest.text(session.id(), "Weather?"));
 
             Turn turn = runtime.turns().find(turnId).orElseThrow();

@@ -1,7 +1,6 @@
 package ai.mindconnect.agent.cli.local;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -11,6 +10,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import ai.mindconnect.agent.cli.local.file.FileApprovalMemory;
 import ai.mindconnect.agent.cli.local.file.FileSessionStore;
 import ai.mindconnect.agent.cli.local.file.FileSourcePlugin;
+import ai.mindconnect.agent.cli.local.file.FileAgentResolver;
 import ai.mindconnect.agent.cli.local.file.HarnessDirectories;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
@@ -67,10 +67,20 @@ public final class LocalRuntime {
                         (name, session) -> DEFAULT_AGENT.equals(name) ? Optional.of(BUILT_IN) : Optional.empty())));
     }
 
-    /** A session that works in a directory: where its files are, and whose {@code .mc} folder holds for it. */
-    public static SessionSpec sessionIn(Path workingDirectory, UserId userId, String agentName) {
-        return new SessionSpec(userId, null, agentName, ModelSettings.NONE,
-                Map.of(HarnessDirectories.WORKING_DIRECTORY, workingDirectory.toAbsolutePath().toString()));
+    /**
+     * A session that works in a directory: where its files are, and whose
+     * {@code .mc} folder holds for it. The agent is looked up once, here —
+     * the session keeps it as it was found.
+     */
+    public SessionSpec sessionIn(Path workingDirectory, UserId userId, String agentName) {
+        Path directory = workingDirectory.toAbsolutePath();
+        HarnessDirectories directories = new HarnessDirectories(home);
+        AgentDefinition agent = new FileAgentResolver(directories)
+                .resolve(agentName, directories.configDirectories(directory))
+                .or(() -> DEFAULT_AGENT.equals(agentName) ? Optional.of(BUILT_IN) : Optional.empty())
+                .orElseThrow(() -> new IllegalArgumentException("There is no agent " + agentName));
+        return new SessionSpec(userId, null, agent,
+                Map.of(HarnessDirectories.WORKING_DIRECTORY, directory.toString()));
     }
 
     private static Plugin provides(String name, java.util.function.Consumer<PluginRegistry> install) {

@@ -42,11 +42,12 @@ public final class LocalCliApplication {
         }
         String model = McEnv.get("MC_MODEL", DEFAULT_MODEL);
         Path home = Path.of(System.getProperty("user.home"));
-        try (AgentRuntime runtime = new LocalRuntime(home).builder()
+        LocalRuntime local = new LocalRuntime(home);
+        try (AgentRuntime runtime = local.builder()
                 .model(new OpenAiChat(apiKey, model).chat())
                 .plugin(modelOfLastResort(model))
                 .build()) {
-            Session session = runtime.sessions().open(LocalRuntime.sessionIn(
+            Session session = runtime.sessions().open(local.sessionIn(
                     Path.of(""), UserId.of(System.getProperty("user.name")), agent));
             LocalCli cli = new LocalCli(runtime, session,
                     new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8)), System.out);

@@ -6,7 +6,6 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
@@ -58,8 +57,8 @@ final class SubAgentTool implements Tool {
         // its messages do not land in the caller's history. The metadata
         // go along — it works in the same place for the same user.
         Session child = sessions.get().open(new SessionSpec(
-                session.userId(), session.id(), agent.name(), ModelSettings.NONE, session.metadata()));
+                session.userId(), session.id(), agent, session.metadata()));
         return ToolOutput.delegate(new TurnRequest(
-                child.id(), List.of(new ContentPart.Text(task)), agent.name(), ModelSettings.NONE));
+                child.id(), List.of(new ContentPart.Text(task)), agent));
     }
 }

@@ -9,8 +9,7 @@ import java.util.Map;
 public record SessionSpec(
         UserId userId,
         SessionId parentId,
-        String defaultAgent,
-        ModelSettings modelSettings,
+        AgentDefinition agent,
         Map<String, Object> metadata
 ) {
 
@@ -18,8 +17,8 @@ public record SessionSpec(
         metadata = Map.copyOf(metadata);
     }
 
-    /** A root session with no agent, no settings and no metadata of its own. */
+    /** A root session with no agent and no metadata of its own. */
     public static SessionSpec of(UserId userId) {
-        return new SessionSpec(userId, null, null, ModelSettings.NONE, Map.of());
+        return new SessionSpec(userId, null, null, Map.of());
     }
 }

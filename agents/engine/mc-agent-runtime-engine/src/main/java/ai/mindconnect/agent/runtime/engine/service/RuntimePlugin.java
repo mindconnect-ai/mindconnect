@@ -4,7 +4,6 @@ import java.util.Set;
 
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
-import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWork;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWorker;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
@@ -70,7 +69,6 @@ public final class RuntimePlugin implements Plugin {
             ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
             EventDelivery events = new EventDelivery(new TurnEventHub(), registry.get(SessionEventHub.class));
             TurnAcceptor acceptor = new TurnAcceptor(sessions,
-                    AgentResolver.firstOf(() -> registry.all(AgentResolver.class)),
                     () -> registry.all(ModelSettingsResolver.class), hooks);
             NamespaceProvider namespaces = registry.get(NamespaceProvider.class);
             TurnTaskMapper turns = new TurnTaskMapper(queue, namespaces);

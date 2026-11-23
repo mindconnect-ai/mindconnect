@@ -1,6 +1,8 @@
 package ai.mindconnect.agent.cli.local.file;
 
 import java.util.HashMap;
+import java.util.List;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 
@@ -43,7 +45,12 @@ public final class FileAgentResolver implements AgentResolver {
 
     @Override
     public Optional<AgentDefinition> resolve(String agentName, Session session) {
-        return directories.configDirectories(session).stream()
+        return resolve(agentName, directories.configDirectories(session));
+    }
+
+    /** The agent of that name in the first of the {@code .mc} folders that has it. */
+    public Optional<AgentDefinition> resolve(String agentName, List<Path> configDirectories) {
+        return configDirectories.stream()
                 .map(config -> FrontMatterDocument.read(config.resolve("agents").resolve(agentName + ".md")))
                 .flatMap(Optional::stream)
                 .findFirst()
