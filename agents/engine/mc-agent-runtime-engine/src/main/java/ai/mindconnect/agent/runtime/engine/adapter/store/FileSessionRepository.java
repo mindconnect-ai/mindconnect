@@ -15,18 +15,22 @@ import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
 
 /**
- * Sessions under {@code {base}/{namespace}/sessions/{sessionId}/session.json}.
+ * Sessions under {@code {base}/{namespace}/sessions/{sessionId}/runtime-session.json}.
+ * Not {@code session.json}: where the earlier runtime keeps its sessions in
+ * the same data directory, that file in that folder is its own.
  * The path follows from the session id alone, which is what lets
  * {@link #update} lock exactly this session's file — reads take no lock,
  * and updates of one session take turns (see {@code mc-file-repo}).
  */
 public final class FileSessionRepository implements SessionRepository {
 
+    private static final String FILE_NAME = "runtime-session.json";
+
     private final Documents<SessionId, Session> sessions;
 
     public FileSessionRepository(Path base, ObjectMapper json, NamespaceProvider namespaces) {
         this.sessions = Documents.of(Session.class)
-                .path((SessionId id) -> "sessions/" + id.value() + "/session.json")
+                .path((SessionId id) -> "sessions/" + id.value() + "/" + FILE_NAME)
                 // The partition of the namespace the current call works in.
                 .build(() -> FileRepo.open(base, namespaces.current()), json);
     }

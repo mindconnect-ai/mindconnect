@@ -80,7 +80,7 @@ class RuntimeEngineAutoConfigurationTest {
                     assertThat(context.getBean(MessageRepository.class)
                             .findByConversation(ConversationId.of(session.id().value()), new PageRequest(0, 10)))
                             .extracting(Message::content).containsExactly("Hi", "Hello.");
-                    assertThat(dataDirectory.resolve("test/sessions/" + session.id().value() + "/session.json"))
+                    assertThat(dataDirectory.resolve("test/sessions/" + session.id().value() + "/runtime-session.json"))
                             .exists();
                 });
     }
