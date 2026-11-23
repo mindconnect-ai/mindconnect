@@ -54,7 +54,7 @@ final class SendToParentTool implements Tool {
             TurnId turnId = turns.get().submit(new TurnRequest(session.parentId(),
                     List.of(new ContentPart.Text("[Message from sub-session " + session.id().value() + "]\n"
                             + message)),
-                    null));
+                    null, Map.of()));
             return ToolOutput.ok("The message was delivered; the other session answers it in turn "
                     + turnId.value() + ".");
         } catch (IllegalArgumentException e) {

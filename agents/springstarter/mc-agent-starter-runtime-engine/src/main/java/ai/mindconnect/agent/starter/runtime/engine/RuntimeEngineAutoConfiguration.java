@@ -46,6 +46,7 @@ import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolActivation;
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolSearchPlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.LoggingTraceSink;
 import ai.mindconnect.agent.runtime.capabilities.trace.TracePlugin;
+import ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.TraceSink;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
@@ -230,6 +231,7 @@ public class RuntimeEngineAutoConfiguration {
                 new ToolSearchPlugin(activation),
                 new SubAgentPlugin(),
                 new PermissionPlugin(PermissionEffect.DENY, approvals),
+                new AttachmentPlugin(),
                 new MemoryPlugin(summaries),
                 new TracePlugin(traces),
                 new InputGuardPlugin(),

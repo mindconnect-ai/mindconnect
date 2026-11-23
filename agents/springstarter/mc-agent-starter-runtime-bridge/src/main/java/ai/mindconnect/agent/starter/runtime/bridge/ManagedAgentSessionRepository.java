@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin;
 import java.util.function.Function;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
@@ -38,7 +39,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
  * <p>A session written the earlier way is kept whole in the session's
  * metadata, and what both sides know is spelled out beside it under the
  * keys the management and the capabilities read: title, type, status,
- * directories, the tools approved and found. Read back the earlier way it
+ * directories, the tools approved and found, the files attached. Read back the earlier way it
  * is the whole one with those entries laid over it — the runtime may have
  * given the chat a title, or remembered an approval, since.
  *
@@ -185,6 +186,7 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
         metadata.put(ManagedSession.ADDITIONAL_DIRECTORIES, written.additionalDirs());
         metadata.put(SessionApprovalMemory.APPROVED_TOOLS, List.copyOf(written.approvedTools()));
         metadata.put(SessionToolActivation.ACTIVATED_TOOLS, written.activatedTools());
+        metadata.put(AttachmentPlugin.ATTACHMENTS, json.convertValue(written.attachedFiles(), List.class));
         // An entry cannot hold nothing: a session without a title or a directory has no such entry.
         if (written.title() == null) {
             metadata.remove(ManagedSession.TITLE);

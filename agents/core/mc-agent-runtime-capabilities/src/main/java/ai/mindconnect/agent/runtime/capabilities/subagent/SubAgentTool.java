@@ -59,6 +59,6 @@ final class SubAgentTool implements Tool {
         Session child = sessions.get().open(new SessionSpec(
                 session.userId(), session.id(), agent, session.metadata()));
         return ToolOutput.delegate(new TurnRequest(
-                child.id(), List.of(new ContentPart.Text(task)), agent));
+                child.id(), List.of(new ContentPart.Text(task)), agent, Map.of()));
     }
 }

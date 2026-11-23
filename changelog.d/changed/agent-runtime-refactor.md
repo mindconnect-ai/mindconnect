@@ -9,3 +9,7 @@
   A chat that refers to an agent follows what is changed on that agent; as soon
   as the chat chooses a model, tools, a prompt or sub-agents of its own, it
   keeps its own definition and no longer follows the stored agent.
+- Files attached to a chat work on the new runtime: the next message announces
+  what was attached or removed, an image or PDF goes to a model that reads it
+  with the message that brought it, and `view_attachment` shows it again in a
+  later turn. A model that cannot read a file is told about it in a note.

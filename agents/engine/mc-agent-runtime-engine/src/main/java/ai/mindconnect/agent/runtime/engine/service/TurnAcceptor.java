@@ -55,7 +55,8 @@ final class TurnAcceptor {
         Turn turn = new Turn(TurnId.of(UUID.randomUUID().toString()), session.id(),
                 agent.withModelSettings(modelSettingsOf(session, agent)),
                 TurnStatus.QUEUED, List.of(), null, null);
-        return new Accepted(turn, TurnMessage.user(request.input()));
+        return new Accepted(turn, new TurnMessage(null, null, TurnMessage.Type.USER, request.input(), List.of(),
+                request.metadata()));
     }
 
     /** The request's agent, else the session's; a turn without either cannot run. */

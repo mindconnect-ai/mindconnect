@@ -82,7 +82,7 @@ public final class RuntimeChatService {
                 .orElseThrow(() -> new IllegalStateException("Session " + sessionId.value() + " has no agent"));
         Session session = known(chat, agent);
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
-                parts.stream().map(RuntimeChatService::part).toList(), agent));
+                parts.stream().map(RuntimeChatService::part).toList(), agent, Map.of()));
         sessions.update(session.id(), current -> current.withMetadata(LAST_TURN, turnId.value()));
         CompletableFuture<String> answer = new CompletableFuture<>();
         StreamEventTranslator translator = new StreamEventTranslator(turnId, turns, events, answer);

@@ -237,7 +237,7 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("Hello."));
 
         awaitRest(turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Hi")), greeter)));
+                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Hi")), greeter, Map.of())));
 
         assertThat(model.requests.get(0).instructions()).startsWith("You talk to ada.").doesNotContain("Never shown");
     }
@@ -274,7 +274,7 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("The operator ran it."));
 
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Go")), boss));
+                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Go")), boss, Map.of()));
         Turn interrupted = awaitRest(turnId);
         assertThat(interrupted.status()).isEqualTo(TurnStatus.INTERRUPTED);
         Interruption interruption = interrupted.interruptions().get(0);
