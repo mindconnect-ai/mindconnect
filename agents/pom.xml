@@ -80,6 +80,15 @@
         <module>core/mc-agent-runtime-core</module>
         <module>core/mc-agent-memory-strategies</module>
         <module>core/mc-agent-runtime</module>
+
+        <!-- The runtime on the plugin kernel: the loop, the API, what sits on it. -->
+        <module>core/mc-agent-loop-core</module>
+        <module>core/mc-agent-runtime-api</module>
+        <module>core/mc-agent-runtime-capabilities</module>
+        <module>engine/mc-agent-runtime-engine</module>
+        <module>client/mc-agent-sdk</module>
+        <module>client/mc-agent-cli-local</module>
+
         <module>tools/core/mc-agent-tools</module>
         <module>tools/core/mc-agent-tools-code</module>
         <module>tools/core/mc-agent-tools-virtual-env</module>
