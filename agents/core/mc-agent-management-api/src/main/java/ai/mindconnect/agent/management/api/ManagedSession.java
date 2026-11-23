@@ -2,6 +2,7 @@ package ai.mindconnect.agent.management.api;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
@@ -54,8 +55,20 @@ public record ManagedSession(
     /** Metadata key of the further directories a session's tools may reach: a list of paths. */
     public static final String ADDITIONAL_DIRECTORIES = "additionalDirs";
 
+    /**
+     * Metadata key of the stored agent a session was opened with: its
+     * {@link AgentId}. Absent for a session whose agent is kept nowhere
+     * else — one made for this session alone.
+     */
+    public static final String AGENT_ID = "agentId";
+
     /** The type of a session that names none: a conversation with a person. */
     public static final String CHAT = "chat";
+
+    /** The stored agent the session was opened with, where it was opened with one. */
+    public Optional<AgentId> agentId() {
+        return metadata.get(AGENT_ID) instanceof String id ? Optional.of(AgentId.of(id)) : Optional.empty();
+    }
 
     /** Whether a session is still worked in. Not whether a turn runs in it right now: that its turns say. */
     public enum Status {

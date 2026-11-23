@@ -152,6 +152,7 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
         Map<String, Object> metadata = new HashMap<>(stored == null ? Map.of() : stored.metadata());
         metadata.put(EARLIER, json.convertValue(written, Map.class));
         metadata.put(RepositorySessionStore.CONVERSATION_ID, written.conversationId().value());
+        metadata.put(ManagedSession.AGENT_ID, written.agentDefinitionId().value());
         metadata.put(ManagedSession.TYPE, written.type());
         metadata.put(ManagedSession.STATUS, written.status().name());
         metadata.put(ManagedSession.ADDITIONAL_DIRECTORIES, written.additionalDirs());
