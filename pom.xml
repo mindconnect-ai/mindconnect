@@ -136,6 +136,18 @@
         <module>agents/core/mc-agent-runtime-core</module>
         <module>agents/core/mc-agent-memory-strategies</module>
         <module>agents/core/mc-agent-runtime</module>
+
+        <!-- The runtime on the plugin kernel. -->
+        <module>agents/core/mc-agent-loop-core</module>
+        <module>agents/core/mc-agent-runtime-api</module>
+        <module>agents/core/mc-agent-runtime-capabilities</module>
+        <module>agents/engine/mc-agent-runtime-engine</module>
+        <module>agents/adapter/postgres/mc-agent-runtime-engine-pg</module>
+        <module>agents/client/mc-agent-sdk</module>
+        <module>agents/client/mc-agent-cli-local</module>
+        <module>agents/springstarter/mc-agent-starter-runtime-engine</module>
+        <module>agents/springstarter/mc-agent-starter-runtime-bridge</module>
+
         <module>agents/tools/core/mc-agent-tools</module>
         <module>agents/tools/core/mc-agent-tools-code</module>
         <module>agents/tools/core/mc-agent-tools-virtual-env</module>

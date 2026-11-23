@@ -27,6 +27,7 @@
         <module>../common/mc-common</module>
         <module>../common/mc-jdbc</module>
         <module>../common/mc-file-repo</module>
+        <module>../common/mc-plugin</module>
         <module>../taskqueue/mc-task-queue</module>
         <module>../taskqueue/mc-task-queue-jdbc</module>
         <module>core/mc-agent-domain</module>
@@ -71,6 +72,7 @@
         <module>springstarter/mc-agent-starter-namespace</module>
         <module>springstarter/mc-agent-starter-runtime</module>
         <module>springstarter/mc-agent-starter-runtime-engine</module>
+        <module>springstarter/mc-agent-starter-runtime-bridge</module>
         <module>springstarter/mc-agent-starter-registry</module>
         <module>springstarter/mc-agent-starter-extension</module>
         <module>springstarter/mc-agent-starter-workflow</module>
