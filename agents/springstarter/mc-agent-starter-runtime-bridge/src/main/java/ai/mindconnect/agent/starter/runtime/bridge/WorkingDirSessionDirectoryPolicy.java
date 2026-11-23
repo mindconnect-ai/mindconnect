@@ -30,6 +30,13 @@ final class WorkingDirSessionDirectoryPolicy implements SessionDirectoryPolicy {
     }
 
     @Override
+    public Optional<String> assign(UserId user, ai.mindconnect.agent.runtime.api.domain.SessionId session) {
+        return userHome.sessionDirOf(ai.mindconnect.agent.UserId.of(user.value()),
+                        ai.mindconnect.agent.SessionId.of(session.value()))
+                .map(Path::toString);
+    }
+
+    @Override
     public Optional<String> ownDirectory(ManagedSession session) {
         return userHome.existingSessionDirOf(ai.mindconnect.agent.UserId.of(session.userId().value()),
                         ai.mindconnect.agent.SessionId.of(session.id().value()))

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.management;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 import ai.mindconnect.agent.management.api.AgentId;
@@ -51,6 +53,38 @@ public final class RepositorySessionManagement implements SessionManagement {
         this.messages = messages;
         this.agents = agents;
         this.directoryPolicy = directoryPolicy;
+    }
+
+    @Override
+    public ManagedSession open(UserId user, SessionAgent agent, String type, SessionDirectories directories) {
+        SessionId id = SessionId.of(UUID.randomUUID().toString());
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put(ManagedSession.TYPE, type == null ? ManagedSession.CHAT : type);
+        AgentDefinition definition;
+        if (agent instanceof SessionAgent.Ref ref) {
+            definition = agents.find(ref.id()).map(ManagedAgent::definition).orElseThrow(() ->
+                    new IllegalArgumentException("There is no agent " + ref.id().value()));
+            metadata.put(ManagedSession.AGENT_ID, ref.id().value());
+            metadata.put(ManagedSession.AGENT, ManagedSession.REF);
+        } else {
+            SessionAgent.Own own = (SessionAgent.Own) agent;
+            definition = own.definition();
+            metadata.put(ManagedSession.AGENT, ManagedSession.OWN);
+            if (own.origin() != null) {
+                metadata.put(ManagedSession.AGENT_ID, own.origin().value());
+            }
+        }
+        String named = directories.working();
+        Optional<String> working = named == null || named.isBlank()
+                ? directoryPolicy.assign(user, id) : Optional.of(directoryPolicy.admit(user, named));
+        working.ifPresent(directory -> metadata.put(ManagedSession.WORKING_DIRECTORY, directory));
+        metadata.put(ManagedSession.ADDITIONAL_DIRECTORIES, directories.additional().stream()
+                .filter(directory -> !directory.isBlank())
+                .map(directory -> directoryPolicy.admit(user, directory))
+                .distinct().toList());
+        Session session = new Session(id, user, null, definition, metadata, Instant.now());
+        sessions.create(session);
+        return managed(session);
     }
 
     @Override

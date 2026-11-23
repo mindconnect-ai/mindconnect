@@ -78,8 +78,16 @@ class AgentApiControllerOwnershipTest {
                 new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
                 new InMemoryToolApprovalRepository(), userChannels);
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
+        // A chat opened through the chat service is a session of the repository these tests read.
+        ai.mindconnect.agent.starter.runtime.bridge.ChatOpener opener =
+                org.mockito.Mockito.mock(ai.mindconnect.agent.starter.runtime.bridge.ChatOpener.class);
+        org.mockito.Mockito.when(opener.open(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call -> sessionService.openChat(call.getArgument(0), call.<UserId>getArgument(1),
+                        call.<String>getArgument(3), call.<List<String>>getArgument(4)));
         AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
-                sessionService, chat, compaction, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
+                sessionService, chat, compaction, opener, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
                 new SessionAccess(sessions), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }

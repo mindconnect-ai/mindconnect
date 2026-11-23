@@ -2,13 +2,14 @@ package ai.mindconnect.agent.management.api;
 
 import java.util.Optional;
 
+import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
 
 /**
  * What an installation says about the directories of its sessions: which
  * ones a user may name, and which one a session was given. The session
- * management asks it when a session's directories change; a server answers
- * from its configuration, a tool on the user's own machine leaves it
+ * management asks it when a session is opened and when its directories
+ * change; a server answers from its configuration, a tool on the user's own machine leaves it
  * {@link #unrestricted()}.
  */
 public interface SessionDirectoryPolicy {
@@ -23,6 +24,12 @@ public interface SessionDirectoryPolicy {
     /** The directory the session was given and always keeps — its uploads live there; empty if it has none. */
     Optional<String> ownDirectory(ManagedSession session);
 
+    /**
+     * The directory a new session works in when none is named for it, made
+     * if need be; empty where a session is given none.
+     */
+    Optional<String> assign(UserId user, SessionId session);
+
     /** Every directory as it is named, and no session with one of its own. */
     static SessionDirectoryPolicy unrestricted() {
         return new SessionDirectoryPolicy() {
@@ -33,6 +40,11 @@ public interface SessionDirectoryPolicy {
 
             @Override
             public Optional<String> ownDirectory(ManagedSession session) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> assign(UserId user, SessionId session) {
                 return Optional.empty();
             }
         };

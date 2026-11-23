@@ -16,6 +16,7 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
+import ai.mindconnect.agent.management.api.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionAttachment;
@@ -144,6 +145,51 @@ class RepositorySessionManagementTest {
     }
 
     @Test
+    void a_session_is_opened_on_an_agent_and_works_where_it_is_told_or_where_the_policy_puts_it() {
+        ManagedAgent owl = new RepositoryAgentManagement(agents).create(ManagedAgent.of(new AgentDefinition("owl",
+                "Owls.", "You know owls.", ModelSettings.NONE, List.of(), 5, Map.of())));
+        SessionDirectoryPolicy homes = new SessionDirectoryPolicy() {
+            @Override
+            public String admit(UserId user, String directory) {
+                if (directory.startsWith("/etc")) {
+                    throw new IllegalArgumentException(directory + " is not for users");
+                }
+                return directory;
+            }
+
+            @Override
+            public Optional<String> ownDirectory(ManagedSession session) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> assign(UserId user, SessionId session) {
+                return Optional.of("/home/" + user.value() + "/" + session.value());
+            }
+        };
+        SessionManagement placing = new RepositorySessionManagement(sessions, messages, agents, homes);
+
+        ManagedSession referring = placing.open(ADA, new SessionAgent.Ref(owl.id()), null, SessionDirectories.NONE);
+        assertThat(referring.agent()).isEqualTo(new SessionAgent.Ref(owl.id()));
+        assertThat(referring.type()).isEqualTo(ManagedSession.CHAT);
+        assertThat(referring.directories().working()).isEqualTo("/home/ada/" + referring.id().value());
+        // The runtime finds it, with the agent's definition to run on.
+        assertThat(runtime.find(referring.id()).orElseThrow().agent()).isEqualTo(owl.definition());
+        assertThat(placing.list(ADA)).extracting(ManagedSession::id).containsExactly(referring.id());
+
+        ManagedSession ofItsOwn = placing.open(ADA, new SessionAgent.Own(HELPER, null), "research",
+                new SessionDirectories("/srv/owls", List.of("/srv/mice")));
+        assertThat(ofItsOwn.agent()).isEqualTo(new SessionAgent.Own(HELPER, null));
+        assertThat(ofItsOwn.type()).isEqualTo("research");
+        assertThat(ofItsOwn.directories()).isEqualTo(new SessionDirectories("/srv/owls", List.of("/srv/mice")));
+
+        assertThatThrownBy(() -> placing.open(ADA, new SessionAgent.Ref(AgentId.of("unknown")), null,
+                SessionDirectories.NONE)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> placing.open(ADA, new SessionAgent.Own(HELPER, null), null,
+                new SessionDirectories("/etc", List.of()))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void a_session_holds_one_file_of_a_name_and_gives_it_up_again() {
         SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
         SessionAttachment owl = new SessionAttachment("f-1", "owl.png", "image/png", 3, null);
@@ -177,6 +223,11 @@ class RepositorySessionManagementTest {
             @Override
             public Optional<String> ownDirectory(ManagedSession session) {
                 return Optional.of("/home/" + session.userId().value() + "/" + session.id().value());
+            }
+
+            @Override
+            public Optional<String> assign(UserId user, SessionId session) {
+                return Optional.of("/home/" + user.value() + "/" + session.value());
             }
         };
         SessionManagement guarded = new RepositorySessionManagement(sessions, messages, agents, underSrv);

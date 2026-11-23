@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
@@ -106,6 +107,13 @@ public class RuntimeBridgeAutoConfiguration {
                                         EarlierAgentConverter converter, ObjectMapper json) {
         return new ManagedStoresFeature(agents::getObject, sessions::getObject, namespaces::getObject, converter,
                 json);
+    }
+
+    /** Opens a chat through the session management, with what the earlier side of the application expects of one. */
+    @Bean
+    ChatOpener chatOpener(ObjectProvider<SessionManagement> sessions, AgentSessionRepository chatSessions,
+                          ConversationManager conversations, UserChannels userChannels) {
+        return new ChatOpener(sessions.getObject(), chatSessions, conversations, userChannels);
     }
 
     /** A file a message refers to is read from the application's file store. */

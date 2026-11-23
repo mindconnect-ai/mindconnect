@@ -57,6 +57,7 @@ public class ChatUiController {
     private final AgentSessionService sessionService;
     /** The chat on the runtime on the plugin kernel, behind the calls this page has always made. */
     private final RuntimeChatService chatService;
+    private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
     private final AgentDefinitionRepository agentRepository;
     private final AgentSessionRepository sessionRepository;
     /** What is done with sessions beside running turns in them: where the list of chats comes from. */
@@ -81,6 +82,7 @@ public class ChatUiController {
 
     public ChatUiController(AgentSessionService sessionService,
                              RuntimeChatService chatService,
+                             ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
                              AgentDefinitionRepository agentRepository,
                              AgentSessionRepository sessionRepository,
                              SessionManagement sessionManagement,
@@ -101,6 +103,7 @@ public class ChatUiController {
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
         this.chatService = chatService;
+        this.chatOpener = chatOpener;
         this.agentRepository = agentRepository;
         this.sessionRepository = sessionRepository;
         this.sessionManagement = sessionManagement;
@@ -628,7 +631,7 @@ public class ChatUiController {
 
     private AgentSession openDefaultChat(String userId) {
         return agentRepository.findByName(DEFAULT_CHAT_AGENT)
-                .map(a -> sessionService.openChat(a.id(), UserId.of(userId)))
+                .map(a -> chatOpener.open(a.id(), UserId.of(userId), null, null, List.of()))
                 .orElseGet(() -> sessionService.openChat(inlineDefaultChatAgent(), UserId.of(userId)));
     }
 
@@ -836,9 +839,7 @@ public class ChatUiController {
         String userId = user.getPreferredUsername();
         return agentRepository.findById(agentId)
                 .map(agent -> {
-                    var session = type == null || AgentSession.CHAT.equals(type)
-                            ? sessionService.openChat(agentId, UserId.of(userId))
-                            : sessionService.openChatOfType(agentId, UserId.of(userId), type);
+                    var session = chatOpener.open(agentId, UserId.of(userId), type, null, List.of());
                     return ResponseEntity.ok(shell(session, historyOf(UserId.of(userId), session), history));
                 })
                 .orElse(ResponseEntity.notFound().build());

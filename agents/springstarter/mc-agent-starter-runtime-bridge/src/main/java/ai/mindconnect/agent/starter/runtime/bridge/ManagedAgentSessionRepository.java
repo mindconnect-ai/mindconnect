@@ -230,17 +230,18 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
                 written.sessionAgents(),
                 metadata.get(ManagedSession.WORKING_DIRECTORY) instanceof String directory ? directory : null,
                 names(metadata.get(ManagedSession.ADDITIONAL_DIRECTORIES)),
-                written.type());
+                metadata.get(ManagedSession.TYPE) instanceof String type ? type : written.type());
     }
 
     /**
-     * A session nobody wrote the earlier way — the runtime opened it itself,
-     * for a sub-agent — from what the runtime knows of it. Its agent is
+     * A session nobody wrote the earlier way — the runtime opened it itself
+     * for a sub-agent, or the management opened it — from what the runtime knows of it. Its agent is
      * named by the id the application gave that agent, where it has one.
      */
     private static AgentSession openedByTheRuntime(Session session) {
-        Object agentId = session.agent() == null ? null
-                : session.agent().metadata().get(AgentDefinitionMapper.AGENT_ID);
+        // The stored agent the session was opened on, else the id the application gave its definition.
+        Object agentId = session.metadata().get(ManagedSession.AGENT_ID) instanceof String stored ? stored
+                : session.agent() == null ? null : session.agent().metadata().get(AgentDefinitionMapper.AGENT_ID);
         return new AgentSession(SessionId.of(session.id().value()),
                 agentId instanceof String id ? AgentId.of(id) : AgentId.of(session.id().value()),
                 UserId.of(session.userId().value()),

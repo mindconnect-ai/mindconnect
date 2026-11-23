@@ -21,6 +21,22 @@ public interface SessionManagement {
     /** A user's sessions that stand under no other, newest first. */
     List<ManagedSession> list(UserId user);
 
+    /**
+     * Opens a session for a user.
+     *
+     * @param agent       the agent it runs on: a managed agent it refers
+     *                    to, or a definition of its own
+     * @param type        what kind of session it is; {@code null} for
+     *                    {@link ManagedSession#CHAT}
+     * @param directories where its tools work. Each has to pass the
+     *                    installation's {@link SessionDirectoryPolicy};
+     *                    without a working directory the session gets the
+     *                    one the policy assigns
+     * @throws IllegalArgumentException for a managed agent that does not
+     *         exist, or a directory the policy refuses
+     */
+    ManagedSession open(UserId user, SessionAgent agent, String type, SessionDirectories directories);
+
     /** The sessions under this one — its sub-agents' and its forks taken as children — oldest first. */
     List<ManagedSession> children(SessionId sessionId);
 

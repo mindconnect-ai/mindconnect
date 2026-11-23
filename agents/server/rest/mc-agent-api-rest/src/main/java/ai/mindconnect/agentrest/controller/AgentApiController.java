@@ -65,6 +65,7 @@ public class AgentApiController {
     private final AgentSessionService sessionService;
     private final ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService chatService;
     private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction;
+    private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final UserChannels userChannels;
     private final SessionAccess sessionAccess;
@@ -75,6 +76,7 @@ public class AgentApiController {
                             AgentSessionService sessionService,
                             ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService chatService,
                             ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
+                            ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
                             ai.mindconnect.filestore.FileStore fileStore,
                             UserChannels userChannels,
                             SessionAccess sessionAccess,
@@ -89,6 +91,7 @@ public class AgentApiController {
         this.sessionService = sessionService;
         this.chatService = chatService;
         this.compaction = compaction;
+        this.chatOpener = chatOpener;
         this.fileStore = fileStore;
         this.userChannels = userChannels;
         this.sessionAccess = sessionAccess;
@@ -219,8 +222,8 @@ public class AgentApiController {
     public AgentSession startSession(@RequestBody StartSessionRequest req, @CurrentUser UserId caller) {
         log.info("POST /api/sessions agentId={} user={} workingDir={}",
                 req.agentId(), caller, req.workingDir());
-        AgentSession session = sessionService.openChat(
-                AgentId.of(req.agentId()), caller, req.workingDir(), req.additionalDirs());
+        AgentSession session = chatOpener.open(
+                AgentId.of(req.agentId()), caller, null, req.workingDir(), req.additionalDirs());
         log.info("Session started: {}", session.id());
         return session;
     }
