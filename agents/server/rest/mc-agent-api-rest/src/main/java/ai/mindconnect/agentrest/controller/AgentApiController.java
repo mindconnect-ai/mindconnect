@@ -1,10 +1,11 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agentrest.dto.WorkingMemoryResponse;
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentPatch;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.chat.stream.ToolApproval;
@@ -65,6 +66,8 @@ public class AgentApiController {
     private final ai.mindconnect.agent.runtime.service.AgentChatService earlierChat;
     private final ai.mindconnect.agent.management.api.SessionManagement management;
     private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction;
+    /** Asked for what only some assemblies have: a service is looked up when it is needed. */
+    private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
     private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final UserChannels userChannels;
@@ -97,6 +100,7 @@ public class AgentApiController {
         this.earlierChat = earlierChat;
         this.management = runtime.service(ai.mindconnect.agent.management.api.SessionManagement.class);
         this.compaction = compaction;
+        this.runtime = runtime;
         this.chatOpener = chatOpener;
         this.fileStore = fileStore;
         this.userChannels = userChannels;
@@ -582,10 +586,11 @@ public class AgentApiController {
             description = "The prompt-assembly view: which messages are live, compressed or "
                     + "truncated, plus token accounting.")
     @GetMapping("/sessions/{sessionId}/memory")
-    public WorkingMemory getWorkingMemory(@PathVariable String sessionId, @CurrentUser UserId caller) {
+    public WorkingMemoryResponse getWorkingMemory(@PathVariable String sessionId, @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("GET /api/sessions/{}/memory", sessionId);
-        return earlierChat.memorySnapshot(id);
+        return WorkingMemoryResponse.of(runtime.service(MemoryInspection.class).inspect(
+                ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value())));
     }
 
     @Operation(tags = "Sessions", summary = "Compress the session's working memory",

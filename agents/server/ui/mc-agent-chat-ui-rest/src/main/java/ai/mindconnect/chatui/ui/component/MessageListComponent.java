@@ -2,7 +2,7 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;

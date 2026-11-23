@@ -5,7 +5,7 @@ import ai.mindconnect.chatui.ui.component.MessageListComponent;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.ui.model.UiPage;

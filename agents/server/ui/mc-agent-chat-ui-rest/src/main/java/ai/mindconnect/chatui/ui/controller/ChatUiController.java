@@ -17,7 +17,7 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionManagement;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
@@ -63,6 +63,8 @@ public class ChatUiController {
     private final AgentSessionRepository sessionRepository;
     /** What is done with sessions beside running turns in them: where the list of chats comes from. */
     private final SessionManagement sessionManagement;
+    /** Asked for what the chat shows of the runtime beyond sessions and turns: how full the context is. */
+    private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
     private final TodoListService todoListService;
     private final ObjectMapper objectMapper;
     /** Optional — null in setups where trace persistence is disabled. */
@@ -106,6 +108,7 @@ public class ChatUiController {
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
         this.sessionTurns = sessionTurns;
+        this.runtime = runtime;
         this.runtimeSessions = runtime.sessions();
         this.earlierChat = earlierChat;
         this.chatOpener = chatOpener;
@@ -2401,7 +2404,8 @@ public class ChatUiController {
      */
     private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
-            return earlierChat.memorySnapshot(sessionId);
+            return runtime.service(ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection.class)
+                    .inspect(runtimeId(sessionId));
         } catch (Exception e) {
             log.warn("Failed to load working memory for session {}: {}", sessionId, e.getMessage());
             return null;
