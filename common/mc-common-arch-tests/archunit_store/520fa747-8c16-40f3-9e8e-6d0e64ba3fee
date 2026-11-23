@@ -1,0 +1,4 @@
+ai.mindconnect.jdbc.DocumentTable has more than 30 methods
+ai.mindconnect.schema.Schema has more than 30 methods
+ai.mindconnect.webscraper.BaseWebScraperOptions has more than 30 methods
+ai.mindconnect.webscraper.RailsWebScraperConfig has more than 30 methods

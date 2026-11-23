@@ -25,7 +25,7 @@ method:
 
 - **One responsibility.** If you need "and" to say what a class does, it is two
   classes. Over ~300 lines or more than 7 constructor parameters is a reason
-  to look.
+  to look. A record's fields are not counted: a value holds what it holds.
 - **Named after its pattern, in the singular.** Registry, Catalog, Resolver,
   Policy, Strategy, Factory, Builder, Repository, Adapter, Gateway, Worker,
   Renderer, Reader, Writer, Converter, Mapper. `Service` only for an
@@ -138,7 +138,43 @@ one fails the build, and the store only shrinks.
 | Rule | Checks |
 | --- | --- |
 | D1 | no framework in a `-core` module or an engine; no `adapter` package in a `-core` module; Spring wiring only at the edge |
-| D2 | `domain` ← `port` ← `service` ← `adapter`; an adapter does not import another module's adapter |
-| D3 | a constructor takes at most 7 parameters |
+| D2 | `domain` ← `port` ← `service` ← `adapter`; an adapter does not import another module's adapter; no cycles between packages |
+| D3 | a constructor takes at most 7 parameters, a record is exempt; a class has at most 30 methods; a class depends on at most 25 other classes of the project |
 | D4 | no class ending in Helper, Util(s), Support, Commons, Holder, Manager; no method starting with process, handle, do unless a supertype names it |
 | Conventions | one constructor per class; SLF4J, never `java.util.logging` |
+
+The three size and coupling rules, and how they count:
+
+- **At most 30 methods.** Declared methods of a class, interface or enum,
+  private ones included, lambdas not. A record is exempt: its accessors come
+  with its components.
+- **At most 25 other classes of the project (fan-out).** Every `ai.mindconnect`
+  class a class mentions in a field, signature, call or annotation. Nested
+  classes count as their top-level class, the class's own nested classes not
+  at all; the JDK and libraries are not counted.
+- **No cycles between packages.** The store holds one line per package
+  dependency that lies on a cycle (`package a depends on b, which leads back
+  to it`), so cutting a cycle shrinks it edge by edge; a new package
+  dependency inside a cycle, or one that closes a new cycle, fails.
+
+The thresholds are set where the outliers start, measured on the code of
+2026-11: half of all classes have at most 4 methods and depend on at most 2
+project classes, 95 % stay under 20 methods and 15 classes. A frozen class is
+not held to its count of today, only kept in the store until it is under the
+threshold.
+
+## What a review can ask for: PMD
+
+What sits inside a method body ArchUnit cannot see. PMD and CPD run on demand,
+never in the normal build, and report without failing:
+
+```bash
+mvn -Ppmd -f <area>/pom.xml verify -DskipTests    # or -f <module>/pom.xml
+```
+
+Findings are printed as warnings and written to each module's `target/pmd.xml`
+and `target/cpd.xml`. The rule set is one file, `mc-java-parent/pmd-ruleset.xml`:
+cognitive complexity of a method (from 15), method length in statements (from
+60), and CPD for copied code (from 100 tokens, within one module). The profile
+finds the rule set through the `.mvn` directory `after-branch-creation.sh`
+creates.

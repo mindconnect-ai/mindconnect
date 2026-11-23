@@ -12,8 +12,13 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.freeze.FreezingArchRule;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -42,6 +47,8 @@ public final class McArchRules {
     private static final Set<String> SPRING_WIRING = Set.of(
         "Component", "Service", "Repository", "Controller", "RestController",
         "Configuration", "AutoConfiguration", "ControllerAdvice", "RestControllerAdvice");
+
+    private static final String PROJECT_PACKAGE = "ai.mindconnect.";
 
     private McArchRules() {
     }
@@ -90,11 +97,46 @@ public final class McArchRules {
             .should(McArchRules.be(IN_BOOT_MODULE))
             .as("D1: @Component, @Configuration, @RestController ... only in starters, apps, rest/ui modules and demos"));
 
-    /** D3: more than seven constructor parameters is more than one responsibility. */
+    /**
+     * D2: packages that need each other cannot be understood, tested or moved
+     * apart. One violation per package dependency that lies on a cycle, so that
+     * the store shrinks edge by edge while a cycle is being cut.
+     */
+    @ArchTest
+    static final ArchRule noPackageCycles = FreezingArchRule.freeze(
+        classes().should(notLieOnAPackageCycle())
+            .as("D2: no cycles between packages"));
+
+    /**
+     * D3: more than seven constructor parameters is more than one responsibility.
+     * A record is exempt: a value holds what it holds.
+     */
     @ArchTest
     static final ArchRule narrowConstructors = FreezingArchRule.freeze(
-        classes().should(haveConstructorsWithAtMostParameters(7))
+        classes().that().areNotRecords()
+            .should(haveConstructorsWithAtMostParameters(7))
             .as("D3: a constructor takes at most 7 parameters"));
+
+    /**
+     * D3: a class with more than 30 methods has more than one responsibility. A
+     * record is exempt, its accessors come with its components. The message
+     * carries no count, so a frozen class does not fail again when it shrinks.
+     */
+    @ArchTest
+    static final ArchRule fewMethods = FreezingArchRule.freeze(
+        classes().that().areNotRecords()
+            .should(haveAtMostMethods(30))
+            .as("D3: a class has at most 30 methods"));
+
+    /**
+     * D3: a class that needs more than 25 others of the project is hard to
+     * change and hard to test. Nested classes count as their top-level class:
+     * a mapper over one family of nested DTOs depends on one thing.
+     */
+    @ArchTest
+    static final ArchRule lowFanOut = FreezingArchRule.freeze(
+        classes().should(dependOnAtMostProjectClasses(25))
+            .as("D3: a class depends on at most 25 other classes of the project"));
 
     /** D4: a suffix like Helper or Manager says the author did not find the role. */
     @ArchTest
@@ -193,6 +235,81 @@ public final class McArchRules {
                             constructor.getFullName() + " takes " + count + " parameters"));
                     }
                 }
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> haveAtMostMethods(int max) {
+        return new ArchCondition<>("have at most " + max + " methods") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                long declared = javaClass.getMethods().stream()
+                    .filter(method -> !method.getModifiers().contains(JavaModifier.SYNTHETIC))
+                    .count();
+                if (declared > max) {
+                    events.add(SimpleConditionEvent.violated(javaClass,
+                        javaClass.getName() + " has more than " + max + " methods"));
+                }
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> dependOnAtMostProjectClasses(int max) {
+        return new ArchCondition<>("depend on at most " + max + " other classes of the project") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                String own = topLevelName(javaClass);
+                long others = javaClass.getDirectDependenciesFromSelf().stream()
+                    .map(dependency -> dependency.getTargetClass().getBaseComponentType())
+                    .filter(target -> target.getName().startsWith(PROJECT_PACKAGE))
+                    .map(McArchRules::topLevelName)
+                    .filter(target -> !target.equals(own))
+                    .distinct()
+                    .count();
+                if (others > max) {
+                    events.add(SimpleConditionEvent.violated(javaClass,
+                        javaClass.getName() + " depends on more than " + max + " other classes of the project"));
+                }
+            }
+        };
+    }
+
+    private static String topLevelName(JavaClass javaClass) {
+        String name = javaClass.getName();
+        int nested = name.indexOf('$');
+        return nested < 0 ? name : name.substring(0, nested);
+    }
+
+    private static ArchCondition<JavaClass> notLieOnAPackageCycle() {
+        return new ArchCondition<>("not lie on a package cycle") {
+            private final Map<String, Set<String>> dependencies = new TreeMap<>();
+
+            @Override
+            public void init(Collection<JavaClass> allClasses) {
+                dependencies.clear();
+            }
+
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                Set<String> targets = dependencies.computeIfAbsent(javaClass.getPackageName(), name -> new TreeSet<>());
+                javaClass.getDirectDependenciesFromSelf().forEach(dependency ->
+                    targets.add(dependency.getTargetClass().getBaseComponentType().getPackageName()));
+            }
+
+            @Override
+            public void finish(ConditionEvents events) {
+                dependencies.forEach((from, targets) -> targets.stream()
+                    .filter(to -> !to.equals(from) && leadsTo(to, from, new HashSet<>()))
+                    .forEach(to -> events.add(SimpleConditionEvent.violated(from,
+                        "package " + from + " depends on " + to + ", which leads back to it"))));
+            }
+
+            private boolean leadsTo(String from, String goal, Set<String> visited) {
+                if (from.equals(goal)) {
+                    return true;
+                }
+                return visited.add(from) && dependencies.getOrDefault(from, Set.of()).stream()
+                    .anyMatch(next -> leadsTo(next, goal, visited));
             }
         };
     }
