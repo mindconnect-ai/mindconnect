@@ -9,9 +9,9 @@ import ai.mindconnect.llm.domain.LlmCallEvent;
  * turn it was made for. Here and not in the runtime's API, because the
  * shape of that report is the gateway's and the provider's.
  *
- * <p>Called on the gateway's thread, once per provider call, so more than
- * once for a model call the gateway retried. Whoever stores the report
- * should not do so on that thread.
+ * <p>Called once per provider call, so more than once for a model call the
+ * gateway retried, and on the thread of the turn after the model call has
+ * ended: the turn's namespace is bound, and the turn can be looked up.
  */
 @FunctionalInterface
 public interface LlmCallTraceListener {

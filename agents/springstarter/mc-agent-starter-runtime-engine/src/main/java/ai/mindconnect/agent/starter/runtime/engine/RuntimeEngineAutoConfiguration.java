@@ -24,14 +24,14 @@ import ai.mindconnect.agent.runtime.capabilities.memory.InMemorySummaryStore;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.memory.SummaryStore;
 import ai.mindconnect.agent.runtime.capabilities.permission.ApprovalMemory;
-import ai.mindconnect.agent.runtime.capabilities.permission.InMemoryApprovalMemory;
+import ai.mindconnect.agent.runtime.capabilities.permission.SessionApprovalMemory;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.prompt.PromptPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
-import ai.mindconnect.agent.runtime.capabilities.toolsearch.InMemoryToolActivation;
+import ai.mindconnect.agent.runtime.capabilities.toolsearch.SessionToolActivation;
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolActivation;
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolSearchPlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.LoggingTraceSink;
@@ -64,9 +64,10 @@ import ai.mindconnect.taskqueue.memory.InMemorySharedStateStore;
  * application's beans, and the runtime's turns show in the same queue and
  * write into the same conversations.
  *
- * <p>What a capability keeps — approvals, summaries, activated tools,
- * traces — lives in memory until a bean of that type says otherwise; that
- * is how the application puts its own stores behind them. Every
+ * <p>Approvals and activated tools are kept in the session's metadata.
+ * Summaries live in memory and traces go to the log until a bean of that
+ * type says otherwise; that is how the application puts its own stores
+ * behind them. Every
  * {@link Plugin} bean is installed after the runtime's own, so it can
  * contribute resolvers and replace what was provided.
  *
@@ -101,8 +102,8 @@ public class RuntimeEngineAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    ApprovalMemory approvalMemory(NamespaceProvider namespaces) {
-        return new InMemoryApprovalMemory(namespaces);
+    ApprovalMemory approvalMemory(ObjectProvider<SessionStore> sessions) {
+        return new SessionApprovalMemory(sessions::getObject);
     }
 
     @Bean
@@ -113,8 +114,8 @@ public class RuntimeEngineAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    ToolActivation toolActivation(NamespaceProvider namespaces) {
-        return new InMemoryToolActivation(namespaces);
+    ToolActivation toolActivation(ObjectProvider<SessionStore> sessions) {
+        return new SessionToolActivation(sessions::getObject);
     }
 
     @Bean

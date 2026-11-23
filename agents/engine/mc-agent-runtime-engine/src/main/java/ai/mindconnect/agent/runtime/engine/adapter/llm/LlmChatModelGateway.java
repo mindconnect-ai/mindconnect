@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,6 +29,7 @@ import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.domain.LlmCallEvent;
 import ai.mindconnect.llm.domain.FinishReason;
 import ai.mindconnect.llm.domain.LlmContent;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -77,9 +79,11 @@ public final class LlmChatModelGateway implements ModelGateway {
         Cancellation cancellation = new Cancellation();
         inFlight.put(request.turnId(), cancellation);
         StreamedAnswer answer = new StreamedAnswer(request.turnId().value(), events);
+        // The gateway reports on a thread of its own; what it reports is handed on
+        // from this one, where the turn's namespace is bound.
+        List<LlmCallEvent> reported = new CopyOnWriteArrayList<>();
         try {
-            chat.chatStreaming(llmRequest(request), answer::accept, cancellation,
-                    event -> traces.onCall(request.turnId(), event));
+            chat.chatStreaming(llmRequest(request), answer::accept, cancellation, reported::add);
         } catch (RuntimeException e) {
             // A closed connection surfaces as a failed call; for a call that
             // was told to stop it is the expected end, and what arrived
@@ -90,6 +94,7 @@ public final class LlmChatModelGateway implements ModelGateway {
             return answer.interrupted();
         } finally {
             inFlight.remove(request.turnId());
+            reported.forEach(event -> traces.onCall(request.turnId(), event));
         }
         return cancellation.isCancelled() ? answer.interrupted() : answer.complete();
     }
