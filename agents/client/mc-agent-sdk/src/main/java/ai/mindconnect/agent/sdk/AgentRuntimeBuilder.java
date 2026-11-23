@@ -191,7 +191,7 @@ public final class AgentRuntimeBuilder {
         List<PermissionRule> given = List.copyOf(rules);
         registry.contribute(PermissionRuleSource.class, session -> given);
         registry.start();
-        return new AgentRuntime(registry, queue);
+        return new AgentRuntime(registry, queue::close);
     }
 
     private static Plugin provides(String name, Consumer<PluginRegistry> install) {

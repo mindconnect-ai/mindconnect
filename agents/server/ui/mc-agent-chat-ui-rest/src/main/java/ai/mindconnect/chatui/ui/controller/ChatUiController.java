@@ -83,7 +83,7 @@ public class ChatUiController {
 
     public ChatUiController(AgentSessionService sessionService,
                              ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
-                             org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.runtime.api.port.in.SessionService> runtimeSessions,
+                             ai.mindconnect.agent.sdk.AgentRuntime runtime,
                              ai.mindconnect.agent.runtime.service.AgentChatService earlierChat,
                              ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
                              AgentDefinitionRepository agentRepository,
@@ -106,7 +106,7 @@ public class ChatUiController {
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
         this.sessionTurns = sessionTurns;
-        this.runtimeSessions = runtimeSessions.getObject();
+        this.runtimeSessions = runtime.sessions();
         this.earlierChat = earlierChat;
         this.chatOpener = chatOpener;
         this.agentRepository = agentRepository;

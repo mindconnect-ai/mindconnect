@@ -33,7 +33,7 @@ import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
-import ai.mindconnect.plugin.PluginRegistry;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.port.in.LlmChat;
@@ -87,7 +87,7 @@ class RuntimeEngineAutoConfigurationTest {
                             .extracting(Message::content).containsExactly("Hi", "Hello.");
                     // An agent kept in the management is one the runtime finds by name.
                     context.getBean(AgentManagement.class).create(ManagedAgent.of(HELPER));
-                    assertThat(context.getBean(PluginRegistry.class).all(AgentResolver.class).get(0)
+                    assertThat(context.getBean(AgentRuntime.class).all(AgentResolver.class).get(0)
                             .resolve("helper", session)).contains(HELPER);
                     // The same session, as the management API lists it.
                     assertThat(context.getBean(SessionManagement.class).list(UserId.of("ada")))

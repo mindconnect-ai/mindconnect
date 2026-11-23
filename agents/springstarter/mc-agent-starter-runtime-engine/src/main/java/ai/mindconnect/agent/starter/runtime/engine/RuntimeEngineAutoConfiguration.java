@@ -63,6 +63,7 @@ import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.out.MessageRepository;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -179,21 +180,28 @@ public class RuntimeEngineAutoConfiguration {
         return LlmCallTraceListener.NONE;
     }
 
+    /**
+     * The runtime, configured: the one thing an application asks for. It is
+     * its own container — what an application needs of it, it asks it for by
+     * type. The workers that run its turns are the application's task queue's
+     * and are not stopped with it.
+     */
     @Bean
     @ConditionalOnMissingBean
-    PluginRegistry runtimePluginRegistry(RuntimeParts parts, List<Plugin> more) {
+    AgentRuntime configuredAgentRuntime(RuntimeParts parts, List<Plugin> more) {
         PluginRegistry registry = new DefaultPluginRegistry();
         parts.plugins().forEach(registry::install);
         // The model plugin is a bean too, so that an application can bring its own; it is installed once.
         more.stream().filter(plugin -> !parts.plugins().contains(plugin)).forEach(registry::install);
         registry.start();
-        return registry;
+        return new AgentRuntime(registry, () -> { });
     }
 
     /** The runtime's own plugins, in the order they are installed. */
     @Bean
     RuntimeParts runtimeParts(NamespaceProvider namespaces, UserProvider users, SessionStore sessions,
-                              AgentManagement agents, TaskQueue queue,
+                              AgentManagement agents, ObjectProvider<SessionManagement> sessionManagement,
+                              TaskQueue queue,
                               ObjectProvider<SharedStateStore> sharedState, LlmGatewayModelPlugin model,
                               CapabilityPlugins capabilities, ObjectProvider<MediaReader> media) {
         Plugin applicationBeans = new Plugin() {
@@ -208,6 +216,8 @@ public class RuntimeEngineAutoConfiguration {
                 registry.provide(UserProvider.class, () -> users);
                 registry.contribute(AgentResolver.class, new ManagedAgentResolver(agents));
                 registry.provide(SessionStore.class, () -> sessions);
+                registry.provide(AgentManagement.class, () -> agents);
+                registry.provide(SessionManagement.class, sessionManagement::getObject);
                 media.ifAvailable(reader -> registry.provide(MediaReader.class, () -> reader));
             }
         };
@@ -246,20 +256,20 @@ public class RuntimeEngineAutoConfiguration {
     /** Summarises a session's earlier turns on request. */
     @Bean
     @ConditionalOnMissingBean
-    MemoryCompaction memoryCompaction(PluginRegistry runtimePluginRegistry) {
-        return runtimePluginRegistry.get(MemoryCompaction.class);
+    MemoryCompaction memoryCompaction(AgentRuntime runtime) {
+        return runtime.service(MemoryCompaction.class);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    SessionService runtimeSessionService(PluginRegistry runtimePluginRegistry) {
-        return runtimePluginRegistry.get(SessionService.class);
+    SessionService runtimeSessionService(AgentRuntime runtime) {
+        return runtime.sessions();
     }
 
     @Bean
     @ConditionalOnMissingBean
-    TurnService runtimeTurnService(PluginRegistry runtimePluginRegistry) {
-        return runtimePluginRegistry.get(TurnService.class);
+    TurnService runtimeTurnService(AgentRuntime runtime) {
+        return runtime.turns();
     }
 
     /** Not beans of type {@link Plugin} themselves: those are the application's, installed after these. */

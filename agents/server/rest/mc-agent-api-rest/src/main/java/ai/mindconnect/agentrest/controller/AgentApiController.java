@@ -77,7 +77,7 @@ public class AgentApiController {
                             ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
                             ai.mindconnect.agentrest.service.TurnFrameStream frameStream,
                             ai.mindconnect.agent.runtime.service.AgentChatService earlierChat,
-                            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.management.api.SessionManagement> management,
+                            ai.mindconnect.agent.sdk.AgentRuntime runtime,
                             ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
                             ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
                             ai.mindconnect.filestore.FileStore fileStore,
@@ -95,7 +95,7 @@ public class AgentApiController {
         this.sessionTurns = sessionTurns;
         this.frameStream = frameStream;
         this.earlierChat = earlierChat;
-        this.management = management.getIfAvailable();
+        this.management = runtime.service(ai.mindconnect.agent.management.api.SessionManagement.class);
         this.compaction = compaction;
         this.chatOpener = chatOpener;
         this.fileStore = fileStore;

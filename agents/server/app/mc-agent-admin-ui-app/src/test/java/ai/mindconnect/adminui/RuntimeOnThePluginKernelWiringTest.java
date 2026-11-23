@@ -19,7 +19,7 @@ import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.agent.runtime.capabilities.memory.SummaryStore;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
-import ai.mindconnect.plugin.PluginRegistry;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 
 /**
  * The real app, started: the runtime on the plugin kernel stands beside the
@@ -50,7 +50,7 @@ class RuntimeOnThePluginKernelWiringTest {
     void its_services_are_beans_and_the_applications_stores_are_behind_its_ports() {
         assertThat(context.getBeansOfType(SessionService.class)).hasSize(1);
         assertThat(context.getBeansOfType(TurnService.class)).hasSize(1);
-        PluginRegistry registry = context.getBean(PluginRegistry.class);
+        AgentRuntime registry = context.getBean(AgentRuntime.class);
         // The application's agents and tools, next to what the capabilities contribute.
         assertThat(registry.all(AgentResolver.class)).isNotEmpty();
         assertThat(registry.all(ToolResolver.class)).hasSizeGreaterThan(1);

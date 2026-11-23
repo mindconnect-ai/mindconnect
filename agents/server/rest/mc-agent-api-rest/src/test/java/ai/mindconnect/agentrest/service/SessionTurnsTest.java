@@ -22,7 +22,9 @@ import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.plugin.DefaultPluginRegistry;
+import ai.mindconnect.plugin.PluginRegistry;
 
 /** A session's turn is addressed by the session, an approval by its tool call. */
 class SessionTurnsTest {
@@ -31,8 +33,7 @@ class SessionTurnsTest {
     private static final TurnId TURN = TurnId.of("t1");
 
     private final TurnService turns = mock(TurnService.class);
-    private final SessionTurns sessionTurns = new SessionTurns(providing(turns),
-            providing(mock(SessionStore.class)), providing(mock(SessionManagement.class)));
+    private final SessionTurns sessionTurns = new SessionTurns(runtimeWith(turns));
 
     @Test
     void an_approval_is_answered_on_the_interruption_of_its_tool_call() {
@@ -66,10 +67,12 @@ class SessionTurnsTest {
         return new Turn(TURN, null, SESSION, null, TurnStatus.INTERRUPTED, List.of(interruption), null, null);
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T> ObjectProvider<T> providing(T object) {
-        ObjectProvider<T> provider = mock(ObjectProvider.class);
-        when(provider.getObject()).thenReturn(object);
-        return provider;
+    private static AgentRuntime runtimeWith(TurnService turns) {
+        PluginRegistry registry = new DefaultPluginRegistry();
+        registry.provide(TurnService.class, () -> turns);
+        registry.provide(SessionStore.class, () -> mock(SessionStore.class));
+        registry.provide(SessionManagement.class, () -> mock(SessionManagement.class));
+        registry.start();
+        return new AgentRuntime(registry, () -> { });
     }
 }

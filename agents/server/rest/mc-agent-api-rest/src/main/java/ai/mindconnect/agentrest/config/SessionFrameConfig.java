@@ -6,7 +6,6 @@ import ai.mindconnect.agentrest.stream.SessionFrameChannels;
 import ai.mindconnect.agentrest.stream.SessionFrameFeed;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +21,7 @@ public class SessionFrameConfig {
     }
 
     @Bean
-    Plugin sessionFrameFeedPlugin(SessionFrameChannels sessionFrames, ObjectProvider<TurnService> turns) {
-        SessionFrameFeed feed = new SessionFrameFeed(sessionFrames, turns::getObject);
+    Plugin sessionFrameFeedPlugin(SessionFrameChannels sessionFrames) {
         return new Plugin() {
             @Override
             public String name() {
@@ -32,7 +30,8 @@ public class SessionFrameConfig {
 
             @Override
             public void install(PluginRegistry registry) {
-                registry.contribute(SessionEventListener.class, feed);
+                registry.contribute(SessionEventListener.class,
+                        new SessionFrameFeed(sessionFrames, registry.supplier(TurnService.class)));
             }
         };
     }

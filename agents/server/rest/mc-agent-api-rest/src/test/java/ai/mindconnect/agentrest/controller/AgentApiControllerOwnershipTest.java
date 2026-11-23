@@ -81,10 +81,10 @@ class AgentApiControllerOwnershipTest {
                     call.<ai.mindconnect.agent.runtime.api.domain.SessionId>getArgument(0).value()));
             return null;
         }).when(management).delete(org.mockito.ArgumentMatchers.any());
-        @SuppressWarnings("unchecked")
-        org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.management.api.SessionManagement>
-                managed = org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
-        org.mockito.Mockito.when(managed.getIfAvailable()).thenReturn(management);
+        ai.mindconnect.plugin.PluginRegistry registry = new ai.mindconnect.plugin.DefaultPluginRegistry();
+        registry.provide(ai.mindconnect.agent.management.api.SessionManagement.class, () -> management);
+        registry.start();
+        ai.mindconnect.agent.sdk.AgentRuntime managed = new ai.mindconnect.agent.sdk.AgentRuntime(registry, () -> { });
         ai.mindconnect.agent.starter.runtime.bridge.ChatOpener opener =
                 org.mockito.Mockito.mock(ai.mindconnect.agent.starter.runtime.bridge.ChatOpener.class);
         org.mockito.Mockito.when(opener.open(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),

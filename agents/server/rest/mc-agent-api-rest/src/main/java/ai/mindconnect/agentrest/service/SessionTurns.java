@@ -13,9 +13,8 @@ import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
-import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import org.springframework.beans.factory.ObjectProvider;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,37 +26,32 @@ import org.springframework.stereotype.Service;
 @Service
 public class SessionTurns {
 
-    private final ObjectProvider<TurnService> turns;
-    private final ObjectProvider<SessionStore> sessions;
-    private final ObjectProvider<SessionManagement> management;
+    private final AgentRuntime runtime;
 
-    public SessionTurns(ObjectProvider<TurnService> turns, ObjectProvider<SessionStore> sessions,
-                        ObjectProvider<SessionManagement> management) {
-        this.turns = turns;
-        this.sessions = sessions;
-        this.management = management;
+    public SessionTurns(AgentRuntime runtime) {
+        this.runtime = runtime;
     }
 
     /** Starts a turn in the session, as the agent the session has right now. */
     public TurnId submit(SessionId sessionId, List<ContentPart> input) {
         // A stored agent the session refers to holds as edited since.
-        AgentDefinition agent = management.getObject().agentOf(sessionId).orElseThrow(() ->
+        AgentDefinition agent = runtime.service(SessionManagement.class).agentOf(sessionId).orElseThrow(() ->
                 new IllegalStateException("Session " + sessionId.value() + " has no agent"));
         // Kept as the session's too: what works for the session between turns has a model to ask.
-        sessions.getObject().update(sessionId, session -> session.withAgent(agent));
-        return turns.getObject().submit(new TurnRequest(sessionId, input, agent, Map.of()));
+        runtime.service(SessionStore.class).update(sessionId, session -> session.withAgent(agent));
+        return runtime.turns().submit(new TurnRequest(sessionId, input, agent, Map.of()));
     }
 
     /** Whether there was a turn to cancel. */
     public boolean cancel(SessionId sessionId) {
-        Optional<Turn> running = turns.getObject().runningTurn(sessionId);
-        running.ifPresent(turn -> turns.getObject().cancel(turn.id()));
+        Optional<Turn> running = runtime.turns().runningTurn(sessionId);
+        running.ifPresent(turn -> runtime.turns().cancel(turn.id()));
         return running.isPresent();
     }
 
     /** What the session's turn waits for: its own questions and those of the sub-agents under it. */
     public List<Interruption> open(SessionId sessionId) {
-        return turns.getObject().runningTurn(sessionId).map(Turn::interruptions).orElse(List.of());
+        return runtime.turns().runningTurn(sessionId).map(Turn::interruptions).orElse(List.of());
     }
 
     /**
@@ -67,12 +61,12 @@ public class SessionTurns {
      * @return the turn that goes on; empty for a card that is stale
      */
     public Optional<TurnId> answerApproval(SessionId sessionId, String callId, boolean approved, boolean forSession) {
-        Optional<Turn> running = turns.getObject().runningTurn(sessionId);
+        Optional<Turn> running = runtime.turns().runningTurn(sessionId);
         Optional<String> asked = running.map(Turn::interruptions).orElse(List.of()).stream()
                 .filter(interruption -> interruption.call() != null && callId.equals(interruption.call().callId()))
                 .map(Interruption::id)
                 .findFirst();
-        asked.ifPresent(id -> turns.getObject().resume(running.orElseThrow().id(), List.of(
+        asked.ifPresent(id -> runtime.turns().resume(running.orElseThrow().id(), List.of(
                 !approved ? InterruptionAnswer.reject(id, "")
                         : forSession ? InterruptionAnswer.approveAlways(id) : InterruptionAnswer.approve(id))));
         return asked.map(id -> running.orElseThrow().id());

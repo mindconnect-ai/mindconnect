@@ -15,12 +15,10 @@ import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
-import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
-import ai.mindconnect.agent.runtime.api.port.in.TurnService;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.channel.Channel;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 /**
@@ -43,14 +41,11 @@ public class TurnFrameStream {
         void ended(String error);
     }
 
-    private final ObjectProvider<TurnService> turns;
-    private final ObjectProvider<SessionService> sessions;
+    private final AgentRuntime runtime;
     private final SessionFrameChannels sessionFrames;
 
-    public TurnFrameStream(ObjectProvider<TurnService> turns, ObjectProvider<SessionService> sessions,
-                           SessionFrameChannels sessionFrames) {
-        this.turns = turns;
-        this.sessions = sessions;
+    public TurnFrameStream(AgentRuntime runtime, SessionFrameChannels sessionFrames) {
+        this.runtime = runtime;
         this.sessionFrames = sessionFrames;
     }
 
@@ -66,7 +61,7 @@ public class TurnFrameStream {
         CompletableFuture<TurnFrameTranslator> frames = new CompletableFuture<>();
         CompletableFuture<Void> over = new CompletableFuture<>();
         // Followed before the turn goes on: that it asks is told by its session, and only once.
-        Subscription asking = sessions.getObject().subscribe(sessionId, true, event -> {
+        Subscription asking = runtime.sessions().subscribe(sessionId, true, event -> {
             if (event instanceof SessionEvent.TurnInterrupted interrupted && !over.isDone()) {
                 frames.join().interrupted(interrupted.interruptions());
                 sink.asked(interrupted.turnId());
@@ -88,9 +83,9 @@ public class TurnFrameStream {
             over.complete(null);
             return false;
         }
-        TurnFrameTranslator translator = new TurnFrameTranslator(started.get(), turns.getObject(), sink::frame);
+        TurnFrameTranslator translator = new TurnFrameTranslator(started.get(), runtime.turns(), sink::frame);
         frames.complete(translator);
-        Subscription following = turns.getObject().subscribe(started.get(), new TurnListener() {
+        Subscription following = runtime.turns().subscribe(started.get(), new TurnListener() {
             @Override
             public void onEvent(TurnEvent event) {
                 if (!over.isDone()) {
@@ -117,7 +112,7 @@ public class TurnFrameStream {
         String id = sessionId.value();
         long firstBuffered = sessionFrames.earliestBufferedSeq(id);
         long latest = sessionFrames.lastSeq(id);
-        String liveTurnId = turns.getObject().runningTurn(sessionId).map(turn -> turn.id().value()).orElse(null);
+        String liveTurnId = runtime.turns().runningTurn(sessionId).map(turn -> turn.id().value()).orElse(null);
         return new StreamAttachment(sessionFrames.subscribe(id, afterSeq, consumer), liveTurnId, firstBuffered,
                 latest);
     }
