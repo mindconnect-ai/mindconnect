@@ -1,7 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -16,8 +15,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,9 +28,8 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.runtime.api.domain.Interruption;
+import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
@@ -53,10 +49,8 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.chat.stream.ApprovalScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
@@ -270,26 +264,6 @@ class RuntimeBridgeAutoConfigurationTest {
         };
     }
 
-    /** What a chat's turn told its listener. */
-    private static final class Heard implements ChatTurnListener {
-
-        private final List<TurnEvent> events = new CopyOnWriteArrayList<>();
-        private final List<Interruption> asked = new CopyOnWriteArrayList<>();
-
-        @Override
-        public void onEvent(TurnEvent event) {
-            events.add(event);
-        }
-
-        @Override
-        public void onSubAgentEvent(Turn subAgent, TurnEvent event) { }
-
-        @Override
-        public void asked(List<Interruption> interruptions) {
-            asked.addAll(interruptions);
-        }
-    }
-
     /** A chat page's session, not yet kept anywhere. */
     private static AgentSession chatSession() {
         return new AgentSession(ai.mindconnect.agent.SessionId.random(), LIBRARIAN.id(),
@@ -298,7 +272,7 @@ class RuntimeBridgeAutoConfigurationTest {
     }
 
     @Test
-    void the_chat_pages_calls_run_on_the_new_runtime_and_stream_the_events_the_page_knows() {
+    void a_chats_turn_runs_on_the_new_runtime_and_is_written_where_the_chat_page_reads() {
         AgentDefinitionRepository agents = mock(AgentDefinitionRepository.class);
         when(agents.findById(LIBRARIAN.id())).thenReturn(Optional.of(LIBRARIAN));
         AgentSession chat = chatSession();
@@ -308,17 +282,11 @@ class RuntimeBridgeAutoConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     keptInTheRuntimesStore(context, chat);
-                    Heard heard = new Heard();
+                    TurnService turns = context.getBean(TurnService.class);
 
-                    ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
-                            .submitChat(chat.id(), "Do we have owls?", heard);
+                    TurnId turnId = turns.submit(TurnRequest.text(runtimeId(chat), "Do we have owls?"));
 
-                    assertThat(turn.result().get(5, TimeUnit.SECONDS)).isEqualTo("Found it.");
-                    assertThat(heard.events).filteredOn(TurnEvent.MessageAppended.class::isInstance)
-                            .extracting(event -> ((TurnEvent.MessageAppended) event).message().type())
-                            .contains(TurnMessage.Type.TOOL_CALL, TurnMessage.Type.TOOL_RESULT);
-                    assertThat(heard.events).hasAtLeastOneElementOfType(TurnEvent.TextDelta.class)
-                            .last().isInstanceOf(TurnEvent.TurnEnded.class);
+                    assertThat(awaitOver(turns, turnId).outcome().text()).isEqualTo("Found it.");
                     // Written into the conversation the chat page reads its history from.
                     assertThat(context.getBean(MessageRepository.class)
                             .findByConversation(chat.conversationId(), new PageRequest(0, 10)))
@@ -328,7 +296,7 @@ class RuntimeBridgeAutoConfigurationTest {
     }
 
     @Test
-    void a_tool_that_needs_approval_asks_on_the_stream_and_goes_on_once_answered() {
+    void a_tool_that_needs_approval_is_kept_as_a_card_and_goes_on_once_answered() {
         AgentDefinitionRepository agents = mock(AgentDefinitionRepository.class);
         when(agents.findById(LIBRARIAN.id())).thenReturn(Optional.of(LIBRARIAN));
         AgentSession chat = chatSession();
@@ -337,31 +305,25 @@ class RuntimeBridgeAutoConfigurationTest {
         application(callingThenAnswering("order_book"), agents, mock(LlmCallTraceRepository.class))
                 .run(context -> {
                     keptInTheRuntimesStore(context, chat);
-                    RuntimeChatService chatService = context.getBean(RuntimeChatService.class);
-                    Heard heard = new Heard();
-                    ChatTurnHandle turn = chatService.submitChat(chat.id(), "Order the owl book.", heard);
-                    for (int i = 0; i < 200 && heard.asked.isEmpty(); i++) {
-                        Thread.sleep(25);
-                    }
-                    assertThat(heard.asked).extracting(asked -> asked.call().toolName())
+                    TurnService turns = context.getBean(TurnService.class);
+                    TurnId turnId = turns.submit(TurnRequest.text(runtimeId(chat), "Order the owl book."));
+                    Turn asked = awaitEnd(turns, turnId);
+                    assertThat(asked.interruptions()).extracting(open -> open.call().toolName())
                             .containsExactly("order_book");
-                    assertThat(turn.result()).isNotDone();
                     // The card is kept where the page draws it from after a reload.
                     verify(openApprovals).saveIfAbsent(argThat(open -> open.callId().equals("c1")
                             && open.rootSessionId().equals(chat.id())
                             && open.content().contains("\"name\":\"order_book\"")));
 
-                    assertThat(chatService.answerApproval(chat.id(), "unknown", true, ApprovalScope.ONCE)).isFalse();
-                    assertThat(chatService.answerApproval(chat.id(), "c1", true, ApprovalScope.ONCE)).isTrue();
+                    turns.resume(turnId, List.of(InterruptionAnswer.approve(asked.interruptions().get(0).id())));
 
-                    assertThat(turn.result().get(5, TimeUnit.SECONDS)).isEqualTo("Found it.");
-                    assertThat(heard.events).last().isInstanceOf(TurnEvent.TurnEnded.class);
+                    assertThat(awaitOver(turns, turnId).outcome().text()).isEqualTo("Found it.");
                     verify(openApprovals).delete(chat.id(), "c1");
                 });
     }
 
     @Test
-    void a_turn_that_fails_ends_for_the_chat_page_too() {
+    void a_turn_that_fails_is_over() {
         AgentDefinitionRepository agents = mock(AgentDefinitionRepository.class);
         when(agents.findById(LIBRARIAN.id())).thenReturn(Optional.of(LIBRARIAN));
         AgentSession chat = chatSession();
@@ -372,12 +334,26 @@ class RuntimeBridgeAutoConfigurationTest {
 
         application(unreachable, agents, mock(LlmCallTraceRepository.class)).run(context -> {
             keptInTheRuntimesStore(context, chat);
-            ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
-                    .submitChat(chat.id(), "Anyone there?", ChatTurnListener.none());
+            TurnService turns = context.getBean(TurnService.class);
 
-            assertThatThrownBy(() -> turn.result().get(5, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class).hasCauseInstanceOf(IllegalStateException.class);
+            TurnId turnId = turns.submit(TurnRequest.text(runtimeId(chat), "Anyone there?"));
+
+            assertThat(awaitOver(turns, turnId).status()).isEqualTo(TurnStatus.FAILED);
         });
+    }
+
+    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(AgentSession chat) {
+        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(chat.id().value());
+    }
+
+    /** The turn once nothing more will happen in it. */
+    private static Turn awaitOver(TurnService turns, TurnId turnId) throws InterruptedException {
+        Turn turn = turns.find(turnId).orElseThrow();
+        for (int i = 0; i < 200 && !turn.status().isFinal(); i++) {
+            Thread.sleep(25);
+            turn = turns.find(turnId).orElseThrow();
+        }
+        return turn;
     }
 
     /** What opening a chat does in the application: its session goes into the runtime's store through the redirected repository. */

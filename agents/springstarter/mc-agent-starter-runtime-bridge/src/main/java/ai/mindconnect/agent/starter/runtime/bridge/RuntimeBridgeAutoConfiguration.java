@@ -5,7 +5,6 @@ import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.message.port.in.ConversationManager;
-import ai.mindconnect.agent.chat.stream.SessionChannels;
 import ai.mindconnect.agent.chat.stream.UserChannels;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.filestore.FileStore;
@@ -24,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
-import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
@@ -44,8 +42,6 @@ import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.message.port.out.MessageRepository;
@@ -192,17 +188,5 @@ public class RuntimeBridgeAutoConfiguration {
     ChatStreams chatStreams(SessionFrameChannels sessionFrames, UserChannels userChannels,
                             ObjectProvider<TurnService> turns, ObjectProvider<SessionStore> sessions) {
         return new ChatStreams(sessionFrames, userChannels, turns::getObject, sessions::getObject);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    RuntimeChatService runtimeChatService(ObjectProvider<TurnService> turns,
-                                          ObjectProvider<SessionService> sessionService,
-                                          ObjectProvider<SessionStore> sessions,
-                                          AgentSessionRepository chatSessions,
-                                          ObjectProvider<SessionManagement> management, AgentChatService earlier,
-                                          ChatStreams chatStreams) {
-        return new RuntimeChatService(turns.getObject(), sessionService.getObject(), sessions.getObject(), chatSessions,
-                management.getObject(), earlier, chatStreams);
     }
 }

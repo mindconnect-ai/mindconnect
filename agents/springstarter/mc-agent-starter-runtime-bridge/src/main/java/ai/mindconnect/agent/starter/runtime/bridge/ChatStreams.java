@@ -2,14 +2,11 @@ package ai.mindconnect.agent.starter.runtime.bridge;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.chat.stream.SessionFrame;
 import ai.mindconnect.agent.chat.stream.SessionFrameChannels;
-import ai.mindconnect.agent.chat.stream.StreamAttachment;
 import ai.mindconnect.agent.chat.stream.TurnFrameTranslator;
 import ai.mindconnect.agent.chat.stream.UserChannels;
 import ai.mindconnect.agent.chat.stream.UserEvent;
@@ -21,7 +18,6 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import ai.mindconnect.channel.Channel;
 import ai.mindconnect.message.domain.ChatTurnId;
 
 /**
@@ -107,16 +103,6 @@ final class ChatStreams implements SessionEventListener {
 
     void answered(SessionId chat, UserId user, String callId, boolean approved) {
         users.publish(user, new UserEvent.ApprovalAnswered(chat, callId, approved));
-    }
-
-    /** @param liveTurnId the turn underway in the session; {@code null} when it is idle */
-    StreamAttachment attach(SessionId chat, long afterSeq, String liveTurnId,
-                            Consumer<Channel.Event<SessionFrame>> consumer) {
-        String sessionId = chat.value();
-        long firstBuffered = sessionFrames.earliestBufferedSeq(sessionId);
-        long latest = sessionFrames.lastSeq(sessionId);
-        return new StreamAttachment(sessionFrames.subscribe(sessionId, afterSeq, consumer), liveTurnId,
-                firstBuffered, latest);
     }
 
     private static SessionId chat(SessionEvent event) {

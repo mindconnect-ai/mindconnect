@@ -64,9 +64,9 @@ public class SessionTurns {
      * Answers the approval a tool call waits for, and the turn goes on.
      *
      * @param forSession with {@code approved}: the tool may run for the rest of the session
-     * @return whether the answer reached a waiting call; false for a card that is stale
+     * @return the turn that goes on; empty for a card that is stale
      */
-    public boolean answerApproval(SessionId sessionId, String callId, boolean approved, boolean forSession) {
+    public Optional<TurnId> answerApproval(SessionId sessionId, String callId, boolean approved, boolean forSession) {
         Optional<Turn> running = turns.getObject().runningTurn(sessionId);
         Optional<String> asked = running.map(Turn::interruptions).orElse(List.of()).stream()
                 .filter(interruption -> interruption.call() != null && callId.equals(interruption.call().callId()))
@@ -75,6 +75,6 @@ public class SessionTurns {
         asked.ifPresent(id -> turns.getObject().resume(running.orElseThrow().id(), List.of(
                 !approved ? InterruptionAnswer.reject(id, "")
                         : forSession ? InterruptionAnswer.approveAlways(id) : InterruptionAnswer.approve(id))));
-        return asked.isPresent();
+        return asked.map(id -> running.orElseThrow().id());
     }
 }

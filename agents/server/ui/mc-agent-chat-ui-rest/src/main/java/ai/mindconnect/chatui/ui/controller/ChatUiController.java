@@ -1595,7 +1595,7 @@ public class ChatUiController {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         boolean delivered = sessionTurns.answerApproval(runtimeId(sessionId), callId, approved,
-                "session".equalsIgnoreCase(scope));
+                "session".equalsIgnoreCase(scope)).isPresent();
         log.info("POST /chat/api/sessions/{}/approval call={} approved={} scope={} delivered={}",
                 sessionId.value(), callId, approved, scope, delivered);
         return ResponseEntity.ok(ai.mindconnect.chatui.ui.component.MessageListComponent.removeApprovalCard(callId));

@@ -5,10 +5,8 @@ import ai.mindconnect.agent.runtime.domain.AgentPatch;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.chat.stream.ApprovalScope;
 import ai.mindconnect.agent.chat.stream.ToolApproval;
 import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.auth.SessionAccess;
@@ -37,6 +35,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * External REST API for agents and their chat sessions: agent CRUD, session
@@ -58,11 +57,13 @@ public class AgentApiController {
     private static final Logger log = LoggerFactory.getLogger(AgentApiController.class);
 
     /** How long a finished turn's stream waits for its Done frame before it closes anyway. */
-    private static final java.time.Duration DONE_GRACE = java.time.Duration.ofSeconds(5);
 
     private final AgentRegistryService registryService;
     private final AgentSessionService sessionService;
-    private final ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService chatService;
+    private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns;
+    private final ai.mindconnect.agentrest.service.TurnFrameStream frameStream;
+    private final ai.mindconnect.agent.runtime.service.AgentChatService earlierChat;
+    private final ai.mindconnect.agent.management.api.SessionManagement management;
     private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction;
     private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
     private final ai.mindconnect.filestore.FileStore fileStore;
@@ -73,7 +74,10 @@ public class AgentApiController {
 
     public AgentApiController(AgentRegistryService registryService,
                             AgentSessionService sessionService,
-                            ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService chatService,
+                            ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
+                            ai.mindconnect.agentrest.service.TurnFrameStream frameStream,
+                            ai.mindconnect.agent.runtime.service.AgentChatService earlierChat,
+                            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.management.api.SessionManagement> management,
                             ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
                             ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
                             ai.mindconnect.filestore.FileStore fileStore,
@@ -88,7 +92,10 @@ public class AgentApiController {
                 : new ai.mindconnect.agent.management.directory.WorkingDirBrowser(sessionService.workingDirPolicy());
         this.registryService = registryService;
         this.sessionService = sessionService;
-        this.chatService = chatService;
+        this.sessionTurns = sessionTurns;
+        this.frameStream = frameStream;
+        this.earlierChat = earlierChat;
+        this.management = management.getIfAvailable();
         this.compaction = compaction;
         this.chatOpener = chatOpener;
         this.fileStore = fileStore;
@@ -352,36 +359,49 @@ public class AgentApiController {
      */
     private SseEmitter streamTurn(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
         SseEmitter emitter = new SseEmitter(120_000L);
-        // Set once the turn's Done frame has gone out to this client.
-        java.util.concurrent.CompletableFuture<Void> doneSent = new java.util.concurrent.CompletableFuture<>();
-
-        ChatTurnHandle turn = chatService.submitFrames(sessionId, parts, frame -> {
-            sendFrame(emitter, frame);
-            if ("done".equals(frame.type())) {
-                doneSent.complete(null);
-            }
-        });
-
-        turn.outcome().thenAccept(result -> {
-            if (result.isIncomplete()) {
-                sendFrame(emitter, IncompleteFrame.of(result.turnId().value(), result.pendingApprovals()));
-            }
-        });
-        // Close the stream when the turn finishes (success or failure). The turn's future
-        // completes on the queue's thread while its last events still travel on the
-        // subscription's own: closing right away cut off the end of a fast final round —
-        // the last text and the Done frame hit a completed emitter. So a successful turn
-        // closes once its Done has been sent, or after a short grace if a Done never comes.
-        turn.result().whenComplete((response, error) -> {
-            if (error != null) {
-                endStream(emitter, sessionId, error);
-                return;
-            }
-            doneSent.completeOnTimeout(null, DONE_GRACE.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
-                    .whenComplete((ignored, e) -> endStream(emitter, sessionId, null));
-        });
-
+        frameStream.stream(runtimeId(sessionId), () -> Optional.of(sessionTurns.submit(runtimeId(sessionId),
+                parts.stream().map(AgentApiController::part).toList())), false, sinkTo(emitter, sessionId));
         return emitter;
+    }
+
+    /** The emitter as where a turn's stream goes; a turn that asks is told with what it waits for. */
+    private ai.mindconnect.agentrest.service.TurnFrameStream.Sink sinkTo(SseEmitter emitter, SessionId sessionId) {
+        return new ai.mindconnect.agentrest.service.TurnFrameStream.Sink() {
+            @Override
+            public void frame(TurnFrame frame) {
+                sendFrame(emitter, frame);
+            }
+
+            @Override
+            public void asked(ai.mindconnect.agent.runtime.api.domain.TurnId turnId) {
+                sendFrame(emitter, IncompleteFrame.of(turnId.value(), earlierChat.openApprovals(sessionId)));
+            }
+
+            @Override
+            public void ended(String error) {
+                endStream(emitter, sessionId, error == null ? null : new IllegalStateException(error));
+            }
+        };
+    }
+
+    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId sessionId) {
+        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value());
+    }
+
+    /** A part of a message as the runtime takes it. */
+    private static ai.mindconnect.agent.loop.domain.ContentPart part(ai.mindconnect.message.domain.ContentPart part) {
+        return switch (part) {
+            case ai.mindconnect.message.domain.ContentPart.Text text ->
+                    new ai.mindconnect.agent.loop.domain.ContentPart.Text(text.text());
+            case ai.mindconnect.message.domain.ContentPart.Image image ->
+                    new ai.mindconnect.agent.loop.domain.ContentPart.Image(
+                            new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId(image.fileId()),
+                            ai.mindconnect.agent.loop.domain.ContentPart.Image.Detail.AUTO, image.name());
+            case ai.mindconnect.message.domain.ContentPart.File file ->
+                    new ai.mindconnect.agent.loop.domain.ContentPart.Document(
+                            new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId(file.fileId()),
+                            file.name());
+        };
     }
 
     /** One frame as JSON; a stream that broke is closed with the failure. */
@@ -465,7 +485,7 @@ public class AgentApiController {
                     + "loop reaches the next cancel-check point.")
     @DeleteMapping("/sessions/{sessionId}/chat")
     public ResponseEntity<Void> cancelChat(@PathVariable String sessionId, @CurrentUser UserId caller) {
-        boolean cancelled = chatService.cancelChat(owned(sessionId, caller));
+        boolean cancelled = sessionTurns.cancel(runtimeId(owned(sessionId, caller)));
         log.info("DELETE /api/sessions/{}/chat → cancelled={}", sessionId, cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
@@ -491,7 +511,7 @@ public class AgentApiController {
         // The replay runs on the channel's drain thread and could outrun the
         // attached frame below — the latch holds event frames until it is out.
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        var attachment = chatService.attach(id, afterSeq, event -> {
+        var attachment = frameStream.attach(runtimeId(id), afterSeq, event -> {
             try {
                 attachedSent.await();
                 emitter.send(SseEmitter.event().data(
@@ -538,7 +558,7 @@ public class AgentApiController {
     public ResponseEntity<Void> deleteSession(@PathVariable String sessionId, @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("DELETE /api/sessions/{}", sessionId);
-        chatService.deleteChat(id);
+        management.delete(runtimeId(id));
         return ResponseEntity.noContent().build();
     }
 
@@ -565,7 +585,7 @@ public class AgentApiController {
     public WorkingMemory getWorkingMemory(@PathVariable String sessionId, @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("GET /api/sessions/{}/memory", sessionId);
-        return chatService.memorySnapshot(id);
+        return earlierChat.memorySnapshot(id);
     }
 
     @Operation(tags = "Sessions", summary = "Compress the session's working memory",
@@ -592,7 +612,7 @@ public class AgentApiController {
                     + "from here. Each entry's content is the call JSON the card shows.")
     @GetMapping("/sessions/{sessionId}/approvals")
     public List<ToolApproval> openApprovals(@PathVariable String sessionId, @CurrentUser UserId caller) {
-        List<ToolApproval> open = chatService.openApprovals(owned(sessionId, caller));
+        List<ToolApproval> open = earlierChat.openApprovals(owned(sessionId, caller));
         log.info("GET /api/sessions/{}/approvals → {} open", sessionId, open.size());
         return open;
     }
@@ -609,8 +629,8 @@ public class AgentApiController {
                                                @RequestParam boolean approved,
                                                @RequestParam(defaultValue = "once") String scope,
                                                @CurrentUser UserId caller) {
-        boolean delivered = chatService.answerApproval(
-                owned(sessionId, caller), callId, approved, ApprovalScope.fromParam(scope));
+        boolean delivered = sessionTurns.answerApproval(runtimeId(owned(sessionId, caller)), callId, approved,
+                "session".equalsIgnoreCase(scope)).isPresent();
         log.info("POST /api/sessions/{}/approvals/{} approved={} scope={} → delivered={}",
                 sessionId, callId, approved, scope, delivered);
         return delivered ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
@@ -631,24 +651,11 @@ public class AgentApiController {
                                                                 @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         SseEmitter emitter = new SseEmitter(120_000L);
-        java.util.function.Consumer<TurnFrame> frames = frame -> sendFrame(emitter, frame);
-        var continued = approved
-                ? chatService.approve(id, callId, ApprovalScope.fromParam(scope), frames)
-                : chatService.deny(id, callId, frames);
+        boolean continued = frameStream.stream(runtimeId(id), () -> sessionTurns.answerApproval(runtimeId(id),
+                callId, approved, "session".equalsIgnoreCase(scope)), true, sinkTo(emitter, id));
         log.info("POST /api/sessions/{}/approvals/{}/continue approved={} scope={} → continued={}",
-                sessionId, callId, approved, scope, continued.isPresent());
-        if (continued.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        continued.get().outcome().whenComplete((result, error) -> {
-            if (error == null && result.isIncomplete()) {
-                sendFrame(emitter, IncompleteFrame.of(result.turnId().value(), result.pendingApprovals()));
-                emitter.complete();
-            } else {
-                endStream(emitter, id, error);
-            }
-        });
-        return ResponseEntity.ok(emitter);
+                sessionId, callId, approved, scope, continued);
+        return continued ? ResponseEntity.ok(emitter) : ResponseEntity.notFound().build();
     }
 
     /**
