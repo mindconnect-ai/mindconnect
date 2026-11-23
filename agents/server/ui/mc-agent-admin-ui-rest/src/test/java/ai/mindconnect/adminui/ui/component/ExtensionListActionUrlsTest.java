@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.extension.adapter.classpath.ClasspathAudit;
 import ai.mindconnect.extension.adapter.classpath.ContributionChecker;

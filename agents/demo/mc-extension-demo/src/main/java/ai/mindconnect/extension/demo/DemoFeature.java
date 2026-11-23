@@ -5,7 +5,7 @@ import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
-import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.jdbc.Sql;
 
 import java.util.Set;

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.trace.adapter.pg.PgLlmCallTraceRepository;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.agent.Namespace;
@@ -8,10 +9,10 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.runtime.domain.TraceContext;
-import ai.mindconnect.agent.runtime.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.TraceContext;
+import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.tools.todo.TodoList;

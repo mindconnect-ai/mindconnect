@@ -1,13 +1,13 @@
 package ai.mindconnect.extension.demo;
 
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.TraceId;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
+import ai.mindconnect.agent.trace.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
 
-import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 
 import java.util.List;
 import java.util.Optional;

@@ -23,6 +23,11 @@
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-trace</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- The directory rules moved to the management engine; this module is on its way out and reads them there. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

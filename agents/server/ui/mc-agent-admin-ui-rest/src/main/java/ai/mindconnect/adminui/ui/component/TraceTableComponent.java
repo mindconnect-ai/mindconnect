@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.ui.controller.SessionUiController;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
+import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiColumn;

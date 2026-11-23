@@ -24,7 +24,7 @@ import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.runtime.port.out.PartContentReader;
 import ai.mindconnect.agent.runtime.port.out.PromptContextProvider;

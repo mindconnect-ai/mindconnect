@@ -63,7 +63,7 @@ import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.agent.runtime.memory.domain.AutoCompactConfig;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration;

@@ -4,7 +4,7 @@ import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.TraceTableComponent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
+import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiSection;
 

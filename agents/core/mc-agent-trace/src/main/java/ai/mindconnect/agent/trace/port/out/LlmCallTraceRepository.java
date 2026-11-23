@@ -1,9 +1,9 @@
-package ai.mindconnect.agent.runtime.port.out;
+package ai.mindconnect.agent.trace.port.out;
 
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.TraceId;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
+import ai.mindconnect.agent.trace.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
 

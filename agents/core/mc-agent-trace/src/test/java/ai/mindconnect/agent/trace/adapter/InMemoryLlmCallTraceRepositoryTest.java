@@ -1,10 +1,10 @@
-package ai.mindconnect.agent.runtime.adapter.repo.memory;
+package ai.mindconnect.agent.trace.adapter;
 
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
-import ai.mindconnect.agent.runtime.domain.TraceContext;
-import ai.mindconnect.agent.runtime.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.domain.TraceContext;
+import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;

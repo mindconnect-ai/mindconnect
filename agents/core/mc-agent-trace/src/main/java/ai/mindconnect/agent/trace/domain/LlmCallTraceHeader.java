@@ -1,7 +1,5 @@
-package ai.mindconnect.agent.runtime.domain.view;
+package ai.mindconnect.agent.trace.domain;
 
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
-import ai.mindconnect.agent.runtime.domain.TraceContext;
 
 import java.time.Instant;
 
@@ -13,7 +11,7 @@ import java.time.Instant;
  */
 public interface LlmCallTraceHeader {
 
-    ai.mindconnect.agent.runtime.domain.TraceId id();
+    ai.mindconnect.agent.trace.domain.TraceId id();
 
     TraceContext context();
 

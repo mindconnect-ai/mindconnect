@@ -1,14 +1,14 @@
-package ai.mindconnect.agent.runtime.adapter.file;
+package ai.mindconnect.agent.trace.adapter;
 
 import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.agent.runtime.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.TraceId;
 
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
-import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

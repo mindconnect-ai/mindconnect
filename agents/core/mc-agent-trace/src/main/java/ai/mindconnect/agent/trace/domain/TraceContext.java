@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.domain;
+package ai.mindconnect.agent.trace.domain;
 
 import ai.mindconnect.agent.SessionId;
 

@@ -1,12 +1,12 @@
-package ai.mindconnect.agent.runtime.adapter.pg;
+package ai.mindconnect.agent.trace.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
-import ai.mindconnect.agent.runtime.domain.TraceContext;
-import ai.mindconnect.agent.runtime.domain.TraceId;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.domain.TraceContext;
+import ai.mindconnect.agent.trace.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;

@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.domain;
+package ai.mindconnect.agent.trace.domain;
 
 import ai.mindconnect.llm.domain.LlmCallEvent;
 
@@ -43,7 +43,7 @@ public record LlmCallTrace(
         Integer errorStatus,
         /** Error body (provider JSON or exception message) if the call failed, else null. */
         String errorBody
-) implements ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader {
+) implements ai.mindconnect.agent.trace.domain.LlmCallTraceHeader {
 
     public static LlmCallTrace of(TraceContext context, LlmCallEvent event) {
         return new LlmCallTrace(

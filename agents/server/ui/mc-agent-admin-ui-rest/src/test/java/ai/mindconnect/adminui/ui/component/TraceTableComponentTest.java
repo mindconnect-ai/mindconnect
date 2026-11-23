@@ -2,9 +2,9 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.ui.component.TraceTableComponent.Query;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
-import ai.mindconnect.agent.runtime.domain.TraceContext;
-import ai.mindconnect.agent.runtime.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.domain.TraceContext;
+import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.ui.model.UiRow;
