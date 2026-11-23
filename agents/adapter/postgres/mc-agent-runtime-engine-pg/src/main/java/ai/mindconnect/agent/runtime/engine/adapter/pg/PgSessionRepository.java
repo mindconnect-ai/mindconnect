@@ -1,10 +1,12 @@
 package ai.mindconnect.agent.runtime.engine.adapter.pg;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.jdbc.DocumentTable;
@@ -59,5 +61,22 @@ public final class PgSessionRepository implements SessionRepository {
     @Override
     public Optional<Session> update(SessionId id, UnaryOperator<Session> change) {
         return sessions.update(namespaces.current(), id.value(), change);
+    }
+
+    @Override
+    public List<Session> findByUser(UserId user) {
+        return sessions.find("WHERE namespace = ? AND user_id = ? AND parent_id IS NULL "
+                + "ORDER BY created_at DESC, id", namespaces.current(), user.value());
+    }
+
+    @Override
+    public List<Session> findByParent(SessionId parent) {
+        return sessions.find("WHERE namespace = ? AND parent_id = ? ORDER BY created_at, id",
+                namespaces.current(), parent.value());
+    }
+
+    @Override
+    public boolean delete(SessionId id) {
+        return sessions.deleteById(namespaces.current(), id.value());
     }
 }

@@ -22,6 +22,7 @@ import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.port.out.MessageRepository;
 
@@ -50,7 +51,9 @@ public final class RepositorySessionStore implements SessionStore {
 
     private final SessionRepository sessions;
     private final MessageRepository messages;
-    private final SessionMessageMapper mapper = new SessionMessageMapper();
+    private static final SessionMessageMapper READER = new SessionMessageMapper();
+
+    private final SessionMessageMapper mapper = READER;
 
     public RepositorySessionStore(SessionRepository sessions, MessageRepository messages) {
         this.sessions = sessions;
@@ -72,6 +75,15 @@ public final class RepositorySessionStore implements SessionStore {
     /** The message repository asks a scope supplier where the runtime asks a namespace provider. */
     private static ScopeSupplier scopeOf(NamespaceProvider namespaces) {
         return () -> Scope.of(new Namespace(namespaces.current()));
+    }
+
+    /**
+     * A stored message as the turn message it was written from; empty for
+     * one no turn wrote. For whoever reads a conversation beside the runtime
+     * and wants it in the runtime's terms.
+     */
+    public static Optional<TurnMessage> turnMessageOf(Message stored) {
+        return READER.turnMessage(stored);
     }
 
     @Override

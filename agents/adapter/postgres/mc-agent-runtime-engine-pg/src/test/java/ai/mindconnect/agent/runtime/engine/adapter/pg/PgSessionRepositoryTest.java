@@ -78,6 +78,26 @@ class PgSessionRepositoryTest {
     }
 
     @Test
+    void sessions_are_listed_by_user_and_by_parent_and_deleted_one_at_a_time() {
+        PgSessionRepository sessions = in("a");
+        Session older = new Session(SessionId.of("older"), UserId.of("ada"), null, null, Map.of(),
+                Instant.parse("2026-11-01T00:00:00Z"));
+        Session child = new Session(SessionId.of("child"), UserId.of("ada"), SESSION.id(), null, Map.of(),
+                Instant.parse("2026-11-24T00:00:00Z"));
+        Session eves = new Session(SessionId.of("eves"), UserId.of("eve"), null, null, Map.of(),
+                Instant.parse("2026-11-25T00:00:00Z"));
+        for (Session session : List.of(older, SESSION, child, eves)) {
+            sessions.create(session);
+        }
+
+        assertThat(sessions.findByUser(UserId.of("ada"))).containsExactly(SESSION, older);
+        assertThat(sessions.findByParent(SESSION.id())).containsExactly(child);
+        assertThat(sessions.delete(child.id())).isTrue();
+        assertThat(sessions.delete(child.id())).isFalse();
+        assertThat(sessions.findByParent(SESSION.id())).isEmpty();
+    }
+
+    @Test
     void the_same_id_is_another_session_in_another_namespace() {
         in("a").create(SESSION);
 

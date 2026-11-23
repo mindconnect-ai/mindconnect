@@ -1,12 +1,16 @@
 package ai.mindconnect.agent.runtime.engine.adapter.store;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 
@@ -43,5 +47,33 @@ public final class InMemorySessionRepository implements SessionRepository {
     @Override
     public Optional<Session> update(SessionId id, UnaryOperator<Session> change) {
         return Optional.ofNullable(sessions.computeIfPresent(key(id), (key, session) -> change.apply(session)));
+    }
+
+    @Override
+    public List<Session> findByUser(UserId user) {
+        return inThisNamespace()
+                .filter(session -> session.userId().equals(user) && session.parentId() == null)
+                .sorted(Comparator.comparing(Session::createdAt).reversed())
+                .toList();
+    }
+
+    @Override
+    public List<Session> findByParent(SessionId parent) {
+        return inThisNamespace()
+                .filter(session -> parent.equals(session.parentId()))
+                .sorted(Comparator.comparing(Session::createdAt))
+                .toList();
+    }
+
+    @Override
+    public boolean delete(SessionId id) {
+        return sessions.remove(key(id)) != null;
+    }
+
+    private Stream<Session> inThisNamespace() {
+        String namespace = namespaces.current();
+        return sessions.entrySet().stream()
+                .filter(entry -> entry.getKey().namespace().equals(namespace))
+                .map(Map.Entry::getValue);
     }
 }

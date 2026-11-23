@@ -1,10 +1,12 @@
 package ai.mindconnect.agent.runtime.engine.port.out;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.UserId;
 
 /**
  * Where the sessions themselves are kept — who it belongs to, its agent,
@@ -24,4 +26,13 @@ public interface SessionRepository {
      * there is no such session.
      */
     Optional<Session> update(SessionId id, UnaryOperator<Session> change);
+
+    /** A user's sessions that stand under no other, newest first. */
+    List<Session> findByUser(UserId user);
+
+    /** The sessions opened under this one — a sub-agent's, a fork taken as a child — oldest first. */
+    List<Session> findByParent(SessionId parent);
+
+    /** Removes the session and nothing else; whether there was one. */
+    boolean delete(SessionId id);
 }
