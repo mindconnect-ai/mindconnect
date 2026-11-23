@@ -498,7 +498,8 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String title = new FormBody(raw).str("title");
         if (title != null && !title.isBlank()) {
-            sessionService.updateTitle(sessionId, title.trim());
+            sessionManagement.rename(
+                    ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()), title.trim());
         }
         String userId = userId(user);
         var sessions = chats(userId);
