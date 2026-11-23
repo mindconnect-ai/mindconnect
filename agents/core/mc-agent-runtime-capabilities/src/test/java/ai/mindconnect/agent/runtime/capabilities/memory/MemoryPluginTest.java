@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.capabilities.memory;
 
+import static org.assertj.core.api.Assertions.tuple;
+import ai.mindconnect.agent.runtime.api.port.out.PromptRenderer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
@@ -59,6 +61,7 @@ class MemoryPluginTest {
     void install_memory() {
         registry = new DefaultPluginRegistry();
         registry.provide(TokenCounter.class, () -> String::length);
+        registry.provide(PromptRenderer.class, () -> (template, variables) -> template);
         registry.provide(ModelGateway.class, () -> new ModelGateway() {
             @Override
             public LlmAnswer ask(ModelRequest request, TurnEventListener events) {
@@ -109,6 +112,29 @@ class MemoryPluginTest {
         });
         registry.install(new MemoryPlugin(new InMemorySummaryStore(NamespaceProvider.fixed("test"))));
         registry.start();
+    }
+
+    @Test
+    void looking_at_the_working_memory_shows_what_would_be_sent_and_changes_nothing() {
+        stored = new Session(SessionId.of("s1"), UserId.of("ada"), null,
+                new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5,
+                        Map.of(MemoryPlugin.MEMORY, Map.of("strategy", "compact", "maxConversationRatio", 0.9))),
+                Map.of(), Instant.EPOCH);
+        registry.after(RuntimeHook.INSTRUCTIONS, (context, instructions) -> instructions + " Be brief.");
+
+        WorkingMemory memory = registry.get(MemoryInspection.class).inspect(SessionId.of("s1"));
+
+        assertThat(memory.instructions()).isEqualTo("You help. Be brief.");
+        assertThat(memory.contextWindowTokens()).hasValue(100);
+        // The two turns before the one underway would be summarised first: they are not sent as said.
+        assertThat(memory.messages()).extracting(entry -> entry.message().id(), WorkingMemory.Entry::sent)
+                .containsExactly(tuple("m1", false), tuple("m2", false), tuple("m3", false), tuple("m4", false),
+                        tuple("m5", true));
+        assertThat(memory.totalTokens()).isEqualTo("You help. Be brief.".length() + "third question .....".length());
+        // Nothing was summarised and nothing kept: looking again finds the same.
+        assertThat(summaryRequests).isEmpty();
+        assertThat(remembered).isEmpty();
+        assertThat(memory.summary()).isEmpty();
     }
 
     @Test

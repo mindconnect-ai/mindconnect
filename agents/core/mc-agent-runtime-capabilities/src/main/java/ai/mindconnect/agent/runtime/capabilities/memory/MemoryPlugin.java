@@ -15,10 +15,15 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.hook.AgentContext;
 import ai.mindconnect.agent.runtime.api.hook.ModelCall;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
+import ai.mindconnect.agent.runtime.api.port.out.PromptRenderer;
+import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.TokenCounter;
 import ai.mindconnect.plugin.BeforeOutcome;
@@ -72,6 +77,7 @@ public final class MemoryPlugin implements Plugin {
         ConversationSummarizer summarizer = new ConversationSummarizer(registry.supplier(ModelGateway.class));
         Supplier<SessionStore> sessions = registry.supplier(SessionStore.class);
         registry.provide(MemoryCompaction.class, () -> sessionId -> compact(sessions.get(), sessionId, summarizer));
+        registry.provide(MemoryInspection.class, () -> sessionId -> inspect(registry, sessionId));
         registry.before(RuntimeHook.MODEL_CALL, call -> BeforeOutcome.proceed(call.with(fitted(call,
                 registry.get(TokenCounter.class), registry.get(ModelGateway.class), summarizer,
                 // Kept on the message, so the result is shown as this note from now on.
@@ -104,6 +110,13 @@ public final class MemoryPlugin implements Plugin {
         return left.size();
     }
 
+    /**
+     * What of a history goes to the model: the summary there is, the
+     * messages that are sent, and the ones that have to be summarised first
+     * because they no longer fit.
+     */
+    private record Fit(Optional<ConversationSummary> summary, List<TurnMessage> sent, List<TurnMessage> toSummarise) { }
+
     private ModelRequest fitted(ModelCall call, TokenCounter counter, ModelGateway model,
                                 ConversationSummarizer summarizer, BiConsumer<TurnMessage, String> remember) {
         ModelRequest request = call.request();
@@ -111,30 +124,44 @@ public final class MemoryPlugin implements Plugin {
         if (config.strategy() == MemoryConfig.Strategy.FULL) {
             return request;
         }
+        Fit fit = fit(config, call.context().session().id(), request.messages(), request.settings(), counter, model,
+                remember);
+        Optional<ConversationSummary> summary = fit.summary();
+        if (!fit.toSummarise().isEmpty()) {
+            List<TurnMessage> left = fit.toSummarise();
+            summary = Optional.of(new ConversationSummary(
+                    summarizer.summarize(request.turnId(), request.settings(), summary, left),
+                    left.get(left.size() - 1).id()));
+            summaries.save(call.context().session().id(), summary.get());
+        }
+        return placed(request, fit.sent(), summary, config.summaryPlacement());
+    }
+
+    /** Decides and changes nothing, except through {@code remember}: summarising is the caller's. */
+    private Fit fit(MemoryConfig config, SessionId sessionId, List<TurnMessage> said, ModelSettings settings,
+                    TokenCounter counter, ModelGateway model, BiConsumer<TurnMessage, String> remember) {
+        if (config.strategy() == MemoryConfig.Strategy.FULL) {
+            return new Fit(Optional.empty(), said, List.of());
+        }
         if (config.strategy() == MemoryConfig.Strategy.NONE) {
-            List<TurnMessage> said = request.messages();
-            return placed(request, said.subList(firstTurnWhere(said, from -> true), said.size()),
-                    Optional.empty(), config.summaryPlacement());
+            return new Fit(Optional.empty(), said.subList(firstTurnWhere(said, from -> true), said.size()),
+                    List.of());
         }
         int budget = (int) (config.maxConversationRatio()
-                * model.contextWindowTokens(request.settings()).orElse(DEFAULT_CONTEXT_WINDOW_TOKENS));
+                * model.contextWindowTokens(settings).orElse(DEFAULT_CONTEXT_WINDOW_TOKENS));
         boolean compact = config.strategy() == MemoryConfig.Strategy.COMPACT;
-        Optional<ConversationSummary> summary = compact
-                ? summaries.find(call.context().session().id()) : Optional.empty();
+        Optional<ConversationSummary> summary = compact ? summaries.find(sessionId) : Optional.empty();
 
         List<TurnMessage> messages = new ToolResultTrimmer(counter, budget, config.keepRecentToolResults(), remember)
-                .trim(after(summary, request.messages()));
+                .trim(after(summary, said));
+        List<TurnMessage> toSummarise = List.of();
         if (counter.count(messages) > budget) {
             // Half the budget stays as said: a summary that leaves no room for what follows it helps nobody.
             int room = compact ? budget / 2 : budget;
             List<TurnMessage> counted = messages;
             int kept = firstTurnWhere(counted, from -> counter.count(counted.subList(from, counted.size())) > room);
             if (compact && kept > 0) {
-                List<TurnMessage> left = messages.subList(0, kept);
-                summary = Optional.of(new ConversationSummary(
-                        summarizer.summarize(request.turnId(), request.settings(), summary, left),
-                        left.get(left.size() - 1).id()));
-                summaries.save(call.context().session().id(), summary.get());
+                toSummarise = List.copyOf(messages.subList(0, kept));
             }
             messages = messages.subList(kept, messages.size());
         }
@@ -143,7 +170,43 @@ public final class MemoryPlugin implements Plugin {
             messages = messages.subList(
                     firstTurnWhere(counted, from -> counted.size() - from > config.maxMessages()), messages.size());
         }
-        return placed(request, messages, summary, config.summaryPlacement());
+        return new Fit(summary, messages, toSummarise);
+    }
+
+    private WorkingMemory inspect(PluginRegistry registry, SessionId sessionId) {
+        Session session = registry.get(SessionStore.class).find(sessionId).orElseThrow(() ->
+                new IllegalArgumentException("There is no session " + sessionId.value()));
+        AgentDefinition agent = session.agent();
+        if (agent == null) {
+            throw new IllegalArgumentException("Session " + sessionId.value() + " has no agent");
+        }
+        TokenCounter counter = registry.get(TokenCounter.class);
+        ModelGateway model = registry.get(ModelGateway.class);
+        // As the engine makes them for a model call: the template with what the providers know, then what
+        // the capabilities add. No turn is underway, so the context names none.
+        Map<String, Object> variables = new HashMap<>();
+        registry.all(PromptVariableProvider.class).forEach(provider ->
+                variables.putAll(provider.variables(agent, session)));
+        String instructions = registry.run(RuntimeHook.INSTRUCTIONS, new AgentContext(session, agent, null),
+                context -> registry.get(PromptRenderer.class).render(agent.instructions(), variables));
+
+        List<TurnMessage> said = registry.get(SessionStore.class).messages(sessionId);
+        Fit fit = fit(MemoryConfig.of(agent), sessionId, said, agent.modelSettings(), counter, model,
+                (message, note) -> { });
+        // What would be summarised first is not sent as said either.
+        Map<String, TurnMessage> sent = new HashMap<>();
+        fit.sent().forEach(message -> sent.put(message.id(), message));
+        List<WorkingMemory.Entry> entries = said.stream().map(message -> {
+            TurnMessage asSent = sent.get(message.id());
+            boolean shortened = asSent != null && !asSent.text().equals(message.text());
+            return new WorkingMemory.Entry(message, asSent != null, shortened ? asSent.text() : null,
+                    counter.count(asSent != null ? asSent.text() : message.text()));
+        }).toList();
+        Optional<String> summary = fit.summary().map(ConversationSummary::text);
+        int instructionTokens = counter.count(instructions);
+        return new WorkingMemory(instructions, instructionTokens, summary, entries,
+                instructionTokens + summary.map(counter::count).orElse(0) + counter.count(fit.sent()),
+                model.contextWindowTokens(agent.modelSettings()));
     }
 
     /** What the summary does not cover; everything, when there is none or its last message is not in the history. */

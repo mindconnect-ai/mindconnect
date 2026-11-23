@@ -1,5 +1,8 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction;
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.adminui.ui.page.MemoryPage;
 import ai.mindconnect.adminui.ui.page.TodosPage;
 import ai.mindconnect.adminui.ui.page.TracesPage;
@@ -7,12 +10,7 @@ import ai.mindconnect.adminui.ui.component.RoundtripCardComponent;
 import ai.mindconnect.adminui.ui.component.TraceTableComponent;
 import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
-import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
@@ -43,37 +41,23 @@ public class SessionUiController {
 
     private static final Logger log = LoggerFactory.getLogger(SessionUiController.class);
 
-    /** The runtime's: the todo and trace dialogs keep no way of their own to the sessions. */
+    /** The runtime's: the dialogs keep no way of their own to the sessions. */
     private final AgentRuntime runtime;
     private final SessionManagement sessions;
-    private final AgentChatService chatService;
-    private final AgentSessionRepository sessionRepository;
     private final TodoListService todoListService;
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
     private final ConversationManager conversations;
-    /**
-     * The memory dialog has to resolve the agent the same way the earlier
-     * runtime's run did: a chat with an inline session agent has no entry in
-     * the registry, and looking it up there answered 404.
-     */
-    private final SessionAgentResolver agentResolver;
 
     public SessionUiController(AgentRuntime runtime,
-                             AgentChatService chatService,
-                             AgentDefinitionRepository agentRepository,
-                             AgentSessionRepository sessionRepository,
                              TodoListService todoListService,
                              LlmCallTraceRepository traceRepository,
                              ConversationManager conversations) {
         this.runtime = runtime;
         this.sessions = runtime.service(SessionManagement.class);
-        this.chatService = chatService;
-        this.sessionRepository = sessionRepository;
         this.todoListService = todoListService;
         this.traceRepository = traceRepository;
         this.conversations = conversations;
-        this.agentResolver = new SessionAgentResolver(agentRepository);
     }
 
     private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId id) {
@@ -112,10 +96,10 @@ public class SessionUiController {
      * replaces only the detail pane (clicked from the master list).
      */
 
-    /** Working memory, or null when the snapshot cannot be built. */
+    /** What the session's agent would be sent now, or null when that cannot be told. */
     private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
-            return chatService.memorySnapshot(sessionId);
+            return runtime.service(MemoryInspection.class).inspect(runtimeId(sessionId));
         } catch (Exception e) {
             log.warn("Failed to load working memory for session {}: {}", sessionId, e.getMessage());
             return null;
@@ -127,34 +111,29 @@ public class SessionUiController {
                                         @RequestParam(value = "seq", required = false) Integer seq,
                                         @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        var memory = safeMemorySnapshot(sessionId);
-        if (memory == null) {
-            return ResponseEntity.status(503).body("Working memory unavailable for this session");
-        }
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> {
-                            var page = new MemoryPage(session, agent, memory);
-                            if (seq != null) return ResponseEntity.ok(page.selectEntry(seq));
-                            if (dialog) return sessionDialog(sessionId, "Working Memory", page.render());
-                            return ResponseEntity.ok(page.render());
-                        }))
-                .orElse(ResponseEntity.notFound().build());
+        return sessions.find(runtimeId(sessionId)).<ResponseEntity<?>>map(session -> {
+            var memory = safeMemorySnapshot(sessionId);
+            if (memory == null) {
+                return ResponseEntity.status(503).body("Working memory unavailable for this session");
+            }
+            var page = new MemoryPage(session.id(), agentNameOf(session), memory);
+            if (seq != null) return ResponseEntity.ok(page.selectEntry(seq));
+            if (dialog) return sessionDialog(sessionId, "Working Memory", page.render());
+            return ResponseEntity.ok(page.render());
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     /**
-     * Compresses unsummarized messages via the configured memory strategy and
-     * re-renders the working-memory page with the new (smaller) snapshot, so
-     * the operator immediately sees the effect of the compression — fewer
-     * tokens, freshly-marked {@code (compressed)} entries, etc. Returns a
-     * full UiPage so the front-end's existing data-action handler swaps the
-     * page in place.
+     * Summarises what no summary covers yet and re-renders the
+     * working-memory page, so the operator immediately sees the effect —
+     * fewer tokens, a summary row. Returns a full UiPage so the front-end's
+     * existing data-action handler swaps the page in place.
      */
     @PostMapping("/sessions/{sessionId}/memory/compress")
     public ResponseEntity<?> compressMemory(@PathVariable("sessionId") String sessionIdValue) {
         SessionId sessionId = SessionId.of(sessionIdValue);
         try {
-            chatService.compressMemory(sessionId);
+            runtime.service(MemoryCompaction.class).compact(runtimeId(sessionId));
         } catch (Exception e) {
             log.warn("Failed to compress memory for session {}: {}", sessionId, e.getMessage());
             return ResponseEntity.status(500).body("Compression failed: " + e.getMessage());
@@ -163,9 +142,9 @@ public class SessionUiController {
         if (memory == null) {
             return ResponseEntity.status(503).body("Working memory unavailable after compression");
         }
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> ResponseEntity.ok(new MemoryPage(session, agent, memory).render())))
+        return sessions.find(runtimeId(sessionId))
+                .<ResponseEntity<?>>map(session ->
+                        ResponseEntity.ok(new MemoryPage(session.id(), agentNameOf(session), memory).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
