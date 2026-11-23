@@ -14,7 +14,6 @@ import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
-import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptRenderer;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.taskqueue.SharedStateStore;
@@ -77,9 +76,7 @@ public final class RuntimePlugin implements Plugin {
             TurnTaskMapper turns = new TurnTaskMapper(queue, namespaces);
             queue.register(TurnTaskMapper.TYPE, new NamespaceBoundWorker(
                     new TurnWorker(sessions, tools, registry.get(ModelGateway.class), hooks, events, turns,
-                            // Pebble unless someone provided another renderer.
-                            new InstructionRenderer(
-                                    registry.find(PromptRenderer.class).orElseGet(PebblePromptRenderer::new),
+                            new InstructionRenderer(registry.get(PromptRenderer.class),
                                     () -> registry.all(PromptVariableProvider.class))),
                     namespaces));
             queue.register(ToolCallWorker.TYPE, new NamespaceBoundWorker(

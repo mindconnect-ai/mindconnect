@@ -54,6 +54,7 @@ import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
+import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
@@ -127,6 +128,7 @@ class EngineWithCapabilitiesTest {
             }
         });
         registry.install(new InMemorySessionStorePlugin());
+        registry.install(new PebblePromptPlugin());
         registry.install(new Plugin() {
             @Override
             public String name() {

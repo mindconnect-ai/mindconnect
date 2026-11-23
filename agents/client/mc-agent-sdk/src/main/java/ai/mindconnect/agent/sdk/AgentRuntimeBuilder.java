@@ -40,6 +40,7 @@ import ai.mindconnect.agent.runtime.capabilities.trace.TracePlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmGatewayModelPlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
+import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
@@ -174,6 +175,7 @@ public final class AgentRuntimeBuilder {
                         new InMemorySkillResolver(skills),
                         new InMemoryToolResolver(tools),
                         new InMemoryGuardResolver(inputGuards, outputGuards)),
+                new PebblePromptPlugin(),
                 new PromptPlugin(),
                 new SkillPlugin(),
                 new ToolSearchPlugin(new InMemoryToolActivation(namespaces)),

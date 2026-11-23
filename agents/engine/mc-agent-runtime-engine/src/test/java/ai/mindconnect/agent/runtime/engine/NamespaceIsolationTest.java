@@ -37,6 +37,7 @@ import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
+import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.namespace.ThreadBoundNamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
@@ -88,6 +89,7 @@ class NamespaceIsolationTest {
             into.contribute(AgentResolver.class, AgentResolver.of(List.of(LEAD, RESEARCHER)));
         }));
         registry.install(new InMemorySessionStorePlugin());
+        registry.install(new PebblePromptPlugin());
         registry.install(new RuntimePlugin(queue, new InMemorySharedStateStore()));
         registry.install(new SubAgentPlugin());
         registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(namespaces)));
