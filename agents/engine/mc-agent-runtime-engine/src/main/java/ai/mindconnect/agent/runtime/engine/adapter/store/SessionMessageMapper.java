@@ -55,7 +55,10 @@ final class SessionMessageMapper {
      * a conversation begun elsewhere names it.
      */
     static ConversationId conversationOf(Session session) {
-        return ConversationId.of(session.metadata().get(RepositorySessionStore.CONVERSATION_ID) instanceof String id
+        // Only a session at the root continues a conversation begun elsewhere. A sub-agent's session gets
+        // its caller's metadata, this key with it, and must still keep its messages out of the caller's history.
+        return ConversationId.of(session.parentId() == null
+                && session.metadata().get(RepositorySessionStore.CONVERSATION_ID) instanceof String id
                 ? id : session.id().value());
     }
 

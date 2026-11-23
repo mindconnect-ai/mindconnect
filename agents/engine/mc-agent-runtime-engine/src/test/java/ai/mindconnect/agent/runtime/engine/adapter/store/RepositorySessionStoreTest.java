@@ -84,6 +84,18 @@ class RepositorySessionStoreTest {
     }
 
     @Test
+    void a_sub_agents_session_keeps_its_messages_out_of_the_conversation_its_caller_continues() {
+        Session caller = new Session(SessionId.of("s-caller"), UserId.of("ada"), null, null,
+                Map.of(RepositorySessionStore.CONVERSATION_ID, "c9"), Instant.EPOCH);
+        // Opened with the caller's metadata, as the sub-agent tool does.
+        Session called = new Session(SessionId.of("s-called"), UserId.of("ada"), caller.id(), null,
+                caller.metadata(), Instant.EPOCH);
+
+        assertThat(RepositorySessionStore.conversationOf(caller).value()).isEqualTo("c9");
+        assertThat(RepositorySessionStore.conversationOf(called).value()).isEqualTo("s-called");
+    }
+
+    @Test
     void messages_are_stored_the_way_the_message_repository_has_always_held_a_conversation() {
         MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages);
