@@ -71,6 +71,25 @@ class RepositorySessionStoreTest {
 
     @ParameterizedTest
     @MethodSource("stores")
+    void a_message_shown_shortened_keeps_what_it_said_and_says_what_is_shown_instead(SessionStore store) {
+        SessionId id = SessionId.of("s2");
+        store.create(new Session(id, UserId.of("ada"), null, null, Map.of(), Instant.EPOCH));
+        TurnMessage result = store.append(id, List.of(TurnMessage.toolResult("c1", "bash", "a long listing", false)))
+                .get(0);
+
+        store.updateMessageMetadata(id, result.id(), metadata -> {
+            Map<String, Object> changed = new java.util.HashMap<>(metadata);
+            changed.put(SessionStore.COMPRESSED, "[removed]");
+            return changed;
+        });
+
+        TurnMessage read = store.messages(id).get(0);
+        assertThat(read.text()).isEqualTo("a long listing");
+        assertThat(read.metadata()).containsEntry(SessionStore.COMPRESSED, "[removed]").containsEntry("callId", "c1");
+    }
+
+    @ParameterizedTest
+    @MethodSource("stores")
     void a_session_is_changed_in_place_and_created_only_once(SessionStore store) {
         if (store.find(ID).isEmpty()) {
             store.create(SESSION);

@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.api.port.out;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
@@ -19,6 +20,13 @@ import ai.mindconnect.agent.runtime.api.domain.TurnId;
  * them.
  */
 public interface SessionStore {
+
+    /**
+     * The metadata key of a message the model is no longer shown in full:
+     * its value is the short text shown in its place. A store with a field
+     * of its own for that keeps it there.
+     */
+    String COMPRESSED = "compressed";
 
     /**
      * Keeps a new session.
@@ -59,4 +67,15 @@ public interface SessionStore {
      * What comes in one call belongs together and is written together.
      */
     List<TurnMessage> append(SessionId sessionId, List<TurnMessage> messages);
+
+    /**
+     * Changes the metadata of one stored message, as one step. What a
+     * message says is never changed: a session keeps everything as it was
+     * said, and whoever wants the model to read something else in its place
+     * says so here — see {@link #COMPRESSED}.
+     *
+     * @throws IllegalArgumentException if the session has no such message
+     */
+    void updateMessageMetadata(SessionId sessionId, String messageId,
+                               UnaryOperator<Map<String, Object>> change);
 }

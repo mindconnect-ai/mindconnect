@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.engine.service.TurnMessageConverter;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
@@ -44,7 +45,7 @@ final class SessionMessageMapper {
         metadata.put(CONTENT, json.get("content"));
         metadata.put(TOOL_CALLS, json.get("toolCalls"));
         boolean fromUser = written.type() == TurnMessage.Type.USER;
-        return new Message(MessageId.random(), conversationOf(session),
+        return compressedAsItsMetadataSays(new Message(MessageId.random(), conversationOf(session),
                 fromUser ? session.userId().value()
                         : session.agent() == null ? UNNAMED_AGENT : session.agent().name(),
                 fromUser ? ParticipantType.USER : ParticipantType.AGENT, null,
@@ -55,7 +56,25 @@ final class SessionMessageMapper {
                     case TOOL_RESULT -> MessageType.TOOL_RESULT;
                 },
                 written.text(), metadata, sequenceNumber, Instant.now(), false, null, null, null, null,
-                written.turnId() == null ? null : ChatTurnId.of(written.turnId()), null, null);
+                written.turnId() == null ? null : ChatTurnId.of(written.turnId()), null, null));
+    }
+
+    /** The stored message with other metadata of the turn message; what it holds beyond text stays. */
+    Message withTurnMetadata(Message stored, Map<String, Object> turnMetadata) {
+        Map<String, Object> metadata = new LinkedHashMap<>(turnMetadata);
+        metadata.put(CONTENT, stored.metadata().get(CONTENT));
+        metadata.put(TOOL_CALLS, stored.metadata().get(TOOL_CALLS));
+        return compressedAsItsMetadataSays(stored.withMetadata(metadata));
+    }
+
+    /** The repository has fields of its own for a message shown shortened; the entry moves there. */
+    private static Message compressedAsItsMetadataSays(Message message) {
+        if (!(message.metadata().get(SessionStore.COMPRESSED) instanceof String shownInstead)) {
+            return message;
+        }
+        Map<String, Object> metadata = new LinkedHashMap<>(message.metadata());
+        metadata.remove(SessionStore.COMPRESSED);
+        return message.withMetadata(metadata).withCompressed(shownInstead, null);
     }
 
     /** Empty for a message no turn wrote: a note of the system, an approval of the earlier runtime. */
@@ -76,6 +95,9 @@ final class SessionMessageMapper {
             json.put("type", turnType.name());
             json.put("content", metadata.containsKey(CONTENT) ? metadata.remove(CONTENT) : List.of());
             json.put("toolCalls", metadata.containsKey(TOOL_CALLS) ? metadata.remove(TOOL_CALLS) : List.of());
+            if (stored.compressed() && stored.compressedContent() != null) {
+                metadata.put(SessionStore.COMPRESSED, stored.compressedContent());
+            }
             json.put("metadata", metadata);
             return turnMessages.fromJson(json);
         });

@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.engine.adapter.store;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
@@ -20,6 +21,7 @@ import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.port.out.MessageRepository;
 
 /**
@@ -95,6 +97,18 @@ public final class RepositorySessionStore implements SessionStore {
             stored.add(message.stored(id));
         }
         return stored;
+    }
+
+    @Override
+    public void updateMessageMetadata(SessionId sessionId, String messageId,
+                                      UnaryOperator<Map<String, Object>> change) {
+        Session session = sessions.find(sessionId).orElseThrow(() -> missing(sessionId));
+        messages.update(SessionMessageMapper.conversationOf(session), MessageId.of(messageId),
+                        stored -> mapper.turnMessage(stored)
+                                .map(message -> mapper.withTurnMetadata(stored, change.apply(message.metadata())))
+                                .orElse(stored))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Session " + sessionId.value() + " has no message " + messageId));
     }
 
     private static IllegalArgumentException missing(SessionId sessionId) {

@@ -1,8 +1,12 @@
 package ai.mindconnect.agent.runtime.capabilities.memory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
@@ -10,6 +14,7 @@ import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.hook.ModelCall;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.TokenCounter;
 import ai.mindconnect.plugin.BeforeOutcome;
 import ai.mindconnect.plugin.Plugin;
@@ -49,12 +54,20 @@ public final class MemoryPlugin implements Plugin {
     @Override
     public void install(PluginRegistry registry) {
         ConversationSummarizer summarizer = new ConversationSummarizer(registry.supplier(ModelGateway.class));
-        registry.before(RuntimeHook.MODEL_CALL, call -> BeforeOutcome.proceed(call.with(
-                fitted(call, registry.get(TokenCounter.class), registry.get(ModelGateway.class), summarizer))));
+        Supplier<SessionStore> sessions = registry.supplier(SessionStore.class);
+        registry.before(RuntimeHook.MODEL_CALL, call -> BeforeOutcome.proceed(call.with(fitted(call,
+                registry.get(TokenCounter.class), registry.get(ModelGateway.class), summarizer,
+                // Kept on the message, so the result is shown as this note from now on.
+                (message, note) -> sessions.get().updateMessageMetadata(call.context().session().id(), message.id(),
+                        metadata -> {
+                            Map<String, Object> changed = new HashMap<>(metadata);
+                            changed.put(SessionStore.COMPRESSED, note);
+                            return changed;
+                        })))));
     }
 
     private ModelRequest fitted(ModelCall call, TokenCounter counter, ModelGateway model,
-                                ConversationSummarizer summarizer) {
+                                ConversationSummarizer summarizer, BiConsumer<TurnMessage, String> remember) {
         ModelRequest request = call.request();
         MemoryConfig config = MemoryConfig.of(call.context().agent());
         if (config.strategy() == MemoryConfig.Strategy.FULL) {
@@ -66,7 +79,7 @@ public final class MemoryPlugin implements Plugin {
         Optional<ConversationSummary> summary = compact
                 ? summaries.find(call.context().session().id()) : Optional.empty();
 
-        List<TurnMessage> messages = new ToolResultTrimmer(counter, budget, config.keepRecentToolResults())
+        List<TurnMessage> messages = new ToolResultTrimmer(counter, budget, config.keepRecentToolResults(), remember)
                 .trim(after(summary, request.messages()));
         if (counter.count(messages) > budget) {
             // Half the budget stays as said: a summary that leaves no room for what follows it helps nobody.

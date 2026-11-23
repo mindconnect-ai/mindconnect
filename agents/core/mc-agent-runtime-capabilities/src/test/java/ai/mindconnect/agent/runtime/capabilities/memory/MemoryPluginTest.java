@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +31,7 @@ import ai.mindconnect.agent.runtime.api.hook.ModelCall;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.TokenCounter;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -45,6 +49,8 @@ class MemoryPluginTest {
             said("m5", TurnMessage.Type.USER, "third question ....."));
 
     private final List<ModelRequest> summaryRequests = new ArrayList<>();
+    /** The notes the plugin asked the store to keep, by message id. */
+    private final Map<String, String> remembered = new HashMap<>();
     private PluginRegistry registry;
 
     @BeforeEach
@@ -65,6 +71,38 @@ class MemoryPluginTest {
 
             @Override
             public void cancel(TurnId turnId) {
+            }
+        });
+        registry.provide(SessionStore.class, () -> new SessionStore() {
+            @Override
+            public void updateMessageMetadata(SessionId sessionId, String messageId,
+                                              UnaryOperator<Map<String, Object>> change) {
+                remembered.put(messageId, (String) change.apply(Map.of()).get(SessionStore.COMPRESSED));
+            }
+
+            @Override
+            public void create(Session session) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Optional<Session> find(SessionId sessionId) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Session update(SessionId sessionId, UnaryOperator<Session> change) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<TurnMessage> messages(SessionId sessionId) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<TurnMessage> append(SessionId sessionId, List<TurnMessage> messages) {
+                throw new UnsupportedOperationException();
             }
         });
         registry.install(new MemoryPlugin(new InMemorySummaryStore(NamespaceProvider.fixed("test"))));
@@ -112,6 +150,28 @@ class MemoryPluginTest {
     }
 
     @Test
+    void an_old_tool_result_is_shown_as_a_note_and_stays_one_once_it_was() {
+        List<TurnMessage> withResult = List.of(
+                said("m1", TurnMessage.Type.USER, "list the files"),
+                new TurnMessage("m2", "t", TurnMessage.Type.TOOL_RESULT,
+                        List.of(new ContentPart.Text("x".repeat(200))), List.of(), Map.of("callId", "c1")),
+                said("m3", TurnMessage.Type.USER, "and now?"));
+
+        ModelRequest overBudget = sent(Map.of("strategy", "window", "keepRecentToolResults", 0), 0.9, withResult);
+
+        assertThat(overBudget.messages().get(1).text()).startsWith("[Tool result removed");
+        assertThat(remembered).containsOnlyKeys("m2");
+
+        // The store hands the message back with the note; shown is the note, however much room there is.
+        List<TurnMessage> marked = List.of(withResult.get(0),
+                new TurnMessage("m2", "t", TurnMessage.Type.TOOL_RESULT, List.of(new ContentPart.Text("short")),
+                        List.of(), Map.of(SessionStore.COMPRESSED, remembered.get("m2"))),
+                withResult.get(2));
+        assertThat(sent(Map.of("strategy", "window"), 1.0, marked).messages().get(1).text())
+                .isEqualTo(remembered.get("m2"));
+    }
+
+    @Test
     void a_history_that_fits_is_sent_as_it_is() {
         assertThat(sent(Map.of("strategy", "compact"), 1.0).messages()).isEqualTo(HISTORY);
         assertThat(summaryRequests).isEmpty();
@@ -119,14 +179,18 @@ class MemoryPluginTest {
 
     /** What the model is sent when an agent with these memory settings asks with the history. */
     private ModelRequest sent(Map<String, Object> memory, double ratio) {
-        Map<String, Object> settings = new java.util.HashMap<>(memory);
+        return sent(memory, ratio, HISTORY);
+    }
+
+    private ModelRequest sent(Map<String, Object> memory, double ratio, List<TurnMessage> history) {
+        Map<String, Object> settings = new HashMap<>(memory);
         settings.put("maxConversationRatio", ratio);
         AgentDefinition agent = new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE,
                 List.of(), 5, Map.of(MemoryPlugin.MEMORY, settings));
         List<ModelRequest> sent = new ArrayList<>();
         registry.run(RuntimeHook.MODEL_CALL,
                 new ModelCall(new AgentContext(SESSION, agent, TurnId.of("t3")),
-                        new ModelRequest(TurnId.of("t3"), ModelSettings.NONE, "You help.", HISTORY, List.of())),
+                        new ModelRequest(TurnId.of("t3"), ModelSettings.NONE, "You help.", history, List.of())),
                 call -> {
                     sent.add(call.request());
                     return LlmAnswer.of(List.of(), new Usage(0, 0));
