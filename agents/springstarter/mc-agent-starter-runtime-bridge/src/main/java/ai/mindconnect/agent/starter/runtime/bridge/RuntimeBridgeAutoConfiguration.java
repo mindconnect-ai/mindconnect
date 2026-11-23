@@ -44,7 +44,7 @@ import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.plugin.Plugin;

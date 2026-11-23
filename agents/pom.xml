@@ -91,6 +91,8 @@
         <module>engine/mc-agent-runtime-engine</module>
         <module>core/mc-agent-trace</module>
         <module>adapter/postgres/mc-agent-trace-pg</module>
+        <module>core/mc-agent-skill</module>
+        <module>adapter/postgres/mc-agent-skill-pg</module>
         <module>core/mc-agent-management-api</module>
         <module>engine/mc-agent-management</module>
         <module>adapter/postgres/mc-agent-runtime-engine-pg</module>

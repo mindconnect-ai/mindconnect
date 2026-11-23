@@ -65,7 +65,7 @@ import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepositor
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;

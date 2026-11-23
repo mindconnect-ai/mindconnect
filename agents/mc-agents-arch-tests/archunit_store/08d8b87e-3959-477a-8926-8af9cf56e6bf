@@ -52,7 +52,6 @@ ai.mindconnect.agent.runtime.adapter.pg.PgAgentDefinitionRepository has 2 constr
 ai.mindconnect.agent.runtime.adapter.pg.PgAgentRepositoryFactory has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgAgentSessionRepository has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgConversationSummaryRepository has 2 constructors
-ai.mindconnect.agent.runtime.adapter.pg.PgSkillRepository has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgTodoListRepository has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgUserMemoryRepository has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgWorkingMemoryRepository has 2 constructors
@@ -90,6 +89,7 @@ ai.mindconnect.agent.runtime.usermemory.MemoryEntry has 2 constructors
 ai.mindconnect.agent.runtime.usermemory.MemoryReadTool has 2 constructors
 ai.mindconnect.agent.runtime.usermemory.MemoryWriteTool has 2 constructors
 ai.mindconnect.agent.security.UserRecorder has 2 constructors
+ai.mindconnect.agent.skill.adapter.pg.PgSkillRepository has 2 constructors
 ai.mindconnect.agent.starter.namespace.ScopeBindingFilter has 3 constructors
 ai.mindconnect.agent.tool.AgentTool has 2 constructors
 ai.mindconnect.agent.tool.ConnectionTest has 2 constructors

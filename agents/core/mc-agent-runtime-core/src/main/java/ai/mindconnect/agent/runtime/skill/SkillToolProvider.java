@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.skill;
 
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.agent.skill.domain.SkillSource;
+import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.Tool;

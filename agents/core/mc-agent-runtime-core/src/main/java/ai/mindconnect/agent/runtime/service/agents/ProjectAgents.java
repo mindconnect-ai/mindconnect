@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.service.agents;
 
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
-import ai.mindconnect.agent.runtime.markdown.FrontMatter;
+import ai.mindconnect.agent.skill.domain.FrontMatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

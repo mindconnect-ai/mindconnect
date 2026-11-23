@@ -6,11 +6,11 @@ import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
-import ai.mindconnect.agent.runtime.markdown.FrontMatter;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillId;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
-import ai.mindconnect.agent.runtime.skill.SkillSource;
+import ai.mindconnect.agent.skill.domain.FrontMatter;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillId;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.agent.skill.domain.SkillSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

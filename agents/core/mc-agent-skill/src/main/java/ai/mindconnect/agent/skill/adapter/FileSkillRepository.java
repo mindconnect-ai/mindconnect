@@ -1,9 +1,9 @@
-package ai.mindconnect.agent.runtime.adapter.file;
+package ai.mindconnect.agent.skill.adapter;
 
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillId;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillId;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;

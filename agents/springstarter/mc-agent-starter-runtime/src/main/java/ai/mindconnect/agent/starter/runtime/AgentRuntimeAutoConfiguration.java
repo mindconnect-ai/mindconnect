@@ -32,7 +32,7 @@ import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;

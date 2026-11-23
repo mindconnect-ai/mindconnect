@@ -4,9 +4,9 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
-import ai.mindconnect.agent.runtime.skill.Skill;
+import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +41,7 @@ public class SkillsFeature extends ConfigurableFeature {
         } catch (java.io.IOException e) {
             throw new java.io.UncheckedIOException("Failed to read classpath resource: " + resource, e);
         }
-        Skill skill = Skill.fromMarkdown(fallback, content, ai.mindconnect.agent.runtime.skill.SkillSource.MANAGED, null);
+        Skill skill = Skill.fromMarkdown(fallback, content, ai.mindconnect.agent.skill.domain.SkillSource.MANAGED, null);
         if (skill == null) {
             throw new IllegalArgumentException("Not a usable SKILL.md (no instructions, or a name that is "
                     + "not lower-case letters, digits and dashes): " + resource);

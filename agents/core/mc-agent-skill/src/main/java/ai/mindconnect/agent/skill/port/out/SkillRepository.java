@@ -1,4 +1,7 @@
-package ai.mindconnect.agent.runtime.skill;
+package ai.mindconnect.agent.skill.port.out;
+
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillId;
 
 import java.util.List;
 import java.util.Optional;

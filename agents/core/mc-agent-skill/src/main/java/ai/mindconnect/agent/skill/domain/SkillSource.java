@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.skill;
+package ai.mindconnect.agent.skill.domain;
 
 /**
  * Where a skill came from. What it decides is who may change it — a stored

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.skill;
 
+import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.Tool;
 

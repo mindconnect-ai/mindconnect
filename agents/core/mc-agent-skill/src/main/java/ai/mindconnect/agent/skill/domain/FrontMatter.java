@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.markdown;
+package ai.mindconnect.agent.skill.domain;
 
 import java.util.ArrayList;
 import java.util.Arrays;

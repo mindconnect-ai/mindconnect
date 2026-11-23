@@ -2,11 +2,11 @@ package ai.mindconnect.agent.runtime.adapter;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.adapter.file.FileSkillRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
-import ai.mindconnect.agent.runtime.skill.SkillSource;
+import ai.mindconnect.agent.skill.adapter.FileSkillRepository;
+import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.agent.skill.domain.SkillSource;
 import ai.mindconnect.common.StaleVersionException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

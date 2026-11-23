@@ -7,8 +7,8 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillDefinition;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillResolver;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillSummary;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 
 /** The skills of the application's repository that are switched on. */
 final class RepositorySkillResolver implements SkillResolver {

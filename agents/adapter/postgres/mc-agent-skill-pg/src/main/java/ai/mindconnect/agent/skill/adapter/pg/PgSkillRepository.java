@@ -1,9 +1,9 @@
-package ai.mindconnect.agent.runtime.adapter.pg;
+package ai.mindconnect.agent.skill.adapter.pg;
 
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillId;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillId;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 

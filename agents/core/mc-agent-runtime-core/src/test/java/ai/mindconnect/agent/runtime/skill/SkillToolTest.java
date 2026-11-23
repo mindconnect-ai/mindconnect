@@ -1,5 +1,9 @@
 package ai.mindconnect.agent.runtime.skill;
 
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.agent.skill.domain.SkillSource;
+import ai.mindconnect.agent.skill.domain.SkillId;
+import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.UserId;
 import org.junit.jupiter.api.Test;
 

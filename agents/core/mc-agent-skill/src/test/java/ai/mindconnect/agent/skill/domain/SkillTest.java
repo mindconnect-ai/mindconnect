@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.skill;
+package ai.mindconnect.agent.skill.domain;
 
 import org.junit.jupiter.api.Test;
 
