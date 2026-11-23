@@ -7,7 +7,6 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.port.out.LlmProvider;
 import ai.mindconnect.agent.loop.port.out.TurnEventListener;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
-import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.hook.AgentContext;
@@ -28,24 +27,24 @@ final class GatewayLlmProvider implements LlmProvider {
     private final ToolResolver tools;
     private final HookRunner hooks;
     private final AgentContext context;
-    private final ModelSettings settings;
+    private final InstructionRenderer instructions;
 
     GatewayLlmProvider(ModelGateway gateway, ToolResolver tools, HookRunner hooks, AgentContext context,
-                       ModelSettings settings) {
+                       InstructionRenderer instructions) {
         this.gateway = gateway;
         this.tools = tools;
         this.hooks = hooks;
         this.context = context;
-        this.settings = settings;
+        this.instructions = instructions;
     }
 
     @Override
     public LlmAnswer ask(String requestId, String sessionId, List<TurnMessage> history, TurnEventListener events) {
-        String instructions = hooks.run(RuntimeHook.INSTRUCTIONS, context, asked -> asked.agent().instructions());
+        String rendered = hooks.run(RuntimeHook.INSTRUCTIONS, context, instructions::render);
         // Starts from what exists and the agent names; who may see what is the hooks' business.
         List<ToolDefinition> offered = hooks.run(RuntimeHook.TOOL_OFFER, context, asked ->
                 tools.tools(asked.session()).stream().filter(tool -> asked.agent().uses(tool.name())).toList());
-        ModelRequest request = new ModelRequest(context.turnId(), settings, instructions, history, offered);
+        ModelRequest request = new ModelRequest(context.turnId(), context.agent().modelSettings(), rendered, history, offered);
         return hooks.run(RuntimeHook.MODEL_CALL, new ModelCall(context, request),
                 call -> gateway.ask(call.request(), events));
     }

@@ -50,6 +50,7 @@ import ai.mindconnect.agent.runtime.api.hook.TurnAdmission;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
+import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
@@ -224,6 +225,19 @@ class EngineWithCapabilitiesTest {
 
         assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
         assertThat(toolResults(turnId)).containsExactly("Berlin");
+    }
+
+    @Test
+    void instructions_are_a_template_rendered_with_what_plugins_contribute() throws InterruptedException {
+        registry.contribute(PromptVariableProvider.class, (agent, in) -> Map.of("user", in.userId().value()));
+        AgentDefinition greeter = new AgentDefinition("greeter", "Greets.",
+                "You talk to {{ user }}.{% if missing %} Never shown.{% endif %}", ModelSettings.NONE, List.of(), 5, Map.of());
+        model.script.add(TurnMessage.assistant("Hello."));
+
+        awaitRest(turns.submit(new TurnRequest(session.id(),
+                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Hi")), greeter)));
+
+        assertThat(model.requests.get(0).instructions()).startsWith("You talk to ada.").doesNotContain("Never shown");
     }
 
     @Test

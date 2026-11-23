@@ -1,11 +1,10 @@
 package ai.mindconnect.agent.runtime.capabilities.prompt;
 
-import ai.mindconnect.agent.runtime.api.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.api.port.out.TokenCounter;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
-/** The dependency-free answers to "how long is this" and "fill in this template". */
+/** The dependency-free answer to "how long is this": an estimate, until an exact counter is provided. */
 public final class PromptPlugin implements Plugin {
 
     @Override
@@ -16,6 +15,5 @@ public final class PromptPlugin implements Plugin {
     @Override
     public void install(PluginRegistry registry) {
         registry.provide(TokenCounter.class, EstimatingTokenCounter::new);
-        registry.provide(PromptRenderer.class, VariablePromptRenderer::new);
     }
 }

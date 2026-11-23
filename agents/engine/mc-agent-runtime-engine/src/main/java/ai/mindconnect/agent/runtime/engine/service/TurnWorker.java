@@ -25,7 +25,6 @@ import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskNotification;
 import ai.mindconnect.taskqueue.TaskOutcome;
-import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskWorker;
 
@@ -53,15 +52,17 @@ final class TurnWorker implements TaskWorker {
     private final HookRunner hooks;
     private final EventDelivery events;
     private final TurnTaskMapper turns;
+    private final InstructionRenderer instructions;
 
     TurnWorker(SessionStore sessions, ToolResolver tools, ModelGateway gateway, HookRunner hooks,
-               EventDelivery events, TurnTaskMapper turns) {
+               EventDelivery events, TurnTaskMapper turns, InstructionRenderer instructions) {
         this.sessions = sessions;
         this.tools = tools;
         this.gateway = gateway;
         this.hooks = hooks;
         this.events = events;
         this.turns = turns;
+        this.instructions = instructions;
     }
 
     /** The caller's answer to an interruption, as a message to the task of the turn that asked. */
@@ -91,7 +92,7 @@ final class TurnWorker implements TaskWorker {
         AgentContext agentContext = new AgentContext(session, turn.agent(), turnId);
         AgentLoop loop = new DefaultAgentLoop(
                 new DefaultAgentRound(
-                        new GatewayLlmProvider(gateway, tools, hooks, agentContext, turn.agent().modelSettings()),
+                        new GatewayLlmProvider(gateway, tools, hooks, agentContext, instructions),
                         new QueuedToolExecutor(ctx, decisions, turn, session)),
                 turn.agent().maxRounds());
         ctx.onCancel(() -> loop.cancel(turnId.value()));
