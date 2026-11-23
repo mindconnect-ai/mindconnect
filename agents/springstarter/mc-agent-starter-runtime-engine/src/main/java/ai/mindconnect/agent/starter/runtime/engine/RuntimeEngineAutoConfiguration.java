@@ -20,6 +20,7 @@ import ai.mindconnect.agent.management.adapter.FileAgentRepository;
 import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
+import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
@@ -135,9 +136,11 @@ public class RuntimeEngineAutoConfiguration {
     @ConditionalOnMissingBean
     SessionManagement sessionManagement(SessionRepository sessions, MessageRepository messages,
                                         AgentRepository agents,
-                                        ObjectProvider<SessionDirectoryPolicy> directoryPolicy) {
+                                        ObjectProvider<SessionDirectoryPolicy> directoryPolicy,
+                                        ObjectProvider<SessionCleanup> cleanups) {
         return new RepositorySessionManagement(sessions, messages, agents,
-                directoryPolicy.getIfAvailable(SessionDirectoryPolicy::unrestricted));
+                directoryPolicy.getIfAvailable(SessionDirectoryPolicy::unrestricted),
+                cleanups.orderedStream().toList());
     }
 
     @Bean

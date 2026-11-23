@@ -92,7 +92,11 @@ public interface SessionManagement {
      */
     Optional<AgentDefinition> agentOf(SessionId sessionId);
 
-    /** Deletes the session, what was said in it, and every session under it. A session that is not there is none. */
+    /**
+     * Deletes the session with what was said in it and every session under
+     * it, and what the installation's {@link SessionCleanup}s keep of them.
+     * Nothing happens if there is no such session.
+     */
     void delete(SessionId sessionId);
 
     /** What was said in the session, oldest first. */

@@ -495,7 +495,7 @@ public class ChatUiController {
         if (ownedSession(sessionId, user).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        sessionService.deleteSession(sessionId);
+        sessionManagement.delete(runtimeId(sessionId));
         log.info("Chat {} deleted", sessionId);
 
         var sessions = chats(userId);
@@ -1152,7 +1152,7 @@ public class ChatUiController {
             deleteWithSubSessions(child.id());
         }
         try {
-            sessionService.deleteSession(sessionId);
+            sessionManagement.delete(runtimeId(sessionId));
         } catch (RuntimeException e) {
             log.warn("Could not delete test session {}: {}", sessionId, e.getMessage());
         }

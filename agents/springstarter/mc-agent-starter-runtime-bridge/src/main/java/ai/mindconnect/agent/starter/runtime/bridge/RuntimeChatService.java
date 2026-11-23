@@ -150,6 +150,11 @@ public final class RuntimeChatService {
         return earlier.openApprovals(sessionId);
     }
 
+    /** Deletes the chat with what was said in it, the sessions under it and what the application keeps of them. */
+    public void deleteChat(SessionId sessionId) {
+        management.delete(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()));
+    }
+
     /** Whether there was a turn to cancel. */
     public boolean cancelChat(SessionId sessionId) {
         Optional<Turn> underway = underway(sessionId);

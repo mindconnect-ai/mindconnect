@@ -79,6 +79,11 @@ class AgentApiControllerOwnershipTest {
                 new InMemoryToolApprovalRepository(), userChannels);
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         // A chat opened through the chat service is a session of the repository these tests read.
+        // A chat deleted through the chat service is gone from the repository these tests read.
+        org.mockito.Mockito.doAnswer(call -> {
+            sessions.deleteById(call.getArgument(0));
+            return null;
+        }).when(chat).deleteChat(org.mockito.ArgumentMatchers.any());
         ai.mindconnect.agent.starter.runtime.bridge.ChatOpener opener =
                 org.mockito.Mockito.mock(ai.mindconnect.agent.starter.runtime.bridge.ChatOpener.class);
         org.mockito.Mockito.when(opener.open(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),

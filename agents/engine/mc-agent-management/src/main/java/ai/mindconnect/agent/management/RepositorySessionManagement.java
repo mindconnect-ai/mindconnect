@@ -18,6 +18,7 @@ import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionAttachment;
+import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
@@ -46,9 +47,12 @@ public final class RepositorySessionManagement implements SessionManagement {
     private final MessageRepository messages;
     private final AgentRepository agents;
     private final SessionDirectoryPolicy directoryPolicy;
+    private final List<SessionCleanup> cleanups;
 
     public RepositorySessionManagement(SessionRepository sessions, MessageRepository messages,
-                                       AgentRepository agents, SessionDirectoryPolicy directoryPolicy) {
+                                       AgentRepository agents, SessionDirectoryPolicy directoryPolicy,
+                                       List<SessionCleanup> cleanups) {
+        this.cleanups = List.copyOf(cleanups);
         this.sessions = sessions;
         this.messages = messages;
         this.agents = agents;
@@ -227,6 +231,8 @@ public final class RepositorySessionManagement implements SessionManagement {
         sessions.find(sessionId).ifPresent(session -> {
             messages.deleteByConversation(RepositorySessionStore.conversationOf(session));
             sessions.delete(sessionId);
+            ManagedSession deleted = managed(session);
+            cleanups.forEach(cleanup -> cleanup.deleted(deleted));
         });
     }
 

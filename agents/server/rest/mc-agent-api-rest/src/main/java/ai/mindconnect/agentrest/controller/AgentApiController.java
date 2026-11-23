@@ -545,7 +545,7 @@ public class AgentApiController {
     public ResponseEntity<Void> deleteSession(@PathVariable String sessionId, @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("DELETE /api/sessions/{}", sessionId);
-        sessionService.deleteSession(id);
+        chatService.deleteChat(id);
         return ResponseEntity.noContent().build();
     }
 

@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
+import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
@@ -114,6 +117,22 @@ public class RuntimeBridgeAutoConfiguration {
     ChatOpener chatOpener(ObjectProvider<SessionManagement> sessions, AgentSessionRepository chatSessions,
                           ConversationManager conversations, UserChannels userChannels) {
         return new ChatOpener(sessions.getObject(), chatSessions, conversations, userChannels);
+    }
+
+    /** What the earlier runtime's stores keep of a session goes with it. */
+    @Bean
+    SessionCleanup earlierStoresCleanup(WorkingMemoryRepository workingMemory, ConversationSummaryRepository summaries,
+                                        TodoListRepository todoLists, ToolApprovalRepository approvals,
+                                        LlmCallTraceRepository traces, ConversationManager conversations,
+                                        AgentSessionRepository chatSessions) {
+        return new EarlierStoresCleanup(workingMemory, summaries, todoLists, approvals, traces, conversations,
+                chatSessions);
+    }
+
+    /** A session's own directory goes with it. */
+    @Bean
+    SessionCleanup sessionDirectoryCleanup(UserHome userHome) {
+        return new SessionDirectoryCleanup(userHome);
     }
 
     /** A file a message refers to is read from the application's file store. */

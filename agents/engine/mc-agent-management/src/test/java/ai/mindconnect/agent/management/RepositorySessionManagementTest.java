@@ -50,8 +50,10 @@ class RepositorySessionManagementTest {
     /** What the runtime does: the sessions and messages the management API is to find. */
     private final SessionStore runtime = new RepositorySessionStore(sessions, messages);
     private final AgentRepository agents = new InMemoryAgentRepository(NamespaceProvider.fixed("test"));
+    /** The sessions a cleanup was told are gone. */
+    private final List<ManagedSession> cleanedUp = new java.util.ArrayList<>();
     private final SessionManagement management = new RepositorySessionManagement(sessions, messages, agents,
-            SessionDirectoryPolicy.unrestricted());
+            SessionDirectoryPolicy.unrestricted(), List.of(cleanedUp::add));
 
     private Session open(String id, String user, String parent, String createdAt, Map<String, Object> metadata) {
         Session session = new Session(SessionId.of(id), UserId.of(user), parent == null ? null : SessionId.of(parent),
@@ -167,7 +169,8 @@ class RepositorySessionManagementTest {
                 return Optional.of("/home/" + user.value() + "/" + session.value());
             }
         };
-        SessionManagement placing = new RepositorySessionManagement(sessions, messages, agents, homes);
+        SessionManagement placing = new RepositorySessionManagement(sessions, messages, agents,
+            homes, List.of(cleanedUp::add));
 
         ManagedSession referring = placing.open(ADA, new SessionAgent.Ref(owl.id()), null, SessionDirectories.NONE);
         assertThat(referring.agent()).isEqualTo(new SessionAgent.Ref(owl.id()));
@@ -230,7 +233,8 @@ class RepositorySessionManagementTest {
                 return Optional.of("/home/" + user.value() + "/" + session.value());
             }
         };
-        SessionManagement guarded = new RepositorySessionManagement(sessions, messages, agents, underSrv);
+        SessionManagement guarded = new RepositorySessionManagement(sessions, messages, agents,
+            underSrv, List.of(cleanedUp::add));
         SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
 
         assertThat(guarded.changeDirectories(id, new SessionDirectories("/srv/owls", List.of("/srv/mice")))
@@ -278,6 +282,8 @@ class RepositorySessionManagementTest {
 
         assertThat(management.list(ADA)).extracting(session -> session.id().value()).containsExactly("other");
         assertThat(management.find(child)).isEmpty();
+        // Whoever keeps something per session hears of each one that went, the one under it first.
+        assertThat(cleanedUp).extracting(session -> session.id().value()).containsExactly("child", "top");
         assertThat(messages.findByConversation(ai.mindconnect.message.domain.ConversationId.of("child"),
                 new ai.mindconnect.common.PageRequest(0, 10))).isEmpty();
         assertThat(runtime.messages(other)).hasSize(1);
