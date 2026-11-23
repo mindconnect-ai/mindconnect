@@ -1,12 +1,14 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.tools.todo.adapter.pg.PgTodoListRepository;
+
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
-import ai.mindconnect.agent.runtime.tools.todo.TodoItem;
-import ai.mindconnect.agent.runtime.tools.todo.TodoList;
-import ai.mindconnect.agent.runtime.tools.todo.TodoStatus;
+import ai.mindconnect.agent.tools.todo.TodoItem;
+import ai.mindconnect.agent.tools.todo.TodoList;
+import ai.mindconnect.agent.tools.todo.TodoStatus;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.BeforeEach;

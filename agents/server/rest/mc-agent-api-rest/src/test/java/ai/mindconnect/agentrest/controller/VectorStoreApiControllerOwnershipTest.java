@@ -6,7 +6,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryConversationSummaryRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryTodoListRepository;
+import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;

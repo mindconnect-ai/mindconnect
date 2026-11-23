@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.tools.todo;
+package ai.mindconnect.agent.tools.todo;
 
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;

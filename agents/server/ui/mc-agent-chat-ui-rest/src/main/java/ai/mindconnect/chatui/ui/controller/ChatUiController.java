@@ -19,7 +19,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
+import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;

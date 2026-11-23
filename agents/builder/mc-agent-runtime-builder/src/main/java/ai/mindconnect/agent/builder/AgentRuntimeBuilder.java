@@ -57,7 +57,7 @@ import ai.mindconnect.agent.runtime.service.task.SubAgentSupport;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.ToolAdvisor;
 import ai.mindconnect.agent.tool.ToolEnvironment;

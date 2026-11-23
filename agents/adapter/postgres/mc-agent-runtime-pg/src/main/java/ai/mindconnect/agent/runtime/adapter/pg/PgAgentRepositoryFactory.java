@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.tools.todo.adapter.pg.PgTodoListRepository;
+
 import ai.mindconnect.agent.skill.adapter.pg.PgSkillRepository;
 import ai.mindconnect.agent.trace.adapter.pg.PgLlmCallTraceRepository;
 import ai.mindconnect.agent.ScopeSupplier;
@@ -10,7 +12,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
 import ai.mindconnect.jdbc.Sql;
 

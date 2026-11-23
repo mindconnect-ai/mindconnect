@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.tools.todo;
+package ai.mindconnect.agent.tools.todo;
 
 /**
  * Lifecycle state of a single {@link TodoItem}.

@@ -146,6 +146,8 @@
         <module>agents/adapter/postgres/mc-agent-trace-pg</module>
         <module>agents/core/mc-agent-skill</module>
         <module>agents/adapter/postgres/mc-agent-skill-pg</module>
+        <module>agents/tools/core/mc-agent-tools-todo</module>
+        <module>agents/adapter/postgres/mc-agent-tools-todo-pg</module>
         <module>agents/core/mc-agent-management-api</module>
         <module>agents/engine/mc-agent-management</module>
         <module>agents/adapter/postgres/mc-agent-runtime-engine-pg</module>

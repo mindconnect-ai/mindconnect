@@ -239,8 +239,8 @@ class RuntimeBridgeAutoConfigurationTest {
                 .withBean(AgentChatService.class, () -> mock(AgentChatService.class))
                 .withBean(ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository.class,
                         () -> mock(ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository.class))
-                .withBean(ai.mindconnect.agent.runtime.tools.todo.TodoListRepository.class,
-                        () -> mock(ai.mindconnect.agent.runtime.tools.todo.TodoListRepository.class))
+                .withBean(ai.mindconnect.agent.tools.todo.TodoListRepository.class,
+                        () -> mock(ai.mindconnect.agent.tools.todo.TodoListRepository.class))
                 .withBean(ai.mindconnect.message.port.in.ConversationManager.class,
                         () -> mock(ai.mindconnect.message.port.in.ConversationManager.class))
                 .withBean(ai.mindconnect.agent.runtime.service.stream.SessionChannels.class,

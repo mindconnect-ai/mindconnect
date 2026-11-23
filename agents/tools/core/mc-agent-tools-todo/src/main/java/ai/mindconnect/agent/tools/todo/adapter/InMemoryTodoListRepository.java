@@ -1,11 +1,11 @@
-package ai.mindconnect.agent.runtime.adapter.repo.memory;
+package ai.mindconnect.agent.tools.todo.adapter;
 
 import ai.mindconnect.agent.PerNamespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 
-import ai.mindconnect.agent.runtime.tools.todo.TodoList;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.tools.todo.TodoList;
+import ai.mindconnect.agent.tools.todo.TodoListRepository;
 
 import java.util.Map;
 import java.util.Optional;

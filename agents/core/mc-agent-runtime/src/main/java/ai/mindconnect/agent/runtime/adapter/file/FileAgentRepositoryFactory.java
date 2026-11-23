@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.agent.tools.todo.adapter.FileTodoListRepository;
+
 import ai.mindconnect.agent.skill.adapter.FileSkillRepository;
 import ai.mindconnect.agent.trace.adapter.FileLlmCallTraceRepository;
 import ai.mindconnect.agent.ScopeSupplier;
@@ -10,7 +12,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

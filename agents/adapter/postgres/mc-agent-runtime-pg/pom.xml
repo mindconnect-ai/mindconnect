@@ -25,6 +25,11 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-tools-todo-pg</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-skill-pg</artifactId>
             <version>${project.version}</version>
         </dependency>

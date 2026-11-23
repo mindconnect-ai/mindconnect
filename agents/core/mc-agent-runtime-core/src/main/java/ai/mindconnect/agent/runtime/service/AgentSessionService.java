@@ -9,7 +9,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.AuthenticationInfo;

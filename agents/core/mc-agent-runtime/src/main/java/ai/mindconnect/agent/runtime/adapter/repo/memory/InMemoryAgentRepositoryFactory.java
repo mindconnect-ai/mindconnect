@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
+
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
 import ai.mindconnect.agent.trace.adapter.InMemoryLlmCallTraceRepository;
 import ai.mindconnect.agent.ScopeSupplier;
@@ -10,7 +12,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
 
 /** The agent runtime's repositories in memory, one store per namespace — nothing survives the process. */

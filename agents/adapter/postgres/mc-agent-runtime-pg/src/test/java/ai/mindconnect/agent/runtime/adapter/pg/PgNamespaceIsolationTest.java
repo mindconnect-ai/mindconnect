@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.tools.todo.adapter.pg.PgTodoListRepository;
+
 import ai.mindconnect.agent.trace.adapter.pg.PgLlmCallTraceRepository;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.AuthenticationInfo;
@@ -15,7 +17,7 @@ import ai.mindconnect.agent.trace.domain.TraceContext;
 import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.runtime.tools.todo.TodoList;
+import ai.mindconnect.agent.tools.todo.TodoList;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
