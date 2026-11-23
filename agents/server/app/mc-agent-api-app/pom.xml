@@ -31,6 +31,12 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-runtime</artifactId>
         </dependency>
+        <!-- The runtime on the plugin kernel and its stores: this server keeps sessions and agents where the admin UI does. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-bridge</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-file</artifactId>

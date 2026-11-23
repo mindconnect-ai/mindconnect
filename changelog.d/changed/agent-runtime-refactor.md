@@ -13,3 +13,6 @@
   what was attached or removed, an image or PDF goes to a model that reads it
   with the message that brought it, and `view_attachment` shows it again in a
   later turn. A model that cannot read a file is told about it in a note.
+- The REST server keeps sessions and agents in the same stores as the admin UI:
+  a chat started in one is found, with its history and attachments, in the
+  other when both share their data.
