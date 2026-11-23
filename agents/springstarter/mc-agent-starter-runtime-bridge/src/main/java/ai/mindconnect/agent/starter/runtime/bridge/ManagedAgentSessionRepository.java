@@ -168,11 +168,18 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
         Map<String, Object> metadata = new HashMap<>(stored == null ? Map.of() : stored.metadata());
         metadata.put(EARLIER, json.convertValue(written, Map.class));
         metadata.put(RepositorySessionStore.CONVERSATION_ID, written.conversationId().value());
-        SessionAgent chosen = written.mainAgent().orElse(null);
-        boolean refers = chosen == null || chosen instanceof SessionAgentRef ref && unchanged(ref);
-        metadata.put(ManagedSession.AGENT_ID,
-                (chosen instanceof SessionAgentRef ref ? ref.id() : written.agentDefinitionId()).value());
-        metadata.put(ManagedSession.AGENT, refers ? ManagedSession.REF : ManagedSession.OWN);
+        // The agent is spelled out when the writer chose one; any other write leaves it as it is kept —
+        // the management may have given the session another since, which the earlier session does not show.
+        AgentDefinition agent = stored == null ? null : stored.agent();
+        if (stored == null || !metadata.containsKey(ManagedSession.AGENT) || !sameAgent(written, earlier(stored))) {
+            SessionAgent chosen = written.mainAgent().orElse(null);
+            boolean refers = chosen == null || chosen instanceof SessionAgentRef ref && unchanged(ref);
+            metadata.put(ManagedSession.AGENT_ID,
+                    (chosen instanceof SessionAgentRef ref ? ref.id() : written.agentDefinitionId()).value());
+            metadata.put(ManagedSession.AGENT, refers ? ManagedSession.REF : ManagedSession.OWN);
+            // Kept for a chat that refers to its agent as well: what the session last ran on.
+            agent = agentOf.apply(written).orElse(agent);
+        }
         metadata.put(ManagedSession.TYPE, written.type());
         metadata.put(ManagedSession.STATUS, written.status().name());
         metadata.put(ManagedSession.ADDITIONAL_DIRECTORIES, written.additionalDirs());
@@ -192,8 +199,7 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
         return new Session(runtimeId(written.id()),
                 ai.mindconnect.agent.runtime.api.domain.UserId.of(written.userId().value()),
                 written.parentSessionId() == null ? null : runtimeId(written.parentSessionId()),
-                // Kept for a chat that refers to its agent as well: what the session last ran on.
-                agentOf.apply(written).orElse(stored == null ? null : stored.agent()),
+                agent,
                 metadata,
                 stored != null ? stored.createdAt()
                         : written.startedAt() == null ? Instant.now() : written.startedAt());
@@ -235,6 +241,11 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
                         RepositorySessionStore.conversationOf(session).value()),
                 null, SessionStatus.ACTIVE, session.createdAt(), null,
                 session.parentId() == null ? null : SessionId.of(session.parentId().value()), null, null);
+    }
+
+    private static boolean sameAgent(AgentSession one, AgentSession other) {
+        return one.agentDefinitionId().equals(other.agentDefinitionId())
+                && one.sessionAgents().equals(other.sessionAgents());
     }
 
     /** Does the chat take the stored agent as it is? */

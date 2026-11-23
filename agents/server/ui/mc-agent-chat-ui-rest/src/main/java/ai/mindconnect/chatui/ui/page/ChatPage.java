@@ -86,11 +86,6 @@ public final class ChatPage {
         this.agent = agent;
         this.messages = new MessageListComponent(session.id(), agent, history, memory, subAgentTree)
                 .withSessionTitle(session.title())
-                .withCustomPrompt(session.mainAgent()
-                        .filter(a -> a instanceof SessionAgentRef)
-                        .map(a -> ((SessionAgentRef) a)
-                                .hasPromptOverride())
-                        .orElse(false))
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
@@ -102,6 +97,12 @@ public final class ChatPage {
      * The tools the registry can hand out here, so the "+" menu's Tools badge
      * counts what the Tools picker counts — a binding without a row is not in it.
      */
+    /** Whether the chat runs on a prompt of its own, not its agent's — the header says so. */
+    public ChatPage withOwnPrompt(boolean ownPrompt) {
+        messages.withCustomPrompt(ownPrompt);
+        return this;
+    }
+
     public ChatPage withOfferedTools(java.util.Collection<String> offeredTools) {
         this.chatForm.withAgentCounts(agent, offeredTools);
         return this;

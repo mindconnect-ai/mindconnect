@@ -4,10 +4,8 @@ import ai.mindconnect.agentrest.service.SessionFileService;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.springframework.http.HttpStatus;
@@ -48,7 +46,7 @@ public class ChatFilesUiController {
     private final SessionFileService sessionFiles;
     private final AgentSessionRepository sessions;
     private final AgentSessionService sessionService;
-    private final SessionAgentResolver agentResolver;
+    private final ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents;
     private final SessionOwnership ownership;
     /** Whether a turn is live right now — the composer is redrawn in that state. */
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
@@ -62,7 +60,7 @@ public class ChatFilesUiController {
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  AgentSessionRepository sessions,
                                  AgentSessionService sessionService,
-                                 AgentDefinitionRepository agents,
+                                 ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents,
                                  SessionOwnership ownership,
                                  ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                                  ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
@@ -73,7 +71,7 @@ public class ChatFilesUiController {
         this.sessionFiles = sessionFiles;
         this.sessions = sessions;
         this.sessionService = sessionService;
-        this.agentResolver = new SessionAgentResolver(agents);
+        this.chatAgents = chatAgents;
         this.ownership = ownership;
         this.activeStreams = activeStreams;
         this.toolRegistry = toolRegistry;
@@ -189,7 +187,7 @@ public class ChatFilesUiController {
      */
     private UiPatch.Operation attachmentCountRefresh(SessionId sessionId) {
         var session = sessions.findById(sessionId).orElse(null);
-        var agent = session == null ? null : agentResolver.resolve(session);
+        var agent = session == null ? null : chatAgents.effective(session);
         // Whichever state the composer is in stays: a file attached mid-turn
         // must not swap the Stop button for a Send button.
         boolean streaming = activeStreams.findHandle(

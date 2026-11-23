@@ -354,7 +354,7 @@ class RuntimeBridgeAutoConfigurationTest {
                 mock(AgentSessionRepository.class), context.getBean(ObjectMapper.class),
                 () -> context.getBean(NamespaceProvider.class),
                 written -> ManagedStoresFeature.agentOf(written, context.getBean(AgentDefinitionRepository.class),
-                        context.getBean(AgentDefinitionMapper.class))).create(chat);
+                        context.getBean(EarlierAgentConverter.class))).create(chat);
     }
 
     private static Turn awaitEnd(TurnService turns, TurnId turnId) throws InterruptedException {

@@ -54,16 +54,18 @@ class ManagedStoresTest {
                     new AgentTool(AgentToolId.random(), "switched_off", null, Map.of(), false, false, false, null)),
             List.of("proof-reader"), List.of("archivist"), true, null, Instant.EPOCH, Instant.EPOCH);
 
+    private static final EarlierAgentConverter CONVERTER = new EarlierAgentConverter(new AgentDefinitionMapper(), JSON);
+
     private final AgentRepository managedAgents = new InMemoryAgentRepository(NAMESPACES);
     private final AgentDefinitionRepository earlierAgents = mock(AgentDefinitionRepository.class);
     private final AgentDefinitionRepository agents = new ManagedAgentDefinitionRepository(
-            () -> managedAgents, earlierAgents, new AgentDefinitionMapper(), JSON, () -> NAMESPACES);
+            () -> managedAgents, earlierAgents, CONVERTER, () -> NAMESPACES);
 
     private final SessionRepository runtimeSessions = new InMemorySessionRepository(NAMESPACES);
     private final AgentSessionRepository earlierSessions = mock(AgentSessionRepository.class);
     private final AgentSessionRepository sessions = new ManagedAgentSessionRepository(
             () -> runtimeSessions, earlierSessions, JSON, () -> NAMESPACES,
-            written -> ManagedStoresFeature.agentOf(written, agents, new AgentDefinitionMapper()));
+            written -> ManagedStoresFeature.agentOf(written, agents, CONVERTER));
 
     private static AgentSession chat(String user) {
         return new AgentSession(SessionId.random(), LIBRARIAN.id(), UserId.of(user), ConversationId.random(), null,
@@ -157,6 +159,11 @@ class ManagedStoresTest {
                 .containsEntry(ManagedSession.AGENT, ManagedSession.OWN)
                 .containsEntry(ManagedSession.AGENT_ID, LIBRARIAN.id().value());
         assertThat(runtimeSessions.find(id).orElseThrow().agent().instructions()).isEqualTo("You find maps.");
+
+        // Its own definition is the chat's: neither the agent's changes nor a write about something else reach it.
+        agents.save(LIBRARIAN.withTools(List.of()));
+        sessions.update(chat.id(), session -> session.withTitle("Maps"));
+        assertThat(runtimeSessions.find(id).orElseThrow().agent().tools()).isNotEmpty();
     }
 
     @Test

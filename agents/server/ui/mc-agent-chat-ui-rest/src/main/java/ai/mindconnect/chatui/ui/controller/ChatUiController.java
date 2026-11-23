@@ -17,10 +17,7 @@ import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
-import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
-import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
-import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
@@ -77,7 +74,8 @@ public class ChatUiController {
     private final ai.mindconnect.chatui.ui.ChatHostLinks hostLinks;
     private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository;
     private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
-    private final SessionAgentResolver agentResolver;
+    /** The agent a chat runs on, as the session management keeps it. */
+    private final ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents;
     /** The server's tree a user may pick a working directory from. */
     private final ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser;
 
@@ -86,6 +84,7 @@ public class ChatUiController {
                              AgentDefinitionRepository agentRepository,
                              AgentSessionRepository sessionRepository,
                              SessionManagement sessionManagement,
+                             ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents,
                              TodoListService todoListService,
                              ObjectMapper objectMapper,
                              LlmCallTraceRepository traceRepository,
@@ -114,7 +113,7 @@ public class ChatUiController {
         this.hostLinks = hostLinks.getIfAvailable(() -> ai.mindconnect.chatui.ui.ChatHostLinks.NONE);
         this.llmConfigRepository = llmConfigRepository;
         this.toolRegistry = toolRegistry;
-        this.agentResolver = new SessionAgentResolver(agentRepository);
+        this.chatAgents = chatAgents;
     }
 
     /**
@@ -185,7 +184,7 @@ public class ChatUiController {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
-        var effective = agentResolver.resolve(session);
+        var effective = chatAgents.effective(session);
         AgentId agentId = boundAgentId(session);
 
         var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
@@ -215,7 +214,7 @@ public class ChatUiController {
         String agentId = body.str("agentId");
         AgentDefinition picked = agentId == null || agentId.isBlank() ? null
                 : agentRepository.findById(AgentId.of(agentId)).orElse(null);
-        var effective = agentResolver.resolve(session);
+        var effective = chatAgents.effective(session);
         AgentId bound = boundAgentId(session);
         var values = ai.mindconnect.chatui.ui.component.ChatSettingsComponent.valuesFor(picked, bound,
                 new ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values(
@@ -251,68 +250,28 @@ public class ChatUiController {
         var body = new FormBody(raw);
         String agentId = body.str("agentId");
 
-        SessionAgent agent;
-        if (agentId != null && !agentId.isBlank()) {
-            var def = agentRepository.findById(AgentId.of(agentId))
-                    .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
-            // Switching to another agent hands the chat over completely: that
-            // agent's model, tools and prompt win, which is what the picker
-            // promises. Staying on the same one keeps what this chat chose —
-            // the ref carries exactly these overrides for that.
-            boolean sameAgent = def.id().equals(boundAgentId(session));
-            var previous = sameAgent ? sessionRef(session) : null;
-
-            // Only a value that actually differs is stored: an untouched field
-            // must not turn into an override that then stops tracking edits to
-            // the agent itself.
-            String prompt = sameAgent ? differing(body.str("systemPrompt"), def.systemPrompt()) : null;
-            String llm = sameAgent ? differing(body.str("llmConfigName"), def.llmConfigName()) : null;
-
-            agent = new SessionAgentRef(def.id(), true, def.name(), llm,
-                    previous == null ? null : previous.tools(),
-                    prompt,
-                    previous == null ? null : previous.callableAgents());
-        } else if (session.mainAgent().orElse(null) instanceof InlineSessionAgent kept) {
-            // A chat that is already its own agent: the model and the prompt
-            // change, its identity and its tools do not. Rebuilt component by
-            // component rather than through inlineAgent(), which mints a new
-            // id — approvals and the prompt's agent metadata are keyed by it.
-            agent = new InlineSessionAgent(kept.id(), kept.main(), kept.label(),
-                    orKeep(body.str("systemPrompt"), kept.systemPrompt()),
-                    orKeep(body.str("llmConfigName"), kept.llmConfigName()),
-                    kept.tools(), kept.callableAgents());
+        var effective = chatAgents.effective(session);
+        var def = agentId == null || agentId.isBlank() ? null
+                : agentRepository.findById(AgentId.of(agentId))
+                        .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
+        // Another agent takes the chat over as it is, which is what the picker promises. The agent the
+        // chat already refers to stays referred to while the form says what the agent says; a model or
+        // a prompt that differs makes the chat's definition its own, as does a chat without an agent.
+        boolean another = def != null && !def.id().equals(boundAgentId(session));
+        boolean untouched = def != null && differing(body.str("systemPrompt"), def.systemPrompt()) == null
+                && differing(body.str("llmConfigName"), def.llmConfigName()) == null;
+        if (another || untouched) {
+            sessionManagement.useAgent(runtimeId(sessionId),
+                    ai.mindconnect.agent.management.api.AgentId.of(def.id().value()));
         } else {
-            // Detaching from a registry agent: a new agent under a new id, as
-            // the switch says. It starts on what the chat was actually
-            // running, so leaving the agent behind does not also silently
-            // change what the chat can do.
-            //
-            // The tool BINDINGS are carried over whole rather than rebuilt
-            // from their names, for the reason pickTools spells out: a name
-            // round-trip drops every tool the registry cannot resolve on this
-            // machine — Gmail without credentials — and with it whatever the
-            // binding carried beyond the name. The roster comes along too:
-            // dropping it would hand a chat the run of every agent the moment
-            // it edited its own prompt, which is the hole SessionAgentRef's
-            // javadoc warns about.
-            var effective = agentResolver.resolve(session);
-            agent = new InlineSessionAgent(AgentId.random(), true, "Chat",
-                    orKeep(body.str("systemPrompt"), effective.systemPrompt()),
-                    orKeep(body.str("llmConfigName"), effective.llmConfigName()),
-                    effective.tools(), effective.effectiveCallableAgents());
+            chatAgents.own(session, effective.withBasicFields(effective.name(), effective.description(),
+                    orKeep(body.str("systemPrompt"), effective.systemPrompt()), effective.welcomeMessage(),
+                    orKeep(body.str("llmConfigName"), effective.llmConfigName())));
         }
-        var saved = sessionService.replaceSessionAgent(sessionId, agent);
+        var saved = sessionRepository.findById(sessionId).orElseThrow();
         String userId = userId(user);
         return ResponseEntity.ok(
                 shell(saved, chats(userId)));
-    }
-
-    /** This chat's own overrides on the agent it references, or {@code null}. */
-    private static SessionAgentRef sessionRef(AgentSession session) {
-        return session.mainAgent()
-                .filter(a -> a instanceof SessionAgentRef)
-                .map(a -> (SessionAgentRef) a)
-                .orElse(null);
     }
 
     /** The submitted value, or what the chat already had when nothing was submitted. */
@@ -468,7 +427,7 @@ public class ChatUiController {
      * hard-coded idle form used to do.
      */
     private UiPatch.Operation composerRefresh(ai.mindconnect.agent.runtime.domain.AgentSession session) {
-        var agent = agentResolver.resolve(session);
+        var agent = chatAgents.effective(session);
         boolean streaming = activeStreams.findHandle(
                 ai.mindconnect.chatui.service.SessionOwnership.channelOf(session.id())).isPresent();
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
@@ -622,7 +581,7 @@ public class ChatUiController {
                          List<ManagedSession> sessions,
                          ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
         var seen = rememberShown(session.id());
-        var agent = agentResolver.resolve(session);
+        var agent = chatAgents.effective(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
                 sessions, session, agent.name(), chat.renderContent(), agentIcons())
@@ -776,32 +735,29 @@ public class ChatUiController {
         def.tools().forEach(t -> out.putIfAbsent(t.name(), t.deferred()));
         return out;
     }
+    /** Does the chat run on a prompt other than that of the stored agent its definition was taken from? */
+    private boolean ownPrompt(AgentSession session, AgentDefinition effective) {
+        return sessionManagement.find(runtimeId(session.id()))
+                .map(ai.mindconnect.agent.management.api.ManagedSession::agent)
+                .filter(agent -> agent instanceof ai.mindconnect.agent.management.api.SessionAgent.Own own
+                        && own.origin() != null)
+                .flatMap(agent -> agentRepository.findById(AgentId.of(
+                        ((ai.mindconnect.agent.management.api.SessionAgent.Own) agent).origin().value())))
+                .map(origin -> !java.util.Objects.equals(origin.systemPrompt(), effective.systemPrompt()))
+                .orElse(false);
+    }
+
     /**
-     * The registry agent this chat runs on, or {@code null} for a chat with an
-     * agent of its own.
-     *
-     * <p>Two shapes mean the same thing. Picking an agent in the settings
-     * dialog writes a {@link SessionAgentRef};
-     * opening a chat from an agent — which is now every chat, via
-     * {@code default-chat} — sets only {@code agentDefinitionId} and leaves the
-     * session-agent list empty. Reading just the ref reported "no agent" for
-     * the second kind, and pressing Apply on one detached the chat from the
-     * agent it was plainly running on.
-     *
-     * <p>The id is checked against the registry: an inline agent's id is minted
-     * for the session and would otherwise look like a binding.
+     * The stored agent this chat refers to, or {@code null} for a chat that
+     * runs on a definition of its own — also one that was taken from a
+     * stored agent and changed since.
      */
     private AgentId boundAgentId(AgentSession session) {
-        AgentId ref = session.mainAgent()
-                .filter(a -> a instanceof SessionAgentRef)
-                .map(SessionAgent::id)
+        return sessionManagement.find(runtimeId(session.id()))
+                .map(ai.mindconnect.agent.management.api.ManagedSession::agent)
+                .filter(agent -> agent instanceof ai.mindconnect.agent.management.api.SessionAgent.Ref)
+                .map(agent -> AgentId.of(((ai.mindconnect.agent.management.api.SessionAgent.Ref) agent).id().value()))
                 .orElse(null);
-        if (ref != null) {
-            return ref;
-        }
-        AgentId fromSession = session.agentDefinitionId();
-        return fromSession != null && agentRepository.findById(fromSession).isPresent()
-                ? fromSession : null;
     }
 
     /**
@@ -958,7 +914,7 @@ public class ChatUiController {
 
     /** The picker's body for the session as it stands right now. */
     private ai.mindconnect.ui.model.UiNode toolsPicker(AgentSession session) {
-        var effective = agentResolver.resolve(session);
+        var effective = chatAgents.effective(session);
         var byGroup = offeredToolsByGroup();
         var subgroups = new java.util.HashMap<String, String>();
         byGroup.values().forEach(names -> names.forEach(name -> {
@@ -999,7 +955,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var effective = agentResolver.resolve(sessionOpt.get());
+        var effective = chatAgents.effective(sessionOpt.get());
         var chosen = selection(effective);
         apply(chosen, tool, state);
         var saved = replaceTools(sessionOpt.get(), chosen, null);
@@ -1020,7 +976,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var effective = agentResolver.resolve(sessionOpt.get());
+        var effective = chatAgents.effective(sessionOpt.get());
         var chosen = selection(effective);
         offeredToolsByGroup().getOrDefault(group, java.util.Set.of())
                 .forEach(tool -> apply(chosen, tool, state));
@@ -1050,7 +1006,7 @@ public class ChatUiController {
 
     /** The sub-agent picker's body for the session as it stands right now. */
     private ai.mindconnect.ui.model.UiNode subAgentsPicker(AgentSession session) {
-        var effective = agentResolver.resolve(session);
+        var effective = chatAgents.effective(session);
         return ai.mindconnect.chatui.ui.component.ChatSubAgentsComponent.node(
                 session.id(), delegatableAgents(effective),
                 java.util.Set.copyOf(effective.effectiveCallableAgents()));
@@ -1069,7 +1025,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var effective = agentResolver.resolve(sessionOpt.get());
+        var effective = chatAgents.effective(sessionOpt.get());
         var roster = new java.util.LinkedHashSet<>(effective.effectiveCallableAgents());
         if (on) {
             roster.add(agent);
@@ -1227,46 +1183,19 @@ public class ChatUiController {
      */
     private AgentSession replaceTools(AgentSession session, java.util.Map<String, Boolean> chosen,
                                       Roster roster) {
-        var effective = agentResolver.resolve(session);
-        AgentId bound = boundAgentId(session);
-        SessionAgent agent;
-        if (bound != null) {
-            var def = agentRepository.findById(bound)
-                    .orElseThrow(() -> new IllegalArgumentException("No such agent: " + bound));
-            var previous = sessionRef(session);
-            // Only a value that actually differs becomes an override — the
-            // same rule the settings dialog follows. Toggling a tool on and
-            // straight back off must leave the chat tracking its agent's tool
-            // list, not frozen on a copy of it.
-            var offerable = selection(def);
-            offerable.keySet().retainAll(allToolNames());
-            // pickTools against the EFFECTIVE definition, not the registry's:
-            // it is the one that already carries this chat's overrides, so a
-            // binding the chat chose earlier (an approval flag, a mount dir)
-            // survives the next click.
-            List<ai.mindconnect.agent.tool.AgentTool> toolOverride =
-                    new java.util.HashMap<>(chosen).equals(offerable) ? null : pickTools(effective, chosen);
-            List<String> rosterOverride = roster == null
-                    ? (previous == null ? null : previous.callableAgents())
-                    : roster.names().equals(def.effectiveCallableAgents()) ? null : roster.names();
-            agent = new SessionAgentRef(def.id(), true, def.name(),
-                    previous == null ? null : previous.llmConfigName(),
-                    toolOverride,
-                    previous == null ? null : previous.systemPrompt(),
-                    rosterOverride);
-        } else {
-            // Rebuilt from the bindings, not from names, for the reason
-            // pickTools gives; and under the same id when the chat already is
-            // its own agent, since approvals are keyed by it.
-            var tools = pickTools(effective, chosen);
-            var base = session.mainAgent().orElse(null) instanceof InlineSessionAgent kept
-                    ? kept
-                    : inlineAgent(effective.llmConfigName(), List.of(), effective.systemPrompt());
-            agent = new InlineSessionAgent(base.id(), base.main(), base.label(), base.systemPrompt(),
-                    base.llmConfigName(), tools,
-                    roster == null ? effective.effectiveCallableAgents() : roster.names());
+        var effective = chatAgents.effective(session);
+        // pickTools against the effective definition: it carries what this chat chose before, so a
+        // binding's approval flag or mount directory survives the next click.
+        var changed = effective.withTools(pickTools(effective, chosen));
+        if (roster != null) {
+            changed = changed.withCallableAgents(roster.names());
         }
-        return sessionService.replaceSessionAgent(session.id(), agent);
+        // Switching a tool on and straight back off writes nothing: a chat that refers to its agent
+        // keeps referring to it until something really differs.
+        if (!changed.equals(effective)) {
+            chatAgents.own(session, changed);
+        }
+        return sessionRepository.findById(session.id()).orElseThrow();
     }
 
     /**
@@ -1330,6 +1259,7 @@ public class ChatUiController {
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
                 .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
                         llmConfigRepository, agent.llmConfigName()))
+                .withOwnPrompt(ownPrompt(session, agent))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks)
                 .withOfferedTools(offeredToolNames());
@@ -1521,7 +1451,7 @@ public class ChatUiController {
 
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var agent = agentOpt.get();
 
@@ -1566,7 +1496,7 @@ public class ChatUiController {
         log.info("DELETE /chat/api/sessions/{}/messages fromSeq={} toSeq={}", sessionId.value(), fromSeq, toSeq);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
 
         sessionService.deleteMessages(sessionId, fromSeq, toSeq);
@@ -1590,7 +1520,7 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
@@ -1644,7 +1574,7 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }

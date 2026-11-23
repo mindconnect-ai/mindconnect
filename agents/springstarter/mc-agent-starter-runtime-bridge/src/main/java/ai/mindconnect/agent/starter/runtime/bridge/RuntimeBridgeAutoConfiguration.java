@@ -99,8 +99,20 @@ public class RuntimeBridgeAutoConfiguration {
     RuntimeFeature managedStoresFeature(ObjectProvider<AgentRepository> agents,
                                         ObjectProvider<SessionRepository> sessions,
                                         ObjectProvider<NamespaceProvider> namespaces,
-                                        AgentDefinitionMapper mapper, ObjectMapper json) {
-        return new ManagedStoresFeature(agents::getObject, sessions::getObject, namespaces::getObject, mapper, json);
+                                        EarlierAgentConverter converter, ObjectMapper json) {
+        return new ManagedStoresFeature(agents::getObject, sessions::getObject, namespaces::getObject, converter,
+                json);
+    }
+
+    @Bean
+    EarlierAgentConverter earlierAgentConverter(AgentDefinitionMapper mapper, ObjectMapper json) {
+        return new EarlierAgentConverter(mapper, json);
+    }
+
+    /** The agent a chat runs on, for the chat page while it draws agents in the earlier types. */
+    @Bean
+    ChatAgentChoice chatAgentChoice(ObjectProvider<SessionManagement> sessions, EarlierAgentConverter converter) {
+        return new ChatAgentChoice(sessions.getObject(), converter);
     }
 
     /** Which directories a session may have, as the earlier runtime's configuration says it. */

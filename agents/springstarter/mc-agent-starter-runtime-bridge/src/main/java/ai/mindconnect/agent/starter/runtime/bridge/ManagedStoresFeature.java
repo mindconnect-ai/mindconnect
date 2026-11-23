@@ -33,23 +33,24 @@ final class ManagedStoresFeature implements RuntimeFeature {
     private final Supplier<AgentRepository> agents;
     private final Supplier<SessionRepository> sessions;
     private final Supplier<NamespaceProvider> namespaces;
-    private final AgentDefinitionMapper mapper;
+    private final EarlierAgentConverter converter;
     private final ObjectMapper json;
 
     ManagedStoresFeature(Supplier<AgentRepository> agents, Supplier<SessionRepository> sessions,
-                         Supplier<NamespaceProvider> namespaces, AgentDefinitionMapper mapper, ObjectMapper json) {
+                         Supplier<NamespaceProvider> namespaces, EarlierAgentConverter converter,
+                         ObjectMapper json) {
         this.agents = agents;
         this.sessions = sessions;
         this.namespaces = namespaces;
-        this.mapper = mapper;
+        this.converter = converter;
         this.json = json;
     }
 
     /** The definition the chat's choice amounts to right now; empty when the agent behind it is gone. */
     static Optional<AgentDefinition> agentOf(AgentSession written, AgentDefinitionRepository definitions,
-                                             AgentDefinitionMapper mapper) {
+                                             EarlierAgentConverter converter) {
         try {
-            return Optional.of(mapper.toRuntime(new SessionAgentResolver(definitions).resolve(written)));
+            return Optional.of(converter.runs(new SessionAgentResolver(definitions).resolve(written)));
         } catch (DomainException gone) {
             return Optional.empty();
         }
@@ -65,11 +66,11 @@ final class ManagedStoresFeature implements RuntimeFeature {
         // The agents as they are kept now, for a chat whose choice amounts to a definition of its own.
         AtomicReference<AgentDefinitionRepository> definitions = new AtomicReference<>();
         ctx.decorate(AgentDefinitionRepository.class, earlier -> {
-            definitions.set(new ManagedAgentDefinitionRepository(agents, earlier, mapper, json, namespaces));
+            definitions.set(new ManagedAgentDefinitionRepository(agents, earlier, converter, namespaces));
             return definitions.get();
         });
         ctx.decorate(AgentSessionRepository.class, earlier ->
                 new ManagedAgentSessionRepository(sessions, earlier, json, namespaces,
-                        written -> agentOf(written, definitions.get(), mapper)));
+                        written -> agentOf(written, definitions.get(), converter)));
     }
 }
