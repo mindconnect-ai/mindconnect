@@ -52,12 +52,12 @@ public final class SubAgentPlugin implements Plugin {
             // Offered per agent at the hook below, not here: an agent is a
             // tool only for the agents that name it.
             @Override
-            public List<ToolDefinition> tools(Session session) {
+            public List<ToolDefinition> tools(AgentDefinition agent, Session session) {
                 return List.of();
             }
 
             @Override
-            public Optional<Tool> resolve(String toolName, Session session) {
+            public Optional<Tool> resolve(String toolName, AgentDefinition caller, Session session) {
                 if (SendToParentTool.NAME.equals(toolName)) {
                     return Optional.of(sendToParent);
                 }

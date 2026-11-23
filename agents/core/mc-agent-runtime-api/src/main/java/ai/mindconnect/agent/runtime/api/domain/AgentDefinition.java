@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.api.domain;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * What an agent is: its instructions, the model it prefers, the tools it may
@@ -51,6 +52,11 @@ public record AgentDefinition(
 
     /** Whether the agent may use the tool at all, offered at once or not. */
     public boolean uses(String toolName) {
-        return tools.stream().anyMatch(tool -> tool.name().equals(toolName));
+        return binding(toolName).isPresent();
+    }
+
+    /** How this agent uses the tool; empty when it does not name it. */
+    public Optional<ToolBinding> binding(String toolName) {
+        return tools.stream().filter(tool -> tool.name().equals(toolName)).findFirst();
     }
 }

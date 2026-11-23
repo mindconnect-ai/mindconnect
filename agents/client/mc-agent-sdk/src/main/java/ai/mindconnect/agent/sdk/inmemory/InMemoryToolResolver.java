@@ -3,6 +3,7 @@ package ai.mindconnect.agent.sdk.inmemory;
 import java.util.List;
 import java.util.Optional;
 
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
@@ -18,12 +19,12 @@ public final class InMemoryToolResolver implements ToolResolver {
     }
 
     @Override
-    public List<ToolDefinition> tools(Session session) {
-        return tools.tools(session);
+    public List<ToolDefinition> tools(AgentDefinition agent, Session session) {
+        return tools.tools(agent, session);
     }
 
     @Override
-    public Optional<Tool> resolve(String toolName, Session session) {
-        return tools.resolve(toolName, session);
+    public Optional<Tool> resolve(String toolName, AgentDefinition agent, Session session) {
+        return tools.resolve(toolName, agent, session);
     }
 }

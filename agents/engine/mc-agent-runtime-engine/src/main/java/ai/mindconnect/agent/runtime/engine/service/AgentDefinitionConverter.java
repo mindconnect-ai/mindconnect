@@ -24,7 +24,8 @@ public final class AgentDefinitionConverter {
         json.put("instructions", agent.instructions());
         json.put(MODEL_SETTINGS, settingsToJson(agent.modelSettings()));
         json.put("tools", agent.tools().stream()
-                .map(tool -> Map.<String, Object>of("name", tool.name(), "deferred", tool.deferred())).toList());
+                .map(tool -> Map.<String, Object>of("name", tool.name(), "deferred", tool.deferred(),
+                        "metadata", tool.metadata())).toList());
         json.put("maxRounds", agent.maxRounds());
         json.put("metadata", agent.metadata());
         return json;
@@ -36,7 +37,9 @@ public final class AgentDefinitionConverter {
                 (String) json.get("instructions"),
                 settingsFromJson((Map<String, Object>) json.get(MODEL_SETTINGS)),
                 ((List<Map<String, Object>>) json.get("tools")).stream()
-                        .map(tool -> new ToolBinding((String) tool.get("name"), Boolean.TRUE.equals(tool.get("deferred"))))
+                        .map(tool -> new ToolBinding((String) tool.get("name"), Boolean.TRUE.equals(tool.get("deferred")),
+                                tool.get("metadata") instanceof Map<?, ?> metadata
+                                        ? (Map<String, Object>) metadata : Map.of()))
                         .toList(),
                 ((Number) json.get("maxRounds")).intValue(),
                 json.get("metadata") instanceof Map<?, ?> metadata ? (Map<String, Object>) metadata : Map.of());

@@ -99,6 +99,21 @@ class CapabilitiesWithoutEngineTest {
     }
 
     @Test
+    void a_tool_the_agent_wants_approved_asks_although_no_rule_does() {
+        AgentDefinition careful = new AgentDefinition("careful", "Asks first.", "You ask first.", ModelSettings.NONE,
+                List.of(new ToolBinding("web_search", false, Map.of(PermissionPlugin.NEEDS_APPROVAL, true))),
+                5, Map.of());
+        ToolCall call = new ToolCall("c1", "web_search", Map.of(), CONTEXT.turnId(), SESSION.id());
+
+        ToolOutput asked = run(new ToolInvocation(
+                new AgentContext(SESSION, careful, CONTEXT.turnId()), call, Optional.empty()));
+        ToolOutput byAnotherAgent = run(new ToolInvocation(CONTEXT, call, Optional.empty()));
+
+        assertThat(asked).isInstanceOf(ToolOutput.Interrupted.class);
+        assertThat(byAnotherAgent).isEqualTo(ToolOutput.ok("ran web_search"));
+    }
+
+    @Test
     void a_tool_that_asks_interrupts_and_runs_once_approved() {
         ToolCall call = new ToolCall("c1", "bash", Map.of(), CONTEXT.turnId(), SESSION.id());
 
@@ -114,12 +129,12 @@ class CapabilitiesWithoutEngineTest {
     void a_sub_agent_is_a_tool_that_resolves_by_the_agents_name() {
         ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
 
-        assertThat(tools.resolve("researcher", SESSION)).isPresent();
+        assertThat(tools.resolve("researcher", LEAD, SESSION)).isPresent();
     }
 
     private List<String> offeredNames() {
         ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
-        return registry.run(RuntimeHook.TOOL_OFFER, CONTEXT, context -> tools.tools(context.session()).stream()
+        return registry.run(RuntimeHook.TOOL_OFFER, CONTEXT, context -> tools.tools(context.agent(), context.session()).stream()
                         .filter(tool -> context.agent().uses(tool.name()))
                         .toList())
                 .stream().map(ToolDefinition::name).toList();
@@ -128,7 +143,7 @@ class CapabilitiesWithoutEngineTest {
     private ToolOutput run(ToolInvocation invocation) {
         ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
         return registry.run(RuntimeHook.TOOL_CALL, invocation, running ->
-                tools.resolve(running.call().toolName(), SESSION).orElseThrow().execute(running.call(), SESSION));
+                tools.resolve(running.call().toolName(), LEAD, SESSION).orElseThrow().execute(running.call(), SESSION));
     }
 
     private static SkillResolver skills(SkillDefinition... skills) {

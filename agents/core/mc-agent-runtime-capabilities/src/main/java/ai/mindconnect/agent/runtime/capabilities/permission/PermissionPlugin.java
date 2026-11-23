@@ -7,6 +7,7 @@ import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
+import ai.mindconnect.agent.runtime.api.hook.AgentContext;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.hook.ToolInvocation;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
@@ -21,6 +22,13 @@ import ai.mindconnect.plugin.PluginRegistry;
  * being usable.
  */
 public final class PermissionPlugin implements Plugin {
+
+    /**
+     * The key in the metadata of an agent's tool entry that says a call of
+     * this tool by this agent has to be approved: {@code true}. It makes an
+     * allowed tool ask; a tool a rule denies stays denied.
+     */
+    public static final String NEEDS_APPROVAL = "needsApproval";
 
     private final PermissionEffect unruled;
     private final ApprovalMemory approvals;
@@ -47,11 +55,11 @@ public final class PermissionPlugin implements Plugin {
         registry.contribute(ToolResolver.class, ToolResolver.of(List.of(new AskUserTool())));
 
         registry.after(RuntimeHook.TOOL_OFFER, (context, tools) -> tools.stream()
-                .filter(tool -> effect(registry, tool.name(), context.session()) != PermissionEffect.DENY)
+                .filter(tool -> effect(registry, tool.name(), context) != PermissionEffect.DENY)
                 .toList());
 
         registry.before(RuntimeHook.TOOL_CALL, invocation ->
-                switch (effect(registry, invocation.call().toolName(), invocation.context().session())) {
+                switch (effect(registry, invocation.call().toolName(), invocation.context())) {
                     case ALLOW -> BeforeOutcome.proceed(invocation);
                     case DENY -> BeforeOutcome.stop(ToolOutput.failed(
                             "Error: " + invocation.call().toolName() + " is not permitted here"));
@@ -81,12 +89,16 @@ public final class PermissionPlugin implements Plugin {
         return BeforeOutcome.proceed(invocation);
     }
 
-    private PermissionEffect effect(PluginRegistry registry, String toolName, Session session) {
-        return registry.all(PermissionRuleSource.class).stream()
-                .flatMap(source -> source.rules(session).stream())
+    private PermissionEffect effect(PluginRegistry registry, String toolName, AgentContext context) {
+        PermissionEffect ruled = registry.all(PermissionRuleSource.class).stream()
+                .flatMap(source -> source.rules(context.session()).stream())
                 .filter(rule -> rule.covers(toolName))
                 .map(PermissionRule::effect)
                 .findFirst()
                 .orElse(unruled);
+        boolean agentAsks = context.agent().binding(toolName)
+                .map(binding -> Boolean.TRUE.equals(binding.metadata().get(NEEDS_APPROVAL)))
+                .orElse(false);
+        return ruled == PermissionEffect.ALLOW && agentAsks ? PermissionEffect.ASK : ruled;
     }
 }

@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
@@ -82,7 +83,7 @@ final class ToolCallWorker implements TaskWorker {
         Turn turn = turns.turn(turnId).orElseThrow();
         ToolOutput output = hooks.run(RuntimeHook.TOOL_CALL,
                 new ToolInvocation(new AgentContext(session, turn.agent(), turnId), call, answer),
-                invocation -> run(invocation.call(), session));
+                invocation -> run(invocation.call(), invocation.context().agent(), session));
         return switch (output) {
             case ToolOutput.Completed completed -> {
                 if (completed.failed()) {
@@ -125,8 +126,8 @@ final class ToolCallWorker implements TaskWorker {
         return TaskOutcome.done("Error: the agent did not finish its task (" + status + ")");
     }
 
-    private ToolOutput run(ToolCall call, Session session) {
-        Optional<Tool> tool = tools.resolve(call.toolName(), session);
+    private ToolOutput run(ToolCall call, AgentDefinition agent, Session session) {
+        Optional<Tool> tool = tools.resolve(call.toolName(), agent, session);
         if (tool.isEmpty()) {
             return ToolOutput.failed("Error: there is no tool named " + call.toolName());
         }

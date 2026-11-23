@@ -43,7 +43,7 @@ final class GatewayLlmProvider implements LlmProvider {
         String rendered = hooks.run(RuntimeHook.INSTRUCTIONS, context, instructions::render);
         // Starts from what exists and the agent names; who may see what is the hooks' business.
         List<ToolDefinition> offered = hooks.run(RuntimeHook.TOOL_OFFER, context, asked ->
-                tools.tools(asked.session()).stream().filter(tool -> asked.agent().uses(tool.name())).toList());
+                tools.tools(asked.agent(), asked.session()).stream().filter(tool -> asked.agent().uses(tool.name())).toList());
         ModelRequest request = new ModelRequest(context.turnId(), context.agent().modelSettings(), rendered, history, offered);
         return hooks.run(RuntimeHook.MODEL_CALL, new ModelCall(context, request),
                 call -> gateway.ask(call.request(), events));

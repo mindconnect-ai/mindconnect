@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.capabilities.toolsearch;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -56,15 +57,13 @@ final class ToolSearchTool implements Tool {
             return ToolOutput.failed("Error: " + NAME + " needs a query");
         }
         // A tool is not told which agent runs it; the turn knows.
-        List<String> deferred = turns.get().find(call.turnId())
-                .map(Turn::agent)
-                .map(AgentDefinition::tools)
-                .orElse(List.of()).stream()
+        Optional<AgentDefinition> agent = turns.get().find(call.turnId()).map(Turn::agent);
+        List<String> deferred = agent.map(AgentDefinition::tools).orElse(List.of()).stream()
                 .filter(ToolBinding::deferred)
                 .map(ToolBinding::name)
                 .toList();
         List<String> words = List.of(query.toLowerCase(Locale.ROOT).split("\\s+"));
-        List<ToolDefinition> found = tools.tools(session).stream()
+        List<ToolDefinition> found = agent.map(searching -> tools.tools(searching, session)).orElse(List.of()).stream()
                 .filter(tool -> deferred.contains(tool.name()))
                 .filter(tool -> matches(tool, words))
                 .limit(MAX_RESULTS)
