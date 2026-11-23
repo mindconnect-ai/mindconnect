@@ -6,6 +6,9 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.agent.runtime.api.hook.AgentContext;
+import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
+import ai.mindconnect.plugin.BeforeOutcome;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.plugin.Plugin;
@@ -17,6 +20,14 @@ import ai.mindconnect.plugin.PluginRegistry;
  * {@link SkillResolver} someone else contributes.
  */
 public final class SkillPlugin implements Plugin {
+
+    /**
+     * The key in an agent's metadata that picks its skills: a list of skill
+     * names. Without the key the agent may load every skill there is — one
+     * added later is in reach without touching the agent; with an empty
+     * list it has none, and is offered neither the list nor the tool.
+     */
+    public static final String SKILLS = "skills";
 
     @Override
     public String name() {
@@ -30,10 +41,17 @@ public final class SkillPlugin implements Plugin {
         registry.contribute(ToolResolver.class, ToolResolver.of(List.of(loadSkill)));
 
         registry.after(RuntimeHook.INSTRUCTIONS, (context, instructions) ->
-                instructions + listing(summaries(resolvers, context.session())));
+                instructions + listing(summaries(resolvers, context)));
         // Offered without the agent naming it: an agent that has skills must be able to load them.
+        // The tool is not told which agent calls it; a skill the agent did not pick is refused here.
+        registry.before(RuntimeHook.TOOL_CALL, invocation ->
+                LoadSkillTool.NAME.equals(invocation.call().toolName())
+                        && !mayLoad(invocation.context(), String.valueOf(invocation.call().arguments().get("name")))
+                        ? BeforeOutcome.stop(ToolOutput.failed("Error: there is no skill named "
+                                + invocation.call().arguments().get("name")))
+                        : BeforeOutcome.proceed(invocation));
         registry.after(RuntimeHook.TOOL_OFFER, (context, tools) -> {
-            if (summaries(resolvers, context.session()).isEmpty()) {
+            if (summaries(resolvers, context).isEmpty()) {
                 return tools;
             }
             List<ToolDefinition> offered = new ArrayList<>(tools);
@@ -42,8 +60,16 @@ public final class SkillPlugin implements Plugin {
         });
     }
 
-    private static List<SkillSummary> summaries(Supplier<List<SkillResolver>> resolvers, Session session) {
-        return resolvers.get().stream().flatMap(resolver -> resolver.skills(session).stream()).toList();
+    /** The skills there are for the session that this agent may load. */
+    private static List<SkillSummary> summaries(Supplier<List<SkillResolver>> resolvers, AgentContext context) {
+        return resolvers.get().stream()
+                .flatMap(resolver -> resolver.skills(context.session()).stream())
+                .filter(skill -> mayLoad(context, skill.name()))
+                .toList();
+    }
+
+    private static boolean mayLoad(AgentContext context, String skillName) {
+        return !(context.agent().metadata().get(SKILLS) instanceof List<?> picked) || picked.contains(skillName);
     }
 
     private static String listing(List<SkillSummary> skills) {

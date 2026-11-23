@@ -85,6 +85,20 @@ class CapabilitiesWithoutEngineTest {
     }
 
     @Test
+    void an_agent_that_picks_its_skills_sees_and_loads_only_those() {
+        AgentDefinition picky = new AgentDefinition("picky", "Picks.", "You pick.", ModelSettings.NONE, List.of(), 5,
+                Map.of(SkillPlugin.SKILLS, List.of("other")));
+        AgentContext context = new AgentContext(SESSION, picky, CONTEXT.turnId());
+        ToolCall load = new ToolCall("c1", "load_skill", Map.of("name", "citations"), CONTEXT.turnId(), SESSION.id());
+
+        assertThat(registry.run(RuntimeHook.INSTRUCTIONS, context, asked -> asked.agent().instructions()))
+                .isEqualTo("You pick.");
+        assertThat(run(new ToolInvocation(context, load, Optional.empty())))
+                .isEqualTo(ToolOutput.failed("Error: there is no skill named citations"));
+        assertThat(run(new ToolInvocation(CONTEXT, load, Optional.empty()))).isEqualTo(ToolOutput.ok("Cite like this."));
+    }
+
+    @Test
     void the_offer_holds_back_deferred_tools_and_adds_what_the_capabilities_bring() {
         assertThat(offeredNames()).containsExactlyInAnyOrder(
                 "web_search", "bash", "load_skill", "tool_search", "researcher");
