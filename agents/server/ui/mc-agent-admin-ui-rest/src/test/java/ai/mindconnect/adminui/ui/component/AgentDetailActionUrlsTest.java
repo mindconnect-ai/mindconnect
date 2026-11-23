@@ -1,16 +1,13 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.management.api.ManagedAgent;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,17 +32,15 @@ class AgentDetailActionUrlsTest {
                 "assistants", "bot", null, ManagedAgent.Status.ACTIVE, null, null, 0);
     }
 
-    /** Renders without a database: the detail header only asks for the session list. */
-    private static final AgentSessionRepository NO_SESSIONS = new AgentSessionRepository() {
-        @Override public AgentSession create(AgentSession session) { throw new UnsupportedOperationException(); }
-        @Override public Optional<AgentSession> update(SessionId id,
-                java.util.function.UnaryOperator<AgentSession> change) { throw new UnsupportedOperationException(); }
-        @Override public Optional<AgentSession> findById(SessionId id) { return Optional.empty(); }
-        @Override public List<AgentSession> findByAgent(AgentId agent, UserId user) { return List.of(); }
-        @Override public List<AgentSession> findByUser(UserId user) { return List.of(); }
-        @Override public List<AgentSession> findByParentSession(SessionId parent) { return List.of(); }
-        @Override public void deleteById(SessionId id) { throw new UnsupportedOperationException(); }
-    };
+    /** Renders without a runtime: the detail header only asks for the session list. */
+    private static final SessionManagement NO_SESSIONS = (SessionManagement) java.lang.reflect.Proxy.newProxyInstance(
+            SessionManagement.class.getClassLoader(), new Class<?>[] {SessionManagement.class},
+            (proxy, method, arguments) -> {
+                if (method.getName().equals("list")) {
+                    return List.of();
+                }
+                throw new UnsupportedOperationException(method.getName());
+            });
 
     private static String json(Object node) throws Exception {
         return new ObjectMapper().writeValueAsString(node);

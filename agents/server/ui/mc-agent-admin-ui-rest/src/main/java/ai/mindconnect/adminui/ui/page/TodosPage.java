@@ -2,8 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.TodoListComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tools.todo.TodoList;
 import ai.mindconnect.agent.tools.todo.TodoStatus;
 import ai.mindconnect.ui.model.UiAction;
@@ -26,22 +25,23 @@ import ai.mindconnect.ui.model.UiSection;
  */
 public final class TodosPage extends AdminPage {
 
-    private final AgentSession session;
-    private final AgentDefinition agent;
+    private final SessionId session;
+    private final String agentName;
     private final TodoList list;
 
     private final TodoListComponent todoList;
 
-    public TodosPage(AgentSession session, AgentDefinition agent, TodoList list) {
+    /** @param agentName the agent the session runs as, for the heading */
+    public TodosPage(SessionId session, String agentName, TodoList list) {
         this.session = session;
-        this.agent = agent;
+        this.agentName = agentName;
         this.list = list;
-        this.todoList = new TodoListComponent(session.id(), list);
+        this.todoList = new TodoListComponent(session, list);
     }
 
     @Override
     public UiPage render() {
-        String sessionId = session.id().value();
+        String sessionId = session.value();
 
         UiList listUi = todoList.render();
 
@@ -58,7 +58,7 @@ public final class TodosPage extends AdminPage {
 
         long open = list.items().stream()
                 .filter(i -> i.status() != TodoStatus.COMPLETED).count();
-        String title = "Todos — " + agent.name() + summary(open);
+        String title = "Todos — " + agentName + summary(open);
 
         var section = UiSection.of("todos-session-" + sessionId, title)
                 .section("todos", "Todos", listUi);

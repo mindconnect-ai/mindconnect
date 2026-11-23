@@ -5,7 +5,7 @@ import ai.mindconnect.adminui.ui.component.AgentDetailComponent;
 import ai.mindconnect.adminui.ui.component.SessionTableComponent;
 import ai.mindconnect.adminui.ui.component.ToolTableComponent;
 import ai.mindconnect.agent.management.api.ManagedAgent;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 
@@ -23,22 +23,22 @@ public final class AgentDetailPage extends AdminPage {
 
     private final ManagedAgent agent;
     private final String userId;
-    private final AgentSessionRepository sessionRepository;
+    private final SessionManagement sessions;
     private final String initialSection;
     private final String selectedRowId;
     private ai.mindconnect.ui.model.UiNode memoryTab;
 
     public AgentDetailPage(ManagedAgent agent, String userId,
-                           AgentSessionRepository sessionRepository) {
-        this(agent, userId, sessionRepository, null, null);
+                           SessionManagement sessions) {
+        this(agent, userId, sessions, null, null);
     }
 
     public AgentDetailPage(ManagedAgent agent, String userId,
-                           AgentSessionRepository sessionRepository,
+                           SessionManagement sessions,
                            String initialSection, String selectedRowId) {
         this.agent = agent;
         this.userId = userId;
-        this.sessionRepository = sessionRepository;
+        this.sessions = sessions;
         this.initialSection = initialSection;
         this.selectedRowId = selectedRowId;
     }
@@ -51,7 +51,7 @@ public final class AgentDetailPage extends AdminPage {
 
     @Override
     public UiPage render() {
-        var detail = new AgentDetailComponent(agent, userId, sessionRepository,
+        var detail = new AgentDetailComponent(agent, userId, sessions,
                 initialSection, selectedRowId).memoryTab(memoryTab);
         return UiPage.of("/admin/agents/" + agent.id().value(), detail.render());
     }
@@ -63,7 +63,7 @@ public final class AgentDetailPage extends AdminPage {
      */
     public UiPatch refreshSessions() {
         var table = new SessionTableComponent(ai.mindconnect.agent.AgentId.of(agent.id().value()), userId,
-                sessionRepository);
+                sessions);
         return patch(UiPatch.Operation.replace(table.id(), table.render()));
     }
 

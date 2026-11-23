@@ -10,7 +10,7 @@ import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -40,24 +40,24 @@ public final class AgentDetailComponent implements UiComponent {
     /** What the runtime runs: name, model, tools, and in its metadata what the capabilities read. */
     private final AgentDefinition definition;
     private final String userId;
-    private final AgentSessionRepository sessionRepository;
+    private final SessionManagement sessions;
     private final String initialSection;
     private final String selectedRowId;
     /** The "Memory" tab — what this agent keeps about its users; null leaves it out. */
     private UiNode memoryTab;
 
     public AgentDetailComponent(ManagedAgent agent, String userId,
-                                 AgentSessionRepository sessionRepository) {
-        this(agent, userId, sessionRepository, null, null);
+                                 SessionManagement sessions) {
+        this(agent, userId, sessions, null, null);
     }
 
     public AgentDetailComponent(ManagedAgent agent, String userId,
-                                 AgentSessionRepository sessionRepository,
+                                 SessionManagement sessions,
                                  String initialSection, String selectedRowId) {
         this.agent = agent;
         this.definition = agent.definition();
         this.userId = userId;
-        this.sessionRepository = sessionRepository;
+        this.sessions = sessions;
         this.initialSection = initialSection;
         this.selectedRowId = selectedRowId;
     }
@@ -85,7 +85,7 @@ public final class AgentDetailComponent implements UiComponent {
 
         var toolTable    = new ToolTableComponent(agent, selectedToolId).render();
         var sessionTable = new SessionTableComponent(ai.mindconnect.agent.AgentId.of(agent.id().value()), userId,
-                sessionRepository, selectedSessId).render();
+                sessions, selectedSessId).render();
 
         // The section's own title is a plain string — the renderer escapes it,
         // so an icon cannot go in it. A header-only UiList draws the same bar

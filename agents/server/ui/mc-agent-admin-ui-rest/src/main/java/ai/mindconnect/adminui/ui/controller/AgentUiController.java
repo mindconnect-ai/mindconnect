@@ -16,6 +16,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.management.api.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
@@ -27,7 +28,6 @@ import ai.mindconnect.agent.starter.runtime.bridge.AgentDefinitionMapper;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.DomainException;
@@ -63,7 +63,8 @@ public class AgentUiController {
 
     /** The runtime's: the pages keep no way of their own to the agents. */
     private final AgentManagement agents;
-    private final AgentSessionRepository sessionRepository;
+    /** The runtime's too: an agent's sessions are listed and deleted where every session is. */
+    private final SessionManagement sessions;
     private final LlmConfigRepository llmConfigRepository;
     private final ToolRegistry toolRegistry;
     private final ToolTestService toolTestService;
@@ -76,7 +77,6 @@ public class AgentUiController {
     private final org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi;
 
     public AgentUiController(AgentRuntime runtime,
-                                AgentSessionRepository sessionRepository,
                                 LlmConfigRepository llmConfigRepository,
                                 ToolRegistry toolRegistry,
                                 ToolTestService toolTestService,
@@ -86,7 +86,7 @@ public class AgentUiController {
                                 org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi) {
         this.memoryUi = memoryUi;
         this.agents = runtime.service(AgentManagement.class);
-        this.sessionRepository = sessionRepository;
+        this.sessions = runtime.service(SessionManagement.class);
         this.llmConfigRepository = llmConfigRepository;
         this.toolRegistry = toolRegistry;
         this.toolTestService = toolTestService;
@@ -132,7 +132,7 @@ public class AgentUiController {
                                          @AuthenticationPrincipal OidcUser user) {
         String userId = user.getPreferredUsername();
         return agents.find(AgentId.of(idValue))
-                .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository, section, row)
+                .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessions, section, row)
                         .memoryTab(memoryTab(a)).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -148,9 +148,10 @@ public class AgentUiController {
                                                  @PathVariable("sessionId") String sessionIdValue,
                                                  @AuthenticationPrincipal OidcUser user) {
         String userId = user.getPreferredUsername();
-        sessionRepository.deleteById(SessionId.of(sessionIdValue));
+        // Through the management: what else is kept of the session goes with it.
+        sessions.delete(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionIdValue));
         return agents.find(AgentId.of(idValue))
-                .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository).refreshSessions()))
+                .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessions).refreshSessions()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -489,7 +490,7 @@ public class AgentUiController {
                 .map(a -> {
                     ManagedAgent updated = updateTools(id, tools -> tools.stream()
                             .filter(t -> !t.id().equals(toolId)).toList());
-                    return ResponseEntity.ok(new AgentDetailPage(updated, userId, sessionRepository).refreshTools());
+                    return ResponseEntity.ok(new AgentDetailPage(updated, userId, sessions).refreshTools());
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

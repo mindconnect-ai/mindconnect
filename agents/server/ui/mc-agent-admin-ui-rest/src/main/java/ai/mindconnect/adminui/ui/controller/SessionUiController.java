@@ -13,16 +13,20 @@ import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.port.in.ConversationManager;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -39,50 +43,51 @@ public class SessionUiController {
 
     private static final Logger log = LoggerFactory.getLogger(SessionUiController.class);
 
-    private final AgentSessionService sessionService;
+    /** The runtime's: the todo and trace dialogs keep no way of their own to the sessions. */
+    private final AgentRuntime runtime;
+    private final SessionManagement sessions;
     private final AgentChatService chatService;
-    private final AgentDefinitionRepository agentRepository;
     private final AgentSessionRepository sessionRepository;
     private final TodoListService todoListService;
-    private final ObjectMapper objectMapper;
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
-    private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
-
-    private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
-    private final ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory;
-    private final ToolApprovalRepository approvalStore;
+    private final ConversationManager conversations;
     /**
-     * The session tools (memory, traces, todos) have to resolve the
-     * agent the same way the run does. A chat with an inline session agent has
-     * no entry in the registry, and looking it up there answered 404 for every
-     * one of these dialogs.
+     * The memory dialog has to resolve the agent the same way the earlier
+     * runtime's run did: a chat with an inline session agent has no entry in
+     * the registry, and looking it up there answered 404.
      */
     private final SessionAgentResolver agentResolver;
 
-    public SessionUiController(AgentSessionService sessionService,
+    public SessionUiController(AgentRuntime runtime,
                              AgentChatService chatService,
                              AgentDefinitionRepository agentRepository,
                              AgentSessionRepository sessionRepository,
                              TodoListService todoListService,
-                             ObjectMapper objectMapper,
                              LlmCallTraceRepository traceRepository,
-                             ai.mindconnect.chatui.service.ActiveStreams activeStreams,
-                             ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
-                             ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory,
-                             ToolApprovalRepository approvalStore) {
-        this.sessionService = sessionService;
-        this.sessionFiles = sessionFiles;
+                             ConversationManager conversations) {
+        this.runtime = runtime;
+        this.sessions = runtime.service(SessionManagement.class);
         this.chatService = chatService;
-        this.agentRepository = agentRepository;
         this.sessionRepository = sessionRepository;
         this.todoListService = todoListService;
-        this.objectMapper = objectMapper;
         this.traceRepository = traceRepository;
-        this.activeStreams = activeStreams;
-        this.layoutFactory = layoutFactory;
-        this.approvalStore = approvalStore;
+        this.conversations = conversations;
         this.agentResolver = new SessionAgentResolver(agentRepository);
+    }
+
+    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId id) {
+        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value());
+    }
+
+    /** The agent the session runs as, for a dialog's heading; a session without one is still shown. */
+    private String agentNameOf(ManagedSession session) {
+        return sessions.agentOf(session.id()).map(AgentDefinition::name).orElse("(no agent)");
+    }
+
+    /** The conversation a session's messages and traces are filed under; empty for a session that is gone. */
+    private java.util.Optional<ConversationId> conversationOf(SessionId sessionId) {
+        return runtime.sessions().find(runtimeId(sessionId)).map(RepositorySessionStore::conversationOf);
     }
 
     /**
@@ -177,13 +182,12 @@ public class SessionUiController {
             return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
         }
         List<LlmCallTraceHeader> traces = loadTraceHeaders(sessionId);
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> {
-                            var page = new TracesPage(session, agent, traces);
-                            if (dialog) return sessionDialog(sessionId, "Traces", page.render());
-                            return ResponseEntity.ok(page.render());
-                        }))
+        return sessions.find(runtimeId(sessionId))
+                .<ResponseEntity<?>>map(session -> {
+                    var page = new TracesPage(sessionId, agentNameOf(session), traces);
+                    if (dialog) return sessionDialog(sessionId, "Traces", page.render());
+                    return ResponseEntity.ok(page.render());
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -220,18 +224,16 @@ public class SessionUiController {
     }
 
     /**
-     * Walks the session tree directly via parentSessionId: top-level
-     * session + every sub-agent session (transitively) it spawned. For
-     * each session we know the conversationId, so we read the headers
-     * straight from those known paths — no scanning every conversation
-     * directory on disk.
+     * Walks the session tree: the session and every sub-agent session
+     * (transitively) it spawned. Each session says which conversation its
+     * traces are filed under, so the headers are read straight from there —
+     * no scanning every conversation directory on disk.
      */
     private List<LlmCallTraceHeader> loadTraceHeaders(SessionId sessionId) {
         List<LlmCallTraceHeader> traces = new java.util.ArrayList<>();
         for (SessionId sid : collectSessionTree(sessionId)) {
             try {
-                ConversationId convId = sessionRepository.findById(sid)
-                        .map(s -> s.conversationId()).orElse(null);
+                ConversationId convId = conversationOf(sid).orElse(null);
                 if (convId == null) continue;
                 traces.addAll(traceRepository.findHeadersByConversation(convId));
             } catch (Exception e) {
@@ -260,7 +262,10 @@ public class SessionUiController {
                             ? trace.context().sessionId() : SessionId.of(sessionIdValue);
                     List<Message> history;
                     try {
-                        history = sessionService.loadHistory(owner);
+                        history = conversationOf(owner)
+                                .map(conversation -> conversations.loadHistory(conversation,
+                                        new PageRequest(0, Integer.MAX_VALUE)))
+                                .orElse(List.of());
                     } catch (Exception e) {
                         log.warn("Failed to load history for session {}: {}", owner, e.getMessage());
                         history = List.of();
@@ -287,14 +292,13 @@ public class SessionUiController {
     public ResponseEntity<?> getTodos(@PathVariable("sessionId") String sessionIdValue,
                                       @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> {
-                            var list = todoListService.load(sessionId);
-                            var page = new TodosPage(session, agent, list).render();
-                            if (dialog) return sessionDialog(sessionId, "Todos", page);
-                            return ResponseEntity.<UiPage>ok(page);
-                        }))
+        return sessions.find(runtimeId(sessionId))
+                .<ResponseEntity<?>>map(session -> {
+                    var list = todoListService.load(sessionId);
+                    var page = new TodosPage(sessionId, agentNameOf(session), list).render();
+                    if (dialog) return sessionDialog(sessionId, "Todos", page);
+                    return ResponseEntity.<UiPage>ok(page);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -310,9 +314,8 @@ public class SessionUiController {
 
     /**
      * Walks the parent/child session tree rooted at {@code rootSessionId}
-     * via {@link AgentSessionRepository#findByParentSession(SessionId)} and
-     * returns every session id encountered (root first, then BFS through
-     * sub-agents). Stays cheap because session.json files are tiny.
+     * and returns every session id encountered (root first, then BFS through
+     * sub-agents).
      */
     private List<SessionId> collectSessionTree(SessionId rootSessionId) {
         List<SessionId> ordered = new java.util.ArrayList<>();
@@ -324,8 +327,8 @@ public class SessionUiController {
             if (!visited.add(current)) continue;
             ordered.add(current);
             try {
-                for (var sub : sessionRepository.findByParentSession(current)) {
-                    frontier.add(sub.id());
+                for (ManagedSession sub : sessions.children(runtimeId(current))) {
+                    frontier.add(SessionId.of(sub.id().value()));
                 }
             } catch (Exception e) {
                 log.warn("Failed to list sub-sessions of {}: {}", current, e.getMessage());
