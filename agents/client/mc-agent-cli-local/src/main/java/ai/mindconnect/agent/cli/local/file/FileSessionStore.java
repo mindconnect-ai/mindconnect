@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 import java.util.UUID;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -45,7 +46,7 @@ public final class FileSessionStore implements SessionStore {
     }
 
     @Override
-    public void save(Session session) {
+    public synchronized void save(Session session) {
         Map<String, Object> content = new LinkedHashMap<>();
         content.put("id", session.id().value());
         content.put("userId", session.userId().value());
@@ -79,6 +80,14 @@ public final class FileSessionStore implements SessionStore {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read session " + sessionId, e);
         }
+    }
+
+    @Override
+    public synchronized Session update(SessionId sessionId, UnaryOperator<Session> change) {
+        Session changed = change.apply(find(sessionId).orElseThrow(() ->
+                new IllegalArgumentException("There is no session " + sessionId.value())));
+        save(changed);
+        return changed;
     }
 
     @Override

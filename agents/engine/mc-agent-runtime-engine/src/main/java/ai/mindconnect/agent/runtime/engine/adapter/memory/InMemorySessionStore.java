@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
@@ -39,6 +40,15 @@ public final class InMemorySessionStore implements SessionStore {
     @Override
     public Optional<Session> find(SessionId sessionId) {
         return Optional.ofNullable(sessions.get(key(sessionId)));
+    }
+
+    @Override
+    public Session update(SessionId sessionId, UnaryOperator<Session> change) {
+        Session changed = sessions.computeIfPresent(key(sessionId), (key, session) -> change.apply(session));
+        if (changed == null) {
+            throw new IllegalArgumentException("There is no session " + sessionId.value());
+        }
+        return changed;
     }
 
     @Override

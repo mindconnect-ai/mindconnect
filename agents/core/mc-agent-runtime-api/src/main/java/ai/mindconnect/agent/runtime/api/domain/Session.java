@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.api.domain;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -32,5 +33,12 @@ public record Session(
 
     public Session {
         metadata = Map.copyOf(metadata);
+    }
+
+    /** This session with one more entry in its metadata, or another value for one it has. */
+    public Session withMetadata(String key, Object value) {
+        Map<String, Object> changed = new HashMap<>(metadata);
+        changed.put(key, value);
+        return new Session(id, userId, parentId, agent, changed, createdAt);
     }
 }

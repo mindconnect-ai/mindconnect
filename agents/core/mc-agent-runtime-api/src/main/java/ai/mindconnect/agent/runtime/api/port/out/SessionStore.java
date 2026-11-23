@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.api.port.out;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -22,6 +23,16 @@ public interface SessionStore {
     void save(Session session);
 
     Optional<Session> find(SessionId sessionId);
+
+    /**
+     * Changes a session where it is kept and returns it as it then stands.
+     * The store reads, applies the change and writes as one step, so two
+     * plugins that each add something to the metadata do not overwrite each
+     * other — which reading and saving on their own would.
+     *
+     * @throws IllegalArgumentException if there is no such session
+     */
+    Session update(SessionId sessionId, UnaryOperator<Session> change);
 
     /** The session's messages, oldest first. */
     List<TurnMessage> messages(SessionId sessionId);

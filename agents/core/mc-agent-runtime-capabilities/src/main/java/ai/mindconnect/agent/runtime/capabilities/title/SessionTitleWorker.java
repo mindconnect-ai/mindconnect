@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.runtime.capabilities.title;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -63,10 +62,7 @@ final class SessionTitleWorker implements BackgroundWorker {
         if (title.isEmpty()) {
             return;
         }
-        Map<String, Object> metadata = new HashMap<>(session.metadata());
-        metadata.put(TITLE, title);
-        sessions.get().save(new Session(session.id(), session.userId(), session.parentId(),
-                session.agent(), metadata, session.createdAt()));
+        sessions.get().update(sessionId, stored -> stored.withMetadata(TITLE, title));
         // A list of sessions on screen wants the title when it is there, not at the next reload.
         events.get().publish(new SessionEvent.Notice(sessionId, null, TITLE_FOUND, Map.of(TITLE, title)));
     }
