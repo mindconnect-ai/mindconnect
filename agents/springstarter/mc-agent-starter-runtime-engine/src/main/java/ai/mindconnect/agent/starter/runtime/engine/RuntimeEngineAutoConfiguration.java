@@ -47,6 +47,7 @@ import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolSearchPlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.LoggingTraceSink;
 import ai.mindconnect.agent.runtime.capabilities.trace.TracePlugin;
 import ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin;
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction;
 import ai.mindconnect.agent.runtime.capabilities.trace.TraceSink;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
@@ -237,6 +238,13 @@ public class RuntimeEngineAutoConfiguration {
                 new InputGuardPlugin(),
                 new OutputGuardPlugin(),
                 new SessionTitlePlugin()));
+    }
+
+    /** Summarises a session's earlier turns on request. */
+    @Bean
+    @ConditionalOnMissingBean
+    MemoryCompaction memoryCompaction(PluginRegistry runtimePluginRegistry) {
+        return runtimePluginRegistry.get(MemoryCompaction.class);
     }
 
     @Bean

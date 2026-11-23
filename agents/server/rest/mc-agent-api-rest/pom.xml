@@ -23,6 +23,12 @@
             <artifactId>mc-agent-management-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Turns run on the runtime on the plugin kernel, behind the chat service the bridge offers. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-bridge</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime</artifactId>

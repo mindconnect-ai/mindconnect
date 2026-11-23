@@ -16,3 +16,7 @@
 - The REST server keeps sessions and agents in the same stores as the admin UI:
   a chat started in one is found, with its history and attachments, in the
   other when both share their data.
+- The REST API's chat turns run on the new runtime: sending a message,
+  cancelling, reattaching to a session's stream, answering an approval with or
+  without a continuation stream, and compressing a session's memory, which now
+  summarises everything before the last turn for an agent that keeps a summary.

@@ -51,6 +51,8 @@ class MemoryPluginTest {
     private final List<ModelRequest> summaryRequests = new ArrayList<>();
     /** The notes the plugin asked the store to keep, by message id. */
     private final Map<String, String> remembered = new HashMap<>();
+    /** The session the store finds; none until a test puts one there. */
+    private Session stored;
     private PluginRegistry registry;
 
     @BeforeEach
@@ -87,7 +89,7 @@ class MemoryPluginTest {
 
             @Override
             public Optional<Session> find(SessionId sessionId) {
-                throw new UnsupportedOperationException();
+                return Optional.ofNullable(stored);
             }
 
             @Override
@@ -97,7 +99,7 @@ class MemoryPluginTest {
 
             @Override
             public List<TurnMessage> messages(SessionId sessionId) {
-                throw new UnsupportedOperationException();
+                return HISTORY;
             }
 
             @Override
@@ -151,6 +153,26 @@ class MemoryPluginTest {
             assertThat(sent.instructions()).startsWith("You help.").endsWith("SUMMARY 1");
             assertThat(texts(sent)).containsExactly("third question .....");
         }
+    }
+
+    @Test
+    void asked_to_a_session_is_summarised_up_to_its_last_turn_and_only_what_no_summary_covers() {
+        MemoryCompaction compaction = registry.get(MemoryCompaction.class);
+        stored = new Session(SESSION.id(), SESSION.userId(), null, new AgentDefinition("helper", "Helps.",
+                "You help.", ModelSettings.NONE, List.of(), 5,
+                Map.of(MemoryPlugin.MEMORY, Map.of("strategy", "compact"))), Map.of(), Instant.EPOCH);
+
+        assertThat(compaction.compact(SESSION.id())).isEqualTo(4);
+        assertThat(summaryRequests.get(0).messages().get(0).text()).contains("first question", "second answer")
+                .doesNotContain("third question");
+        assertThat(compaction.compact(SESSION.id())).as("nothing new to cover").isZero();
+        // The next model call starts from that summary and does not make another.
+        assertThat(sent(Map.of("strategy", "compact"), 0.9).instructions()).endsWith("SUMMARY 1");
+        assertThat(summaryRequests).hasSize(1);
+
+        stored = new Session(SESSION.id(), SESSION.userId(), null, new AgentDefinition("helper", "Helps.",
+                "You help.", ModelSettings.NONE, List.of(), 5, Map.of()), Map.of(), Instant.EPOCH);
+        assertThat(compaction.compact(SESSION.id())).as("an agent that keeps no summary").isZero();
     }
 
     @Test

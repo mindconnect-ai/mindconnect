@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
+import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.agent.management.api.SessionManagement;
@@ -152,8 +154,9 @@ public class RuntimeBridgeAutoConfiguration {
                                           ObjectProvider<SessionService> sessionService,
                                           ObjectProvider<SessionStore> sessions,
                                           AgentSessionRepository chatSessions,
-                                          ObjectProvider<SessionManagement> management, AgentChatService earlier) {
+                                          ObjectProvider<SessionManagement> management, AgentChatService earlier,
+                                          SessionChannels sessionChannels, UserChannels userChannels) {
         return new RuntimeChatService(turns.getObject(), sessionService.getObject(), sessions.getObject(), chatSessions,
-                management.getObject(), earlier);
+                management.getObject(), earlier, new ChatStreams(sessionChannels, userChannels));
     }
 }

@@ -43,7 +43,7 @@ import java.util.Map;
  * External REST API for agents and their chat sessions: agent CRUD, session
  * lifecycle, chat streaming, history and working memory. Delegates to the
  * same use-case services the admin UI runs on ({@link AgentRegistryService},
- * {@link AgentSessionService}, {@link AgentChatService}).
+ * {@link AgentSessionService}, the bridge's chat service).
  *
  * <p>Sessions belong to the authenticated caller ({@link CurrentUser}): one is
  * opened for the caller and listed for the caller, and every
@@ -63,7 +63,8 @@ public class AgentApiController {
 
     private final AgentRegistryService registryService;
     private final AgentSessionService sessionService;
-    private final AgentChatService chatService;
+    private final ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService chatService;
+    private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final UserChannels userChannels;
     private final SessionAccess sessionAccess;
@@ -72,7 +73,8 @@ public class AgentApiController {
 
     public AgentApiController(AgentRegistryService registryService,
                             AgentSessionService sessionService,
-                            AgentChatService chatService,
+                            ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService chatService,
+                            ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
                             ai.mindconnect.filestore.FileStore fileStore,
                             UserChannels userChannels,
                             SessionAccess sessionAccess,
@@ -86,6 +88,7 @@ public class AgentApiController {
         this.registryService = registryService;
         this.sessionService = sessionService;
         this.chatService = chatService;
+        this.compaction = compaction;
         this.fileStore = fileStore;
         this.userChannels = userChannels;
         this.sessionAccess = sessionAccess;
@@ -577,7 +580,7 @@ public class AgentApiController {
                                                               @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("POST /api/sessions/{}/compress", sessionId);
-        int compressed = chatService.compressMemory(id);
+        int compressed = compaction.compact(ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value()));
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "compressedMessages", compressed));

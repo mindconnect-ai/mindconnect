@@ -63,7 +63,11 @@ class AgentApiControllerOwnershipTest {
     private final UserChannels userChannels = new UserChannels();
 
     private AgentSessionService sessionService;
-    private RecordingChatService chat;
+    /** No turn runs in these tests: what reaches the chat service is all that is looked at. */
+    private final ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService chat =
+            org.mockito.Mockito.mock(ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService.class);
+    private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction =
+            org.mockito.Mockito.mock(ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction.class);
     private AgentDefinition agent;
     private MockMvc mvc;
 
@@ -73,10 +77,9 @@ class AgentApiControllerOwnershipTest {
                 new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
                 new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
                 new InMemoryToolApprovalRepository(), userChannels);
-        chat = new RecordingChatService(sessionService);
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
-                sessionService, chat, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
+                sessionService, chat, compaction, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
                 new SessionAccess(sessions), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }
@@ -116,7 +119,7 @@ class AgentApiControllerOwnershipTest {
             mvc.perform(request).andExpect(status().isNotFound());
         }
 
-        assertThat(chat.calls).as("nothing reached the chat service").isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(chat, compaction);
         assertThat(sessions.findById(SessionId.of(bobs))).as("the session was not deleted").isPresent();
     }
 
@@ -143,7 +146,8 @@ class AgentApiControllerOwnershipTest {
                 .andExpect(jsonPath("$.compressedMessages").value(0));
         mvc.perform(delete("/api/sessions/{id}", alices)).andExpect(status().isNoContent());
 
-        assertThat(chat.calls).containsExactly("openApprovals " + alices, "compressMemory " + alices);
+        org.mockito.Mockito.verify(chat).openApprovals(ai.mindconnect.agent.SessionId.of(alices));
+        org.mockito.Mockito.verify(compaction).compact(ai.mindconnect.agent.runtime.api.domain.SessionId.of(alices));
         assertThat(sessions.findById(SessionId.of(alices))).isEmpty();
     }
 
@@ -172,61 +176,5 @@ class AgentApiControllerOwnershipTest {
                 post("/api/sessions/{id}/approvals/{callId}", sessionId, "call-1").param("approved", "true"),
                 post("/api/sessions/{id}/approvals/{callId}/continue", sessionId, "call-1").param("approved", "true"),
                 delete("/api/sessions/{id}", sessionId));
-    }
-
-    /** A chat service that only records what reaches it — no turn runs in these tests. */
-    static class RecordingChatService extends AgentChatService {
-
-        final List<String> calls = new CopyOnWriteArrayList<>();
-
-        RecordingChatService(AgentSessionService sessions) {
-            super(sessions, null, null, null, null, null, null, null, null, null, null);
-        }
-
-        @Override
-        public ChatTurnHandle submitChat(SessionId sessionId, List<ContentPart> parts,
-                                         Consumer<StreamEvent> eventHandler) {
-            calls.add("submitChat " + sessionId.value());
-            throw new IllegalStateException("No turn runs in this test");
-        }
-
-        @Override
-        public boolean cancelChat(SessionId sessionId) {
-            calls.add("cancelChat " + sessionId.value());
-            return false;
-        }
-
-        @Override
-        public WorkingMemory memorySnapshot(SessionId sessionId) {
-            calls.add("memorySnapshot " + sessionId.value());
-            throw new IllegalStateException("No memory in this test");
-        }
-
-        @Override
-        public int compressMemory(SessionId sessionId) {
-            calls.add("compressMemory " + sessionId.value());
-            return 0;
-        }
-
-        @Override
-        public List<ToolApproval> openApprovals(SessionId rootSessionId) {
-            calls.add("openApprovals " + rootSessionId.value());
-            return List.of();
-        }
-
-        @Override
-        public boolean answerApproval(SessionId rootSessionId, String callId, boolean approved,
-                                      ApprovalScope scope) {
-            calls.add("answerApproval " + rootSessionId.value());
-            return false;
-        }
-
-        @Override
-        public java.util.Optional<ai.mindconnect.agent.runtime.port.in.ChatTurnHandle> approve(
-                SessionId rootSessionId, String callId, ApprovalScope scope,
-                java.util.function.Consumer<ai.mindconnect.agent.runtime.domain.StreamEvent> events) {
-            calls.add("approve " + rootSessionId.value());
-            return java.util.Optional.empty();
-        }
     }
 }

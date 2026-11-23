@@ -237,6 +237,10 @@ class RuntimeBridgeAutoConfigurationTest {
                 .withBean(LlmCallTraceRepository.class, () -> traces)
                 .withBean(AgentSessionRepository.class, () -> chatSessions)
                 .withBean(AgentChatService.class, () -> mock(AgentChatService.class))
+                .withBean(ai.mindconnect.agent.runtime.service.stream.SessionChannels.class,
+                        ai.mindconnect.agent.runtime.service.stream.SessionChannels::new)
+                .withBean(ai.mindconnect.agent.runtime.service.stream.UserChannels.class,
+                        ai.mindconnect.agent.runtime.service.stream.UserChannels::new)
                 .withBean(ai.mindconnect.filestore.FileStore.class,
                         () -> mock(ai.mindconnect.filestore.FileStore.class))
                 .withBean(ai.mindconnect.agent.runtime.service.WorkingDirPolicy.class,

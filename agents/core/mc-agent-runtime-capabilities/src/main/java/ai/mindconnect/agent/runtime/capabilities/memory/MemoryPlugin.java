@@ -1,5 +1,9 @@
 package ai.mindconnect.agent.runtime.capabilities.memory;
 
+import java.util.UUID;
+import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +60,7 @@ public final class MemoryPlugin implements Plugin {
     public void install(PluginRegistry registry) {
         ConversationSummarizer summarizer = new ConversationSummarizer(registry.supplier(ModelGateway.class));
         Supplier<SessionStore> sessions = registry.supplier(SessionStore.class);
+        registry.provide(MemoryCompaction.class, () -> sessionId -> compact(sessions.get(), sessionId, summarizer));
         registry.before(RuntimeHook.MODEL_CALL, call -> BeforeOutcome.proceed(call.with(fitted(call,
                 registry.get(TokenCounter.class), registry.get(ModelGateway.class), summarizer,
                 // Kept on the message, so the result is shown as this note from now on.
@@ -65,6 +70,27 @@ public final class MemoryPlugin implements Plugin {
                             changed.put(SessionStore.COMPRESSED, note);
                             return changed;
                         })))));
+    }
+
+    private int compact(SessionStore sessions, SessionId sessionId, ConversationSummarizer summarizer) {
+        Session session = sessions.find(sessionId).orElseThrow(() ->
+                new IllegalArgumentException("There is no session " + sessionId.value()));
+        if (session.agent() == null
+                || MemoryConfig.of(session.agent()).strategy() != MemoryConfig.Strategy.COMPACT) {
+            return 0;
+        }
+        Optional<ConversationSummary> summary = summaries.find(sessionId);
+        List<TurnMessage> open = after(summary, sessions.messages(sessionId));
+        // The last turn stays as said: what follows a summary needs something to follow.
+        List<TurnMessage> left = open.subList(0, firstTurnWhere(open, from -> true));
+        if (left.isEmpty()) {
+            return 0;
+        }
+        summaries.save(sessionId, new ConversationSummary(
+                summarizer.summarize(TurnId.of("compaction-" + UUID.randomUUID()), session.agent().modelSettings(),
+                        summary, left),
+                left.get(left.size() - 1).id()));
+        return left.size();
     }
 
     private ModelRequest fitted(ModelCall call, TokenCounter counter, ModelGateway model,

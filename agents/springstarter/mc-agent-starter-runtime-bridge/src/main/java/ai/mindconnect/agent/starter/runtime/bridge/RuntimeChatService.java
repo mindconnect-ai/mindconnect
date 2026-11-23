@@ -31,6 +31,8 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.channel.Channel;
 import ai.mindconnect.message.domain.ChatTurnId;
 
 /**
@@ -48,6 +50,7 @@ public final class RuntimeChatService {
     private final AgentSessionRepository chatSessions;
     private final SessionManagement management;
     private final AgentChatService earlier;
+    private final ChatStreams streams;
 
     /**
      * Metadata of the runtime's session: the turn last submitted in it — what
@@ -59,7 +62,8 @@ public final class RuntimeChatService {
     public RuntimeChatService(TurnService turns, SessionService sessionService, SessionStore sessions,
                               AgentSessionRepository chatSessions,
                               SessionManagement management,
-                              AgentChatService earlier) {
+                              AgentChatService earlier, ChatStreams streams) {
+        this.streams = streams;
         this.turns = turns;
         this.sessionService = sessionService;
         this.sessions = sessions;
@@ -84,12 +88,30 @@ public final class RuntimeChatService {
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
                 parts.stream().map(RuntimeChatService::part).toList(), agent, Map.of()));
         sessions.update(session.id(), current -> current.withMetadata(LAST_TURN, turnId.value()));
+        ChatTurnId chatTurnId = ChatTurnId.of(turnId.value());
+        Consumer<StreamEvent> stream = streams.started(chat, chatTurnId);
+        Handle handle = following(sessionId, turnId, stream.andThen(events), false);
+        handle.result().whenComplete((text, failure) -> streams.finished(chat, chatTurnId, failure));
+        return handle;
+    }
+
+    /**
+     * Listens to a turn from now on.
+     *
+     * @param untilAsked whether listening ends when the turn has to ask — for a caller that is answered
+     *                   with a stream of its own for every answer it gives; else it lasts to the turn's end
+     */
+    private Handle following(SessionId sessionId, TurnId turnId, Consumer<StreamEvent> events, boolean untilAsked) {
+        ChatTurnId chatTurnId = ChatTurnId.of(turnId.value());
         CompletableFuture<String> answer = new CompletableFuture<>();
+        CompletableFuture<TurnResult> outcome = new CompletableFuture<>();
         StreamEventTranslator translator = new StreamEventTranslator(turnId, turns, events, answer);
         // What the turn says comes from the turn; that it has to ask comes from its session.
-        Subscription asking = sessionService.subscribe(session.id(), false, event -> {
+        Subscription asking = sessionService.subscribe(
+                ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()), false, event -> {
             if (event instanceof SessionEvent.TurnInterrupted interrupted && interrupted.turnId().equals(turnId)) {
                 translator.interrupted(interrupted.interruptions());
+                outcome.complete(TurnResult.incomplete(chatTurnId, earlier.openApprovals(sessionId)));
             }
             // A turn that dies does not say so itself; its session does, and the page must hear an end.
             if (event instanceof SessionEvent.TurnFinished finished && finished.turnId().equals(turnId)) {
@@ -98,10 +120,34 @@ public final class RuntimeChatService {
         });
         Subscription following = turns.subscribe(turnId, translator);
         answer.whenComplete((text, failure) -> {
+            if (failure == null) {
+                outcome.complete(TurnResult.completed(chatTurnId, text));
+            } else {
+                outcome.completeExceptionally(failure);
+            }
+        });
+        (untilAsked ? outcome : answer).whenComplete((reached, failure) -> {
             following.close();
             asking.close();
         });
-        return new Handle(turnId, sessionId, answer);
+        return new Handle(turnId, sessionId, answer, outcome);
+    }
+
+    /**
+     * The session's stream from after {@code afterSeq} on: what was buffered
+     * since is replayed, then it goes on live, across turns.
+     */
+    public AgentChatService.Attachment attach(SessionId sessionId, long afterSeq,
+                                              Consumer<Channel.Event<ai.mindconnect.agent.runtime.service.stream.SessionEvent>> consumer) {
+        AgentSession chat = chatSessions.findById(sessionId).orElseThrow(() ->
+                new IllegalArgumentException("There is no session " + sessionId.value()));
+        return streams.attach(chat, afterSeq,
+                underway(sessionId).map(turn -> ChatTurnId.of(turn.id().value())).orElse(null), consumer);
+    }
+
+    /** The approvals the chat is waiting for, oldest first — its own and those of the sub-agents under it. */
+    public List<ToolApproval> openApprovals(SessionId sessionId) {
+        return earlier.openApprovals(sessionId);
     }
 
     /** Whether there was a turn to cancel. */
@@ -139,16 +185,45 @@ public final class RuntimeChatService {
      * @return whether the answer reached a waiting call; false for a card that is stale
      */
     public boolean answerApproval(SessionId sessionId, String callId, boolean approved, ApprovalScope scope) {
+        return answered(sessionId, callId, approved, scope, null).isPresent();
+    }
+
+    /**
+     * Allows the call and streams how the turn goes on: to its end, or to
+     * the next question it has. Empty for a card that is stale.
+     */
+    public Optional<ChatTurnHandle> approve(SessionId sessionId, String callId, ApprovalScope scope,
+                                            Consumer<StreamEvent> events) {
+        return answered(sessionId, callId, true, scope, events);
+    }
+
+    /** Refuses the call and streams how the turn goes on, like {@link #approve}. */
+    public Optional<ChatTurnHandle> deny(SessionId sessionId, String callId, Consumer<StreamEvent> events) {
+        return answered(sessionId, callId, false, ApprovalScope.ONCE, events);
+    }
+
+    /** @param events who hears how the turn goes on; {@code null} for nobody beyond who heard it so far */
+    private Optional<ChatTurnHandle> answered(SessionId sessionId, String callId, boolean approved,
+                                              ApprovalScope scope, Consumer<StreamEvent> events) {
         Optional<Turn> underway = underway(sessionId);
         Optional<String> asked = underway.map(Turn::interruptions).orElse(List.of()).stream()
                 .filter(interruption -> interruption.call() != null && callId.equals(interruption.call().callId()))
                 .map(interruption -> interruption.id())
                 .findFirst();
-        asked.ifPresent(interruptionId -> turns.resume(underway.orElseThrow().id(), List.of(
-                !approved ? InterruptionAnswer.reject(interruptionId, "")
-                        : scope == ApprovalScope.SESSION ? InterruptionAnswer.approveAlways(interruptionId)
-                        : InterruptionAnswer.approve(interruptionId))));
-        return asked.isPresent();
+        if (asked.isEmpty()) {
+            return Optional.empty();
+        }
+        TurnId turnId = underway.orElseThrow().id();
+        // Listening before the answer goes in: what the turn does next is not missed.
+        Handle handle = events == null
+                ? new Handle(turnId, sessionId, new CompletableFuture<>(), new CompletableFuture<>())
+                : following(sessionId, turnId, events, true);
+        turns.resume(turnId, List.of(
+                !approved ? InterruptionAnswer.reject(asked.get(), "")
+                        : scope == ApprovalScope.SESSION ? InterruptionAnswer.approveAlways(asked.get())
+                        : InterruptionAnswer.approve(asked.get())));
+        chatSessions.findById(sessionId).ifPresent(chat -> streams.answered(chat, callId, approved));
+        return Optional.of(handle);
     }
 
     /**
@@ -186,11 +261,14 @@ public final class RuntimeChatService {
         private final TurnId turnId;
         private final SessionId sessionId;
         private final CompletableFuture<String> answer;
+        private final CompletableFuture<TurnResult> outcome;
 
-        private Handle(TurnId turnId, SessionId sessionId, CompletableFuture<String> answer) {
+        private Handle(TurnId turnId, SessionId sessionId, CompletableFuture<String> answer,
+                       CompletableFuture<TurnResult> outcome) {
             this.turnId = turnId;
             this.sessionId = sessionId;
             this.answer = answer;
+            this.outcome = outcome;
         }
 
         @Override
@@ -220,7 +298,7 @@ public final class RuntimeChatService {
 
         @Override
         public CompletableFuture<TurnResult> outcome() {
-            return answer.thenApply(text -> TurnResult.completed(id(), text));
+            return outcome;
         }
 
         @Override
