@@ -11,8 +11,9 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
  *
  * <pre>
  * memory:
- *   strategy: compact              # full | window | compact
+ *   strategy: compact              # none | full | window | compact
  *   maxConversationRatio: 0.8      # share of the context window the history may take
+ *   maxMessages: 20                # window only: at most so many messages, counted in whole turns
  *   keepRecentToolResults: 3       # the newest tool results are never shortened
  *   summaryPlacement: system_prompt   # system_prompt | user_message
  * </pre>
@@ -20,13 +21,18 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
  * <p>Sizes are shares of the model's context window, not tokens: the same
  * agent keeps working when it is given a model with another window.
  */
-record MemoryConfig(Strategy strategy, double maxConversationRatio, int keepRecentToolResults,
+record MemoryConfig(Strategy strategy, double maxConversationRatio, int maxMessages, int keepRecentToolResults,
                     SummaryPlacement summaryPlacement) {
 
+    /** {@link #maxMessages} of an agent that sets none: the context window alone bounds the history. */
+    static final int NO_LIMIT = Integer.MAX_VALUE;
+
     /** What an agent that says nothing gets: bounded, and without a model call of its own. */
-    static final MemoryConfig DEFAULT = new MemoryConfig(Strategy.WINDOW, 0.8, 3, SummaryPlacement.SYSTEM_PROMPT);
+    static final MemoryConfig DEFAULT = new MemoryConfig(Strategy.WINDOW, 0.8, NO_LIMIT, 3, SummaryPlacement.SYSTEM_PROMPT);
 
     enum Strategy {
+        /** Only the turn underway: an agent that answers each question on its own. */
+        NONE,
         /** Everything, as it was said. */
         FULL,
         /** The newest turns that fit; what is older is not sent. */
@@ -51,6 +57,8 @@ record MemoryConfig(Strategy strategy, double maxConversationRatio, int keepRece
                         ? Strategy.valueOf(strategy.toUpperCase(Locale.ROOT)) : DEFAULT.strategy(),
                 memory.get("maxConversationRatio") instanceof Number ratio
                         ? ratio.doubleValue() : DEFAULT.maxConversationRatio(),
+                memory.get("maxMessages") instanceof Number messages
+                        ? messages.intValue() : DEFAULT.maxMessages(),
                 memory.get("keepRecentToolResults") instanceof Number kept
                         ? kept.intValue() : DEFAULT.keepRecentToolResults(),
                 memory.get("summaryPlacement") instanceof String placement

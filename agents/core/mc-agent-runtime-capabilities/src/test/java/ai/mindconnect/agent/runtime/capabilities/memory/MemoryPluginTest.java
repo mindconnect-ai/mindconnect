@@ -116,6 +116,21 @@ class MemoryPluginTest {
     }
 
     @Test
+    void an_agent_without_memory_is_sent_only_the_turn_underway() {
+        assertThat(texts(sent(Map.of("strategy", "none"), 1.0))).containsExactly("third question .....");
+        assertThat(summaryRequests).isEmpty();
+    }
+
+    @Test
+    void a_window_can_be_bounded_by_messages_counted_in_whole_turns() {
+        // Three messages would cut the second turn in two; the window takes the turns that fit whole.
+        assertThat(texts(sent(Map.of("strategy", "window", "maxMessages", 3), 1.0)))
+                .containsExactly("second question ...", "second answer ......", "third question .....");
+        assertThat(texts(sent(Map.of("strategy", "window", "maxMessages", 2), 1.0)))
+                .containsExactly("third question .....");
+    }
+
+    @Test
     void a_window_leaves_out_the_oldest_turns_whole() {
         ModelRequest sent = sent(Map.of("strategy", "window"), 0.7);
 

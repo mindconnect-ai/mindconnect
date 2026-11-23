@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 import ai.mindconnect.agent.loop.domain.ContentPart;
@@ -27,9 +28,9 @@ import ai.mindconnect.plugin.PluginRegistry;
  * on the same history.
  *
  * <p>Which strategy an agent gets it says in its metadata, see
- * {@link MemoryConfig}. In order, until the history fits: old tool results
- * are shortened, then the oldest turns are left out — summarised first, if
- * the agent asks for that. Turns are left out whole, so a tool call never
+ * {@link MemoryConfig}: everything, only the turn underway, or what fits.
+ * For what fits, in order: old tool results are shortened, then the oldest
+ * turns are left out — summarised first, if the agent asks for that. Turns are left out whole, so a tool call never
  * loses its result.
  */
 public final class MemoryPlugin implements Plugin {
@@ -73,6 +74,11 @@ public final class MemoryPlugin implements Plugin {
         if (config.strategy() == MemoryConfig.Strategy.FULL) {
             return request;
         }
+        if (config.strategy() == MemoryConfig.Strategy.NONE) {
+            List<TurnMessage> said = request.messages();
+            return placed(request, said.subList(firstTurnWhere(said, from -> true), said.size()),
+                    Optional.empty(), config.summaryPlacement());
+        }
         int budget = (int) (config.maxConversationRatio()
                 * model.contextWindowTokens(request.settings()).orElse(DEFAULT_CONTEXT_WINDOW_TOKENS));
         boolean compact = config.strategy() == MemoryConfig.Strategy.COMPACT;
@@ -83,7 +89,9 @@ public final class MemoryPlugin implements Plugin {
                 .trim(after(summary, request.messages()));
         if (counter.count(messages) > budget) {
             // Half the budget stays as said: a summary that leaves no room for what follows it helps nobody.
-            int kept = firstTurnThatFits(messages, counter, compact ? budget / 2 : budget);
+            int room = compact ? budget / 2 : budget;
+            List<TurnMessage> counted = messages;
+            int kept = firstTurnWhere(counted, from -> counter.count(counted.subList(from, counted.size())) > room);
             if (compact && kept > 0) {
                 List<TurnMessage> left = messages.subList(0, kept);
                 summary = Optional.of(new ConversationSummary(
@@ -92,6 +100,11 @@ public final class MemoryPlugin implements Plugin {
                 summaries.save(call.context().session().id(), summary.get());
             }
             messages = messages.subList(kept, messages.size());
+        }
+        if (messages.size() > config.maxMessages()) {
+            List<TurnMessage> counted = messages;
+            messages = messages.subList(
+                    firstTurnWhere(counted, from -> counted.size() - from > config.maxMessages()), messages.size());
         }
         return placed(request, messages, summary, config.summaryPlacement());
     }
@@ -109,21 +122,23 @@ public final class MemoryPlugin implements Plugin {
     }
 
     /**
-     * Where the newest turns that fit the budget begin. Never past the start
-     * of the last turn: the turn underway is sent whole, whatever it takes.
+     * Where the newest turns begin that are not too much: going back from
+     * the end, the start of the last turn before {@code tooMuch} says so of
+     * a start. Never past the start of the last turn — the turn underway is
+     * sent whole, whatever it takes — and 0 for a history without a turn.
      */
-    private static int firstTurnThatFits(List<TurnMessage> messages, TokenCounter counter, int budget) {
-        int kept = 0;
+    private static int firstTurnWhere(List<TurnMessage> messages, IntPredicate tooMuch) {
+        int kept = -1;
         for (int i = messages.size() - 1; i >= 0; i--) {
             if (messages.get(i).type() != TurnMessage.Type.USER) {
                 continue;
             }
-            if (kept != 0 && counter.count(messages.subList(i, messages.size())) > budget) {
+            if (kept >= 0 && tooMuch.test(i)) {
                 break;
             }
             kept = i;
         }
-        return kept;
+        return Math.max(kept, 0);
     }
 
     private static ModelRequest placed(ModelRequest request, List<TurnMessage> messages,
