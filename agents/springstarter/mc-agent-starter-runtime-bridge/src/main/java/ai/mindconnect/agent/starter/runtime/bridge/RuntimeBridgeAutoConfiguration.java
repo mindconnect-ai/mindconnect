@@ -7,8 +7,10 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
+import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.agent.runtime.capabilities.memory.SummaryStore;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
@@ -18,7 +20,9 @@ import ai.mindconnect.agent.runtime.capabilities.skill.SkillResolver;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.message.port.out.MessageRepository;
@@ -75,5 +79,17 @@ public class RuntimeBridgeAutoConfiguration {
     @ConditionalOnMissingBean
     LlmCallTraceListener llmCallTraceListener(LlmCallTraceRepository traces, ObjectProvider<TurnService> turns) {
         return new RepositoryLlmCallTraceListener(traces, turns::getObject);
+    }
+
+    /** After the runtime's own services: it calls them. */
+    @Bean
+    @ConditionalOnMissingBean
+    RuntimeChatService runtimeChatService(ObjectProvider<TurnService> turns,
+                                          ObjectProvider<SessionService> sessionService,
+                                          ObjectProvider<SessionStore> sessions,
+                                          AgentSessionRepository chatSessions, AgentDefinitionRepository agents,
+                                          AgentDefinitionMapper mapper) {
+        return new RuntimeChatService(turns.getObject(), sessionService.getObject(), sessions.getObject(), chatSessions,
+                new SessionAgentResolver(agents), mapper);
     }
 }

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -43,6 +44,16 @@ import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.SessionStatus;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.agent.runtime.memory.domain.AutoCompactConfig;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
@@ -125,6 +136,9 @@ class RuntimeBridgeAutoConfigurationTest {
         }
     });
 
+    /** The chat page's sessions, as the application keeps them. */
+    private final AgentSessionRepository chatSessions = mock(AgentSessionRepository.class);
+
     @TempDir
     Path dataDirectory;
 
@@ -169,21 +183,7 @@ class RuntimeBridgeAutoConfigurationTest {
         when(agents.findByName("librarian")).thenReturn(Optional.of(LIBRARIAN));
         LlmCallTraceRepository traces = mock(LlmCallTraceRepository.class);
 
-        new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(
-                        RuntimeBridgeAutoConfiguration.class, RuntimeEngineAutoConfiguration.class))
-                .withPropertyValues("mindconnect.data.base-dir=" + dataDirectory)
-                .withBean(ScopeSupplier.class, () -> SCOPE)
-                .withBean(ObjectMapper.class, () -> new ObjectMapper().registerModule(new JavaTimeModule()))
-                .withBean(TaskQueue.class, () -> new LocalTaskQueue(new InMemoryTaskStore()))
-                .withBean(MessageRepository.class, () -> new InMemoryMessageRepository(SCOPE))
-                .withBean(LlmChat.class, () -> chat)
-                .withBean(LlmConfigRepository.class, () -> mock(LlmConfigRepository.class))
-                .withBean(AgentDefinitionRepository.class, () -> agents)
-                .withBean(SkillRepository.class, SkillRepository::empty)
-                .withBean(ToolRegistry.class, () -> TOOLS)
-                .withBean(ConversationSummaryRepository.class, () -> mock(ConversationSummaryRepository.class))
-                .withBean(LlmCallTraceRepository.class, () -> traces)
+        application(chat, agents, traces)
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     Session session = context.getBean(SessionService.class).open(new SessionSpec(UserId.of("ada"),
@@ -204,6 +204,103 @@ class RuntimeBridgeAutoConfigurationTest {
                             .extracting(tool -> tool.description()).containsExactly("Searches our catalog.");
                     assertThat(asked.get(0).tools()).extracting(tool -> tool.name()).doesNotContain("order_book");
                     verify(traces, times(2)).save(any());
+                });
+    }
+
+    /** The application's beans as the starters find them, with this model and these stores. */
+    private ApplicationContextRunner application(LlmChat chat, AgentDefinitionRepository agents,
+                                                 LlmCallTraceRepository traces) {
+        return new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(
+                        RuntimeBridgeAutoConfiguration.class, RuntimeEngineAutoConfiguration.class))
+                .withPropertyValues("mindconnect.data.base-dir=" + dataDirectory)
+                .withBean(ScopeSupplier.class, () -> SCOPE)
+                .withBean(ObjectMapper.class, () -> new ObjectMapper().registerModule(new JavaTimeModule()))
+                .withBean(TaskQueue.class, () -> new LocalTaskQueue(new InMemoryTaskStore()))
+                .withBean(MessageRepository.class, () -> new InMemoryMessageRepository(SCOPE))
+                .withBean(LlmChat.class, () -> chat)
+                .withBean(LlmConfigRepository.class, () -> mock(LlmConfigRepository.class))
+                .withBean(AgentDefinitionRepository.class, () -> agents)
+                .withBean(SkillRepository.class, SkillRepository::empty)
+                .withBean(ToolRegistry.class, () -> TOOLS)
+                .withBean(ConversationSummaryRepository.class, () -> mock(ConversationSummaryRepository.class))
+                .withBean(LlmCallTraceRepository.class, () -> traces)
+                .withBean(AgentSessionRepository.class, () -> chatSessions);
+    }
+
+    /** A model that first calls the tool with the question's subject and then answers. */
+    private static LlmChat callingThenAnswering(String toolName) {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        return (request, handler, cancellation, listener) -> {
+            if (calls.incrementAndGet() == 1) {
+                handler.accept(new LlmStreamChunk.ToolCallDelta(0, "c1", toolName, "{\"q\":\"owls\"}"));
+                handler.accept(new LlmStreamChunk.Done(FinishReason.TOOL_CALLS, 10, 1));
+            } else {
+                handler.accept(new LlmStreamChunk.TextDelta("Found it."));
+            }
+        };
+    }
+
+    /** The chat page's session, as the application keeps it. */
+    private static AgentSession chatSession() {
+        return new AgentSession(ai.mindconnect.agent.SessionId.random(), LIBRARIAN.id(),
+                ai.mindconnect.agent.UserId.of("ada"), ConversationId.random(), "Books", SessionStatus.ACTIVE,
+                Instant.EPOCH, null, null, null, null);
+    }
+
+    @Test
+    void the_chat_pages_calls_run_on_the_new_runtime_and_stream_the_events_the_page_knows() {
+        AgentDefinitionRepository agents = mock(AgentDefinitionRepository.class);
+        when(agents.findById(LIBRARIAN.id())).thenReturn(Optional.of(LIBRARIAN));
+        AgentSession chat = chatSession();
+        when(chatSessions.findById(chat.id())).thenReturn(Optional.of(chat));
+
+        application(callingThenAnswering("search_catalog"), agents, mock(LlmCallTraceRepository.class))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    List<StreamEvent> streamed = new CopyOnWriteArrayList<>();
+
+                    ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
+                            .submitChat(chat.id(), "Do we have owls?", streamed::add);
+
+                    assertThat(turn.result().get(5, TimeUnit.SECONDS)).isEqualTo("Found it.");
+                    assertThat(streamed).filteredOn(event -> !(event instanceof StreamEvent.AskingLlm))
+                            .extracting(event -> event.getClass().getSimpleName())
+                            .containsExactly("ToolCallStarted", "ToolCallResult", "Token", "TurnUsage", "Done");
+                    // Written into the conversation the chat page reads its history from.
+                    assertThat(context.getBean(MessageRepository.class)
+                            .findByConversation(chat.conversationId(), new PageRequest(0, 10)))
+                            .extracting(Message::type).containsExactly(MessageType.CHAT, MessageType.TOOL_CALL,
+                                    MessageType.TOOL_DISPATCHED, MessageType.TOOL_RESULT, MessageType.CHAT);
+                });
+    }
+
+    @Test
+    void a_tool_that_needs_approval_asks_on_the_stream_and_goes_on_once_answered() {
+        AgentDefinitionRepository agents = mock(AgentDefinitionRepository.class);
+        when(agents.findById(LIBRARIAN.id())).thenReturn(Optional.of(LIBRARIAN));
+        AgentSession chat = chatSession();
+        when(chatSessions.findById(chat.id())).thenReturn(Optional.of(chat));
+
+        application(callingThenAnswering("order_book"), agents, mock(LlmCallTraceRepository.class))
+                .run(context -> {
+                    RuntimeChatService chatService = context.getBean(RuntimeChatService.class);
+                    List<StreamEvent> streamed = new CopyOnWriteArrayList<>();
+                    ChatTurnHandle turn = chatService.submitChat(chat.id(), "Order the owl book.", streamed::add);
+                    for (int i = 0; i < 200 && streamed.stream()
+                            .noneMatch(StreamEvent.ApprovalRequested.class::isInstance); i++) {
+                        Thread.sleep(25);
+                    }
+                    assertThat(streamed).filteredOn(StreamEvent.ApprovalRequested.class::isInstance)
+                            .extracting(event -> ((StreamEvent.ApprovalRequested) event).toolName())
+                            .containsExactly("order_book");
+                    assertThat(turn.result()).isNotDone();
+
+                    assertThat(chatService.answerApproval(chat.id(), "unknown", true, ApprovalScope.ONCE)).isFalse();
+                    assertThat(chatService.answerApproval(chat.id(), "c1", true, ApprovalScope.ONCE)).isTrue();
+
+                    assertThat(turn.result().get(5, TimeUnit.SECONDS)).isEqualTo("Found it.");
+                    assertThat(streamed).last().isInstanceOf(StreamEvent.Done.class);
                 });
     }
 
