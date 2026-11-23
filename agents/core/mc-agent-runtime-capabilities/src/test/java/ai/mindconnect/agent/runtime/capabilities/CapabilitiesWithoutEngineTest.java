@@ -101,7 +101,7 @@ class CapabilitiesWithoutEngineTest {
     @Test
     void the_offer_holds_back_deferred_tools_and_adds_what_the_capabilities_bring() {
         assertThat(offeredNames()).containsExactlyInAnyOrder(
-                "web_search", "bash", "load_skill", "tool_search", "researcher");
+                "web_search", "bash", "load_skill", "tool_search", "run_agent", "run_agents", "list_agents");
     }
 
     @Test
@@ -140,10 +140,28 @@ class CapabilitiesWithoutEngineTest {
     }
 
     @Test
-    void a_sub_agent_is_a_tool_that_resolves_by_the_agents_name() {
+    void an_agent_that_names_sub_agents_can_hand_them_tasks_and_see_who_there_is() {
         ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
 
-        assertThat(tools.resolve("researcher", LEAD, SESSION)).isPresent();
+        assertThat(tools.resolve("run_agent", LEAD, SESSION)).isPresent();
+        assertThat(tools.resolve("run_agents", LEAD, SESSION)).isPresent();
+        assertThat(tools.resolve("list_agents", LEAD, SESSION).orElseThrow()
+                .execute(new ToolCall("c1", "list_agents", Map.of(), TurnId.of("t1"), SESSION.id()), SESSION))
+                .isEqualTo(ToolOutput.ok("- researcher: Looks things up."));
+        // An agent that names none has nobody to hand a task to.
+        assertThat(tools.resolve("run_agent", RESEARCHER, SESSION)).isEmpty();
+    }
+
+    @Test
+    void a_task_for_an_agent_the_caller_does_not_name_is_refused_with_who_there_is() {
+        ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
+
+        ToolOutput refused = tools.resolve("run_agent", LEAD, SESSION).orElseThrow().execute(
+                new ToolCall("c1", "run_agent", Map.of("name", "lead", "message", "Lead yourself."),
+                        TurnId.of("t1"), SESSION.id()), SESSION);
+
+        assertThat(refused).isEqualTo(ToolOutput.failed(
+                "Error: there is no agent named lead you can call. Available to you: researcher"));
     }
 
     private List<String> offeredNames() {

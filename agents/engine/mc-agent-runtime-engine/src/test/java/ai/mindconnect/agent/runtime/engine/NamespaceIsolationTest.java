@@ -115,7 +115,7 @@ class NamespaceIsolationTest {
         List<SessionEvent> heardInA = new CopyOnWriteArrayList<>();
         in("a", () -> registry.get(SessionService.class).subscribe(SAME_ID, true, heardInA::add));
         script.add(TurnMessage.toolCalls(List.of(
-                new TurnMessage.ToolCall("c1", "researcher", Map.of("task", "Find it.")))));
+                new TurnMessage.ToolCall("c1", "run_agent", Map.of("name", "researcher", "message", "Find it.")))));
         script.add(TurnMessage.assistant("Found."));
         script.add(TurnMessage.assistant("Answer for A."));
         script.add(TurnMessage.assistant("Answer for B."));

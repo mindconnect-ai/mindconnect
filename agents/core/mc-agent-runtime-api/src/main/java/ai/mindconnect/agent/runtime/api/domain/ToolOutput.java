@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.api.domain;
 
+import java.util.List;
 import java.util.Map;
 
 /** What became of running a tool. */
@@ -25,12 +26,19 @@ public sealed interface ToolOutput {
     }
 
     /**
-     * The tool hands the call to another turn: the engine runs the request as
-     * a child of the calling turn and that turn's answer is the call's
-     * result. This is what makes a sub-agent an ordinary tool — it needs no
-     * way to start turns, only to say which one it wants.
+     * The tool hands the call to other turns: the engine runs the requests
+     * side by side as children of the calling turn, and their answers are
+     * the call's result — the one answer as it is, several together, each
+     * under the name of its agent. This is what makes a sub-agent an
+     * ordinary tool: it needs no way to start turns, only to say which ones
+     * it wants.
      */
-    record Delegated(TurnRequest request) implements ToolOutput { }
+    record Delegated(List<TurnRequest> requests) implements ToolOutput {
+
+        public Delegated {
+            requests = List.copyOf(requests);
+        }
+    }
 
     static ToolOutput ok(String text) {
         return new Completed(text, false);
@@ -45,6 +53,10 @@ public sealed interface ToolOutput {
     }
 
     static ToolOutput delegate(TurnRequest request) {
-        return new Delegated(request);
+        return new Delegated(List.of(request));
+    }
+
+    static ToolOutput delegate(List<TurnRequest> requests) {
+        return new Delegated(requests);
     }
 }

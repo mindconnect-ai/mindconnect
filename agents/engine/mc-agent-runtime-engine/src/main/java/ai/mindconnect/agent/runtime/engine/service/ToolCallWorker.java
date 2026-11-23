@@ -23,6 +23,7 @@ import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
+import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.taskqueue.TaskWorker;
 
 /**
@@ -48,6 +49,8 @@ final class ToolCallWorker implements TaskWorker {
     static final String ARGUMENTS = "arguments";
     static final String ANSWER = "answer";
     static final String FAILED = "failed";
+    /** In the task's state: the agents its call was handed to, in the order their turns were started. */
+    private static final String DELEGATED_TO = "delegatedTo";
     static final String INTERRUPT_KIND = "interruptKind";
     static final String INTERRUPT_DETAILS = "interruptDetails";
 
@@ -71,7 +74,7 @@ final class ToolCallWorker implements TaskWorker {
     public TaskOutcome execute(TaskContext ctx) {
         List<TaskRecord> delegated = ctx.children();
         if (!delegated.isEmpty()) {
-            return delegatedResult(ctx, delegated.get(0));
+            return delegatedResult(ctx, delegated);
         }
         Map<String, Object> payload = ctx.task().payload();
         Session session = sessions.find(SessionId.of((String) payload.get(SESSION_ID))).orElseThrow();
@@ -102,8 +105,14 @@ final class ToolCallWorker implements TaskWorker {
 
     private TaskOutcome delegate(TaskContext ctx, ToolOutput.Delegated handedOn) {
         try {
-            ctx.submitChild(TurnTaskMapper.submission(acceptor.accept(handedOn.request()), Optional.empty(),
-                    CallerBoundWorker.callerOf(ctx.task())));
+            // Accepted one by one before any is started: a request that is refused starts none.
+            List<TaskSubmission> accepted = handedOn.requests().stream()
+                    .map(request -> TurnTaskMapper.submission(acceptor.accept(request), Optional.empty(),
+                            CallerBoundWorker.callerOf(ctx.task())))
+                    .toList();
+            ctx.updateState(Map.of(DELEGATED_TO, handedOn.requests().stream()
+                    .map(request -> request.agent() == null ? "agent" : request.agent().name()).toList()));
+            accepted.forEach(ctx::submitChild);
             return TaskOutcome.suspendUntilChildren();
         } catch (IllegalArgumentException e) {
             ctx.updateState(Map.of(FAILED, true));
@@ -111,19 +120,43 @@ final class ToolCallWorker implements TaskWorker {
         }
     }
 
-    /** The turn's answer is the call's result; a turn that ended without one is an error the model reads. */
-    private TaskOutcome delegatedResult(TaskContext ctx, TaskRecord child) {
-        if (!child.status().terminal()) {
+    /**
+     * The turns' answers are the call's result: the one answer as it is,
+     * several under the names of their agents. A turn that ended without an
+     * answer is an error the model reads; the call failed when all did.
+     */
+    private TaskOutcome delegatedResult(TaskContext ctx, List<TaskRecord> children) {
+        if (children.stream().anyMatch(child -> !child.status().terminal())) {
             return TaskOutcome.suspendUntilChildren();
         }
-        if (child.status() == TaskStatus.COMPLETED
-                && TurnStatus.COMPLETED.name().equals(child.state().get(TurnTaskMapper.STATUS))) {
-            return TaskOutcome.done(child.result());
+        List<String> answers = children.stream().map(ToolCallWorker::answerOf).toList();
+        if (children.stream().noneMatch(ToolCallWorker::answered)) {
+            ctx.updateState(Map.of(FAILED, true));
+        }
+        if (children.size() == 1) {
+            return TaskOutcome.done(answers.get(0));
+        }
+        List<?> names = ctx.task().state().get(DELEGATED_TO) instanceof List<?> kept ? kept : List.of();
+        StringBuilder together = new StringBuilder();
+        for (int i = 0; i < answers.size(); i++) {
+            together.append(i == 0 ? "" : "\n\n").append("## ").append(i + 1).append(". ")
+                    .append(i < names.size() ? names.get(i) : "agent").append("\n").append(answers.get(i));
+        }
+        return TaskOutcome.done(together.toString());
+    }
+
+    private static boolean answered(TaskRecord child) {
+        return child.status() == TaskStatus.COMPLETED
+                && TurnStatus.COMPLETED.name().equals(child.state().get(TurnTaskMapper.STATUS));
+    }
+
+    private static String answerOf(TaskRecord child) {
+        if (answered(child)) {
+            return child.result();
         }
         Object status = child.status() == TaskStatus.COMPLETED
                 ? child.state().get(TurnTaskMapper.STATUS) : child.status();
-        ctx.updateState(Map.of(FAILED, true));
-        return TaskOutcome.done("Error: the agent did not finish its task (" + status + ")");
+        return "Error: the agent did not finish its task (" + status + ")";
     }
 
     private ToolOutput run(ToolCall call, AgentDefinition agent, Session session) {

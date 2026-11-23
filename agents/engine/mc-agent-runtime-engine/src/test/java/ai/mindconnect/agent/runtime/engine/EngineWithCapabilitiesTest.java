@@ -180,7 +180,7 @@ class EngineWithCapabilitiesTest {
         ModelRequest asked = model.requests.get(0);
         assertThat(asked.instructions()).startsWith("You lead.").contains("citations: How to cite sources.");
         assertThat(asked.tools()).extracting(ToolDefinition::name).containsExactlyInAnyOrder(
-                "bash", "ask_user", "load_skill", "tool_search", "researcher");
+                "bash", "ask_user", "load_skill", "tool_search", "run_agent", "run_agents", "list_agents");
         assertThat(traces).extracting(TraceRecord::kind).containsExactly(TraceRecord.MODEL_CALL);
     }
 
@@ -224,7 +224,7 @@ class EngineWithCapabilitiesTest {
 
     @Test
     void a_sub_agents_turn_names_the_turn_that_called_it() throws InterruptedException {
-        model.script.add(call("c1", "researcher", Map.of("task", "Find the capital of France.")));
+        model.script.add(call("c1", "run_agent", Map.of("name", "researcher", "message", "Find the capital of France.")));
         model.script.add(call("c2", "bash", Map.of()));
 
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Capital of France?"));
@@ -338,7 +338,7 @@ class EngineWithCapabilitiesTest {
 
     @Test
     void a_sub_agent_runs_a_turn_of_its_own_and_its_answer_is_the_tools_result() throws InterruptedException {
-        model.script.add(call("c1", "researcher", Map.of("task", "Find the capital of France.")));
+        model.script.add(call("c1", "run_agent", Map.of("name", "researcher", "message", "Find the capital of France.")));
         model.script.add(TurnMessage.assistant("Paris."));
         model.script.add(TurnMessage.assistant("The capital is Paris."));
 
@@ -355,6 +355,25 @@ class EngineWithCapabilitiesTest {
     }
 
     @Test
+    void several_sub_agents_run_side_by_side_and_their_answers_are_the_tools_result_together()
+            throws InterruptedException {
+        model.script.add(call("c1", "run_agents", Map.of("tasks", List.of(
+                Map.of("name", "researcher", "message", "Capital of France?"),
+                Map.of("name", "researcher", "message", "Capital of France, again?")))));
+        // Both sub-agents answer the same, so it does not matter which one asks first.
+        model.script.add(TurnMessage.assistant("Paris."));
+        model.script.add(TurnMessage.assistant("Paris."));
+        model.script.add(TurnMessage.assistant("Both say Paris."));
+
+        Turn ended = awaitRest(turns.submit(TurnRequest.text(session.id(), "Ask twice.")));
+
+        assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
+        assertThat(toolResults(ended.id()))
+                .containsExactly("## 1. researcher\nParis.\n\n## 2. researcher\nParis.");
+        assertThat(ended.outcome().text()).isEqualTo("Both say Paris.");
+    }
+
+    @Test
     void an_approval_a_sub_agent_needs_comes_back_on_the_callers_turn() throws InterruptedException {
         registry.contribute(AgentResolver.class, (name, in) ->
                 "operator".equals(name) ? Optional.of(new AgentDefinition("operator", "Runs commands.",
@@ -362,7 +381,7 @@ class EngineWithCapabilitiesTest {
                         : Optional.empty());
         AgentDefinition boss = new AgentDefinition("boss", "Delegates.", "You delegate.", ModelSettings.NONE,
                 List.of(), 5, Map.of(SubAgentPlugin.SUB_AGENTS, List.of("operator")));
-        model.script.add(call("c1", "operator", Map.of("task", "Run it.")));
+        model.script.add(call("c1", "run_agent", Map.of("name", "operator", "message", "Run it.")));
         model.script.add(call("c2", "bash", Map.of()));
         model.script.add(TurnMessage.assistant("Ran."));
         model.script.add(TurnMessage.assistant("The operator ran it."));

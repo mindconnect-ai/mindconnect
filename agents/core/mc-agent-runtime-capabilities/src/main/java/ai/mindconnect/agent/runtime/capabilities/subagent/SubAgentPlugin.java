@@ -17,10 +17,15 @@ import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
 /**
- * Sub-agents: every agent an agent names as a sub-agent is offered to its
- * model as a tool under the agent's name, and a child session may write to
- * the one it came from. Both are ordinary tools; the engine only knows that
- * a tool may hand its call to another turn.
+ * Sub-agents: an agent that names sub-agents gets {@code run_agent} to hand
+ * one of them a task, {@code run_agents} to hand out several at once and
+ * {@code list_agents} to see who there is, and a child session may write to
+ * the one it came from. All are ordinary tools; the engine only knows that
+ * a tool may hand its call to other turns.
+ *
+ * <p>One tool with the agent as a parameter and not a tool per agent: the
+ * model learns once what delegating is, an agent may be named like a tool,
+ * and the list of tools stays the same when an agent comes or goes.
  */
 public final class SubAgentPlugin implements Plugin {
 
@@ -49,8 +54,7 @@ public final class SubAgentPlugin implements Plugin {
         SendToParentTool sendToParent = new SendToParentTool(registry.supplier(TurnService.class));
 
         registry.contribute(ToolResolver.class, new ToolResolver() {
-            // Offered per agent at the hook below, not here: an agent is a
-            // tool only for the agents that name it.
+            // Offered at the hook below, not here: only an agent that names sub-agents has these.
             @Override
             public List<ToolDefinition> tools(AgentDefinition agent, Session session) {
                 return List.of();
@@ -61,18 +65,26 @@ public final class SubAgentPlugin implements Plugin {
                 if (SendToParentTool.NAME.equals(toolName)) {
                     return Optional.of(sendToParent);
                 }
-                return agents.resolve(toolName, session)
-                        .map(agent -> new SubAgentTool(agent, registry.supplier(SessionService.class)));
+                if (subAgentsOf(caller).isEmpty()) {
+                    return Optional.empty();
+                }
+                RunAgentTool single = new RunAgentTool(caller, agents, registry.supplier(SessionService.class));
+                return switch (toolName) {
+                    case RunAgentTool.NAME -> Optional.of(single);
+                    case RunAgentsTool.NAME -> Optional.of(new RunAgentsTool(single));
+                    case ListAgentsTool.NAME -> Optional.of(new ListAgentsTool(caller, agents));
+                    default -> Optional.empty();
+                };
             }
         });
 
         registry.after(RuntimeHook.TOOL_OFFER, (context, tools) -> {
             List<ToolDefinition> offered = new ArrayList<>(tools);
-            subAgentsOf(context.agent()).stream()
-                    .map(name -> agents.resolve(name, context.session()))
-                    .flatMap(Optional::stream)
-                    .map(SubAgentTool::definition)
-                    .forEach(offered::add);
+            if (!subAgentsOf(context.agent()).isEmpty()) {
+                offered.add(RunAgentTool.definition(context.agent()));
+                offered.add(RunAgentsTool.DEFINITION);
+                offered.add(ListAgentsTool.DEFINITION);
+            }
             if (context.session().parentId() != null) {
                 offered.add(SendToParentTool.DEFINITION);
             }
