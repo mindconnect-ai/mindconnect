@@ -16,7 +16,7 @@ ai.mindconnect.adminui.ui.component.ExtensionListComponent has 3 constructors
 ai.mindconnect.adminui.ui.component.LlmConfigFormComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.SessionTableComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.ToolCatalogComponent has 2 constructors
-ai.mindconnect.adminui.ui.component.ToolCatalogComponent$Entry has 3 constructors
+ai.mindconnect.adminui.ui.component.ToolCatalogComponent$Entry has 2 constructors
 ai.mindconnect.adminui.ui.component.ToolTableComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.TraceTableComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.UserToolsComponent$Row has 2 constructors

@@ -16,7 +16,6 @@ import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
@@ -630,7 +629,7 @@ public class ChatUiController {
     private AgentSession openDefaultChat(String userId) {
         return agentRepository.findByName(DEFAULT_CHAT_AGENT)
                 .map(a -> chatOpener.open(a.id(), UserId.of(userId), null, null, List.of()))
-                .orElseGet(() -> sessionService.openChat(inlineDefaultChatAgent(), UserId.of(userId)));
+                .orElseGet(() -> chatOpener.open(fallbackChatAgent(), UserId.of(userId)));
     }
 
     /**
@@ -642,19 +641,11 @@ public class ChatUiController {
     private static final List<String> DEFAULT_TOOLS = List.of("todo_read", "todo_write");
 
     /** The fallback chat agent: the standard model, the standard tools, nobody to delegate to. */
-    private InlineSessionAgent inlineDefaultChatAgent() {
-        return inlineAgent(defaultLlmConfigName(), DEFAULT_TOOLS, null);
-    }
-
-    /** @param systemPrompt {@code null} or blank falls back to the built-in one. */
-    private InlineSessionAgent inlineAgent(String llmConfigName, List<String> tools, String systemPrompt) {
-        List<String> names = tools == null || tools.isEmpty() ? DEFAULT_TOOLS : tools;
+    private AgentDefinition fallbackChatAgent() {
         var known = allToolNames();
-        return InlineSessionAgent.of(
-                "Chat", systemPrompt == null || systemPrompt.isBlank() ? CHAT_SYSTEM_PROMPT : systemPrompt,
-                llmConfigName == null ? defaultLlmConfigName() : llmConfigName,
-                names.stream().filter(known::contains).toList(),
-                List.of());
+        return AgentDefinition.create("Chat", "", CHAT_SYSTEM_PROMPT, null, defaultLlmConfigName())
+                .withTools(DEFAULT_TOOLS.stream().filter(known::contains)
+                        .map(ai.mindconnect.agent.tool.AgentTool::of).toList());
     }
 
     /** The default prompt of a chat that has no agent behind it. */
@@ -1110,8 +1101,7 @@ public class ChatUiController {
         AgentSession test = null;
         ChatTurnHandle turn = null;
         try {
-            test = sessionService.openChat(def.id(), chat.userId(), chat.id(), null, null,
-                    chat.workingDir(), chat.additionalDirs());
+            test = chatOpener.openUnder(chat, def.id());
             // A title of its own spares the title generator a call for a
             // session that is gone again in a minute.
             sessionManagement.rename(runtimeId(test.id()), "Test: " + def.name());

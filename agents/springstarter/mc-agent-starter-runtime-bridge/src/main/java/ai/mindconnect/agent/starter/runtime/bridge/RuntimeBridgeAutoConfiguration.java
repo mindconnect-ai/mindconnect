@@ -115,8 +115,9 @@ public class RuntimeBridgeAutoConfiguration {
     /** Opens a chat through the session management, with what the earlier side of the application expects of one. */
     @Bean
     ChatOpener chatOpener(ObjectProvider<SessionManagement> sessions, AgentSessionRepository chatSessions,
-                          ConversationManager conversations, UserChannels userChannels) {
-        return new ChatOpener(sessions.getObject(), chatSessions, conversations, userChannels);
+                          ConversationManager conversations, UserChannels userChannels,
+                          EarlierAgentConverter converter) {
+        return new ChatOpener(sessions.getObject(), chatSessions, conversations, userChannels, converter);
     }
 
     /** What the earlier runtime's stores keep of a session goes with it. */

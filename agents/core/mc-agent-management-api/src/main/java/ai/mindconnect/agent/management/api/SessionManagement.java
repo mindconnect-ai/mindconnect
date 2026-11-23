@@ -24,6 +24,10 @@ public interface SessionManagement {
     /**
      * Opens a session for a user.
      *
+     * @param parent      the session it is opened under, with which it is
+     *                    deleted; {@code null} for one of its own. Where
+     *                    the parent works, the new session may work without
+     *                    the policy being asked again
      * @param agent       the agent it runs on: a managed agent it refers
      *                    to, or a definition of its own
      * @param type        what kind of session it is; {@code null} for
@@ -35,7 +39,8 @@ public interface SessionManagement {
      * @throws IllegalArgumentException for a managed agent that does not
      *         exist, or a directory the policy refuses
      */
-    ManagedSession open(UserId user, SessionAgent agent, String type, SessionDirectories directories);
+    ManagedSession open(UserId user, SessionId parent, SessionAgent agent, String type,
+                        SessionDirectories directories);
 
     /** The sessions under this one — its sub-agents' and its forks taken as children — oldest first. */
     List<ManagedSession> children(SessionId sessionId);

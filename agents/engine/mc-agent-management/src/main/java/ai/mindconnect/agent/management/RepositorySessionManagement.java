@@ -60,8 +60,17 @@ public final class RepositorySessionManagement implements SessionManagement {
     }
 
     @Override
-    public ManagedSession open(UserId user, SessionAgent agent, String type, SessionDirectories directories) {
+    public ManagedSession open(UserId user, SessionId parent, SessionAgent agent, String type,
+                               SessionDirectories directories) {
         SessionId id = SessionId.of(UUID.randomUUID().toString());
+        // Where the session above it works was admitted when that one was given it.
+        Set<String> held = new HashSet<>();
+        if (parent != null) {
+            ManagedSession above = managed(existing(parent));
+            held.addAll(above.directories().additional());
+            held.add(above.directories().working());
+            directoryPolicy.ownDirectory(above).ifPresent(held::add);
+        }
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put(ManagedSession.TYPE, type == null ? ManagedSession.CHAT : type);
         AgentDefinition definition;
@@ -80,13 +89,14 @@ public final class RepositorySessionManagement implements SessionManagement {
         }
         String named = directories.working();
         Optional<String> working = named == null || named.isBlank()
-                ? directoryPolicy.assign(user, id) : Optional.of(directoryPolicy.admit(user, named));
+                ? directoryPolicy.assign(user, id)
+                : Optional.of(held.contains(named) ? named : directoryPolicy.admit(user, named));
         working.ifPresent(directory -> metadata.put(ManagedSession.WORKING_DIRECTORY, directory));
         metadata.put(ManagedSession.ADDITIONAL_DIRECTORIES, directories.additional().stream()
                 .filter(directory -> !directory.isBlank())
-                .map(directory -> directoryPolicy.admit(user, directory))
+                .map(directory -> held.contains(directory) ? directory : directoryPolicy.admit(user, directory))
                 .distinct().toList());
-        Session session = new Session(id, user, null, definition, metadata, Instant.now());
+        Session session = new Session(id, user, parent, definition, metadata, Instant.now());
         sessions.create(session);
         return managed(session);
     }

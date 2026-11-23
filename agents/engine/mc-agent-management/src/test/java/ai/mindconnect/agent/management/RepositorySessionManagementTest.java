@@ -172,7 +172,7 @@ class RepositorySessionManagementTest {
         SessionManagement placing = new RepositorySessionManagement(sessions, messages, agents,
             homes, List.of(cleanedUp::add));
 
-        ManagedSession referring = placing.open(ADA, new SessionAgent.Ref(owl.id()), null, SessionDirectories.NONE);
+        ManagedSession referring = placing.open(ADA, null, new SessionAgent.Ref(owl.id()), null, SessionDirectories.NONE);
         assertThat(referring.agent()).isEqualTo(new SessionAgent.Ref(owl.id()));
         assertThat(referring.type()).isEqualTo(ManagedSession.CHAT);
         assertThat(referring.directories().working()).isEqualTo("/home/ada/" + referring.id().value());
@@ -180,15 +180,21 @@ class RepositorySessionManagementTest {
         assertThat(runtime.find(referring.id()).orElseThrow().agent()).isEqualTo(owl.definition());
         assertThat(placing.list(ADA)).extracting(ManagedSession::id).containsExactly(referring.id());
 
-        ManagedSession ofItsOwn = placing.open(ADA, new SessionAgent.Own(HELPER, null), "research",
+        ManagedSession ofItsOwn = placing.open(ADA, null, new SessionAgent.Own(HELPER, null), "research",
                 new SessionDirectories("/srv/owls", List.of("/srv/mice")));
         assertThat(ofItsOwn.agent()).isEqualTo(new SessionAgent.Own(HELPER, null));
         assertThat(ofItsOwn.type()).isEqualTo("research");
         assertThat(ofItsOwn.directories()).isEqualTo(new SessionDirectories("/srv/owls", List.of("/srv/mice")));
 
-        assertThatThrownBy(() -> placing.open(ADA, new SessionAgent.Ref(AgentId.of("unknown")), null,
+        // Under another session: it may work where that one works, and it is listed under it.
+        ManagedSession under = placing.open(ADA, referring.id(), new SessionAgent.Own(HELPER, null), null,
+                new SessionDirectories(referring.directories().working(), List.of()));
+        assertThat(under.parentId()).isEqualTo(referring.id());
+        assertThat(placing.children(referring.id())).extracting(ManagedSession::id).containsExactly(under.id());
+
+        assertThatThrownBy(() -> placing.open(ADA, null, new SessionAgent.Ref(AgentId.of("unknown")), null,
                 SessionDirectories.NONE)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> placing.open(ADA, new SessionAgent.Own(HELPER, null), null,
+        assertThatThrownBy(() -> placing.open(ADA, null, new SessionAgent.Own(HELPER, null), null,
                 new SessionDirectories("/etc", List.of()))).isInstanceOf(IllegalArgumentException.class);
     }
 
