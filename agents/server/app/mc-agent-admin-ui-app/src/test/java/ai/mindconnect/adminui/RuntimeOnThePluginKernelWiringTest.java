@@ -17,7 +17,6 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
-import ai.mindconnect.agent.runtime.capabilities.memory.SummaryStore;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 
@@ -54,7 +53,7 @@ class RuntimeOnThePluginKernelWiringTest {
         // The application's agents and tools, next to what the capabilities contribute.
         assertThat(registry.all(AgentResolver.class)).isNotEmpty();
         assertThat(registry.all(ToolResolver.class)).hasSizeGreaterThan(1);
-        assertThat(context.getBean(SummaryStore.class).getClass().getSimpleName()).isEqualTo("RepositorySummaryStore");
-        assertThat(context.getBean(LlmCallTraceListener.class)).isNotSameAs(LlmCallTraceListener.NONE);
+        // Every provider call is kept as a trace: the runtime's own listener, not nobody.
+        assertThat(registry.service(LlmCallTraceListener.class)).isNotSameAs(LlmCallTraceListener.NONE);
     }
 }

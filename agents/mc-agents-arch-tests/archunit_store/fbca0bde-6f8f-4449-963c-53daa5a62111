@@ -1,2 +1,1 @@
-Method <ai.mindconnect.agent.runtime.service.AgentChatService.handleFor(ai.mindconnect.agent.runtime.domain.AgentSession, ai.mindconnect.message.domain.ChatTurnId, int, long, java.util.function.Consumer, boolean)> has name matching '(process|handle|do)[A-Z].*' in (AgentChatService.java:331)
 Method <ai.mindconnect.mcp.gateway.local.McpTargetEndpoints.processSpawn(ai.mindconnect.mcp.gateway.McpTarget$Process)> has name matching '(process|handle|do)[A-Z].*' in (McpTargetEndpoints.java:89)

@@ -18,6 +18,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
@@ -26,11 +31,6 @@
              library compiles against none of them. -->
         <!-- The OpenAI Responses API over this runtime; served alongside
              the admin UI so one process answers both. -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-api-responses-rest</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tools</artifactId>
@@ -111,21 +111,8 @@
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime</artifactId>
-        </dependency>
         <!-- persistence: one starter per backend, mindconnect.persistence picks -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-starter-runtime</artifactId>
-        </dependency>
         <!-- The runtime on the plugin kernel, beside the earlier one until the chat has moved over. -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-starter-runtime-bridge</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-file</artifactId>
@@ -151,11 +138,6 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-admin-ui-rest</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <!-- The worked example of an extension, shipped switched off: Install → Extensions turns it on per namespace. -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-extension-demo</artifactId>
         </dependency>
         <!-- Seeds the bundled example workflows into the store on startup -->
         <dependency>

@@ -36,26 +36,13 @@
         <module>tools/vector/mc-vector-store-tools</module>
         <module>core/mc-file-store-core</module>
         <module>core/mc-file-store</module>
-        <module>builder/mc-agent-runtime-feature-core</module>
-        <module>builder/mc-agent-runtime-feature-skills</module>
-        <module>builder/mc-agent-runtime-feature-tools</module>
-        <module>builder/mc-agent-runtime-feature-workflows</module>
-        <module>builder/mc-agent-runtime-feature-file-upload</module>
-        <module>builder/mc-agent-runtime-feature-transcription</module>
-        <module>builder/mc-agent-runtime-feature-taskqueue</module>
-        <module>builder/mc-agent-runtime-feature-subagents</module>
-        <module>builder/mc-agent-runtime-builder</module>
-        <module>demo/mc-agent-simple-demo</module>
-        <module>demo/mc-extension-demo</module>
 
         <module>responses-api/mc-agent-protocol</module>
         <module>responses-api/mc-agent-protocol-openai</module>
-        <module>responses-api/mc-agent-protocol-mc-runtime</module>
         <module>core/mc-llm-gateway-core</module>
         <module>core/mc-llm-gateway</module>
         <module>adapter/postgres/mc-llm-gateway-pg</module>
         <module>adapter/postgres/mc-message-repository-pg</module>
-        <module>adapter/postgres/mc-agent-runtime-pg</module>
         <module>adapter/postgres/mc-file-store-pg</module>
         <module>server/core/mc-user-core</module>
         <module>server/core/mc-user</module>
@@ -70,9 +57,7 @@
         <module>springstarter/mc-agent-starter-file</module>
         <module>springstarter/mc-agent-starter-postgres</module>
         <module>springstarter/mc-agent-starter-namespace</module>
-        <module>springstarter/mc-agent-starter-runtime</module>
         <module>springstarter/mc-agent-starter-runtime-engine</module>
-        <module>springstarter/mc-agent-starter-runtime-bridge</module>
         <module>springstarter/mc-agent-starter-registry</module>
         <module>springstarter/mc-agent-starter-extension</module>
         <module>springstarter/mc-agent-starter-workflow</module>
@@ -80,9 +65,6 @@
         <module>core/mc-message-repository-core</module>
         <module>core/mc-message-repository</module>
         <module>core/mc-agent-tool-spi</module>
-        <module>core/mc-agent-runtime-core</module>
-        <module>core/mc-agent-memory-strategies</module>
-        <module>core/mc-agent-runtime</module>
 
         <!-- The runtime on the plugin kernel: the loop, the API, what sits on it. -->
         <module>core/mc-agent-loop-core</module>
@@ -99,6 +81,8 @@
         <module>adapter/postgres/mc-agent-tools-usermemory-pg</module>
         <module>core/mc-agent-management-api</module>
         <module>engine/mc-agent-management</module>
+        <module>engine/mc-agent-runtime-infrastructure</module>
+        <module>adapter/postgres/mc-agent-runtime-infrastructure-pg</module>
         <module>adapter/postgres/mc-agent-runtime-engine-pg</module>
         <module>adapter/postgres/mc-agent-management-pg</module>
         <module>client/mc-agent-sdk</module>
@@ -134,13 +118,11 @@
         <module>server/ui/mc-mcp-gateway-admin-ui-rest</module>
         <module>server/rest/mc-agent-api-rest</module>
         <module>server/core/mc-agent-security</module>
-        <module>server/rest/mc-agent-api-responses-rest</module>
         <module>server/app/mc-agent-api-app</module>
         <module>server/ui/mc-agent-chat-ui-rest</module>
         <module>server/ui/mc-agent-registry-admin-ui-rest</module>
         <module>server/ui/mc-agent-admin-ui-rest</module>
         <module>server/app/mc-agent-admin-ui-app</module>
-        <module>client/mc-agent-cli</module>
         <module>mc-agents-arch-tests</module>
     </modules>
 

@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.ui.component;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
-import ai.mindconnect.agent.starter.runtime.bridge.AgentDefinitionMapper;
+import ai.mindconnect.agent.management.tool.AgentToolBinding;
 import ai.mindconnect.agent.tool.AgentTool;
 
 import java.util.HashMap;
@@ -91,7 +91,7 @@ public final class AgentSetting {
 
     /** The agent's tools as the tool pages edit them. */
     public static List<AgentTool> tools(ManagedAgent agent) {
-        return agent.definition().tools().stream().map(AgentDefinitionMapper::agentTool).toList();
+        return agent.definition().tools().stream().map(AgentToolBinding::agentTool).toList();
     }
 
     /** The agent with these tools, without the ones the runtime derives. */
@@ -100,7 +100,7 @@ public final class AgentSetting {
         return agent.withDefinition(new AgentDefinition(definition.name(), definition.description(),
                 definition.instructions(), definition.modelSettings(),
                 tools.stream().filter(tool -> !DERIVED_TOOLS.contains(tool.name()))
-                        .map(AgentDefinitionMapper::binding).toList(),
+                        .map(AgentToolBinding::of).toList(),
                 definition.maxRounds(), definition.metadata()));
     }
 }

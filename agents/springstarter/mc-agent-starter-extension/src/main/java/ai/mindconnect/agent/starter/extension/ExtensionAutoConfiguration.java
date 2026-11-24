@@ -2,7 +2,7 @@ package ai.mindconnect.agent.starter.extension;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.ToolFactory;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -20,7 +20,7 @@ import ai.mindconnect.extension.domain.ExtensionRegistry;
 import ai.mindconnect.extension.port.out.BrandActivationRepository;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
-import ai.mindconnect.extension.runtime.ExtensionsFeature;
+import ai.mindconnect.extension.runtime.ExtensionPlugin;
 import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
@@ -64,7 +64,7 @@ public class ExtensionAutoConfiguration {
     private static final Logger log = LoggerFactory.getLogger(ExtensionAutoConfiguration.class);
 
     /** The service interfaces the host loads from the classpath — what the audit looks at. */
-    static final List<Class<?>> CLASSPATH_SPIS = List.of(ToolFactory.class, MultiToolProvider.class, RuntimeFeature.class);
+    static final List<Class<?>> CLASSPATH_SPIS = List.of(ToolFactory.class, MultiToolProvider.class, Plugin.class);
 
     @Bean
     @ConditionalOnMissingBean
@@ -205,7 +205,7 @@ public class ExtensionAutoConfiguration {
     /** The runtime feature that lets a namespace's decisions reach the tool registry. */
     @Bean
     @ConditionalOnMissingBean
-    ExtensionsFeature extensionsFeature(ExtensionService extensions) {
-        return new ExtensionsFeature(extensions);
+    ExtensionPlugin extensionPlugin(ExtensionService extensions) {
+        return new ExtensionPlugin(extensions);
     }
 }

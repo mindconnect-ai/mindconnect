@@ -24,7 +24,6 @@ import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.agent.starter.runtime.bridge.AgentDefinitionMapper;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -178,7 +177,7 @@ public class AgentUiController {
             return ResponseEntity.badRequest().build();
         }
         // Only now is there an id to write into the definition.
-        agents.update(created.id(), created.version(), AgentDefinitionMapper::written);
+        agents.update(created.id(), created.version(), java.util.function.UnaryOperator.identity());
         return detail(created.id().value(), null, null, user);
     }
 
@@ -198,7 +197,7 @@ public class AgentUiController {
         }
         ManagedAgent changed;
         try {
-            changed = AgentDefinitionMapper.written(fromForm(existing, body));
+            changed = (fromForm(existing, body));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -302,7 +301,7 @@ public class AgentUiController {
         }
         ManagedAgent copy = agents.copy(id);
         // The copy is an agent of its own: its id in its definition, not the original's.
-        return ResponseEntity.ok(form(agents.update(copy.id(), copy.version(), AgentDefinitionMapper::written))
+        return ResponseEntity.ok(form(agents.update(copy.id(), copy.version(), java.util.function.UnaryOperator.identity()))
                 .render());
     }
 
@@ -504,7 +503,7 @@ public class AgentUiController {
         for (int attempt = 1; ; attempt++) {
             ManagedAgent read = agents.find(id).orElseThrow(() -> DomainException.notFound("Agent", id.value()));
             try {
-                return agents.update(id, read.version(), stored -> AgentDefinitionMapper.written(
+                return agents.update(id, read.version(), stored -> (
                         AgentSetting.withTools(stored, change.apply(AgentSetting.tools(stored)))));
             } catch (ConcurrentModificationException e) {
                 if (attempt >= ATTEMPTS) throw e;

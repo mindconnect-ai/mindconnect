@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.starter.runtime.engine;
 
+import ai.mindconnect.plugin.Plugin;
+import ai.mindconnect.plugin.PluginRegistry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
@@ -58,7 +60,7 @@ class RuntimeEngineAutoConfigurationTest {
     Path dataDirectory;
 
     @Test
-    void a_turn_runs_on_the_applications_queue_and_writes_into_its_message_repository() {
+    void a_turn_runs_through_the_services_the_starter_hands_out() {
         LlmChat chat = (request, handler, cancellation, listener) ->
                 handler.accept(new LlmStreamChunk.TextDelta("Hello."));
         new ApplicationContextRunner()
@@ -66,10 +68,18 @@ class RuntimeEngineAutoConfigurationTest {
                 .withPropertyValues("mindconnect.data.base-dir=" + dataDirectory)
                 .withBean(ScopeSupplier.class, () -> SCOPE)
                 .withBean(ObjectMapper.class, () -> new ObjectMapper().registerModule(new JavaTimeModule()))
-                .withBean(TaskQueue.class, () -> new LocalTaskQueue(new InMemoryTaskStore()))
-                .withBean(MessageRepository.class, () -> new InMemoryMessageRepository(SCOPE))
-                .withBean(LlmChat.class, () -> chat)
-                .withBean(LlmConfigRepository.class, () -> mock(LlmConfigRepository.class))
+                // The application's own plugin comes after the starter's: its model is the one that answers.
+                .withBean(Plugin.class, () -> new Plugin() {
+                    @Override
+                    public String name() {
+                        return "test-model";
+                    }
+
+                    @Override
+                    public void install(PluginRegistry registry) {
+                        registry.provide(LlmChat.class, () -> chat);
+                    }
+                })
                 .run(context -> {
                     SessionService sessions = context.getBean(SessionService.class);
                     TurnService turns = context.getBean(TurnService.class);
@@ -79,7 +89,7 @@ class RuntimeEngineAutoConfigurationTest {
                     Turn ended = awaitEnd(turns, turnId);
 
                     assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
-                    assertThat(context.getBean(SessionStore.class).messages(session.id()))
+                    assertThat(context.getBean(AgentRuntime.class).service(SessionStore.class).messages(session.id()))
                             .extracting(TurnMessage::text).containsExactly("Hi", "Hello.");
                     // The same conversation the application's own code reads.
                     assertThat(context.getBean(MessageRepository.class)
@@ -87,8 +97,9 @@ class RuntimeEngineAutoConfigurationTest {
                             .extracting(Message::content).containsExactly("Hi", "Hello.");
                     // An agent kept in the management is one the runtime finds by name.
                     context.getBean(AgentManagement.class).create(ManagedAgent.of(HELPER));
-                    assertThat(context.getBean(AgentRuntime.class).all(AgentResolver.class).get(0)
-                            .resolve("helper", session)).contains(HELPER);
+                    assertThat(context.getBean(AgentRuntime.class).all(AgentResolver.class).stream()
+                            .flatMap(resolver -> resolver.resolve("helper", session).stream())
+                            .map(AgentDefinition::name)).contains("helper");
                     // The same session, as the management API lists it.
                     assertThat(context.getBean(SessionManagement.class).list(UserId.of("ada")))
                             .extracting(listed -> listed.id()).containsExactly(session.id());

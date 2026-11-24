@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.starter.file;
 
-import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
 import ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository;
@@ -33,7 +32,7 @@ import java.nio.file.Path;
  * File persistence for the agent runtime: everything under
  * {@code mindconnect.data.base-dir} (default {@code data}), one directory
  * per namespace. The runtime's stores are built by the runtime starter from
- * the {@link Persistence} declared here; this starter adds what is
+ * {@code mindconnect.persistence}; this starter adds what is
  * installation-wide and not the runtime's — the users and their API tokens.
  *
  * <p>It declares no scope: an application works in one namespace unless it also
@@ -49,12 +48,6 @@ import java.nio.file.Path;
 public class FilePersistenceAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(FilePersistenceAutoConfiguration.class);
-
-    @Bean
-    @ConditionalOnMissingBean(Persistence.class)
-    Persistence persistence(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return Persistence.file(Path.of(baseDir));
-    }
 
     /** Installation-wide, not per namespace: a user is the same person in every namespace. */
     @Bean

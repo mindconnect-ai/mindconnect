@@ -2,6 +2,7 @@ package ai.mindconnect.agent.tools.usermemory;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
@@ -30,12 +31,6 @@ public final class UserMemoryPlugin implements Plugin {
     /** The key in a tool binding's metadata of what the operator set for the tool; see {@link MemoryReach#OVERRIDE}. */
     public static final String OVERRIDES = "overrides";
 
-    private final UserMemoryService service;
-
-    public UserMemoryPlugin(UserMemoryService service) {
-        this.service = service;
-    }
-
     @Override
     public String name() {
         return "user-memory";
@@ -43,9 +38,22 @@ public final class UserMemoryPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
-        registry.provide(UserMemoryService.class, () -> service);
-        MemoryIndex index = new MemoryIndex(service);
-        registry.after(RuntimeHook.INSTRUCTIONS, (context, instructions) -> instructions + section(index, context));
+        // On the store the runtime keeps memories in; made on first use, when the store is there.
+        registry.provide(UserMemoryService.class,
+                () -> new UserMemoryService(registry.get(UserMemoryRepository.class)));
+        Supplier<MemoryIndex> index = new Supplier<>() {
+            private MemoryIndex made;
+
+            @Override
+            public synchronized MemoryIndex get() {
+                if (made == null) {
+                    made = new MemoryIndex(registry.get(UserMemoryService.class));
+                }
+                return made;
+            }
+        };
+        registry.after(RuntimeHook.INSTRUCTIONS,
+                (context, instructions) -> instructions + section(index.get(), context));
     }
 
     private static String section(MemoryIndex index, AgentContext context) {

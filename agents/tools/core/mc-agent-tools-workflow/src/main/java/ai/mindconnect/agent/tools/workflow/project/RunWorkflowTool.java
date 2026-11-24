@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.tools.workflow.project;
 
-import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tools.workflow.step.CallerLimits;

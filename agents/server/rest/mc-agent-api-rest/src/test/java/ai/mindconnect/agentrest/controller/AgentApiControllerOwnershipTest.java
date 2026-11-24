@@ -57,8 +57,8 @@ class AgentApiControllerOwnershipTest {
 
     @BeforeEach
     void setUp() {
-        ai.mindconnect.agent.starter.runtime.bridge.ChatOpener opener =
-                org.mockito.Mockito.mock(ai.mindconnect.agent.starter.runtime.bridge.ChatOpener.class);
+        ai.mindconnect.agentrest.service.ChatOpening opener =
+                org.mockito.Mockito.mock(ai.mindconnect.agentrest.service.ChatOpening.class);
         org.mockito.Mockito.when(opener.open(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any()))

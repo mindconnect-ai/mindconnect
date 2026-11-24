@@ -88,13 +88,18 @@ public final class RepositoryAgentManagement implements AgentManagement {
         agents.delete(id);
     }
 
+    /** What agents written before 1.0 carry in their definition: the whole agent once more, in its earlier form. */
+    private static final String EARLIER_COPY = "earlier.definition";
+
     /** The definition saying whose it is: the tools it binds read there which agent calls them. */
     private static AgentDefinition identified(AgentDefinition definition, AgentId id) {
-        if (id.value().equals(definition.metadata().get(ManagedAgent.AGENT_ID))) {
+        if (id.value().equals(definition.metadata().get(ManagedAgent.AGENT_ID))
+                && !definition.metadata().containsKey(EARLIER_COPY)) {
             return definition;
         }
         Map<String, Object> metadata = new HashMap<>(definition.metadata());
         metadata.put(ManagedAgent.AGENT_ID, id.value());
+        metadata.remove(EARLIER_COPY);
         return new AgentDefinition(definition.name(), definition.description(), definition.instructions(),
                 definition.modelSettings(), definition.tools(), definition.maxRounds(), metadata);
     }

@@ -8,7 +8,7 @@ import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
-import ai.mindconnect.agent.starter.runtime.bridge.AgentDefinitionMapper;
+import ai.mindconnect.agent.management.tool.AgentToolBinding;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.chatui.ui.component.ChatAgent;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
@@ -59,7 +59,7 @@ public class ChatUiController {
     /** The chat on the runtime on the plugin kernel, behind the calls this page has always made. */
     private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns;
     private final ai.mindconnect.agent.runtime.api.port.in.SessionService runtimeSessions;
-    private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
+    private final ai.mindconnect.agentrest.service.ChatOpening chatOpener;
     private final AgentManagement agents;
     /** What is done with sessions beside running turns in them: where the list of chats comes from. */
     private final SessionManagement sessionManagement;
@@ -83,7 +83,7 @@ public class ChatUiController {
     public ChatUiController(ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy,
                              ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
                              ai.mindconnect.agent.sdk.AgentRuntime runtime,
-                             ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
+                             ai.mindconnect.agentrest.service.ChatOpening chatOpener,
                              SessionManagement sessionManagement,
                              TodoListService todoListService,
                              ObjectMapper objectMapper,
@@ -282,7 +282,7 @@ public class ChatUiController {
                      ai.mindconnect.agent.runtime.api.domain.AgentDefinition changed) {
         // Written without the copy of what the earlier runtime wrote: it describes the definition before.
         sessionManagement.changeAgent(chat.id(), effective.id() == null ? changed
-                : AgentDefinitionMapper.written(effective.withDefinition(changed)).definition());
+                : ChatAgent.identified(effective.withDefinition(changed)).definition());
     }
 
     /** The submitted value, or what the chat already had when nothing was submitted. */
@@ -710,11 +710,11 @@ public class ChatUiController {
                 model == null ? ai.mindconnect.agent.runtime.api.domain.ModelSettings.NONE
                         : ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel(model),
                 DEFAULT_TOOLS.stream().filter(known::contains)
-                        .map(name -> AgentDefinitionMapper.binding(ai.mindconnect.agent.tool.AgentTool.of(name)))
+                        .map(name -> AgentToolBinding.of(ai.mindconnect.agent.tool.AgentTool.of(name)))
                         .toList(),
                 FALLBACK_MAX_ROUNDS,
                 // Its own id, as every agent has one: the tools read whose agent calls them.
-                Map.of(AgentDefinitionMapper.AGENT_ID, java.util.UUID.randomUUID().toString(),
+                Map.of(ManagedAgent.AGENT_ID, java.util.UUID.randomUUID().toString(),
                         SubAgentPlugin.SUB_AGENTS, List.of()));
     }
 
@@ -779,7 +779,7 @@ public class ChatUiController {
             }
             var bound = byName.get(n);
             if (bound == null) {
-                bound = AgentDefinitionMapper.binding(ai.mindconnect.agent.tool.AgentTool.of(n));
+                bound = AgentToolBinding.of(ai.mindconnect.agent.tool.AgentTool.of(n));
             }
             // The same binding, offered up front or left to search.
             picked.put(n, bound.deferred() == deferred ? bound : new ToolBinding(bound.name(), deferred, bound.metadata()));

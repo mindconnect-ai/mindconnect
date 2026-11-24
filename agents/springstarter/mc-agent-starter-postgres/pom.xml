@@ -22,10 +22,6 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-jdbc</artifactId>
         </dependency>
         <dependency>

@@ -25,8 +25,14 @@ class UserMemoryPluginTest {
     private static final ai.mindconnect.agent.UserId ADA = ai.mindconnect.agent.UserId.of("ada");
     private static final String SECRETARY = "11111111-1111-1111-1111-111111111111";
 
-    private final UserMemoryService service = new UserMemoryService(new MapUserMemoryRepository());
-    private final PluginRegistry registry = new DefaultPluginRegistry().install(new UserMemoryPlugin(service));
+    private final PluginRegistry registry = stored(new DefaultPluginRegistry()).install(new UserMemoryPlugin());
+    private final UserMemoryService service = registry.get(UserMemoryService.class);
+
+    private static PluginRegistry stored(PluginRegistry registry) {
+        UserMemoryRepository memories = new MapUserMemoryRepository();
+        registry.provide(UserMemoryRepository.class, () -> memories);
+        return registry;
+    }
 
     @Test
     void whoever_shows_the_memory_asks_the_runtime_for_it() {

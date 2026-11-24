@@ -50,17 +50,6 @@
         <module>agents/tools/vector/mc-vector-store-tools</module>
         <module>agents/core/mc-file-store-core</module>
         <module>agents/core/mc-file-store</module>
-        <module>agents/builder/mc-agent-runtime-feature-core</module>
-        <module>agents/builder/mc-agent-runtime-feature-skills</module>
-        <module>agents/builder/mc-agent-runtime-feature-tools</module>
-        <module>agents/builder/mc-agent-runtime-feature-workflows</module>
-        <module>agents/builder/mc-agent-runtime-feature-file-upload</module>
-        <module>agents/builder/mc-agent-runtime-feature-transcription</module>
-        <module>agents/builder/mc-agent-runtime-feature-taskqueue</module>
-        <module>agents/builder/mc-agent-runtime-feature-subagents</module>
-        <module>agents/builder/mc-agent-runtime-builder</module>
-        <module>agents/demo/mc-agent-simple-demo</module>
-        <module>agents/demo/mc-extension-demo</module>
         <module>common/mc-pathaccessor</module>
         <module>common/mc-script-mini</module>
         <module>common/mc-file-manager</module>
@@ -107,7 +96,6 @@
         <module>agents/core/mc-llm-gateway</module>
         <module>agents/adapter/postgres/mc-llm-gateway-pg</module>
         <module>agents/adapter/postgres/mc-message-repository-pg</module>
-        <module>agents/adapter/postgres/mc-agent-runtime-pg</module>
         <module>agents/adapter/postgres/mc-file-store-pg</module>
         <module>agents/server/core/mc-user-core</module>
         <module>agents/server/core/mc-user</module>
@@ -122,7 +110,6 @@
         <module>agents/springstarter/mc-agent-starter-file</module>
         <module>agents/springstarter/mc-agent-starter-postgres</module>
         <module>agents/springstarter/mc-agent-starter-namespace</module>
-        <module>agents/springstarter/mc-agent-starter-runtime</module>
         <module>agents/springstarter/mc-agent-starter-registry</module>
         <module>agents/springstarter/mc-agent-starter-extension</module>
         <module>agents/springstarter/mc-agent-starter-workflow</module>
@@ -131,11 +118,7 @@
         <module>agents/core/mc-message-repository</module>
         <module>agents/responses-api/mc-agent-protocol</module>
         <module>agents/responses-api/mc-agent-protocol-openai</module>
-        <module>agents/responses-api/mc-agent-protocol-mc-runtime</module>
         <module>agents/core/mc-agent-tool-spi</module>
-        <module>agents/core/mc-agent-runtime-core</module>
-        <module>agents/core/mc-agent-memory-strategies</module>
-        <module>agents/core/mc-agent-runtime</module>
 
         <!-- The runtime on the plugin kernel. -->
         <module>agents/core/mc-agent-loop-core</module>
@@ -152,12 +135,13 @@
         <module>agents/adapter/postgres/mc-agent-tools-usermemory-pg</module>
         <module>agents/core/mc-agent-management-api</module>
         <module>agents/engine/mc-agent-management</module>
+        <module>agents/engine/mc-agent-runtime-infrastructure</module>
+        <module>agents/adapter/postgres/mc-agent-runtime-infrastructure-pg</module>
         <module>agents/adapter/postgres/mc-agent-runtime-engine-pg</module>
         <module>agents/adapter/postgres/mc-agent-management-pg</module>
         <module>agents/client/mc-agent-sdk</module>
         <module>agents/client/mc-agent-cli-local</module>
         <module>agents/springstarter/mc-agent-starter-runtime-engine</module>
-        <module>agents/springstarter/mc-agent-starter-runtime-bridge</module>
 
         <module>agents/tools/core/mc-agent-tools</module>
         <module>agents/tools/core/mc-agent-tools-code</module>
@@ -193,9 +177,7 @@
         <module>agents/server/ui/mc-agent-chat-ui-rest</module>
         <module>agents/server/ui/mc-agent-registry-admin-ui-rest</module>
         <module>agents/server/ui/mc-agent-admin-ui-rest</module>
-        <module>agents/server/rest/mc-agent-api-responses-rest</module>
         <module>agents/server/app/mc-agent-admin-ui-app</module>
-        <module>agents/client/mc-agent-cli</module>
         <module>common/mc-common-arch-tests</module>
         <module>taskqueue/mc-task-queue-arch-tests</module>
         <module>workflow/mc-workflow-arch-tests</module>

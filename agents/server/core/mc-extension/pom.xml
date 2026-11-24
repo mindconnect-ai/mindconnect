@@ -42,7 +42,8 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-core</artifactId>
+            <artifactId>mc-agent-runtime-infrastructure</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

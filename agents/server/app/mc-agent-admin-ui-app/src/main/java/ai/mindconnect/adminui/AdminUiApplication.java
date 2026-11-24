@@ -9,8 +9,8 @@ import org.springframework.context.annotation.Import;
 
 /**
  * The admin UI. The agent runtime — repositories, LLM layer, tools, turn
- * loop — comes from {@code mc-agent-starter-runtime}, built from the same
- * features the embedded builder installs and configured from the
+ * loop — comes from {@code mc-agent-starter-runtime-engine}, built through the
+ * SDK's builder and configured from the
  * {@code mindconnect.*} properties; what is left here is the UI's own.
  */
 @SpringBootApplication
@@ -19,8 +19,7 @@ import org.springframework.context.annotation.Import;
     "ai.mindconnect.agentrest"
 })
 @Import({
-    InfrastructureConfig.class,
-    ai.mindconnect.agent.responses.config.ResponsesApiConfiguration.class
+    InfrastructureConfig.class
 })
 @Slf4j
 public class AdminUiApplication {

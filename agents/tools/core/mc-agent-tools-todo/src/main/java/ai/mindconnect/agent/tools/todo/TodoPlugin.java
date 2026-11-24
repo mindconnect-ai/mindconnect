@@ -4,6 +4,8 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
+import java.util.function.Supplier;
+
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
@@ -15,11 +17,6 @@ import ai.mindconnect.plugin.PluginRegistry;
  */
 public final class TodoPlugin implements Plugin {
 
-    private final TodoListService service;
-
-    public TodoPlugin(TodoListService service) {
-        this.service = service;
-    }
 
     @Override
     public String name() {
@@ -28,8 +25,11 @@ public final class TodoPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
+        // On the store the runtime keeps todo lists in; made on first use, when the store is there.
+        registry.provide(TodoListService.class, () -> new TodoListService(registry.get(TodoListRepository.class)));
+        Supplier<TodoListService> service = registry.supplier(TodoListService.class);
         registry.contribute(PromptVariableProvider.class, (agent, session) ->
-                TodoPromptVariable.of(service.load(SessionId.of(session.id().value()))));
+                TodoPromptVariable.of(service.get().load(SessionId.of(session.id().value()))));
         registry.after(RuntimeHook.TOOL_CALL, (invocation, output) -> {
             String tool = invocation.call().toolName();
             // Not after a failure, and not after the todo tools: their own result already shows the list.
@@ -37,7 +37,7 @@ public final class TodoPlugin implements Plugin {
                     || TodoWriteTool.NAME.equals(tool) || TodoReadTool.NAME.equals(tool)) {
                 return output;
             }
-            TodoList list = service.load(SessionId.of(invocation.context().session().id().value()));
+            TodoList list = service.get().load(SessionId.of(invocation.context().session().id().value()));
             return list.hasOpenItems()
                     ? ToolOutput.ok(done.text() + "\n\n" + TodoContinuationAdvisor.hint(list)) : output;
         });

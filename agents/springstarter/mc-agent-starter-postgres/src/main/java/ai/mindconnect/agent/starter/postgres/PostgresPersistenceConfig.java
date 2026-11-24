@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.starter.postgres;
 
-import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.jdbc.Json;
 import ai.mindconnect.jdbc.Sql;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,14 +65,6 @@ public class PostgresPersistenceConfig {
     @Bean
     Sql mindconnectSql(DataSource mindconnectDataSource, ObjectMapper objectMapper) {
         return Sql.of(mindconnectDataSource, new Json(objectMapper));
-    }
-
-    /** What the runtime starter builds every store of the runtime from: Postgres, side channels under the data dir. */
-    @Bean
-    @ConditionalOnMissingBean(Persistence.class)
-    Persistence persistence(DataSource mindconnectDataSource,
-                            @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return Persistence.postgres(mindconnectDataSource, java.nio.file.Path.of(baseDir));
     }
 
     // ── users ───────────────────────────────────────────────────────────────

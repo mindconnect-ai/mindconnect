@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.tools.workflow.project;
 
-import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;

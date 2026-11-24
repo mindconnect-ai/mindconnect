@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.capabilities.guard.InputGuard;
 import ai.mindconnect.agent.runtime.capabilities.guard.InputGuardPlugin;
@@ -45,6 +46,7 @@ import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
+import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import ai.mindconnect.taskqueue.memory.InMemorySharedStateStore;
 import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;
@@ -70,6 +72,8 @@ public final class AgentRuntimeBuilder {
     private PermissionEffect unruledTools = PermissionEffect.ALLOW;
     private NamespaceProvider namespaces = NamespaceProvider.fixed("default");
     private ApprovalMemory approvals;
+    private UserProvider users;
+    private TaskQueue taskQueue;
 
     AgentRuntimeBuilder() {
     }
@@ -133,6 +137,27 @@ public final class AgentRuntimeBuilder {
         return this;
     }
 
+    /**
+     * Who acts in a call, for a host that knows its users: a turn runs as
+     * the user who was acting when it was submitted. Without it nobody is
+     * known.
+     */
+    public AgentRuntimeBuilder users(UserProvider users) {
+        this.users = users;
+        return this;
+    }
+
+    /**
+     * The queue turns and tool calls run on, for a host that brings its own
+     * — one that keeps its tasks in a database, one it also watches. It is
+     * the host's to close. Without it the runtime runs a queue in memory and
+     * closes it with itself.
+     */
+    public AgentRuntimeBuilder taskQueue(TaskQueue queue) {
+        this.taskQueue = queue;
+        return this;
+    }
+
     /** Where "allow for good" is kept, in place of the memory of this process. */
     public AgentRuntimeBuilder approvalMemory(ApprovalMemory approvals) {
         this.approvals = approvals;
@@ -158,16 +183,23 @@ public final class AgentRuntimeBuilder {
     }
 
     public AgentRuntime build() {
-        if (model == null) {
-            throw new IllegalStateException("A runtime needs a model: call model(...) before build()");
-        }
-        LocalTaskQueue queue = new LocalTaskQueue(new InMemoryTaskStore());
+        TaskQueue queue = taskQueue != null ? taskQueue : new LocalTaskQueue(new InMemoryTaskStore());
         PluginRegistry registry = new DefaultPluginRegistry();
         NamespaceProvider namespaces = this.namespaces;
+        UserProvider users = this.users;
         List<Plugin> plugins = new ArrayList<>(List.of(
-                provides("namespace", into -> into.provide(NamespaceProvider.class, () -> namespaces)),
-                sessionStore,
-                model,
+                provides("host", into -> {
+                    into.provide(NamespaceProvider.class, () -> namespaces);
+                    into.provide(TaskQueue.class, () -> queue);
+                    if (users != null) {
+                        into.provide(UserProvider.class, () -> users);
+                    }
+                }),
+                sessionStore));
+        if (model != null) {
+            plugins.add(model);
+        }
+        plugins.addAll(List.of(
                 new RuntimePlugin(queue, new InMemorySharedStateStore()),
                 new InMemorySourcePlugin(
                         new InMemoryAgentResolver(agents),
@@ -189,12 +221,31 @@ public final class AgentRuntimeBuilder {
                 new OutputGuardPlugin(),
                 new ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin(),
                 new SessionTitlePlugin()));
-        plugins.addAll(more);
+        // A plugin of a kind the builder installs itself takes that one's place, so what the
+        // capabilities add to a prompt keeps its order; every other one comes after them.
+        List<Plugin> replacing = more.stream()
+                // Only a kind with a name of its own: the builder's nameless ones are each something else.
+                .filter(given -> !given.getClass().isAnonymousClass()
+                        && plugins.stream().anyMatch(own -> own.getClass() == given.getClass())).toList();
+        plugins.replaceAll(own -> replacing.stream()
+                .filter(given -> given.getClass() == own.getClass()).findFirst().orElse(own));
+        more.stream().filter(given -> !replacing.contains(given)).forEach(plugins::add);
         plugins.stream().filter(plugin -> !left.contains(plugin.getClass())).forEach(registry::install);
+
         List<PermissionRule> given = List.copyOf(rules);
         registry.contribute(PermissionRuleSource.class, session -> given);
-        registry.start();
-        return new AgentRuntime(registry, queue::close);
+        try {
+            registry.start();
+        } catch (IllegalStateException e) {
+            // The one service nothing here brings by default: say how to bring it.
+            if (model == null && String.valueOf(e.getMessage()).contains(ModelGateway.class.getSimpleName())) {
+                throw new IllegalStateException("A runtime needs a model: call model(...) or add a plugin "
+                        + "that provides one before build()", e);
+            }
+            throw e;
+        }
+        // A queue the host brought is the host's to close.
+        return new AgentRuntime(registry, taskQueue != null ? () -> { } : ((LocalTaskQueue) queue)::close);
     }
 
     private static Plugin provides(String name, Consumer<PluginRegistry> install) {

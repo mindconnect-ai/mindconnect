@@ -17,6 +17,16 @@
     <description>Agent REST controllers and DTOs — library, no Spring Boot main class</description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-infrastructure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- What is attached to a session is kept through the management API. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
@@ -29,15 +39,6 @@
             <version>${project.version}</version>
         </dependency>
         <!-- Turns run on the runtime on the plugin kernel, behind the chat service the bridge offers. -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-starter-runtime-bridge</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime</artifactId>
-        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-gateway</artifactId>

@@ -83,7 +83,7 @@ public class AgentApiController {
     private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction;
     /** Asked for what only some assemblies have: a service is looked up when it is needed. */
     private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
-    private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
+    private final ai.mindconnect.agentrest.service.ChatOpening chatOpener;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final UserChannels userChannels;
     private final SessionAccess sessionAccess;
@@ -96,7 +96,7 @@ public class AgentApiController {
                             ai.mindconnect.agentrest.service.TurnFrameStream frameStream,
                             ai.mindconnect.agent.sdk.AgentRuntime runtime,
                             ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
-                            ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
+                            ai.mindconnect.agentrest.service.ChatOpening chatOpener,
                             ai.mindconnect.filestore.FileStore fileStore,
                             UserChannels userChannels,
                             SessionAccess sessionAccess,

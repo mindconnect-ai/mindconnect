@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.tools.workflow.project;
 
-import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

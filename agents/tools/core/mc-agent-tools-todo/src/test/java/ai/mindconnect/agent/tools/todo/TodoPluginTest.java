@@ -32,9 +32,14 @@ class TodoPluginTest {
     private static final Session SESSION = new Session(SessionId.of("11111111-1111-1111-1111-111111111111"), null,
             null, null, Map.of(), Instant.EPOCH);
 
-    private final TodoListService service = new TodoListService(
-            new InMemoryTodoListRepository(ScopeSupplier.local()));
-    private final PluginRegistry registry = new DefaultPluginRegistry().install(new TodoPlugin(service));
+    private final PluginRegistry registry = stored(new DefaultPluginRegistry()).install(new TodoPlugin());
+    private final TodoListService service = registry.get(TodoListService.class);
+
+    private static PluginRegistry stored(PluginRegistry registry) {
+        TodoListRepository lists = new InMemoryTodoListRepository(ScopeSupplier.local());
+        registry.provide(TodoListRepository.class, () -> lists);
+        return registry;
+    }
 
     @Test
     void a_template_hides_the_list_until_the_agent_wrote_one() {

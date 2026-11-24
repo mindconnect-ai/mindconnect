@@ -45,11 +45,6 @@
         <!-- The chat runs on the runtime on the plugin kernel; the bridge takes this page's calls there. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-starter-runtime-bridge</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>
         </dependency>
         <!-- Semantic UI (from the standalone mc-semantic-ui repo) -->

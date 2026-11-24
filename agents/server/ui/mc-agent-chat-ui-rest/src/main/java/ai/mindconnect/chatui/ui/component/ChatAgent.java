@@ -9,7 +9,6 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
-import ai.mindconnect.agent.starter.runtime.bridge.AgentDefinitionMapper;
 import ai.mindconnect.common.DomainException;
 
 import java.time.Instant;
@@ -49,7 +48,7 @@ public final class ChatAgent {
     public static ManagedAgent effective(SessionManagement sessions, AgentManagement agents, ManagedSession chat) {
         AgentDefinition runs = sessions.agentOf(chat.id()).orElseThrow(() -> DomainException.notFound(
                 "AgentDefinition", chat.agentId().map(id -> id.value()).orElse(chat.id().value())));
-        String id = runs.metadata().get(AgentDefinitionMapper.AGENT_ID) instanceof String stored ? stored
+        String id = runs.metadata().get(ManagedAgent.AGENT_ID) instanceof String stored ? stored
                 : chat.agentId().map(named -> named.value()).orElse(null);
         Optional<ManagedAgent> origin = id == null ? Optional.empty()
                 : agents.find(ai.mindconnect.agent.management.api.AgentId.of(id));
@@ -57,6 +56,23 @@ public final class ChatAgent {
         return new ManagedAgent(id == null ? null : ai.mindconnect.agent.management.api.AgentId.of(id), runs,
                 origin.map(ManagedAgent::group).orElse(null), origin.map(ManagedAgent::icon).orElse(null),
                 origin.map(ManagedAgent::welcomeMessage).orElse(null), ManagedAgent.Status.ACTIVE, now, now, 1);
+    }
+
+    /**
+     * The agent with its id in its definition, where the tools read whose
+     * agent calls them — for a definition a chat keeps for itself, which no
+     * agent management writes.
+     */
+    public static ManagedAgent identified(ManagedAgent agent) {
+        if (agent.id() == null) {
+            return agent;
+        }
+        AgentDefinition definition = agent.definition();
+        java.util.Map<String, Object> metadata = new java.util.HashMap<>(definition.metadata());
+        metadata.put(ManagedAgent.AGENT_ID, agent.id().value());
+        return agent.withDefinition(new AgentDefinition(definition.name(), definition.description(),
+                definition.instructions(), definition.modelSettings(), definition.tools(), definition.maxRounds(),
+                metadata));
     }
 
     /** The agent's id as the chat's links and forms carry it; {@code null} for an agent without one. */
