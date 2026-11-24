@@ -125,3 +125,6 @@
   was rebuilt: what an agent wrote there is not removed with the chat. A
   server that wants the directories gone sets
   `mindconnect.sessions.delete-directory: true`.
+- A namespace created again under the name of a deleted one is seeded like
+  any new namespace; it came up empty until the next restart. The namespaces
+  page says that a new namespace starts with the installation's content.

@@ -98,6 +98,14 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
     }
 
     /**
+     * The namespace was deleted: one created under its name later is a new
+     * namespace, and is seeded on its first use like any other.
+     */
+    public void deleted(Namespace namespace) {
+        firstUse.forget(namespace);
+    }
+
+    /**
      * An extension was switched (on, off, back to default, for the namespace
      * or the brand): seeds the namespace at hand now, and every other one on its
      * next use.

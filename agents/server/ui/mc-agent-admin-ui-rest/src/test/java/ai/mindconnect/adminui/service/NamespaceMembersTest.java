@@ -27,7 +27,7 @@ class NamespaceMembersTest {
     private static final UserId MALLORY = UserId.of("mallory");
 
     private final NamespaceService namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
-    private final NamespaceMembers members = new NamespaceMembers(namespaces, new UserService(new InMemoryUserRepository()));
+    private final NamespaceMembers members = new NamespaceMembers(namespaces, new UserService(new InMemoryUserRepository()), new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class));
 
     NamespaceMembersTest() {
         namespaces.create("acme", "ACME", ALICE);

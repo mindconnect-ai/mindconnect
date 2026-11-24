@@ -56,7 +56,7 @@ class ProfileUiControllerTest {
     private final ProfileUiController controller = controller(true);
 
     private ProfileUiController controller(boolean authEnabled) {
-        return new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users),
+        return new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users, new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class)),
                 ScopeSupplier.fixed(Namespace.DEFAULT), Clock.fixed(NOW, ZoneOffset.UTC), authEnabled);
     }
 
@@ -250,7 +250,7 @@ class ProfileUiControllerTest {
         namespaces.create("acme", null, UserId.of("alice"));
         namespaces.invite(new Namespace("acme"), UserId.of("alice"), namespaces.address("bob"), NamespaceRole.USER);
         users.selectNamespace(UserId.of("bob"), new Namespace("acme"));
-        ProfileUiController inAcme = new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users),
+        ProfileUiController inAcme = new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users, new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class)),
                 ScopeSupplier.fixed(new Namespace("acme")), Clock.fixed(NOW, ZoneOffset.UTC), true);
 
         var answer = inAcme.leave(user("bob"), "acme");

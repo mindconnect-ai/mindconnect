@@ -40,7 +40,7 @@ class NamespaceUiControllerTest {
     private final UserService users = new UserService(userStore);
     private final NamespaceService namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
     private final NamespaceUiController controller = new NamespaceUiController(namespaces, userStore, users,
-            new NamespaceMembers(namespaces, users), ScopeSupplier.fixed(Namespace.DEFAULT));
+            new NamespaceMembers(namespaces, users, new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class)), ScopeSupplier.fixed(Namespace.DEFAULT));
 
     @Test
     void aMemberSwitchesAndTheChoiceIsRememberedOnSessionAndUser() {

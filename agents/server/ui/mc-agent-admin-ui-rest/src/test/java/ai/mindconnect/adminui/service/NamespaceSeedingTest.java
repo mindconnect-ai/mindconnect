@@ -286,6 +286,17 @@ class NamespaceSeedingTest {
     }
 
     @Test
+    void a_namespace_created_again_under_a_deleted_ones_name_is_seeded_like_a_new_one() {
+        use(ERNI);
+        assertThat(runs).hasValue(1);
+
+        seeding.deleted(ERNI);
+        use(ERNI);
+
+        assertThat(runs).as("seeded again on the first use after the delete").hasValue(2);
+    }
+
+    @Test
     void a_namespace_that_does_not_exist_is_not_seeded() {
         namespaces = new NamespaceService(new InMemoryNamespaceRepository(), LOCAL);
         restart();
