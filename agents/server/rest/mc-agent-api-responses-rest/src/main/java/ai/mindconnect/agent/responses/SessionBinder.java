@@ -4,7 +4,7 @@ import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.protocol.Session;
 import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
 import ai.mindconnect.agent.responses.wire.CreateResponseRequest;

@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 
 /**
  * An installation's say on session directories from its configuration: the
@@ -28,7 +28,7 @@ public final class RootedSessionDirectoryPolicy implements SessionDirectoryPolic
     }
 
     @Override
-    public Optional<String> assign(UserId user, ai.mindconnect.agent.runtime.api.domain.SessionId session) {
+    public Optional<String> assign(UserId user, ai.mindconnect.agent.SessionId session) {
         return userHome.sessionDirOf(user.value(),
                         session.value())
                 .map(Path::toString);

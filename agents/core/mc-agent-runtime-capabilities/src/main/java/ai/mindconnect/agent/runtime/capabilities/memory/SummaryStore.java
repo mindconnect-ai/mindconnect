@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.capabilities.memory;
 
 import java.util.Optional;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Where the summary of a session is kept. One per session: a new one covers

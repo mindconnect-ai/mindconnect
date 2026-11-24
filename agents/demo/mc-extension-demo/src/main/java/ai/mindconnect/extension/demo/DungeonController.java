@@ -104,7 +104,7 @@ public class DungeonController {
         if (scenario.isEmpty()) return lobby("No such scenario: " + scenarioId);
         try {
             String session = runtime.service(SessionManagement.class).open(
-                    ai.mindconnect.agent.runtime.api.domain.UserId.of(me().value()), null,
+                    me(), null,
                     new SessionAgent.Ref(runtime.service(AgentManagement.class).findByName(AGENT).orElseThrow().id()),
                     null, SessionDirectories.NONE).id().value();
             Adventure adventure = Adventure.start(scenario.get(), session, me().value());
@@ -178,7 +178,7 @@ public class DungeonController {
      */
     private String ask(String sessionId, String message) {
         TurnId turnId = runtime.turns().submit(TurnRequest.text(
-                ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId), message));
+                ai.mindconnect.agent.SessionId.of(sessionId), message));
         java.util.concurrent.CompletableFuture<Turn> ended = new java.util.concurrent.CompletableFuture<>();
         Subscription following = runtime.turns().subscribe(turnId, new TurnListener() {
             @Override

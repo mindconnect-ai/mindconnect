@@ -118,7 +118,7 @@ class ChatFileUploadSmokeTest {
         // else's, and with authentication off every request runs as the dev
         // user.
         ManagedAgent agent = agents.list().stream().findFirst().orElseThrow();
-        ManagedSession session = chats.open(ai.mindconnect.agent.AgentId.of(agent.id().value()),
+        ManagedSession session = chats.open(agent.id(),
                 UserId.of(SessionOwnership.ANONYMOUS_USER), null, null, java.util.List.of());
 
         String text = "Mindconnect upload smoke test.\n"
@@ -143,7 +143,7 @@ class ChatFileUploadSmokeTest {
                 .contains("attached");
         assertThat(patch).isNotEmpty();
 
-        Map<String, Long> attachments = sessionFiles.listAttachments(ai.mindconnect.agent.SessionId.of(session.id().value()));
+        Map<String, Long> attachments = sessionFiles.listAttachments(session.id());
         assertThat(attachments).as("one ingested file with chunks").hasSize(1);
         assertThat(attachments.values().iterator().next()).isGreaterThan(0L);
 

@@ -18,7 +18,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import ai.mindconnect.agent.management.adapter.FileAgentRepository;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;

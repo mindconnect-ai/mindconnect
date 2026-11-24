@@ -62,7 +62,7 @@ class ChatPageTypingBubbleTest {
         assertThat(JSON.valueToTree(page.streamStart("hello", TYPING)).toString())
                 .doesNotContain("AI is thinking");
 
-        assertThat(op(ops, "MERGE", ChatFormComponent.formId(ai.mindconnect.agent.SessionId.of(session.id().value()))))
+        assertThat(op(ops, "MERGE", ChatFormComponent.formId(session.id())))
                 .as("the composer switches without losing its textarea")
                 .isNotNull();
     }
@@ -92,10 +92,10 @@ class ChatPageTypingBubbleTest {
         for (var patch : new Object[]{page.streamDone(TYPING), page.streamError("boom", TYPING)}) {
             var ops = ops(patch);
             assertThat(op(ops, "REMOVE", TYPING)).isNotNull();
-            assertThat(op(ops, "MERGE", ChatFormComponent.formId(ai.mindconnect.agent.SessionId.of(session.id().value()))))
+            assertThat(op(ops, "MERGE", ChatFormComponent.formId(session.id())))
                     .as("back to Send by MERGE, so the text typed during the turn stays")
                     .isNotNull();
-            assertThat(op(ops, "REPLACE", ChatFormComponent.formId(ai.mindconnect.agent.SessionId.of(session.id().value())))).isNull();
+            assertThat(op(ops, "REPLACE", ChatFormComponent.formId(session.id()))).isNull();
         }
     }
 }

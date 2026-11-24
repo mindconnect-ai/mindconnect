@@ -111,7 +111,7 @@ public class ChatFilesUiController {
         var session = ownership.owned(sessionId, user).orElse(null);
         if (session == null) return false;
         if (session.attachments().stream().anyMatch(f -> fileId.equals(f.id()))) return true;
-        return sessionManagement.messages(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value())).stream()
+        return sessionManagement.messages(sessionId).stream()
                 .flatMap(m -> m.message().content().stream())
                 .map(part -> part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Image image ? image.source()
                         : part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Document document
@@ -188,7 +188,7 @@ public class ChatFilesUiController {
      */
     private UiPatch.Operation attachmentCountRefresh(SessionId sessionId) {
         var session = sessionManagement.find(
-                ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value())).orElse(null);
+                sessionId).orElse(null);
         var agent = session == null ? null
                 : ai.mindconnect.chatui.ui.component.ChatAgent.effective(sessionManagement, agents, session);
         // Whichever state the composer is in stays: a file attached mid-turn

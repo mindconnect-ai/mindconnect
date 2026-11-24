@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 

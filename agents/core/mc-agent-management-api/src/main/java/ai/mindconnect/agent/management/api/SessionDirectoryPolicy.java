@@ -2,8 +2,8 @@ package ai.mindconnect.agent.management.api;
 
 import java.util.Optional;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 
 /**
  * What an installation says about the directories of its sessions: which

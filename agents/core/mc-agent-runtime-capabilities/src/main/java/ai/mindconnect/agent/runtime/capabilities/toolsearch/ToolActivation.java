@@ -3,7 +3,7 @@ package ai.mindconnect.agent.runtime.capabilities.toolsearch;
 import java.util.Collection;
 import java.util.Set;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Which held-back tools a session has found. Kept per session and not per

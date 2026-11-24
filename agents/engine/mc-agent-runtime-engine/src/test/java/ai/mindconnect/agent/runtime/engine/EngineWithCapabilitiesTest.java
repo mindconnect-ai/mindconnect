@@ -46,7 +46,7 @@ import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.hook.TurnAdmission;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;

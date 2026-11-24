@@ -75,7 +75,7 @@ class AgentApiControllerOwnershipTest {
     }
 
     private List<ai.mindconnect.agent.management.api.ManagedSession> sessionsOf(String user) {
-        return management.list(ai.mindconnect.agent.runtime.api.domain.UserId.of(user));
+        return management.list(UserId.of(user));
     }
 
     @Test
@@ -144,8 +144,8 @@ class AgentApiControllerOwnershipTest {
                 .andExpect(jsonPath("$.compressedMessages").value(0));
         mvc.perform(delete("/api/sessions/{id}", alices)).andExpect(status().isNoContent());
 
-        org.mockito.Mockito.verify(sessionTurns).open(ai.mindconnect.agent.runtime.api.domain.SessionId.of(alices));
-        org.mockito.Mockito.verify(compaction).compact(ai.mindconnect.agent.runtime.api.domain.SessionId.of(alices));
+        org.mockito.Mockito.verify(sessionTurns).open(SessionId.of(alices));
+        org.mockito.Mockito.verify(compaction).compact(SessionId.of(alices));
         assertThat(sessionsOf("alice")).isEmpty();
     }
 

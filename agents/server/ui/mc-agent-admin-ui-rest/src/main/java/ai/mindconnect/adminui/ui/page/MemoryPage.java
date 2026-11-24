@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.ui.page;
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.MemoryDetailSectionComponent;
 import ai.mindconnect.adminui.ui.component.MemoryMasterListComponent;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;

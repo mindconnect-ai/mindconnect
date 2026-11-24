@@ -501,7 +501,7 @@ public class VectorStoreUiController {
         Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.management.api.ManagedSession>> chats = new java.util.HashMap<>();
         Map<String, ai.mindconnect.agent.management.api.ManagedSession> ownChats = new java.util.HashMap<>();
         for (var session : runtime.service(ai.mindconnect.agent.management.api.SessionManagement.class)
-                .list(ai.mindconnect.agent.runtime.api.domain.UserId.of(caller.value()))) {
+                .list(caller)) {
             ownChats.put(session.id().value(), session);
             for (var attached : session.attachments()) {
                 chats.computeIfAbsent(attached.id(), k -> new java.util.LinkedHashMap<>())

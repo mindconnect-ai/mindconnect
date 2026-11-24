@@ -11,7 +11,7 @@ import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;

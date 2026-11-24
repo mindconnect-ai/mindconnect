@@ -130,8 +130,8 @@ public final class AgentRuntimeBackend {
         return runtime.service(SessionManagement.class);
     }
 
-    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(String sessionId) {
-        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId);
+    private static SessionId runtimeId(String sessionId) {
+        return SessionId.of(sessionId);
     }
 
     private Optional<ManagedSession> ownedSession(String sessionId) {
@@ -173,7 +173,7 @@ public final class AgentRuntimeBackend {
             ManagedAgent agent = runtime.service(AgentManagement.class).findByName(agentName)
                     .orElseThrow(() -> new RuntimeBackendException("No agent named '" + agentName + "'"));
             return toProtocol(sessionManagement().open(
-                    ai.mindconnect.agent.runtime.api.domain.UserId.of(caller.get().value()), null,
+                    caller.get(), null,
                     new SessionAgent.Ref(agent.id()), null, SessionDirectories.NONE));
         }
 

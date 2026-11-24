@@ -7,7 +7,7 @@ import java.util.function.UnaryOperator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;

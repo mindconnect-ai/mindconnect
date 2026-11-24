@@ -43,29 +43,29 @@ class NamespaceWriteGuardTest {
     /** A store that records what reached it, so a refused write is visible as "nothing did". */
     private static final class Recording implements AgentManagement {
         final List<String> saved = new ArrayList<>();
-        final List<ai.mindconnect.agent.management.api.AgentId> deleted = new ArrayList<>();
+        final List<AgentId> deleted = new ArrayList<>();
 
         @Override public ManagedAgent create(ManagedAgent agent) {
             saved.add(agent.definition().name());
             return agent;
         }
 
-        @Override public ManagedAgent update(ai.mindconnect.agent.management.api.AgentId id, long expectedVersion,
+        @Override public ManagedAgent update(AgentId id, long expectedVersion,
                                              java.util.function.UnaryOperator<ManagedAgent> change) {
             saved.add(id.value());
             return null;
         }
 
-        @Override public ManagedAgent copy(ai.mindconnect.agent.management.api.AgentId id) {
+        @Override public ManagedAgent copy(AgentId id) {
             saved.add(id.value());
             return null;
         }
 
-        @Override public void delete(ai.mindconnect.agent.management.api.AgentId id) {
+        @Override public void delete(AgentId id) {
             deleted.add(id);
         }
 
-        @Override public Optional<ManagedAgent> find(ai.mindconnect.agent.management.api.AgentId id) {
+        @Override public Optional<ManagedAgent> find(AgentId id) {
             return Optional.empty();
         }
 
@@ -110,7 +110,7 @@ class NamespaceWriteGuardTest {
         assertThatThrownBy(() -> guarded.create(agent()))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("Only an admin of 'acme'");
-        assertThatThrownBy(() -> guarded.delete(ai.mindconnect.agent.management.api.AgentId.of("a1")))
+        assertThatThrownBy(() -> guarded.delete(AgentId.of("a1")))
                 .isInstanceOf(AccessDeniedException.class);
 
         assertThat(store.saved).isEmpty();
@@ -126,7 +126,7 @@ class NamespaceWriteGuardTest {
                 return List.of();
             }
             @Override public Optional<ai.mindconnect.agent.management.api.ManagedAgent> find(
-                    ai.mindconnect.agent.management.api.AgentId id) { return Optional.empty(); }
+                    AgentId id) { return Optional.empty(); }
             @Override public Optional<ai.mindconnect.agent.management.api.ManagedAgent> findByName(String name) {
                 return Optional.empty();
             }
@@ -136,23 +136,23 @@ class NamespaceWriteGuardTest {
                 return agent;
             }
             @Override public ai.mindconnect.agent.management.api.ManagedAgent update(
-                    ai.mindconnect.agent.management.api.AgentId id, long expectedVersion,
+                    AgentId id, long expectedVersion,
                     java.util.function.UnaryOperator<ai.mindconnect.agent.management.api.ManagedAgent> change) {
                 reached.add("update");
                 return null;
             }
             @Override public ai.mindconnect.agent.management.api.ManagedAgent copy(
-                    ai.mindconnect.agent.management.api.AgentId id) {
+                    AgentId id) {
                 reached.add("copy");
                 return null;
             }
-            @Override public void delete(ai.mindconnect.agent.management.api.AgentId id) {
+            @Override public void delete(AgentId id) {
                 reached.add("delete");
             }
         };
         var guarded = new GuardedRepositories.ManagedAgents(managed,
                 new NamespaceWriteGuard(namespaces, ScopeSupplier.fixed(Scope.of(ACME, ALICE))));
-        var id = ai.mindconnect.agent.management.api.AgentId.of("a1");
+        var id = AgentId.of("a1");
 
         assertThat(guarded.list()).isEmpty();
         assertThatThrownBy(() -> guarded.create(null)).isInstanceOf(AccessDeniedException.class);
@@ -169,7 +169,7 @@ class NamespaceWriteGuardTest {
 
         assertThat(guarded.list()).isEmpty();
         assertThat(guarded.findByName("helper")).isEmpty();
-        assertThat(guarded.find(ai.mindconnect.agent.management.api.AgentId.of("a1"))).isEmpty();
+        assertThat(guarded.find(AgentId.of("a1"))).isEmpty();
     }
 
     @Test

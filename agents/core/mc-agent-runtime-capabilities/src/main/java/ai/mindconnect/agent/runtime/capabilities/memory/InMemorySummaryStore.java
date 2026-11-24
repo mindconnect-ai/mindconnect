@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 
 /** Summaries that live as long as the process; a session summarised before a restart is summarised again. */

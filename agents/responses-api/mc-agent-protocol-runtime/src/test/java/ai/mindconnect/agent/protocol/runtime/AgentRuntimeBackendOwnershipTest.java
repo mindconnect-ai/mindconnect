@@ -73,7 +73,7 @@ class AgentRuntimeBackendOwnershipTest {
         Session session = backend.open("helper");
 
         assertThat(fixture.runtime().service(SessionManagement.class)
-                .find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(session.id())).orElseThrow()
+                .find(ai.mindconnect.agent.SessionId.of(session.id())).orElseThrow()
                 .userId().value()).isEqualTo("bob");
     }
 

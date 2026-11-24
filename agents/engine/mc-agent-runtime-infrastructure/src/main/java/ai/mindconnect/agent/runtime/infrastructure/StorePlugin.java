@@ -114,7 +114,7 @@ public abstract class StorePlugin implements Plugin {
         }
         // What is kept for one session goes with it.
         registry.contribute(SessionCleanup.class, session -> {
-            ai.mindconnect.agent.SessionId id = ai.mindconnect.agent.SessionId.of(session.id().value());
+            ai.mindconnect.agent.SessionId id = session.id();
             registry.get(TodoListRepository.class).deleteBySession(id);
             registry.get(LlmCallTraceRepository.class).deleteBySession(id);
         });

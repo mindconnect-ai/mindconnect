@@ -53,7 +53,7 @@ public class ToolResultDownloadController {
         if (ownership.owned(sessionId, user).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        return sessions.messages(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionIdValue)).stream()
+        return sessions.messages(SessionId.of(sessionIdValue)).stream()
                 .filter(message -> messageId.equals(message.id()))
                 .map(ManagedMessage::message)
                 .filter(message -> message.type() == TurnMessage.Type.TOOL_RESULT)

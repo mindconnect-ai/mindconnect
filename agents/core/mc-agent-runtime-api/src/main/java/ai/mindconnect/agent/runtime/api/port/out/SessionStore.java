@@ -7,7 +7,7 @@ import java.util.function.UnaryOperator;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 
 /**

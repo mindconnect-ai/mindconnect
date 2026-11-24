@@ -8,7 +8,7 @@ import java.util.List;
 
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelSettingsResolver;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.common.util.McEnv;

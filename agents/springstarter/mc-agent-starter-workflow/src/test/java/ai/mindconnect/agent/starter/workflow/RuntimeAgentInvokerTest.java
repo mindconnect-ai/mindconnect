@@ -36,7 +36,7 @@ import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;

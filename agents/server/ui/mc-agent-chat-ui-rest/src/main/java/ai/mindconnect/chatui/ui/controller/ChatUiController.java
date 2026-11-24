@@ -133,7 +133,7 @@ public class ChatUiController {
         // Headers for the sidebar; only the chat being shown is loaded whole.
         var sessions = chats(userId(user));
         var latest = ChatLanding.pick(sessions, lastShownChat(), this::written)
-                .flatMap(id -> sessionManagement.find(runtimeId(id)));
+                .flatMap(id -> sessionManagement.find(id));
         if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
             // tabs opening at once would each leave an empty chat behind. The
@@ -214,7 +214,7 @@ public class ChatUiController {
         var body = new FormBody(raw == null ? Map.of() : raw);
         String agentId = body.str("agentId");
         ManagedAgent picked = agentId == null || agentId.isBlank() ? null
-                : agents.find(ai.mindconnect.agent.management.api.AgentId.of(agentId)).orElse(null);
+                : agents.find(AgentId.of(agentId)).orElse(null);
         var effective = effective(session);
         AgentId bound = boundAgentId(session);
         var values = ai.mindconnect.chatui.ui.component.ChatSettingsComponent.valuesFor(picked, bound,
@@ -253,7 +253,7 @@ public class ChatUiController {
 
         var effective = effective(session);
         var def = agentId == null || agentId.isBlank() ? null
-                : agents.find(ai.mindconnect.agent.management.api.AgentId.of(agentId))
+                : agents.find(AgentId.of(agentId))
                         .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
         // Another agent takes the chat over as it is, which is what the picker promises. The agent the
         // chat already refers to stays referred to while the form says what the agent says; a model or
@@ -262,13 +262,13 @@ public class ChatUiController {
         boolean untouched = def != null && differing(body.str("systemPrompt"), def.definition().instructions()) == null
                 && differing(body.str("llmConfigName"), ChatAgent.model(def)) == null;
         if (another || untouched) {
-            sessionManagement.useAgent(runtimeId(sessionId), def.id());
+            sessionManagement.useAgent(sessionId, def.id());
         } else {
             own(session, effective, ChatAgent.withPromptAndModel(effective.definition(),
                     orKeep(body.str("systemPrompt"), effective.definition().instructions()),
                     orKeep(body.str("llmConfigName"), ChatAgent.model(effective))));
         }
-        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
+        var saved = sessionManagement.find(sessionId).orElseThrow();
         String userId = userId(user);
         return ResponseEntity.ok(
                 shell(saved, chats(userId)));
@@ -350,9 +350,9 @@ public class ChatUiController {
                                           @AuthenticationPrincipal OidcUser user) {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        sessionManagement.changeDirectories(runtimeId(sessionId),
+        sessionManagement.changeDirectories(sessionId,
                 new SessionDirectories(pathOf(raw), sessionOpt.get().directories().additional()));
-        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
+        var saved = sessionManagement.find(sessionId).orElseThrow();
         return ResponseEntity.ok(UiPatch.of()
                 .patch(UiPatch.Operation.remove("chat-dialog"))
                 .patch(composerRefresh(saved))
@@ -386,10 +386,10 @@ public class ChatUiController {
         String path = pathOf(raw);
         if (path == null) throw new IllegalArgumentException("Type or pick a directory to add first");
         var session = sessionOpt.get();
-        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.directories().working(),
+        sessionManagement.changeDirectories(sessionId, new SessionDirectories(session.directories().working(),
                 java.util.stream.Stream.concat(session.directories().additional().stream(), java.util.stream.Stream.of(path))
                         .toList()));
-        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
+        var saved = sessionManagement.find(sessionId).orElseThrow();
         return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId().value(), path))
                 .toast(ai.mindconnect.ui.model.UiToast.success("Added " + path).title("Additional directories")));
     }
@@ -402,9 +402,9 @@ public class ChatUiController {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
-        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.directories().working(),
+        sessionManagement.changeDirectories(sessionId, new SessionDirectories(session.directories().working(),
                 session.directories().additional().stream().filter(d -> !d.equals(path)).toList()));
-        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
+        var saved = sessionManagement.find(sessionId).orElseThrow();
         return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId().value(), saved.directories().working()))
                 .toast(ai.mindconnect.ui.model.UiToast.success("Removed " + path).title("Additional directories")));
     }
@@ -419,7 +419,7 @@ public class ChatUiController {
     private java.util.concurrent.CompletableFuture<String> startTurn(
             SessionId sessionId, List<ai.mindconnect.agent.loop.domain.ContentPart> input,
             SessionEventListener live) {
-        ai.mindconnect.agent.runtime.api.domain.SessionId chat = runtimeId(sessionId);
+        SessionId chat = sessionId;
         java.util.concurrent.CompletableFuture<String> answer = new java.util.concurrent.CompletableFuture<>();
         // Followed before the turn exists: a session's events are not replayed.
         // Both of the session's channels: the page draws what is written, and has to hear a turn die.
@@ -459,13 +459,9 @@ public class ChatUiController {
     }
 
     /** The card helpers know a sub-agent's run by a UUID; its session's id gives one. */
-    private static java.util.UUID taskOf(ai.mindconnect.agent.runtime.api.domain.SessionId subSession) {
+    private static java.util.UUID taskOf(SessionId subSession) {
         return java.util.UUID.nameUUIDFromBytes(
                 subSession.value().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-    }
-
-    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId sessionId) {
-        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value());
     }
 
     /** The chooser's form redrawn in place. */
@@ -539,11 +535,11 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String title = new FormBody(raw).str("title");
         if (title != null && !title.isBlank()) {
-            sessionManagement.rename(runtimeId(sessionId), title.trim());
+            sessionManagement.rename(sessionId, title.trim());
         }
         String userId = userId(user);
         var sessions = chats(userId);
-        var current = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
+        var current = sessionManagement.find(sessionId).orElseThrow();
         return ResponseEntity.ok(shell(current, sessions));
     }
 
@@ -559,7 +555,7 @@ public class ChatUiController {
         if (ownedSession(sessionId, user).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        sessionManagement.delete(runtimeId(sessionId));
+        sessionManagement.delete(sessionId);
         log.info("Chat {} deleted", sessionId);
 
         var sessions = chats(userId);
@@ -581,7 +577,7 @@ public class ChatUiController {
      */
     private java.util.Optional<ManagedSession> ownedSession(
             SessionId sessionId, OidcUser user) {
-        return sessionManagement.find(runtimeId(sessionId))
+        return sessionManagement.find(sessionId)
                 .filter(session -> SessionOwnership.owns(session, user));
     }
 
@@ -634,7 +630,7 @@ public class ChatUiController {
      * management API, which lists what the runtime and the chat both keep.
      */
     private List<ManagedSession> chats(String userId) {
-        return sessionManagement.list(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId)).stream()
+        return sessionManagement.list(UserId.of(userId)).stream()
                 .filter(session -> ManagedSession.CHAT.equals(session.type()))
                 .toList();
     }
@@ -696,7 +692,7 @@ public class ChatUiController {
     private ManagedSession openDefaultChat(String userId) {
         return agents.findByName(DEFAULT_CHAT_AGENT)
                 .map(agent -> chatOpener.open(ChatAgent.id(agent), UserId.of(userId), null, null, List.of()))
-                .orElseGet(() -> sessionManagement.open(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId),
+                .orElseGet(() -> sessionManagement.open(UserId.of(userId),
                         null, new SessionAgent.Own(fallbackChatAgent(), null), null, SessionDirectories.NONE));
     }
 
@@ -817,7 +813,7 @@ public class ChatUiController {
      * stored agent and changed since.
      */
     private AgentId boundAgentId(ManagedSession session) {
-        return session.agent() instanceof SessionAgent.Ref ref ? AgentId.of(ref.id().value()) : null;
+        return session.agent() instanceof SessionAgent.Ref ref ? ref.id() : null;
     }
 
     /**
@@ -894,7 +890,7 @@ public class ChatUiController {
                                                ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
         AgentId agentId = AgentId.of(agentIdValue);
         String userId = user.getPreferredUsername();
-        return agents.find(ai.mindconnect.agent.management.api.AgentId.of(agentId.value()))
+        return agents.find(agentId)
                 .map(agent -> {
                     var session = chatOpener.open(agentId, UserId.of(userId), type, null, List.of());
                     return ResponseEntity.ok(shell(session, historyOf(UserId.of(userId), session), history));
@@ -913,7 +909,7 @@ public class ChatUiController {
             return chats(userId.value());
         }
         String agentId = session.agentId().map(id -> id.value()).orElse(null);
-        return sessionManagement.list(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId.value())).stream()
+        return sessionManagement.list(userId).stream()
                 .filter(listed -> session.type().equals(listed.type())
                         && java.util.Objects.equals(listed.agentId().map(id -> id.value()).orElse(null), agentId))
                 .toList();
@@ -1204,11 +1200,11 @@ public class ChatUiController {
 
     /** A session and every session it started, deepest first; best effort. */
     private void deleteWithSubSessions(SessionId sessionId) {
-        for (ManagedSession child : sessionManagement.children(runtimeId(sessionId))) {
+        for (ManagedSession child : sessionManagement.children(sessionId)) {
             deleteWithSubSessions(SessionOwnership.idOf(child));
         }
         try {
-            sessionManagement.delete(runtimeId(sessionId));
+            sessionManagement.delete(sessionId);
         } catch (RuntimeException e) {
             log.warn("Could not delete test session {}: {}", sessionId, e.getMessage());
         }
@@ -1357,7 +1353,7 @@ public class ChatUiController {
     private java.util.Set<SessionId> runningSessions(List<ManagedSession> sessions) {
         java.util.Set<SessionId> running = new java.util.HashSet<>();
         for (var s : sessions) {
-            SessionId id = SessionId.of(s.id().value());
+            SessionId id = s.id();
             if (activeStreams.findHandle(ai.mindconnect.chatui.service.SessionOwnership.channelOf(id)).isPresent()) running.add(id);
         }
         return running;
@@ -1367,7 +1363,7 @@ public class ChatUiController {
     private java.util.Set<SessionId> waitingSessions(List<ManagedSession> sessions) {
         java.util.Set<SessionId> waiting = new java.util.HashSet<>();
         for (var s : sessions) {
-            SessionId id = SessionId.of(s.id().value());
+            SessionId id = s.id();
             if (!openApprovals(id).isEmpty()) waiting.add(id);
         }
         return waiting;
@@ -1384,7 +1380,7 @@ public class ChatUiController {
 
     /** The tool calls the session's turn waits for an approval of. */
     private List<Interruption> openApprovals(SessionId sessionId) {
-        return sessionTurns.open(runtimeId(sessionId)).stream()
+        return sessionTurns.open(sessionId).stream()
                 .filter(open -> Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null)
                 .toList();
     }
@@ -1427,7 +1423,7 @@ public class ChatUiController {
         if (toolCallId == null || toolCallId.isBlank()) return List.of();
         List<ManagedSession> children;
         try {
-            children = sessionManagement.children(runtimeId(parentSessionId)).stream()
+            children = sessionManagement.children(parentSessionId).stream()
                     .filter(s -> toolCallId.equals(s.metadata().get(SubAgentPlugin.OPENED_BY_CALL)))
                     .sorted(java.util.Comparator.comparing(
                             ManagedSession::createdAt))
@@ -1537,7 +1533,7 @@ public class ChatUiController {
                                            @AuthenticationPrincipal OidcUser user) {
         SessionId sessionId = SessionId.of(sessionIdValue);
         if (ownedSession(sessionId, user).isEmpty()) return ResponseEntity.notFound().build();
-        boolean cancelled = sessionTurns.cancel(runtimeId(sessionId));
+        boolean cancelled = sessionTurns.cancel(sessionId);
         log.info("DELETE /chat/api/sessions/{}/chat → cancelled={}", sessionId.value(), cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
@@ -1565,7 +1561,7 @@ public class ChatUiController {
         if (toSeq != Integer.MAX_VALUE) {
             throw new IllegalArgumentException("Messages are deleted from one on to the end of the conversation");
         }
-        sessionManagement.deleteMessagesFrom(runtimeId(sessionId), fromSeq);
+        sessionManagement.deleteMessagesFrom(sessionId, fromSeq);
 
         return ResponseEntity.ok(
                 buildChatPage(sessionOpt.get(), agentOpt.get()).headerOnly());
@@ -1615,7 +1611,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        boolean delivered = sessionTurns.answerApproval(runtimeId(sessionId), callId, approved,
+        boolean delivered = sessionTurns.answerApproval(sessionId, callId, approved,
                 "session".equalsIgnoreCase(scope)).isPresent();
         log.info("POST /chat/api/sessions/{}/approval call={} approved={} scope={} delivered={}",
                 sessionId.value(), callId, approved, scope, delivered);
@@ -1647,7 +1643,7 @@ public class ChatUiController {
 
         // Capture the user message at `seq` before we delete it — its parts,
         // so an image sent with it is sent again.
-        java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> parts = sessionManagement.messages(runtimeId(sessionId)).stream()
+        java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> parts = sessionManagement.messages(sessionId).stream()
                 .filter(m -> m.sequence() == seq)
                 .filter(m -> m.message().type() == ai.mindconnect.agent.loop.domain.TurnMessage.Type.USER)
                 .map(m -> m.message().content())
@@ -1663,7 +1659,7 @@ public class ChatUiController {
         // Drop this message and everything after it; the turn below re-adds
         // the user message fresh, so deleting from `seq` inclusive avoids a
         // duplicate. toSeq = MAX_VALUE → delete to the end.
-        sessionManagement.deleteMessagesFrom(runtimeId(sessionId), seq);
+        sessionManagement.deleteMessagesFrom(sessionId, seq);
         log.info("Regenerate session={} from seq={} (deleted to end, re-running turn)", sessionId, seq);
 
         // initialRefresh=true: push the trimmed conversation to the client
@@ -1763,7 +1759,7 @@ public class ChatUiController {
                 streamLabel,
                 returnHref,
                 java.time.Instant.now(),
-                () -> sessionTurns.cancel(runtimeId(sessionId)),
+                () -> sessionTurns.cancel(sessionId),
                 bus));
 
         // 0. Regenerate only: replace the message list with the trimmed
@@ -1874,10 +1870,10 @@ public class ChatUiController {
                         .map(ChatUiController::taskOf).orElse(null);
                 startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
                         liveTasks.containsKey("sub-" + caller) ? caller : null,
-                        taskId, started.agentName(), SessionId.of(started.sessionId().value()), "");
+                        taskId, started.agentName(), started.sessionId(), "");
             }
         };
-        java.util.function.BiConsumer<ai.mindconnect.agent.runtime.api.domain.SessionId, TurnEvent> onSubAgentEvent =
+        java.util.function.BiConsumer<SessionId, TurnEvent> onSubAgentEvent =
                 (subSession, event) -> {
             synchronized (liveLock) {
                 closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
@@ -1941,7 +1937,7 @@ public class ChatUiController {
                 }
             }
         };
-        ai.mindconnect.agent.runtime.api.domain.SessionId chat = runtimeId(sessionId);
+        SessionId chat = sessionId;
         java.util.concurrent.CompletableFuture<String> answer = turnStarter.apply(event -> {
             boolean own = event.sessionId().equals(chat);
             switch (event) {
@@ -2445,7 +2441,7 @@ public class ChatUiController {
     private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
             return runtime.service(ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection.class)
-                    .inspect(runtimeId(sessionId));
+                    .inspect(sessionId);
         } catch (Exception e) {
             log.warn("Failed to load working memory for session {}: {}", sessionId, e.getMessage());
             return null;

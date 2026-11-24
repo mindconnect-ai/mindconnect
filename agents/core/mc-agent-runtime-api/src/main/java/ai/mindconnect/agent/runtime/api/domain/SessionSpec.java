@@ -1,5 +1,9 @@
 package ai.mindconnect.agent.runtime.api.domain;
 
+import ai.mindconnect.agent.UserId;
+
+import ai.mindconnect.agent.SessionId;
+
 import java.util.Map;
 import java.util.Objects;
 

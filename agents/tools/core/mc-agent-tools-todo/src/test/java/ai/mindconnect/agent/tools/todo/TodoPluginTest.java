@@ -12,7 +12,7 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
 import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
@@ -70,7 +70,7 @@ class TodoPluginTest {
     }
 
     private void open(String content) {
-        service.replace(ai.mindconnect.agent.SessionId.of(SESSION.id().value()),
+        service.replace(SESSION.id(),
                 List.of(new TodoItem(UUID.randomUUID(), content, content, TodoStatus.PENDING, 0)));
     }
 

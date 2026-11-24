@@ -15,7 +15,7 @@ import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWorker;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;

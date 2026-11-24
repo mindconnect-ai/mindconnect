@@ -3,7 +3,7 @@ package ai.mindconnect.agent.runtime.capabilities.permission;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 
 /** Approvals that live as long as the process. */

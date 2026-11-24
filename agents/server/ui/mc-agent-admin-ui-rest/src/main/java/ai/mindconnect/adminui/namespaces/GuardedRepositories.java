@@ -52,20 +52,20 @@ public final class GuardedRepositories {
         }
 
         @Override
-        public ManagedAgent update(ai.mindconnect.agent.management.api.AgentId id, long expectedVersion,
+        public ManagedAgent update(AgentId id, long expectedVersion,
                                    UnaryOperator<ManagedAgent> change) {
             guard.requireAdmin("an agent");
             return delegate.update(id, expectedVersion, change);
         }
 
         @Override
-        public ManagedAgent copy(ai.mindconnect.agent.management.api.AgentId id) {
+        public ManagedAgent copy(AgentId id) {
             guard.requireAdmin("an agent");
             return delegate.copy(id);
         }
 
         @Override
-        public void delete(ai.mindconnect.agent.management.api.AgentId id) {
+        public void delete(AgentId id) {
             guard.requireAdmin("an agent");
             delegate.delete(id);
         }
@@ -76,7 +76,7 @@ public final class GuardedRepositories {
         }
 
         @Override
-        public Optional<ManagedAgent> find(ai.mindconnect.agent.management.api.AgentId id) {
+        public Optional<ManagedAgent> find(AgentId id) {
             return delegate.find(id);
         }
 

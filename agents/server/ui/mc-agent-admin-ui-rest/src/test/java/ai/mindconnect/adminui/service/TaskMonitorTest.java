@@ -96,8 +96,8 @@ class TaskMonitorTest {
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
                 new InMemoryAgentRepository(namespaces), SessionDirectoryPolicy.unrestricted(), List.of());
         new RepositorySessionStore(sessions, messages).create(new Session(
-                ai.mindconnect.agent.runtime.api.domain.SessionId.of(alices.value()),
-                ai.mindconnect.agent.runtime.api.domain.UserId.of("alice"), null,
+                alices,
+                UserId.of("alice"), null,
                 new AgentDefinition("Scout", "A test agent", "prompt", ModelSettings.NONE, List.of(), 5, Map.of()),
                 Map.of(ManagedSession.TITLE, "Alice asks"), Instant.now()));
         PluginRegistry registry = new DefaultPluginRegistry();

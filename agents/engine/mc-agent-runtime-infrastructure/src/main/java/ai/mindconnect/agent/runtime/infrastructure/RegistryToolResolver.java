@@ -92,7 +92,7 @@ final class RegistryToolResolver implements ToolResolver {
         if (session.parentId() != null || session.userId() == null) {
             return named;
         }
-        return userTools.get().apply(UserId.of(session.userId().value()), agentId(agent), named).stream()
+        return userTools.get().apply(session.userId(), agentId(agent), named).stream()
                 .filter(AgentTool::enabled)
                 .toList();
     }
@@ -129,9 +129,9 @@ final class RegistryToolResolver implements ToolResolver {
     }
 
     private static ToolCallScope scope(AgentDefinition agent, Session session) {
-        SessionId sessionId = SessionId.of(session.id().value());
+        SessionId sessionId = session.id();
         return new ToolCallScope(
-                UserId.of(session.userId().value()),
+                session.userId(),
                 sessionId,
                 agentId(agent),
                 sessionId,

@@ -40,7 +40,7 @@ final class RepositoryLlmCallTraceListener implements LlmCallTraceListener {
                         // Filed under the conversation the session's messages are in: where the traces page looks.
                         sessions.get().find(turn.sessionId()).map(RepositorySessionStore::conversationOf)
                                 .orElseGet(() -> ConversationId.of(turn.sessionId().value())),
-                        SessionId.of(turn.sessionId().value()),
+                        turn.sessionId(),
                         ChatTurnId.of(turnId.value()),
                         null, 0, turn.agent().name()),
                 event)));

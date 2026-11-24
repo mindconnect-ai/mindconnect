@@ -5,16 +5,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 
 /** The agents and sessions the chat's components are drawn from in a test. */
 public final class ChatFixture {

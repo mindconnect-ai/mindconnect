@@ -4,7 +4,7 @@ import java.util.function.Supplier;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.capabilities.permission.ApprovalMemory;
 

@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.capabilities.memory;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Summarises a session's earlier turns now, without waiting for a model

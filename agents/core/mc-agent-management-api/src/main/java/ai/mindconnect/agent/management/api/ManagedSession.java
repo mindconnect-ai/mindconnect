@@ -1,12 +1,14 @@
 package ai.mindconnect.agent.management.api;
 
+import ai.mindconnect.agent.AgentId;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 
 /**
  * A session as a list of sessions shows it and an operator handles it. The

@@ -13,7 +13,7 @@ import ai.mindconnect.adminui.ui.page.ToolDetailPage;
 import ai.mindconnect.adminui.ui.page.ToolFormPage;
 import ai.mindconnect.adminui.ui.component.AgentSetting;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionManagement;
@@ -140,7 +140,7 @@ public class AgentUiController {
 
     private ai.mindconnect.ui.model.UiNode memoryTab(ManagedAgent agent) {
         MemoryAdminUiController memory = memoryUi.getIfAvailable();
-        return memory == null ? null : memory.agentTab(ai.mindconnect.agent.AgentId.of(agent.id().value()),
+        return memory == null ? null : memory.agentTab(agent.id(),
                 AgentSetting.tools(agent)).orElse(null);
     }
 
@@ -149,7 +149,7 @@ public class AgentUiController {
                                                  @PathVariable("sessionId") String sessionIdValue,
                                                  @AuthenticationPrincipal OidcUser user) {
         String userId = user.getPreferredUsername();
-        var sessionId = ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionIdValue);
+        var sessionId = SessionId.of(sessionIdValue);
         // The tab lists the caller's sessions only; someone else's is answered like a missing one.
         if (sessions.find(sessionId).filter(session -> SessionOwnership.owns(session, user)).isEmpty()) {
             return ResponseEntity.notFound().build();

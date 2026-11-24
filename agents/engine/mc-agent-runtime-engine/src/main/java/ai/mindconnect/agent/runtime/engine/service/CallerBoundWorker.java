@@ -3,7 +3,7 @@ package ai.mindconnect.agent.runtime.engine.service;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
 import ai.mindconnect.taskqueue.TaskContext;

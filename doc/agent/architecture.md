@@ -63,8 +63,9 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
   - `mc-agents-parent/` — the area parent POM
   - `core/` — libraries (no runnable apps)
     - `mc-agent-domain`: the area's shared vocabulary, package `ai.mindconnect.agent` —
-      `Namespace`, `EntityId`, `UserId`, `AuthenticationInfo`, plus `AgentId` and
-      `SessionId` because the tool SPI needs them. Depends on `jackson-annotations` only. A
+      `Namespace`, `EntityId`, `UserId`, plus `AgentId` and `SessionId`: the tool SPI, the
+      runtime API (`mc-agent-runtime-api`) and the management API name a session, a user and
+      an agent by these, so nothing converts between them. Depends on `jackson-annotations` only. A
       type is admitted only when two modules that do not depend on each other need it; every
       other id record (`ConversationId`, `MessageId`, `LlmConfigId`, `FileId`, `AgentToolId`,
       …) lives in the module that owns its entity. Every entity is addressed by such a record

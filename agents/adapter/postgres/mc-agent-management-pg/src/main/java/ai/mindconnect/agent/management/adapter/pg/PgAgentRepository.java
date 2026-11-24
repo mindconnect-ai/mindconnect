@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;

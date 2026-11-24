@@ -42,7 +42,7 @@ final class ChatLanding {
         }
         return newestFirst.stream().limit(MAX_LOOKS)
                 .filter(chat -> titled(chat) || used.test(chat))
-                .map(chat -> SessionId.of(chat.id().value()))
+                .map(chat -> chat.id())
                 .findFirst();
     }
 

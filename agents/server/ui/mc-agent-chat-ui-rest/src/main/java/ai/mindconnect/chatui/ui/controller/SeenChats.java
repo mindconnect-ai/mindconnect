@@ -44,7 +44,7 @@ record SeenChats(Instant since, Set<String> shown) implements Serializable {
         return chats.stream()
                 .filter(chat -> chat.createdAt() != null && chat.createdAt().isAfter(since))
                 .filter(chat -> !shown.contains(chat.id().value()))
-                .map(chat -> SessionId.of(chat.id().value()))
+                .map(chat -> chat.id())
                 .collect(Collectors.toUnmodifiableSet());
     }
 }

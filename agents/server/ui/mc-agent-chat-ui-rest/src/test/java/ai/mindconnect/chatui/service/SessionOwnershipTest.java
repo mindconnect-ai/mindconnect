@@ -49,9 +49,9 @@ class SessionOwnershipTest {
     private final ManagedSession alices = opened("alice");
 
     private ManagedSession opened(String user) {
-        var id = ai.mindconnect.agent.runtime.api.domain.SessionId.of(java.util.UUID.randomUUID().toString());
+        var id = SessionId.of(java.util.UUID.randomUUID().toString());
         new RepositorySessionStore(stored, messages).create(new Session(id,
-                ai.mindconnect.agent.runtime.api.domain.UserId.of(user), null,
+                ai.mindconnect.agent.UserId.of(user), null,
                 new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5, Map.of()),
                 Map.of(), Instant.parse("2026-11-01T00:00:00Z")));
         return management.find(id).orElseThrow();

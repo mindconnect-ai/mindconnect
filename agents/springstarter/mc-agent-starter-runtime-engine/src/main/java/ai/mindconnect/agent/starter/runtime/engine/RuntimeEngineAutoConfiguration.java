@@ -42,7 +42,6 @@ import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.management.directory.DirectoryPlugin;
 import ai.mindconnect.agent.management.directory.SessionDirectoryCleanup;
 import ai.mindconnect.agent.management.directory.UserHome;
-import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.management.directory.WorkingDirBrowser;
 import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
 import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
@@ -212,8 +211,7 @@ public class RuntimeEngineAutoConfiguration {
                 .plugin(new TokenizerPlugin())
                 .plugin(new PermissionPlugin(PermissionEffect.DENY, new SessionApprovalMemory(sessions)))
                 .plugin(new MemoryPlugin(new SessionSummaryStore(sessions)))
-                .plugin(new PromptPlugin(Clock.systemUTC(), user -> userZones.zoneOf(
-                        user == null ? null : ai.mindconnect.agent.UserId.of(user.value()))));
+                .plugin(new PromptPlugin(Clock.systemUTC(), userZones::zoneOf));
         // Off unless the installation says so: deleting a chat must not take files with it.
         if (env.getProperty("mindconnect.sessions.delete-directory", Boolean.class, false)) {
             builder.plugin(provides("session-directory-cleanup", registry -> registry.contribute(

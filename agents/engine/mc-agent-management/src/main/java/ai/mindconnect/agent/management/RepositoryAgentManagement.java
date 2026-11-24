@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;

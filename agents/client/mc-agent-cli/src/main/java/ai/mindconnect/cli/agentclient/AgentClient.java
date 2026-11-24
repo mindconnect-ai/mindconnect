@@ -1,11 +1,11 @@
 package ai.mindconnect.cli.agentclient;
 
 import ai.mindconnect.agent.chat.stream.StreamEvent;
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;

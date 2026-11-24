@@ -4,7 +4,7 @@ import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -15,12 +15,12 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
@@ -154,7 +154,7 @@ public class LocalAgentClient implements AgentClient {
                     if (Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null) {
                         eventHandler.accept(new StreamEvent.ApprovalRequested(open.id(), open.call().callId(),
                                 open.call().toolName(), open.call().arguments(),
-                                ai.mindconnect.agent.SessionId.of(open.call().sessionId().value()), null));
+                                open.call().sessionId(), null));
                     }
                 }
                 // The turn waits: whoever draws the question answers it through answerApproval.

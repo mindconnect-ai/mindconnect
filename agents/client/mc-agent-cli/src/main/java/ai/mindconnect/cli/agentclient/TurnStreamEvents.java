@@ -63,7 +63,7 @@ final class TurnStreamEvents {
             Optional<Turn> turn = turns.find(TurnId.of(id));
             SubAgent seen = new SubAgent(UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)),
                     turn.map(found -> found.agent().name()).orElse("agent"),
-                    turn.map(found -> ai.mindconnect.agent.SessionId.of(found.sessionId().value())).orElse(null));
+                    turn.map(found -> found.sessionId()).orElse(null));
             events.accept(new StreamEvent.SubAgentStarted(seen.taskId(), seen.agentName(), 1, seen.sessionId(), null));
             return seen;
         });

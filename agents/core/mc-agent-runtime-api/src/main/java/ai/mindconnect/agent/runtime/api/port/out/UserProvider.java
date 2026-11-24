@@ -3,7 +3,7 @@ package ai.mindconnect.agent.runtime.api.port.out;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 
 /**
  * Says who is acting right now — on a server the user who is signed in,

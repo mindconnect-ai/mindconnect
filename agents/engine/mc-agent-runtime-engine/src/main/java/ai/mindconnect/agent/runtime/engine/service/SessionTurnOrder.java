@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.engine.service;
 
 import java.util.Optional;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.taskqueue.SharedStateStore;
 

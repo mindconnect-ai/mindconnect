@@ -5,7 +5,7 @@ import java.util.function.BooleanSupplier;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.port.out.TurnJournal;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 
 /**

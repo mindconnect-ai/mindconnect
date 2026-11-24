@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionAgent;
@@ -18,7 +18,7 @@ import ai.mindconnect.agent.management.tool.AgentToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
@@ -41,12 +41,12 @@ final class RuntimeAgentInvoker implements AgentInvoker {
     RuntimeAgentInvoker(AgentRuntime runtime, Duration timeout) {
         this.runtime = runtime;
         this.calls = new WorkflowAgentCalls(
-                name -> agents().findByName(name).map(agent -> ai.mindconnect.agent.AgentId.of(agent.id().value())),
+                name -> agents().findByName(name).map(agent -> agent.id()),
                 (agent, user) -> SessionId.of(runtime.service(SessionManagement.class).open(
-                        UserId.of(user.value()), null, new SessionAgent.Ref(AgentId.of(agent.value())),
+                        user, null, new SessionAgent.Ref(agent),
                         WorkflowAgentCalls.SESSION_TYPE, SessionDirectories.NONE).id().value()),
                 (session, message) -> new RuntimeChatTurn(runtime,
-                        ai.mindconnect.agent.runtime.api.domain.SessionId.of(session.value()), message),
+                        session, message),
                 timeout);
     }
 

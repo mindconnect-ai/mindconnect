@@ -230,7 +230,7 @@ public class SessionFilesUiController {
         var caller = currentUsers.current().orElse(null);
         if (caller == null) return Optional.empty();
         return runtime.service(SessionManagement.class)
-                .find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()))
+                .find(sessionId)
                 .filter(session -> session.userId() != null && caller.value().equals(session.userId().value()))
                 .map(session -> {
                     WorkspaceProvider provider = workspaces.getIfAvailable();
@@ -246,10 +246,10 @@ public class SessionFilesUiController {
     }
 
     private static ToolCallScope scope(ManagedSession session) {
-        SessionId id = SessionId.of(session.id().value());
-        return new ToolCallScope(ai.mindconnect.agent.UserId.of(session.userId().value()), id,
-                session.agentId().map(agent -> AgentId.of(agent.value())).orElse(null),
-                session.parentId() == null ? id : SessionId.of(session.parentId().value()),
+        SessionId id = session.id();
+        return new ToolCallScope(session.userId(), id,
+                session.agentId().orElse(null),
+                session.parentId() == null ? id : session.parentId(),
                 session.directories().working(), session.directories().additional());
     }
 

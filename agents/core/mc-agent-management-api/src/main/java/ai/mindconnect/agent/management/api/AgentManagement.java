@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.management.api;
 
+import ai.mindconnect.agent.AgentId;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;

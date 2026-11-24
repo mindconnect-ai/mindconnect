@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.management.api;
 
+import ai.mindconnect.agent.AgentId;
+
 import java.time.Instant;
 
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;

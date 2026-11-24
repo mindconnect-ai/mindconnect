@@ -87,10 +87,10 @@ public final class ChatPage {
                     MessageListComponent.SubAgentTreeProvider subAgentTree) {
         this.session = session;
         this.agent = agent;
-        this.sessionId = SessionId.of(session.id().value());
+        this.sessionId = session.id();
         this.messages = new MessageListComponent(sessionId, agent, history, memory, subAgentTree)
                 .withSessionTitle(session.title())
-                .withParentSession(session.parentId() == null ? null : SessionId.of(session.parentId().value()));
+                .withParentSession(session.parentId());
         this.chatForm = new ChatFormComponent(sessionId, ChatAgent.id(agent), streaming)
                 .withModelLabel(ChatAgent.model(agent))
                 .withAgentCounts(agent, List.of())
@@ -149,7 +149,7 @@ public final class ChatPage {
         boolean registryAgent = session.agent() == null || session.agent() instanceof SessionAgent.Ref;
         if (registryAgent && session.agentId().isPresent()) {
             String back = links.backHref(
-                    ai.mindconnect.agent.AgentId.of(session.agentId().get().value()), sessionId);
+                    session.agentId().get(), sessionId);
             if (back != null) {
                 items.add(ai.mindconnect.ui.model.UiMenuItem.link("back", "Back to agent", back)
                         .icon("back"));
@@ -220,7 +220,7 @@ public final class ChatPage {
      * Files land in the session's vector store via the ingestion workflow,
      * and vector_search activates for the session.
      */
-    public static ai.mindconnect.ui.model.UiUpload attachZone(ai.mindconnect.agent.SessionId sessionId) {
+    public static ai.mindconnect.ui.model.UiUpload attachZone(SessionId sessionId) {
         return attachZone(sessionId, false);
     }
 
@@ -233,7 +233,7 @@ public final class ChatPage {
      *                   from a document by its media type.
      */
     public static ai.mindconnect.ui.model.UiUpload attachZone(
-            ai.mindconnect.agent.SessionId sessionId, boolean imagesOnly) {
+            SessionId sessionId, boolean imagesOnly) {
         var zone = ai.mindconnect.ui.model.UiUpload
                 .of("chat-attach", null)
                 .multiple()

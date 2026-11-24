@@ -18,13 +18,13 @@ class ChatShellComponentHistoryTest {
 
     /** A chat as the management API lists it. */
     private static ManagedSession chat(SessionId id, String title, Instant startedAt) {
-        return new ManagedSession(ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value()),
-                ai.mindconnect.agent.runtime.api.domain.UserId.of("ada"), null, null, title, ManagedSession.CHAT,
+        return new ManagedSession(id,
+                ai.mindconnect.agent.UserId.of("ada"), null, null, title, ManagedSession.CHAT,
                 ManagedSession.Status.ACTIVE, SessionDirectories.NONE, startedAt, java.util.Map.of());
     }
 
     private static SessionId id(ManagedSession chat) {
-        return SessionId.of(chat.id().value());
+        return chat.id();
     }
 
     private final ManagedSession chat = chat(SessionId.of("s1"), "a talk", Instant.now());

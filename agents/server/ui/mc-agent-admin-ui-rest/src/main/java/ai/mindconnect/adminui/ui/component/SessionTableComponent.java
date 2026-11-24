@@ -10,7 +10,7 @@ import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionManagement;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiTable;
 

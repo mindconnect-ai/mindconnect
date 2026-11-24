@@ -24,6 +24,12 @@
     </description>
 
     <dependencies>
+        <!-- The ids every module shares: a session, a user, an agent are named the same everywhere. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-domain</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-loop-core</artifactId>

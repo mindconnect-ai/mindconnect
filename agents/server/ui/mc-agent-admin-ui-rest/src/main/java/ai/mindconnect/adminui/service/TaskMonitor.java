@@ -327,7 +327,7 @@ public class TaskMonitor implements TaskListener {
     private Optional<ManagedSession> findSession(SessionId id) {
         try {
             return runtime.service(SessionManagement.class)
-                    .find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value()));
+                    .find(id);
         } catch (RuntimeException e) {
             return Optional.empty();
         }

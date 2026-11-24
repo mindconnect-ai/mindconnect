@@ -12,7 +12,7 @@ import java.util.function.Function;
 
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.TokenCounter;

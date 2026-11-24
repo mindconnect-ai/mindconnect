@@ -204,7 +204,7 @@ public class AgentApiController {
     @DeleteMapping("/agents/{agentId}")
     public ResponseEntity<Void> deleteAgent(@PathVariable String agentId) {
         log.info("DELETE /api/agents/{}", agentId);
-        ai.mindconnect.agent.management.api.AgentId id = ai.mindconnect.agent.management.api.AgentId.of(agentId);
+        AgentId id = AgentId.of(agentId);
         if (agents().find(id).isEmpty()) return ResponseEntity.notFound().build();
         agents().delete(id);
         return ResponseEntity.noContent().build();
@@ -215,7 +215,7 @@ public class AgentApiController {
     @PostMapping("/agents/{agentId}/copy")
     public ResponseEntity<ManagedAgent> copyAgent(@PathVariable String agentId) {
         log.info("POST /api/agents/{}/copy", agentId);
-        ai.mindconnect.agent.management.api.AgentId id = ai.mindconnect.agent.management.api.AgentId.of(agentId);
+        AgentId id = AgentId.of(agentId);
         if (agents().find(id).isEmpty()) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(agents().copy(id));
     }
@@ -248,7 +248,7 @@ public class AgentApiController {
     @GetMapping("/agents/{agentId}")
     public ResponseEntity<ManagedAgent> findAgent(@PathVariable String agentId) {
         log.info("GET /api/agents/{}", agentId);
-        return agents().find(ai.mindconnect.agent.management.api.AgentId.of(agentId))
+        return agents().find(AgentId.of(agentId))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -260,7 +260,7 @@ public class AgentApiController {
     /** @param version the agent's version as the caller read it; {@code null} applies to the agent as stored */
     private ManagedAgent changeAgent(String agentId, Long version,
                                      java.util.function.UnaryOperator<ManagedAgent> change) {
-        ai.mindconnect.agent.management.api.AgentId id = ai.mindconnect.agent.management.api.AgentId.of(agentId);
+        AgentId id = AgentId.of(agentId);
         long expected = version != null ? version : agents().find(id)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "No such agent")).version();
@@ -322,7 +322,7 @@ public class AgentApiController {
         log.info("PUT /api/sessions/{}/working-dir workingDir={} additionalDirs={}", id, workingDir, additionalDirs);
         // Clearing counts as a choice too: it would take the chat out of its own directory.
         workingDirPolicy.requireChoice();
-        ManagedSession current = management.find(runtimeId(id)).orElseThrow();
+        ManagedSession current = management.find(id).orElseThrow();
         return answered(management.changeDirectories(current.id(), new SessionDirectories(
                 workingDir == null || workingDir.isBlank() ? null : workingDir,
                 additionalDirs == null ? current.directories().additional() : additionalDirs)));
@@ -339,7 +339,7 @@ public class AgentApiController {
     public List<SessionResponse> listSessions(@RequestParam String agentId, @CurrentUser UserId caller) {
         log.info("GET /api/sessions agentId={} user={}", agentId, caller);
         List<SessionResponse> sessions = management
-                .list(ai.mindconnect.agent.runtime.api.domain.UserId.of(caller.value())).stream()
+                .list(caller).stream()
                 .filter(session -> session.agentId().map(id -> id.value().equals(agentId)).orElse(false))
                 .map(this::answered).toList();
         log.info("Found {} session(s)", sessions.size());
@@ -429,7 +429,7 @@ public class AgentApiController {
      */
     private SseEmitter streamTurn(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
         SseEmitter emitter = new SseEmitter(120_000L);
-        frameStream.stream(runtimeId(sessionId), () -> Optional.of(sessionTurns.submit(runtimeId(sessionId),
+        frameStream.stream(sessionId, () -> Optional.of(sessionTurns.submit(sessionId,
                 parts.stream().map(AgentApiController::part).toList())), false, sinkTo(emitter, sessionId));
         return emitter;
     }
@@ -452,10 +452,6 @@ public class AgentApiController {
                 endStream(emitter, sessionId, error == null ? null : new IllegalStateException(error));
             }
         };
-    }
-
-    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId sessionId) {
-        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value());
     }
 
     /** A part of a message as the runtime takes it. */
@@ -555,7 +551,7 @@ public class AgentApiController {
                     + "loop reaches the next cancel-check point.")
     @DeleteMapping("/sessions/{sessionId}/chat")
     public ResponseEntity<Void> cancelChat(@PathVariable String sessionId, @CurrentUser UserId caller) {
-        boolean cancelled = sessionTurns.cancel(runtimeId(owned(sessionId, caller)));
+        boolean cancelled = sessionTurns.cancel(owned(sessionId, caller));
         log.info("DELETE /api/sessions/{}/chat → cancelled={}", sessionId, cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
@@ -581,7 +577,7 @@ public class AgentApiController {
         // The replay runs on the channel's drain thread and could outrun the
         // attached frame below — the latch holds event frames until it is out.
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        var attachment = frameStream.attach(runtimeId(id), afterSeq, event -> {
+        var attachment = frameStream.attach(id, afterSeq, event -> {
             try {
                 attachedSent.await();
                 emitter.send(SseEmitter.event().data(
@@ -628,7 +624,7 @@ public class AgentApiController {
     public ResponseEntity<Void> deleteSession(@PathVariable String sessionId, @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("DELETE /api/sessions/{}", sessionId);
-        management.delete(runtimeId(id));
+        management.delete(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -660,7 +656,7 @@ public class AgentApiController {
         SessionId id = owned(sessionId, caller);
         log.info("GET /api/sessions/{}/memory", sessionId);
         return WorkingMemoryResponse.of(runtime.service(MemoryInspection.class).inspect(
-                ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value())));
+                id));
     }
 
     @Operation(tags = "Sessions", summary = "Compress the session's working memory",
@@ -671,7 +667,7 @@ public class AgentApiController {
                                                               @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("POST /api/sessions/{}/compress", sessionId);
-        int compressed = compaction.compact(ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value()));
+        int compressed = compaction.compact(id);
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "compressedMessages", compressed));
@@ -704,7 +700,7 @@ public class AgentApiController {
                                                @RequestParam boolean approved,
                                                @RequestParam(defaultValue = "once") String scope,
                                                @CurrentUser UserId caller) {
-        boolean delivered = sessionTurns.answerApproval(runtimeId(owned(sessionId, caller)), callId, approved,
+        boolean delivered = sessionTurns.answerApproval(owned(sessionId, caller), callId, approved,
                 "session".equalsIgnoreCase(scope)).isPresent();
         log.info("POST /api/sessions/{}/approvals/{} approved={} scope={} → delivered={}",
                 sessionId, callId, approved, scope, delivered);
@@ -726,7 +722,7 @@ public class AgentApiController {
                                                                 @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         SseEmitter emitter = new SseEmitter(120_000L);
-        boolean continued = frameStream.stream(runtimeId(id), () -> sessionTurns.answerApproval(runtimeId(id),
+        boolean continued = frameStream.stream(id, () -> sessionTurns.answerApproval(id,
                 callId, approved, "session".equalsIgnoreCase(scope)), true, sinkTo(emitter, id));
         log.info("POST /api/sessions/{}/approvals/{}/continue approved={} scope={} → continued={}",
                 sessionId, callId, approved, scope, continued);
@@ -739,17 +735,17 @@ public class AgentApiController {
      */
     /** The conversation the session's messages are kept in. */
     private ConversationId conversationOf(SessionId sessionId) {
-        return runtime.sessions().find(runtimeId(sessionId)).map(RepositorySessionStore::conversationOf)
+        return runtime.sessions().find(sessionId).map(RepositorySessionStore::conversationOf)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "No such session"));
     }
 
     /** What the session's turn waits for, as the approval cards a client draws. */
     private List<ToolApproval> openApprovals(SessionId sessionId) {
-        return sessionTurns.open(runtimeId(sessionId)).stream()
+        return sessionTurns.open(sessionId).stream()
                 .filter(open -> Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null)
                 .map(open -> new ToolApproval(open.id(), open.call().callId(), open.call().toolName(),
-                        callJson(open), SessionId.of(open.call().sessionId().value()), sessionId, null, null))
+                        callJson(open), open.call().sessionId(), sessionId, null, null))
                 .toList();
     }
 

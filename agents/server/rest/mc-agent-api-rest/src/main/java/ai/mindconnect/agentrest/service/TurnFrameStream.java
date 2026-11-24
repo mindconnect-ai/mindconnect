@@ -12,7 +12,7 @@ import ai.mindconnect.agentrest.stream.TurnFrame;
 import ai.mindconnect.agentrest.stream.TurnFrameTranslator;
 import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;

@@ -38,11 +38,11 @@ public class ChatOpening {
     public ManagedSession open(AgentId agent, UserId user, String type, String workingDirectory,
                                List<String> additionalDirectories) {
         ManagedSession session = runtime.service(SessionManagement.class).open(
-                ai.mindconnect.agent.runtime.api.domain.UserId.of(user.value()), null,
-                new SessionAgent.Ref(ai.mindconnect.agent.management.api.AgentId.of(agent.value())), type,
+                user, null,
+                new SessionAgent.Ref(agent), type,
                 new SessionDirectories(workingDirectory,
                         additionalDirectories == null ? List.of() : additionalDirectories));
-        users.publish(user, new UserEvent.SessionStarted(SessionId.of(session.id().value()), agent, session.type()));
+        users.publish(user, new UserEvent.SessionStarted(session.id(), agent, session.type()));
         return session;
     }
 }

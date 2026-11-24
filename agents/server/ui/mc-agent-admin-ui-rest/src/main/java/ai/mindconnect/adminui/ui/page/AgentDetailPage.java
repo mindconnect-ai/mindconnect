@@ -62,7 +62,7 @@ public final class AgentDetailPage extends AdminPage {
      * detail page.
      */
     public UiPatch refreshSessions() {
-        var table = new SessionTableComponent(ai.mindconnect.agent.AgentId.of(agent.id().value()), userId,
+        var table = new SessionTableComponent(agent.id(), userId,
                 sessions);
         return patch(UiPatch.Operation.replace(table.id(), table.render()));
     }

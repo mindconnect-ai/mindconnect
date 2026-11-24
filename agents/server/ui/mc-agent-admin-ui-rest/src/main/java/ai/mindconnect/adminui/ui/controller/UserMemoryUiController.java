@@ -104,7 +104,7 @@ public class UserMemoryUiController {
         if (agents == null) return id -> null;
         return id -> {
             try {
-                return agents.find(ai.mindconnect.agent.management.api.AgentId.of(id.value()))
+                return agents.find(id)
                         .map(agent -> agent.definition().name()).orElse(null);
             } catch (RuntimeException e) {
                 return null;   // a name is a nicety; the id stands in

@@ -29,7 +29,7 @@ class AgentFormReviewerOptionsTest {
 
     private static ManagedAgent agent(String name, String group, List<String> reviewers,
                                       ManagedAgent.Status status) {
-        return new ManagedAgent(ai.mindconnect.agent.management.api.AgentId.of(AgentId.random().value()),
+        return new ManagedAgent(AgentId.random(),
                 new ai.mindconnect.agent.runtime.api.domain.AgentDefinition(name, "d", "prompt",
                         ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel("cfg"), List.of(), 5,
                         java.util.Map.of(ResponseReviewPlugin.REVIEWERS, reviewers)),

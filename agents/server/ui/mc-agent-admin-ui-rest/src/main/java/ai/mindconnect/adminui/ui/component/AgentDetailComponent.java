@@ -84,7 +84,7 @@ public final class AgentDetailComponent implements UiComponent {
                 ? SessionId.of(selectedRowId) : null;
 
         var toolTable    = new ToolTableComponent(agent, selectedToolId).render();
-        var sessionTable = new SessionTableComponent(ai.mindconnect.agent.AgentId.of(agent.id().value()), userId,
+        var sessionTable = new SessionTableComponent(agent.id(), userId,
                 sessions, selectedSessId).render();
 
         // The section's own title is a plain string — the renderer escapes it,

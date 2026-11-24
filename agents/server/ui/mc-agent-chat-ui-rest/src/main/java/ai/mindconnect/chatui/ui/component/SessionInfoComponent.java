@@ -72,7 +72,7 @@ public final class SessionInfoComponent implements UiComponent {
 
     /** The host's way back, or an inert entry when it offers none. */
     private UiLink backLink() {
-        String href = hostLinks.backHref(ChatAgent.id(agent), ai.mindconnect.agent.SessionId.of(session.id().value()));
+        String href = hostLinks.backHref(ChatAgent.id(agent), session.id());
         return href == null
                 ? UiLink.of("back", "", "")
                 : UiLink.of("back", href, "← Back to Agent");

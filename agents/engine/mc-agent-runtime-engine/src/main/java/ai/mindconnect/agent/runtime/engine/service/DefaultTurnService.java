@@ -10,7 +10,7 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;

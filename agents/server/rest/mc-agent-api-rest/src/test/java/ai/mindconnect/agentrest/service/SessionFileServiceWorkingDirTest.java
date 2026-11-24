@@ -140,7 +140,7 @@ class SessionFileServiceWorkingDirTest {
     }
 
     private static ai.mindconnect.agent.SessionId id(ManagedSession session) {
-        return ai.mindconnect.agent.SessionId.of(session.id().value());
+        return session.id();
     }
 
     private static String pathOf(ManagedSession session, String fileName) {
@@ -157,7 +157,7 @@ class SessionFileServiceWorkingDirTest {
 
         @Override
         public StoredFile save(String name, String contentType, InputStream content,
-                               ai.mindconnect.agent.UserId creator) throws IOException {
+                               UserId creator) throws IOException {
             return save(name, contentType, content);
         }
 

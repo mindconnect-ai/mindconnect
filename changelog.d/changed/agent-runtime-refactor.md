@@ -128,3 +128,8 @@
 - A namespace created again under the name of a deleted one is seeded like
   any new namespace; it came up empty until the next restart. The namespaces
   page says that a new namespace starts with the installation's content.
+- A session, a user and an agent have one id type each: the runtime API and
+  the management API use `SessionId`, `UserId` and `AgentId` of
+  `ai.mindconnect.agent` (`mc-agent-domain`); their own records of the same
+  name are gone. A session id and an agent id are lower-case letters, digits,
+  `.`, `_` and `-`, as everywhere else.

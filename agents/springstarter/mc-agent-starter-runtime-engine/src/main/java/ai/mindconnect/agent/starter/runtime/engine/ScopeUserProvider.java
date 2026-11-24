@@ -5,7 +5,7 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
 
 /**
@@ -25,13 +25,13 @@ final class ScopeUserProvider implements UserProvider {
 
     @Override
     public Optional<UserId> current() {
-        return scope.get().userIfAny().map(user -> UserId.of(user.value()));
+        return scope.get().userIfAny();
     }
 
     @Override
     public <T> T callAs(UserId user, Supplier<T> body) {
         try {
-            return scope.callIn(Scope.of(scope.namespace(), ai.mindconnect.agent.UserId.of(user.value())), body::get);
+            return scope.callIn(Scope.of(scope.namespace(), user), body::get);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

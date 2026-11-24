@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import ai.mindconnect.agent.runtime.api.domain.Turn;
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedSession;
 
 /**

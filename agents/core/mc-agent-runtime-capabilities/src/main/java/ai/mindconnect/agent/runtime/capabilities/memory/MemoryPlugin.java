@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.capabilities.memory;
 
 import java.util.UUID;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import java.util.ArrayList;
 import java.util.HashMap;

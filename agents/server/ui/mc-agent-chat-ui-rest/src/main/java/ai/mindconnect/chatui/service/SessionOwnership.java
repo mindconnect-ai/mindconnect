@@ -39,7 +39,7 @@ public class SessionOwnership {
     /** The session, if it exists and belongs to the caller. */
     public Optional<ManagedSession> owned(SessionId sessionId, OidcUser user) {
         return runtime.service(SessionManagement.class)
-                .find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()))
+                .find(sessionId)
                 .filter(session -> owns(session, user));
     }
 
@@ -61,7 +61,7 @@ public class SessionOwnership {
 
     /** The session's id as the chat's links, forms and channels carry it. */
     public static SessionId idOf(ManagedSession session) {
-        return SessionId.of(session.id().value());
+        return session.id();
     }
 
     /** The channel the chat page streams a session's turns on. */

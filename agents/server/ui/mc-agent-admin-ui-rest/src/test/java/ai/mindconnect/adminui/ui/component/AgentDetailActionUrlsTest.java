@@ -25,7 +25,7 @@ class AgentDetailActionUrlsTest {
     private static final AgentId AGENT_ID = AgentId.of("11111111-2222-3333-4444-555555555555");
 
     private static ManagedAgent agent() {
-        return new ManagedAgent(ai.mindconnect.agent.management.api.AgentId.of(AGENT_ID.value()),
+        return new ManagedAgent(AGENT_ID,
                 new ai.mindconnect.agent.runtime.api.domain.AgentDefinition("Scout", "A test agent", "prompt",
                         ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel("cfg"), List.of(), 5,
                         java.util.Map.of()),

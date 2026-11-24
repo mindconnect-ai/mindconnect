@@ -60,10 +60,6 @@ public class SessionUiController {
         this.conversations = conversations;
     }
 
-    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId id) {
-        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value());
-    }
-
     /** The agent the session runs as, for a dialog's heading; a session without one is still shown. */
     private String agentNameOf(ManagedSession session) {
         return sessions.agentOf(session.id()).map(AgentDefinition::name).orElse("(no agent)");
@@ -71,7 +67,7 @@ public class SessionUiController {
 
     /** The conversation a session's messages and traces are filed under; empty for a session that is gone. */
     private java.util.Optional<ConversationId> conversationOf(SessionId sessionId) {
-        return runtime.sessions().find(runtimeId(sessionId)).map(RepositorySessionStore::conversationOf);
+        return runtime.sessions().find(sessionId).map(RepositorySessionStore::conversationOf);
     }
 
     /**
@@ -99,7 +95,7 @@ public class SessionUiController {
     /** What the session's agent would be sent now, or null when that cannot be told. */
     private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
-            return runtime.service(MemoryInspection.class).inspect(runtimeId(sessionId));
+            return runtime.service(MemoryInspection.class).inspect(sessionId);
         } catch (Exception e) {
             log.warn("Failed to load working memory for session {}: {}", sessionId, e.getMessage());
             return null;
@@ -111,7 +107,7 @@ public class SessionUiController {
                                         @RequestParam(value = "seq", required = false) Integer seq,
                                         @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        return sessions.find(runtimeId(sessionId)).<ResponseEntity<?>>map(session -> {
+        return sessions.find(sessionId).<ResponseEntity<?>>map(session -> {
             var memory = safeMemorySnapshot(sessionId);
             if (memory == null) {
                 return ResponseEntity.status(503).body("Working memory unavailable for this session");
@@ -133,7 +129,7 @@ public class SessionUiController {
     public ResponseEntity<?> compressMemory(@PathVariable("sessionId") String sessionIdValue) {
         SessionId sessionId = SessionId.of(sessionIdValue);
         try {
-            runtime.service(MemoryCompaction.class).compact(runtimeId(sessionId));
+            runtime.service(MemoryCompaction.class).compact(sessionId);
         } catch (Exception e) {
             log.warn("Failed to compress memory for session {}: {}", sessionId, e.getMessage());
             return ResponseEntity.status(500).body("Compression failed: " + e.getMessage());
@@ -142,7 +138,7 @@ public class SessionUiController {
         if (memory == null) {
             return ResponseEntity.status(503).body("Working memory unavailable after compression");
         }
-        return sessions.find(runtimeId(sessionId))
+        return sessions.find(sessionId)
                 .<ResponseEntity<?>>map(session ->
                         ResponseEntity.ok(new MemoryPage(session.id(), agentNameOf(session), memory).render()))
                 .orElse(ResponseEntity.notFound().build());
@@ -161,7 +157,7 @@ public class SessionUiController {
             return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
         }
         List<LlmCallTraceHeader> traces = loadTraceHeaders(sessionId);
-        return sessions.find(runtimeId(sessionId))
+        return sessions.find(sessionId)
                 .<ResponseEntity<?>>map(session -> {
                     var page = new TracesPage(sessionId, agentNameOf(session), traces);
                     if (dialog) return sessionDialog(sessionId, "Traces", page.render());
@@ -271,7 +267,7 @@ public class SessionUiController {
     public ResponseEntity<?> getTodos(@PathVariable("sessionId") String sessionIdValue,
                                       @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        return sessions.find(runtimeId(sessionId))
+        return sessions.find(sessionId)
                 .<ResponseEntity<?>>map(session -> {
                     var list = todoListService.load(sessionId);
                     var page = new TodosPage(sessionId, agentNameOf(session), list).render();
@@ -306,8 +302,8 @@ public class SessionUiController {
             if (!visited.add(current)) continue;
             ordered.add(current);
             try {
-                for (ManagedSession sub : sessions.children(runtimeId(current))) {
-                    frontier.add(SessionId.of(sub.id().value()));
+                for (ManagedSession sub : sessions.children(current)) {
+                    frontier.add(sub.id());
                 }
             } catch (Exception e) {
                 log.warn("Failed to list sub-sessions of {}: {}", current, e.getMessage());

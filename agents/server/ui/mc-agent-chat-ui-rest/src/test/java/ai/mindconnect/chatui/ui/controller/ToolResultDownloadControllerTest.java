@@ -11,8 +11,8 @@ import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
@@ -95,9 +95,9 @@ class ToolResultDownloadControllerTest {
 
     @Test
     void theAddressNamesSessionAndMessage_andThereIsNoneWithoutAnId() {
-        assertThat(ToolResultDownloadController.url(ai.mindconnect.agent.SessionId.of("s1"), "m7"))
+        assertThat(ToolResultDownloadController.url(SessionId.of("s1"), "m7"))
                 .isEqualTo("/chat/api/sessions/s1/tool-results/m7");
-        assertThat(ToolResultDownloadController.url(ai.mindconnect.agent.SessionId.of("s1"), null)).isNull();
+        assertThat(ToolResultDownloadController.url(SessionId.of("s1"), null)).isNull();
     }
 
     private static OidcUser user(String name) {

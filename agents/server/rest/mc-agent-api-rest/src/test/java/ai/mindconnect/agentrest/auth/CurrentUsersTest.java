@@ -51,7 +51,7 @@ class CurrentUsersTest {
     void aSessionOpensOnlyForItsOwner() {
         var sessions = new ai.mindconnect.agentrest.SessionFixture();
         var alices = sessions.open("alice", null);
-        var id = ai.mindconnect.agent.SessionId.of(alices.id().value());
+        var id = alices.id();
         var access = new SessionAccess(sessions.runtime());
 
         assertThat(access.requireOwned(id, UserId.of("alice"))).isEqualTo(alices);

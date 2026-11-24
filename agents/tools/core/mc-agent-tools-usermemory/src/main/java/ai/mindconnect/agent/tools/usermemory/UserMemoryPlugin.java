@@ -66,7 +66,7 @@ public final class UserMemoryPlugin implements Plugin {
         // The write tool's setting decides when there is one: it is the tool that changes the memory.
         MemoryReach reach = MemoryReach.of(write.or(() -> read).orElseThrow().metadata().get(OVERRIDES)
                 instanceof Map<?, ?> overrides ? (Map<String, ?>) overrides : null);
-        return index.render(UserId.of(context.session().userId().value()),
+        return index.render(context.session().userId(),
                 agent.metadata().get(AGENT_ID) instanceof String id ? AgentId.of(id) : null, reach,
                 write.isPresent());
     }

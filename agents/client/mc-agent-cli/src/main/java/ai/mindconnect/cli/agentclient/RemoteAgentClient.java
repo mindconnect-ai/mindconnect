@@ -1,10 +1,10 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 
-import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.AgentId;
 
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -258,9 +258,9 @@ public class RemoteAgentClient implements AgentClient {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");
                 int depth = node.path("depth").asInt(0);
-                ai.mindconnect.agent.SessionId subSessionId = node.path("subSessionId").isMissingNode()
+                SessionId subSessionId = node.path("subSessionId").isMissingNode()
                         || node.path("subSessionId").isNull()
-                        ? null : ai.mindconnect.agent.SessionId.of(node.path("subSessionId").asText());
+                        ? null : SessionId.of(node.path("subSessionId").asText());
                 String input = node.path("text").isMissingNode() || node.path("text").isNull()
                         ? null : node.path("text").asText();
                 yield new StreamEvent.SubAgentStarted(taskId, agentName, depth, subSessionId, input);
@@ -268,8 +268,8 @@ public class RemoteAgentClient implements AgentClient {
             case "sub_agent_done" -> {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");
-                ai.mindconnect.agent.SessionId subSessionId =
-                        ai.mindconnect.agent.SessionId.of(node.path("subSessionId").asText());
+                SessionId subSessionId =
+                        SessionId.of(node.path("subSessionId").asText());
                 String finalText = node.path("finalText").isMissingNode()
                         || node.path("finalText").isNull()
                         ? null : node.path("finalText").asText();
@@ -296,7 +296,7 @@ public class RemoteAgentClient implements AgentClient {
                         node.path("text").asText(null),
                         node.path("toolName").asText(""),
                         Map.of(),
-                        origin == null || origin.isBlank() ? null : ai.mindconnect.agent.SessionId.of(origin),
+                        origin == null || origin.isBlank() ? null : SessionId.of(origin),
                         node.path("error").asText(null));
             }
             default -> null;

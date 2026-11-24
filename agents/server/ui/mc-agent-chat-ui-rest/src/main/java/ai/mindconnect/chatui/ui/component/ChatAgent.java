@@ -51,9 +51,9 @@ public final class ChatAgent {
         String id = runs.metadata().get(ManagedAgent.AGENT_ID) instanceof String stored ? stored
                 : chat.agentId().map(named -> named.value()).orElse(null);
         Optional<ManagedAgent> origin = id == null ? Optional.empty()
-                : agents.find(ai.mindconnect.agent.management.api.AgentId.of(id));
+                : agents.find(AgentId.of(id));
         Instant now = Instant.now();
-        return new ManagedAgent(id == null ? null : ai.mindconnect.agent.management.api.AgentId.of(id), runs,
+        return new ManagedAgent(id == null ? null : AgentId.of(id), runs,
                 origin.map(ManagedAgent::group).orElse(null), origin.map(ManagedAgent::icon).orElse(null),
                 origin.map(ManagedAgent::welcomeMessage).orElse(null), ManagedAgent.Status.ACTIVE, now, now, 1);
     }
@@ -77,7 +77,7 @@ public final class ChatAgent {
 
     /** The agent's id as the chat's links and forms carry it; {@code null} for an agent without one. */
     public static AgentId id(ManagedAgent agent) {
-        return agent == null || agent.id() == null ? null : AgentId.of(agent.id().value());
+        return agent == null ? null : agent.id();
     }
 
     /** The rubric of an agent that names none. */

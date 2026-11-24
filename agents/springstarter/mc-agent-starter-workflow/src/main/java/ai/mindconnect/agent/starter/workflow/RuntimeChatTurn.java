@@ -33,9 +33,9 @@ final class RuntimeChatTurn implements ChatTurnHandle {
     private final CompletableFuture<TurnResult> outcome = new CompletableFuture<>();
 
     /** Submits the message as a turn of the session and follows it. */
-    RuntimeChatTurn(AgentRuntime runtime, ai.mindconnect.agent.runtime.api.domain.SessionId session, String message) {
+    RuntimeChatTurn(AgentRuntime runtime, SessionId session, String message) {
         this.runtime = runtime;
-        this.sessionId = SessionId.of(session.value());
+        this.sessionId = session;
         // Followed before the turn starts: that it asks is told by its session, and only once.
         CompletableFuture<TurnId> started = new CompletableFuture<>();
         Subscription asking = runtime.sessions().lifecycle(session, false, event -> {
@@ -79,7 +79,7 @@ final class RuntimeChatTurn implements ChatTurnHandle {
         return interruptions.stream()
                 .filter(open -> open.call() != null)
                 .map(open -> new ToolApproval(open.id(), open.call().callId(), open.call().toolName(), "{}",
-                        SessionId.of(open.call().sessionId().value()), sessionId, null, null))
+                        open.call().sessionId(), sessionId, null, null))
                 .toList();
     }
 

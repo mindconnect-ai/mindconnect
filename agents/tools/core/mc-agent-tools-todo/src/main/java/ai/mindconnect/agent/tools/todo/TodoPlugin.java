@@ -29,7 +29,7 @@ public final class TodoPlugin implements Plugin {
         registry.provide(TodoListService.class, () -> new TodoListService(registry.get(TodoListRepository.class)));
         Supplier<TodoListService> service = registry.supplier(TodoListService.class);
         registry.contribute(PromptVariableProvider.class, (agent, session) ->
-                TodoPromptVariable.of(service.get().load(SessionId.of(session.id().value()))));
+                TodoPromptVariable.of(service.get().load(session.id())));
         registry.after(RuntimeHook.TOOL_CALL, (invocation, output) -> {
             String tool = invocation.call().toolName();
             // Not after a failure, and not after the todo tools: their own result already shows the list.
@@ -37,7 +37,7 @@ public final class TodoPlugin implements Plugin {
                     || TodoWriteTool.NAME.equals(tool) || TodoReadTool.NAME.equals(tool)) {
                 return output;
             }
-            TodoList list = service.get().load(SessionId.of(invocation.context().session().id().value()));
+            TodoList list = service.get().load(invocation.context().session().id());
             return list.hasOpenItems()
                     ? ToolOutput.ok(done.text() + "\n\n" + TodoContinuationAdvisor.hint(list)) : output;
         });

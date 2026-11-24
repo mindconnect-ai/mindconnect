@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.capabilities.memory;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Shows what a session's agent would be sent now. It only looks: nothing is

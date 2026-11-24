@@ -30,7 +30,7 @@ public class SessionAccess {
     /** The session, if it exists and belongs to {@code caller}. */
     public Optional<ManagedSession> owned(SessionId sessionId, UserId caller) {
         return runtime.service(SessionManagement.class)
-                .find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()))
+                .find(sessionId)
                 .filter(session -> session.userId() != null && caller.value().equals(session.userId().value()));
     }
 

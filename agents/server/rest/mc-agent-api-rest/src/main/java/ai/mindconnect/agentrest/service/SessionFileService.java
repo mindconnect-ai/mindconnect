@@ -94,14 +94,6 @@ public class SessionFileService {
         return runtime.service(SessionManagement.class);
     }
 
-    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId id) {
-        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value());
-    }
-
-    private static ai.mindconnect.agent.UserId userOf(ManagedSession session) {
-        return session.userId() == null ? null : ai.mindconnect.agent.UserId.of(session.userId().value());
-    }
-
     private java.util.Optional<Path> uploadsDir(ManagedSession session) {
         return userHome.uploadsDirOf(session.userId().value(), session.id().value());
     }
@@ -130,7 +122,7 @@ public class SessionFileService {
      */
     private boolean record(SessionId sessionId, SessionAttachment attached, java.util.Optional<Path> copy) {
         try {
-            ManagedSession session = sessions().attach(runtimeId(sessionId), attached);
+            ManagedSession session = sessions().attach(sessionId, attached);
             copy.map(c -> c.getParent().getParent().toString())
                     .filter(dir -> !reaches(session.directories(), Path.of(dir)))
                     .ifPresent(dir -> {
@@ -157,7 +149,7 @@ public class SessionFileService {
      * chunks each ingested file produced.
      */
     public List<SessionAttachment> attachments(SessionId sessionId) {
-        return sessions().find(runtimeId(sessionId)).map(ManagedSession::attachments).orElse(List.of());
+        return sessions().find(sessionId).map(ManagedSession::attachments).orElse(List.of());
     }
 
     /**
@@ -232,14 +224,14 @@ public class SessionFileService {
                 }
             }
         }
-        sessions().find(runtimeId(sessionId)).ifPresent(session -> uploadsDir(session).ifPresent(dir -> {
+        sessions().find(sessionId).ifPresent(session -> uploadsDir(session).ifPresent(dir -> {
             try {
                 Files.deleteIfExists(dir.resolve(fileName));
             } catch (java.io.IOException ignored) {
                 // The record and the entry are gone; a stale copy is harmless.
             }
         }));
-        sessions().detach(runtimeId(sessionId), fileName);
+        sessions().detach(sessionId, fileName);
     }
 
     /**
@@ -250,7 +242,7 @@ public class SessionFileService {
     private void activateViewer(SessionId sessionId) {
         ToolActivation activations = activationsProvider.getIfAvailable();
         if (activations != null) {
-            activations.activate(runtimeId(sessionId),
+            activations.activate(sessionId,
                     List.of("view_attachment"));
         }
     }
@@ -265,7 +257,7 @@ public class SessionFileService {
     private void activateFileTools(SessionId sessionId) {
         ToolActivation activations = activationsProvider.getIfAvailable();
         if (activations != null) {
-            activations.activate(runtimeId(sessionId), List.of("file_read", "file_list"));
+            activations.activate(sessionId, List.of("file_read", "file_list"));
         }
     }
 
@@ -286,7 +278,7 @@ public class SessionFileService {
     private AttachResult ingest(SessionId sessionId, StoredFile stored) {
         SessionAttachment attached = new SessionAttachment(stored.id().value(), stored.name(), stored.contentType(),
                 stored.size(), null);
-        var sessionOpt = sessions().find(runtimeId(sessionId));
+        var sessionOpt = sessions().find(sessionId);
         if (sessionOpt.isEmpty()) {
             return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
         }
@@ -352,7 +344,7 @@ public class SessionFileService {
                 try (InputStream content = fileStore.content(stored.id())) {
                     text = new String(content.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                 }
-                DirectIngestion.ingest(store, ref, userOf(session), "1", stored.name(), text);
+                DirectIngestion.ingest(store, ref, session.userId(), "1", stored.name(), text);
             } else {
                 WorkflowDataRepository workflows = workflowsProvider.getIfAvailable();
                 if (workflows == null) {
@@ -373,7 +365,7 @@ public class SessionFileService {
                 if (copy.isPresent()) {
                     Path sessionDir = copy.get().getParent().getParent();
                     String file = sessionDir.relativize(copy.get()).toString().replace('\\', '/');
-                    ToolCallScope scope = ToolCallScope.ofSession(userOf(session), sessionId, sessionDir.toString());
+                    ToolCallScope scope = ToolCallScope.ofSession(session.userId(), sessionId, sessionDir.toString());
                     result = scope.runWith(() -> executor.executeWorkflow(workflow,
                             Map.of("file", file, "store", storeName, "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(), scope)));
@@ -388,7 +380,7 @@ public class SessionFileService {
                             Map.of("file", spoolBase.relativize(target).toString(), "store", storeName,
                                     "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(),
-                                    new ToolCallScope(userOf(session), sessionId, null)));
+                                    new ToolCallScope(session.userId(), sessionId, null)));
                 }
                 if (!result.isSuccess()) {
                     return new AttachResult(stored, storeName, false,
@@ -399,7 +391,7 @@ public class SessionFileService {
             // on (persisted on the session), defaulting to exactly this store.
             ToolActivation activations = activationsProvider.getIfAvailable();
             if (activations != null) {
-                activations.activate(runtimeId(sessionId), List.of("vector_search"));
+                activations.activate(sessionId, List.of("vector_search"));
             }
             if (copy.isPresent()) activateFileTools(sessionId);
             if (attached.isPdf()) activateViewer(sessionId);

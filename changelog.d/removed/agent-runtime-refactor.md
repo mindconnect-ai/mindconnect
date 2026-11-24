@@ -11,3 +11,4 @@
   old, replaced in the model's context by a note it can be read again from.
 - Data only the earlier runtime wrote — working-memory snapshots, conversation
   summaries — is no longer taken over on first access.
+- `AuthenticationInfo` (`mc-agent-domain`), which nothing used.

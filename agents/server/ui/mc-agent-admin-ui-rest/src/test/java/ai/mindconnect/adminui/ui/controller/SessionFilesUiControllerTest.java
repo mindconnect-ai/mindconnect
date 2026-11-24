@@ -73,9 +73,9 @@ class SessionFilesUiControllerTest {
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
                 new InMemoryAgentRepository(NamespaceProvider.fixed("test")), SessionDirectoryPolicy.unrestricted(),
                 List.of());
-        var id = ai.mindconnect.agent.runtime.api.domain.SessionId.of("s1");
+        var id = ai.mindconnect.agent.SessionId.of("s1");
         new RepositorySessionStore(sessions, messages).create(new Session(id,
-                ai.mindconnect.agent.runtime.api.domain.UserId.of("alice"), null, HELPER,
+                UserId.of("alice"), null, HELPER,
                 Map.of(ManagedSession.WORKING_DIRECTORY, root), Instant.parse("2026-11-01T00:00:00Z")));
         session = management.find(id).orElseThrow();
 

@@ -57,7 +57,7 @@ final class UserEventFeed implements SessionEventListener {
             return;
         }
         UserId user = sessions.get().find(started.sessionId())
-                .map(session -> UserId.of(session.userId().value())).orElseThrow();
+                .map(session -> session.userId()).orElseThrow();
         underway.put(turnId, user);
         users.publish(user, new UserEvent.TurnStarted(chat(started), ChatTurnId.of(turnId.value())));
     }
@@ -91,6 +91,6 @@ final class UserEventFeed implements SessionEventListener {
     }
 
     private static SessionId chat(SessionEvent event) {
-        return SessionId.of(event.sessionId().value());
+        return event.sessionId();
     }
 }

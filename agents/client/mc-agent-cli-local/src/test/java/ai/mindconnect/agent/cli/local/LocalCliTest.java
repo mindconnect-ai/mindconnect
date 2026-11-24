@@ -24,7 +24,7 @@ import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
 import ai.mindconnect.agent.sdk.AgentRuntime;

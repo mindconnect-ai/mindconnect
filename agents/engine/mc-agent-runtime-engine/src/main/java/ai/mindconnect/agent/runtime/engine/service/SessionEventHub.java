@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionLifecycleListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionStreamListener;

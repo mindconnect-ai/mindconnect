@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.capabilities.permission;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 
 /** The approvals a user gave "for the rest of this session", so the same tool does not ask twice. */
 public interface ApprovalMemory {

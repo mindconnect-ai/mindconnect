@@ -4,7 +4,7 @@ import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.ui.model.UiList;
 
-import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.SessionId;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.previewOf;
 
