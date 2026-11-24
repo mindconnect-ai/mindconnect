@@ -165,7 +165,7 @@ class LlmConfigFormLmStudioTest {
         assertThat(prefill.capabilities()).containsExactly(LlmCapability.TOOL_CALLING);
         assertThat(prefill.hint()).contains("32768").contains("131072");
 
-        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, null, prefill);
+        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, null, prefill, List.of());
         assertThat(field(chat, "contextWindowTokens").getValue()).isEqualTo(32768);
         assertThat(field(chat, "contextWindowTokens").getHint()).startsWith("From LM Studio");
         assertThat(field(chat, "capabilities").getValue()).isEqualTo(List.of("TOOL_CALLING"));
@@ -177,7 +177,7 @@ class LlmConfigFormLmStudioTest {
         assertThat(vision.hint()).contains("not loaded");
 
         UiFieldGroup embedding = LlmConfigFormComponent.typeGroup(LlmConfigType.EMBEDDING, null,
-                LlmConfigFormComponent.ModelPrefill.of(NOMIC));
+                LlmConfigFormComponent.ModelPrefill.of(NOMIC), List.of());
         assertThat(field(embedding, "contextWindowTokens").getValue()).isEqualTo(2048);
     }
 
@@ -185,7 +185,7 @@ class LlmConfigFormLmStudioTest {
     void withoutAPrefillTheConfigsOwnValuesShow() {
         LlmConfig config = LlmConfig.lmStudio("lm", "openai/gpt-oss-120b", "http://localhost:1234");
 
-        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, config, null);
+        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, config, null, List.of());
         assertThat(field(chat, "contextWindowTokens").getValue()).isEqualTo(config.contextWindowTokens());
         assertThat(field(chat, "contextWindowTokens").getHint()).doesNotContain("LM Studio");
         assertThat(field(chat, "capabilities").getValue())
@@ -201,7 +201,7 @@ class LlmConfigFormLmStudioTest {
         String withCatalog = mapper.writeValueAsString(
                 new LlmConfigFormComponent(config, List.of(config), ModelChoices.ofLmStudio(CATALOG)).render());
         String withoutCatalog = mapper.writeValueAsString(
-                new LlmConfigFormComponent(config, List.of(config)).render());
+                new LlmConfigFormComponent(config, List.of(config), ModelChoices.none()).render());
 
         assertThat(withCatalog).contains("google/gemma-4-e4b").doesNotContain("\"apiKey\"");
         assertThat(withoutCatalog).doesNotContain("google/gemma-4-e4b").doesNotContain("\"apiKey\"");

@@ -13,7 +13,6 @@ ai.mindconnect.adminui.ui.component.AgentDetailComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.AgentFormComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.AgentListComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.ExtensionListComponent has 3 constructors
-ai.mindconnect.adminui.ui.component.LlmConfigFormComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.SessionTableComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.ToolCatalogComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.ToolCatalogComponent$Entry has 3 constructors

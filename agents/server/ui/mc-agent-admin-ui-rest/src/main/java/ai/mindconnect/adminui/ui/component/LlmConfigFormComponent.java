@@ -39,15 +39,9 @@ public final class LlmConfigFormComponent implements UiComponent {
     /**
      * @param config     the config being edited, or {@code null} for the "new config" form
      * @param allConfigs all stored configs — used to populate the "Delegates To" dropdown
-     */
-    public LlmConfigFormComponent(LlmConfig config, List<LlmConfig> allConfigs) {
-        this(config, allConfigs, ModelChoices.none());
-    }
-
-    /**
-     * @param models the model list for the config's provider — LM Studio's
-     *               catalog, the provider's own listing, or
-     *               {@link ModelChoices#none()} when the Model field stays text
+     * @param models     the model list for the config's provider — LM Studio's
+     *                   catalog, the provider's own listing, or
+     *                   {@link ModelChoices#none()} when the Model field stays text
      */
     public LlmConfigFormComponent(LlmConfig config, List<LlmConfig> allConfigs, ModelChoices models) {
         this.config = config;
@@ -136,12 +130,7 @@ public final class LlmConfigFormComponent implements UiComponent {
      * the field), with a trailing Encrypt helper that turns a freshly typed
      * plain key into its {@code enc:} form via the server. Also rebuilt by
      * the {@code /encrypt-key} patch endpoint, hence static.
-     */
-    public static UiField apiKeyField(String value, String formId) {
-        return apiKeyField(value, formId, null, null);
-    }
-
-    /**
+     *
      * @param configId the config being edited, so the Encrypt round-trip can rebuild this
      *                 same field; {@code null} on the "new config" form
      * @param swapUrl  the field-groups endpoint, so that entering a key reloads the
@@ -175,21 +164,9 @@ public final class LlmConfigFormComponent implements UiComponent {
      * declaration; an embedding model only needs its input window; a
      * speech-to-text model needs neither — its knobs are the provider
      * parameters below.
-     */
-    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(LlmConfigType type, LlmConfig config) {
-        return typeGroup(type, config, null, List.of());
-    }
-
-    /**
-     * @param prefill values picked up from LM Studio for the model just
-     *                chosen, or {@code null} to show the config's own
-     */
-    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(LlmConfigType type, LlmConfig config,
-                                                                 ModelPrefill prefill) {
-        return typeGroup(type, config, prefill, List.of());
-    }
-
-    /**
+     *
+     * @param prefill    values picked up from LM Studio for the model just
+     *                   chosen, or {@code null} to show the config's own
      * @param allConfigs every stored config — the choices for the fallback
      *                   models a rate-limited call switches to
      */
