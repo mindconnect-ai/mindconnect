@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service;
+package ai.mindconnect.agent.management.directory;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,14 +11,14 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** A session's directories as a file explorer sees them: listed, opened, and never left. */
-class SessionDirectoriesTest {
+class SessionFileBrowserTest {
 
     @TempDir
     Path tmp;
 
     Path work;
     Path outside;
-    SessionDirectories dirs;
+    SessionFileBrowser dirs;
     String root;
 
     @BeforeEach
@@ -29,7 +29,7 @@ class SessionDirectoriesTest {
         Files.createDirectories(work.resolve("out/charts"));
         Files.writeString(work.resolve("report.md"), "# Report");
         Files.writeString(work.resolve("out/data.csv"), "a,b\n1,2\n");
-        dirs = new SessionDirectories(List.of(work));
+        dirs = new SessionFileBrowser(List.of(work), java.util.Map.of());
         root = work.toString();
     }
 
@@ -38,7 +38,7 @@ class SessionDirectoriesTest {
         var listing = dirs.list(root, "").orElseThrow();
 
         assertThat(listing.path()).isEmpty();
-        assertThat(listing.entries()).extracting(SessionDirectories.Entry::name)
+        assertThat(listing.entries()).extracting(SessionFileBrowser.Entry::name)
                 .containsExactly("out", "report.md");
         var report = listing.entries().get(1);
         assertThat(report.directory()).isFalse();
@@ -52,7 +52,7 @@ class SessionDirectoriesTest {
         var listing = dirs.list(root, "out").orElseThrow();
 
         assertThat(listing.path()).isEqualTo("out");
-        assertThat(listing.entries()).extracting(SessionDirectories.Entry::path)
+        assertThat(listing.entries()).extracting(SessionFileBrowser.Entry::path)
                 .containsExactly("out/charts", "out/data.csv");
         assertThat(dirs.file(root, "out/data.csv")).contains(work.resolve("out/data.csv"));
         assertThat(dirs.file(root, "out")).as("a folder is no file").isEmpty();
@@ -81,7 +81,7 @@ class SessionDirectoriesTest {
         Files.createSymbolicLink(work.resolve("escape-dir"), outside);
         Files.createSymbolicLink(work.resolve("inside.md"), work.resolve("report.md"));
 
-        assertThat(dirs.list(root, "").orElseThrow().entries()).extracting(SessionDirectories.Entry::name)
+        assertThat(dirs.list(root, "").orElseThrow().entries()).extracting(SessionFileBrowser.Entry::name)
                 .containsExactly("out", "inside.md", "report.md");
         assertThat(dirs.file(root, "escape.txt")).isEmpty();
         assertThat(dirs.list(root, "escape-dir")).isEmpty();
@@ -92,7 +92,7 @@ class SessionDirectoriesTest {
 
     @Test
     void missingRootsAreLeftOut_andDuplicatesFolded() {
-        var withGaps = new SessionDirectories(List.of(work, tmp.resolve("gone"), work, outside));
+        var withGaps = new SessionFileBrowser(List.of(work, tmp.resolve("gone"), work, outside), java.util.Map.of());
 
         assertThat(withGaps.roots()).containsExactly(work, outside);
     }
@@ -100,13 +100,13 @@ class SessionDirectoriesTest {
     @Test
     void aVeryLargeFolderIsCut() throws Exception {
         Path big = Files.createDirectories(work.resolve("big"));
-        for (int i = 0; i <= SessionDirectories.MAX_ENTRIES; i++) {
+        for (int i = 0; i <= SessionFileBrowser.MAX_ENTRIES; i++) {
             Files.writeString(big.resolve("f" + i + ".txt"), "");
         }
 
         var listing = dirs.list(root, "big").orElseThrow();
 
-        assertThat(listing.entries()).hasSize(SessionDirectories.MAX_ENTRIES);
+        assertThat(listing.entries()).hasSize(SessionFileBrowser.MAX_ENTRIES);
         assertThat(listing.truncated()).isTrue();
     }
 
@@ -118,13 +118,13 @@ class SessionDirectoriesTest {
         Files.writeString(remote.resolve("deck/sales.pptx"), "pptx-bytes");
         var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
                 ai.mindconnect.agent.tool.FileRoots.of(remote));
-        SessionDirectories dirs = new SessionDirectories(List.of(work), java.util.Map.of("/workspace", workspace));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(work), java.util.Map.of("/workspace", workspace));
 
         assertThat(dirs.roots()).containsExactly(Path.of("/workspace"), work);
         assertThat(dirs.list("/workspace", "").orElseThrow().entries())
-                .extracting(SessionDirectories.Entry::name).containsExactly("deck");
+                .extracting(SessionFileBrowser.Entry::name).containsExactly("deck");
         assertThat(dirs.list("/workspace", "deck").orElseThrow().entries())
-                .extracting(SessionDirectories.Entry::path).containsExactly("deck/sales.pptx");
+                .extracting(SessionFileBrowser.Entry::path).containsExactly("deck/sales.pptx");
         var content = dirs.open("/workspace", "deck/sales.pptx").orElseThrow();
         assertThat(content.size()).isEqualTo(10);
         assertThat(new String(content.stream().readAllBytes())).isEqualTo("pptx-bytes");
@@ -175,14 +175,14 @@ class SessionDirectoriesTest {
     @Test
     void aFolderWithTooManyFilesIsTooLargeToZip() throws Exception {
         Path big = Files.createDirectories(work.resolve("big"));
-        for (int i = 0; i <= SessionDirectories.MAX_ARCHIVE_FILES; i++) {
+        for (int i = 0; i <= SessionFileBrowser.MAX_ARCHIVE_FILES; i++) {
             Files.createFile(big.resolve("f" + i));
         }
 
         var archive = dirs.archive(root, "big").orElseThrow();
 
         assertThat(archive.tooLarge()).isTrue();
-        assertThat(archive.files()).isEqualTo(SessionDirectories.MAX_ARCHIVE_FILES);
+        assertThat(archive.files()).isEqualTo(SessionFileBrowser.MAX_ARCHIVE_FILES);
     }
 
     @Test
@@ -194,7 +194,7 @@ class SessionDirectoriesTest {
         Files.writeString(remote.resolve("deck/sales.pptx"), "pptx-bytes");
         var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
                 ai.mindconnect.agent.tool.FileRoots.of(remote));
-        SessionDirectories dirs = new SessionDirectories(List.of(), java.util.Map.of("/workspace", workspace));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(), java.util.Map.of("/workspace", workspace));
 
         var whole = dirs.archive("/workspace", "").orElseThrow();
         assertThat(whole.name()).isEqualTo("workspace.zip");
@@ -210,7 +210,7 @@ class SessionDirectoriesTest {
     @Test
     void textPreviewsAsText_binaryAndLargeFilesDoNot() throws Exception {
         Files.write(work.resolve("out/chart.png"), new byte[]{(byte) 0x89, 'P', 'N', 'G', 0, 1});
-        Files.write(work.resolve("out/big.txt"), new byte[SessionDirectories.MAX_EDIT_BYTES + 1]);
+        Files.write(work.resolve("out/big.txt"), new byte[SessionFileBrowser.MAX_EDIT_BYTES + 1]);
         Files.write(work.resolve("out/latin1.txt"), new byte[]{'M', (byte) 0xFC, 'l', 'l'});
 
         var report = dirs.preview(root, "report.md").orElseThrow();
@@ -239,7 +239,7 @@ class SessionDirectoriesTest {
         assertThat(dirs.write(root, "escape.txt", "mine")).isEmpty();
         assertThat(Files.readString(outside.resolve("secret.txt"))).isEqualTo("not yours");
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-                        dirs.write(root, "report.md", "x".repeat(SessionDirectories.MAX_EDIT_BYTES + 1)))
+                        dirs.write(root, "report.md", "x".repeat(SessionFileBrowser.MAX_EDIT_BYTES + 1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -289,7 +289,7 @@ class SessionDirectoriesTest {
         Files.writeString(remote.resolve("deck/notes.md"), "draft");
         var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
                 ai.mindconnect.agent.tool.FileRoots.of(remote));
-        SessionDirectories dirs = new SessionDirectories(List.of(), java.util.Map.of("/workspace", workspace));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(), java.util.Map.of("/workspace", workspace));
 
         assertThat(dirs.preview("/workspace", "deck/notes.md").orElseThrow().text()).isEqualTo("draft");
         assertThat(dirs.write("/workspace", "deck/notes.md", "final")).isPresent();
@@ -317,7 +317,7 @@ class SessionDirectoriesTest {
         Files.writeString(remote.resolve("deck/.home/notes.md"), "the session's own");
         var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
                 ai.mindconnect.agent.tool.FileRoots.of(remote));
-        SessionDirectories dirs = new SessionDirectories(List.of(), java.util.Map.of("/workspace", workspace));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(), java.util.Map.of("/workspace", workspace));
 
         for (String internal : List.of(".home", ".home/.ssh", "/.mc", "deck/../.home", "./.mc")) {
             assertThat(dirs.list("/workspace", internal)).as("list %s", internal).isEmpty();
@@ -329,7 +329,7 @@ class SessionDirectoriesTest {
 
         assertThat(dirs.list("/workspace", "deck").orElseThrow().entries())
                 .as("only the root's folders of that name are the environment's")
-                .extracting(SessionDirectories.Entry::path).containsExactly("deck/.home");
+                .extracting(SessionFileBrowser.Entry::path).containsExactly("deck/.home");
         assertThat(dirs.list("/workspace", "deck/.home")).isPresent();
         assertThat(new String(dirs.open("/workspace", "deck/.home/notes.md").orElseThrow().stream().readAllBytes()))
                 .isEqualTo("the session's own");
@@ -338,7 +338,7 @@ class SessionDirectoriesTest {
     }
 
     /** The zip's entries in order, each with its content as text. */
-    private static java.util.Map<String, String> unzip(SessionDirectories.Archive archive) throws Exception {
+    private static java.util.Map<String, String> unzip(SessionFileBrowser.Archive archive) throws Exception {
         var bytes = new java.io.ByteArrayOutputStream();
         archive.writeTo(bytes);
         var entries = new java.util.LinkedHashMap<String, String>();

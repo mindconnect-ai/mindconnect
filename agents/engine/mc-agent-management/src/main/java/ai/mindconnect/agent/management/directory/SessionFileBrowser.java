@@ -1,5 +1,6 @@
-package ai.mindconnect.agent.runtime.service;
+package ai.mindconnect.agent.management.directory;
 
+import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
 import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 
@@ -37,7 +38,7 @@ import java.util.zip.ZipOutputStream;
  * them and must stay inside it once symbolic links are followed, so neither
  * {@code ..} nor a link the agent planted reaches anything else on the host.
  */
-public class SessionDirectories {
+public class SessionFileBrowser {
 
     /** A listing stops here; a directory with more entries says it was cut. */
     public static final int MAX_ENTRIES = 1000;
@@ -54,16 +55,12 @@ public class SessionDirectories {
     /** Names in a workspace root that are the environment's own, not the session's files. */
     private static final Set<String> WORKSPACE_INTERNALS = Set.of(".home", ".mc");
 
-    /** @param roots the session's directories, in the order they are shown; ones that do not exist are left out */
-    public SessionDirectories(List<Path> roots) {
-        this(roots, Map.of());
-    }
-
     /**
+     * @param roots      the session's directories, in the order they are shown; ones that do not exist are left out
      * @param workspaces workspaces that live elsewhere, shown first under their key (e.g. {@code /workspace});
      *                   read through {@link WorkspaceFiles}, which does its own confinement
      */
-    public SessionDirectories(List<Path> roots, Map<String, WorkspaceFiles> workspaces) {
+    public SessionFileBrowser(List<Path> roots, Map<String, WorkspaceFiles> workspaces) {
         List<Path> existing = new ArrayList<>();
         workspaces.keySet().stream().sorted().map(Path::of).forEach(existing::add);
         for (Path root : roots) {
@@ -71,6 +68,23 @@ public class SessionDirectories {
         }
         this.roots = List.copyOf(existing);
         this.workspaces = Map.copyOf(workspaces);
+    }
+
+    /**
+     * The directories of a session on this machine: its working directory,
+     * then its additional ones, then its own under the users' home when that
+     * is not already among them.
+     */
+    public static SessionFileBrowser of(ManagedSession session, UserHome home) {
+        List<Path> roots = new ArrayList<>();
+        if (session.directories().working() != null && !session.directories().working().isBlank()) {
+            roots.add(Path.of(session.directories().working()));
+        }
+        session.directories().additional().forEach(dir -> roots.add(Path.of(dir)));
+        if (session.userId() != null) {
+            home.existingSessionDirOf(session.userId().value(), session.id().value()).ifPresent(roots::add);
+        }
+        return new SessionFileBrowser(roots, Map.of());
     }
 
     /** A file's name, size and bytes, for viewing or downloading. */

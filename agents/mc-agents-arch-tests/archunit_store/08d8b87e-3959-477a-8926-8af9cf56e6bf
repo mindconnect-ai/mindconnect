@@ -26,7 +26,6 @@ ai.mindconnect.adminui.ui.controller.MemoryAdminUiController has 2 constructors
 ai.mindconnect.adminui.ui.controller.NotificationUiController has 3 constructors
 ai.mindconnect.adminui.ui.controller.OAuthCallbackController has 2 constructors
 ai.mindconnect.adminui.ui.controller.ProfileUiController has 3 constructors
-ai.mindconnect.adminui.ui.controller.SessionFilesUiController has 2 constructors
 ai.mindconnect.adminui.ui.controller.UserMemoryUiController has 2 constructors
 ai.mindconnect.adminui.ui.page.AgentDetailPage has 2 constructors
 ai.mindconnect.adminui.ui.page.AgentFormPage has 2 constructors
@@ -66,7 +65,6 @@ ai.mindconnect.agent.runtime.feature.FeatureException has 2 constructors
 ai.mindconnect.agent.runtime.service.AgentChatService has 3 constructors
 ai.mindconnect.agent.runtime.service.AgentSessionService has 4 constructors
 ai.mindconnect.agent.runtime.service.MessageToLlmMessageMapper has 2 constructors
-ai.mindconnect.agent.runtime.service.SessionDirectories has 2 constructors
 ai.mindconnect.agent.runtime.service.StatelessAgentSeeder has 2 constructors
 ai.mindconnect.agent.runtime.service.StatelessAgentTaskRunner has 2 constructors
 ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider has 3 constructors

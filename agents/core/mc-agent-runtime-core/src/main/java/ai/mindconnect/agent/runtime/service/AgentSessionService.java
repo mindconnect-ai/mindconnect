@@ -186,20 +186,6 @@ public class AgentSessionService {
         return userHome.sessionDirOf(session.userId().value(), session.id().value());
     }
 
-    /**
-     * The directories a session works with, for a file explorer: its working
-     * directory, then its additional ones, then its own under the users' home
-     * when that is not already among them. Only the ones that exist.
-     */
-    public SessionDirectories directories(SessionId sessionId) {
-        AgentSession session = findSession(sessionId);
-        List<java.nio.file.Path> roots = new java.util.ArrayList<>();
-        if (session.hasWorkingDir()) roots.add(java.nio.file.Path.of(session.workingDir()));
-        for (String dir : session.additionalDirs()) roots.add(java.nio.file.Path.of(dir));
-        userHome.existingSessionDirOf(session.userId().value(), session.id().value()).ifPresent(roots::add);
-        return new SessionDirectories(roots);
-    }
-
     /** The users' home this runtime keeps session directories under; may be unconfigured. */
     public UserHome userHome() {
         return userHome;

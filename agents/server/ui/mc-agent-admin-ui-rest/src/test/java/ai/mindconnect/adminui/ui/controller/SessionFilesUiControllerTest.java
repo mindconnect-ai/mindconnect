@@ -1,14 +1,26 @@
 package ai.mindconnect.adminui.ui.controller;
 
-import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.management.RepositorySessionManagement;
+import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.management.directory.UserHome;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.plugin.DefaultPluginRegistry;
+import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
-import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,6 +34,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipInputStream;
@@ -34,12 +49,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SessionFilesUiControllerTest {
 
+    private static final AgentDefinition HELPER = new AgentDefinition("helper", "Helps.", "You help.",
+            ModelSettings.NONE, List.of(), 5, Map.of());
+
     @TempDir
     Path tmp;
 
     private final AtomicReference<UserId> caller = new AtomicReference<>();
     private SessionFilesUiController controller;
-    private AgentSession session;
+    private ManagedSession session;
     private String root;
 
     @BeforeEach
@@ -50,11 +68,23 @@ class SessionFilesUiControllerTest {
         Files.writeString(work.resolve("page.html"), "<script>alert(1)</script>");
         root = work.toString();
 
-        var sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-        session = sessions.create(AgentSession.start(AgentId.random(), UserId.of("alice"), ConversationId.random())
-                .withWorkingDir(root));
-        var sessionService = new AgentSessionService(null, sessions, null, null, null, null, null, null);
-        controller = new SessionFilesUiController(sessionService, sessions, currentUsers());
+        var sessions = new InMemorySessionRepository(NamespaceProvider.fixed("test"));
+        var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
+        SessionManagement management = new RepositorySessionManagement(sessions, messages,
+                new InMemoryAgentRepository(NamespaceProvider.fixed("test")), SessionDirectoryPolicy.unrestricted(),
+                List.of());
+        var id = ai.mindconnect.agent.runtime.api.domain.SessionId.of("s1");
+        new RepositorySessionStore(sessions, messages).create(new Session(id,
+                ai.mindconnect.agent.runtime.api.domain.UserId.of("alice"), null, HELPER,
+                Map.of(ManagedSession.WORKING_DIRECTORY, root), Instant.parse("2026-11-01T00:00:00Z")));
+        session = management.find(id).orElseThrow();
+
+        PluginRegistry registry = new DefaultPluginRegistry();
+        registry.provide(SessionManagement.class, () -> management);
+        registry.start();
+        var beans = new StaticListableBeanFactory();
+        controller = new SessionFilesUiController(new AgentRuntime(registry, () -> { }), currentUsers(), UserHome.none(),
+                beans.getBeanProvider(ai.mindconnect.agent.tool.workspace.WorkspaceProvider.class));
     }
 
     @Test
