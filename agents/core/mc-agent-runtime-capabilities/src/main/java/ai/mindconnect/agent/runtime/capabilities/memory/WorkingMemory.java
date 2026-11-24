@@ -16,7 +16,9 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
  *                            and what the capabilities add to it
  * @param summary             what stands in for the messages that are not
  *                            sent any more; empty when nothing was summarised
- * @param messages            every message of the session, in order
+ * @param messages            every message of the session, in order, each
+ *                            with what a capability adds to it on its way to
+ *                            the model
  * @param totalTokens         instructions, summary and the messages that are
  *                            sent, together
  * @param contextWindowTokens what the agent's model can hold; empty when the

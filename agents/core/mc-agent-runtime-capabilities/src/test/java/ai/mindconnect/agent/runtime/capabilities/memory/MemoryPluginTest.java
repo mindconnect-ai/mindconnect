@@ -140,6 +140,22 @@ class MemoryPluginTest {
     }
 
     @Test
+    void the_working_memory_shows_a_message_as_the_other_capabilities_hand_it_to_the_model() {
+        stored = new Session(SessionId.of("s1"), UserId.of("ada"), null,
+                new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5,
+                        Map.of(MemoryPlugin.MEMORY, Map.of("strategy", "window", "maxConversationRatio", 10.0))),
+                Map.of(), Instant.EPOCH);
+        registry.contribute(MessageAsSent.class, (message, session) -> message.type() == TurnMessage.Type.USER
+                ? said(message.id(), message.type(), "[note] " + message.text()) : message);
+
+        WorkingMemory memory = registry.get(MemoryInspection.class).inspect(SessionId.of("s1"));
+
+        assertThat(memory.messages().get(0).message().text()).isEqualTo("[note] first question ....");
+        assertThat(memory.messages().get(0).sentAs()).as("added to, not shortened").isNull();
+        assertThat(memory.messages().get(1).message().text()).isEqualTo("first answer .......");
+    }
+
+    @Test
     void an_agent_that_asks_for_the_full_history_gets_it() {
         assertThat(texts(sent(Map.of("strategy", "full"), 0.5))).hasSize(5);
         assertThat(summaryRequests).isEmpty();

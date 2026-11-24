@@ -199,7 +199,15 @@ public final class MemoryPlugin implements Plugin {
         String instructions = registry.run(RuntimeHook.INSTRUCTIONS, new AgentContext(session, agent, null),
                 context -> registry.get(PromptRenderer.class).render(agent.instructions(), variables));
 
-        List<TurnMessage> said = registry.get(SessionStore.class).messages(sessionId);
+        // As the other capabilities hand them to the model, before memory fits them.
+        List<MessageAsSent> views = registry.all(MessageAsSent.class);
+        List<TurnMessage> said = registry.get(SessionStore.class).messages(sessionId).stream().map(message -> {
+            TurnMessage asSent = message;
+            for (MessageAsSent view : views) {
+                asSent = view.of(asSent, session);
+            }
+            return asSent;
+        }).toList();
         Fit fit = fit(MemoryConfig.of(agent), sessionId, said, agent.modelSettings(), counter, model,
                 (message, note) -> { });
         // What would be summarised first is not sent as said either.

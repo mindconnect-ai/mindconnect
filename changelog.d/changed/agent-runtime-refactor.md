@@ -110,3 +110,5 @@
   every such chat (`own settings`, before only for a changed prompt), and the
   settings dialog names the state "this chat's own settings" instead of
   "no agent". Picking the agent again in the dialog makes the chat follow it.
+- The working-memory view and `/memory` show a user message with the note
+  about attached or removed files the model reads ahead of it.

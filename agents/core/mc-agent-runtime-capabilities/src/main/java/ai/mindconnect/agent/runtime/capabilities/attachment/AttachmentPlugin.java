@@ -21,6 +21,7 @@ import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.hook.TurnInput;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
+import ai.mindconnect.agent.runtime.capabilities.memory.MessageAsSent;
 import ai.mindconnect.plugin.BeforeOutcome;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -80,6 +81,8 @@ public final class AttachmentPlugin implements Plugin {
             return offered;
         });
         registry.before(RuntimeHook.MODEL_CALL, call -> BeforeOutcome.proceed(call.with(forModel(call))));
+        registry.contribute(MessageAsSent.class, (message, session) ->
+                message.type() == TurnMessage.Type.USER ? withNotice(message, Attachment.of(session)) : message);
     }
 
     /** The request with what changed among the attachments since the model was last told. */

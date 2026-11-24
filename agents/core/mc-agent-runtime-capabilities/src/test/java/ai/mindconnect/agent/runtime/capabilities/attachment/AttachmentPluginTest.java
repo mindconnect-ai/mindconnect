@@ -123,6 +123,20 @@ class AttachmentPluginTest {
     }
 
     @Test
+    void whoever_inspects_the_session_reads_the_same_notice_without_a_model_call() {
+        TurnRequest first = admitted(session(OWL, NOTES), "What is this?");
+        TurnMessage stored = new TurnMessage("m1", "t1", TurnMessage.Type.USER, first.input(), List.of(),
+                first.metadata());
+
+        TurnMessage read = registry.all(ai.mindconnect.agent.runtime.capabilities.memory.MessageAsSent.class)
+                .get(0).of(stored, session(OWL, NOTES));
+
+        assertThat(((ContentPart.Text) read.content().get(0)).text())
+                .startsWith("[System note — attached to this chat: notes.docx (Word document)");
+        assertThat(read.id()).isEqualTo("m1");
+    }
+
+    @Test
     void the_model_reads_a_notice_ahead_of_the_users_text_for_what_still_holds() {
         TurnRequest first = admitted(session(OWL, NOTES), "What is this?");
         history.add(new TurnMessage("m1", "t1", TurnMessage.Type.USER, first.input(), List.of(), first.metadata()));

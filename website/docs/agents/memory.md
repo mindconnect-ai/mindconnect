@@ -140,7 +140,10 @@ extension point for whatever else has to shape the request — a plugin
 registers `registry.before(RuntimeHook.MODEL_CALL, …)` and returns the call
 with another request (see
 [Writing a plugin](./embedding.md#writing-a-plugin)). The working-memory view
-in the Admin UI counts tokens with the same counter memory uses.
+in the Admin UI counts tokens with the same counter memory uses. It makes no
+model call, so it does not run that hook: a plugin that adds to a message on
+its way to the model — the note the attachments put ahead of the user's text —
+also contributes a `MessageAsSent`, and the view shows the message with it.
 
 ## What the Compact button does
 
