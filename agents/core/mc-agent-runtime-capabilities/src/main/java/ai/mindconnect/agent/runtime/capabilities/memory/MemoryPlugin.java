@@ -39,7 +39,8 @@ import ai.mindconnect.plugin.PluginRegistry;
  *
  * <p>Which strategy an agent gets it says in its metadata, see
  * {@link MemoryConfig}: everything, only the turn underway, or what fits.
- * For what fits, in order: old tool results are shortened, then the oldest
+ * For what fits, in order: old tool results are shown as a note — when, the
+ * agent chooses ({@link MemoryConfig.ToolResultPruning}) — then the oldest
  * turns are left out — summarised first, if the agent asks for that. Turns are left out whole, so a tool call never
  * loses its result.
  */
@@ -58,10 +59,11 @@ public final class MemoryPlugin implements Plugin {
      * setting no turn could run with, at the time it is saved instead of in
      * the agent's next turn.
      *
-     * @throws IllegalArgumentException for a strategy or a summary placement there is none of
+     * @throws IllegalArgumentException for a strategy, a pruning or a summary placement there is
+     *         none of, and for a key that is no memory setting
      */
     public static void check(Map<String, Object> setting) {
-        MemoryConfig.of(setting);
+        MemoryConfig.checked(setting);
     }
 
     public MemoryPlugin(SummaryStore summaries) {
@@ -154,8 +156,13 @@ public final class MemoryPlugin implements Plugin {
         boolean compact = config.strategy() == MemoryConfig.Strategy.COMPACT;
         Optional<ConversationSummary> summary = compact ? summaries.find(sessionId) : Optional.empty();
 
-        List<TurnMessage> messages = new ToolResultTrimmer(counter, budget, config.keepRecentToolResults(), remember)
-                .trim(after(summary, said));
+        ToolResultTrimmer trimmer = new ToolResultTrimmer(counter, remember);
+        List<TurnMessage> open = after(summary, said);
+        List<TurnMessage> messages = switch (config.toolResultPruning()) {
+            case WHEN_FULL -> trimmer.whenFull(open, budget, config.keepRecentToolResults());
+            case AFTER_TURN -> trimmer.afterTurn(open, config.keepRecentToolTokens());
+            case OFF -> trimmer.asNoted(open);
+        };
         List<TurnMessage> toSummarise = List.of();
         if (counter.count(messages) > budget) {
             // Half the budget stays as said: a summary that leaves no room for what follows it helps nobody.

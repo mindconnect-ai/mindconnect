@@ -74,7 +74,7 @@ Controls how the conversation is kept within the model's context window.
 
 This is the flat shape; how each `kind` is read, and the `memory` setting of
 the stored shape, is on the [Memory](./memory.md#setting-reference) page.
-Other fields — `toolResultEviction` among them — are not read. When
+`toolResultEviction` becomes `toolResultPruning: after_turn`; other fields are not read. When
 `memoryConfig` is omitted the agent runs with the `window` strategy.
 
 ### `tools[]`

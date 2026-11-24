@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.capabilities.memory;
 import static org.assertj.core.api.Assertions.tuple;
 import ai.mindconnect.agent.runtime.api.port.out.PromptRenderer;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -248,6 +249,65 @@ class MemoryPluginTest {
                 .isEqualTo(remembered.get("m2"));
     }
 
+    /** Three turns: two old results and a skill's in the first, one result in the second, the third underway. */
+    private static final List<TurnMessage> WITH_OLD_RESULTS = List.of(
+            said("m1", TurnMessage.Type.USER, "read both files"),
+            result("m2", "file_read", "a".repeat(15_000)),
+            result("m3", "file_read", "b".repeat(15_000)),
+            result("m4", "skill", "s".repeat(15_000)),
+            said("m5", TurnMessage.Type.USER, "and the third"),
+            result("m6", "file_read", "c".repeat(15_000)),
+            said("m7", TurnMessage.Type.USER, "now compare them"));
+
+    @Test
+    void pruning_after_the_turn_notes_old_results_although_the_history_fits() {
+        ModelRequest sent = sent(Map.of("strategy", "window", "toolResultPruning", "after_turn",
+                "keepRecentToolTokens", 1_000), 100_000, WITH_OLD_RESULTS);
+
+        assertThat(sent.messages().get(1).text()).startsWith("[Tool result removed").contains("id=m2");
+        assertThat(sent.messages().get(2).text()).startsWith("[Tool result removed").contains("id=m3");
+        assertThat(sent.messages().get(3).text()).as("a skill is instructions, not a result").startsWith("sss");
+        assertThat(sent.messages().get(5).text()).as("the turn before the one underway is left alone")
+                .startsWith("ccc");
+        assertThat(remembered).containsOnlyKeys("m2", "m3");
+    }
+
+    @Test
+    void pruning_after_the_turn_keeps_the_newest_results_within_its_budget_and_what_is_not_worth_it() {
+        ModelRequest oneKept = sent(Map.of("strategy", "window", "toolResultPruning", "after_turn",
+                "keepRecentToolTokens", 15_000), 100_000, WITH_OLD_RESULTS);
+
+        // The newer of the two fits the budget; the older alone frees too little to change the history for.
+        assertThat(texts(oneKept)).noneMatch(text -> text.startsWith("[Tool result removed"));
+        assertThat(remembered).isEmpty();
+    }
+
+    @Test
+    void pruning_when_full_and_off_leave_results_of_a_history_that_fits() {
+        for (String pruning : List.of("when_full", "off")) {
+            ModelRequest sent = sent(Map.of("strategy", "window", "toolResultPruning", pruning),
+                    100_000, WITH_OLD_RESULTS);
+            assertThat(sent.messages()).as(pruning).isEqualTo(WITH_OLD_RESULTS);
+        }
+    }
+
+    @Test
+    void pruning_off_notes_nothing_also_when_the_history_does_not_fit() {
+        ModelRequest sent = sent(Map.of("strategy", "window", "toolResultPruning", "off"), 500, WITH_OLD_RESULTS);
+
+        assertThat(texts(sent)).noneMatch(text -> text.startsWith("[Tool result removed"));
+        assertThat(remembered).isEmpty();
+    }
+
+    @Test
+    void a_setting_nothing_reads_is_refused_when_it_is_saved() {
+        assertThatThrownBy(() -> MemoryPlugin.check(Map.of("kind", "auto_compact")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("'kind' is no memory setting");
+        assertThatThrownBy(() -> MemoryPlugin.check(Map.of("toolResultPruning", "sometimes")))
+                .isInstanceOf(IllegalArgumentException.class);
+        MemoryPlugin.check(Map.of("strategy", "compact", "toolResultPruning", "after_turn"));
+    }
+
     @Test
     void a_history_that_fits_is_sent_as_it_is() {
         assertThat(sent(Map.of("strategy", "compact"), 1.0).messages()).isEqualTo(HISTORY);
@@ -277,6 +337,11 @@ class MemoryPluginTest {
 
     private static List<String> texts(ModelRequest request) {
         return request.messages().stream().map(TurnMessage::text).toList();
+    }
+
+    private static TurnMessage result(String id, String toolName, String text) {
+        return new TurnMessage(id, "t", TurnMessage.Type.TOOL_RESULT, List.of(new ContentPart.Text(text)), List.of(),
+                Map.of("callId", "c-" + id, "toolName", toolName));
     }
 
     private static TurnMessage said(String id, TurnMessage.Type type, String text) {

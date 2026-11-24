@@ -83,3 +83,10 @@
 - "Callable by other agents" is back on the agent form: an agent switched off
   there is offered in no roster and `run_agent` refuses it. Seed files that
   say `callableByAgents: false` keep saying so.
+- An agent chooses when old tool results are shown as a note, with
+  `toolResultPruning` in its memory setting: `when_full` (default, only once
+  the history no longer fits), `after_turn` (results of turns that are over,
+  beyond a budget of the newest) or `off`. What the `skill` tool returned is
+  never pruned. `toolResultEviction` of an agent file written before 1.0 is
+  read as `after_turn`. A memory setting with an unknown key is refused when
+  the agent form is saved.

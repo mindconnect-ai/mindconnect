@@ -29,15 +29,27 @@ For `window` and `compact` the budget is `maxConversationRatio` of the model's
 context window (128,000 tokens are assumed for a model whose window is not
 known). Three steps, in this order, each only as far as needed:
 
-1. **Old tool results are shown as a note.** Starting with the oldest, a
-   result is replaced by
-   `[Tool result removed to save context: N tokens, id=<message id>]` until
-   the history fits. The newest `keepRecentToolResults` results are never
-   touched. A result shown as a note once stays that note in every later call,
-   also when the history would fit again — a history whose beginning changes
-   from call to call costs the provider's prompt cache every time. The result
-   itself is still in the session: an agent that has the
-   `fetch_tool_result` tool reads it again by the id the note names.
+1. **Old tool results are shown as a note**,
+   `[Tool result removed to save context: N tokens, id=<message id>]`. When,
+   the agent chooses with `toolResultPruning`:
+   - `when_full` (the default) — only once the history no longer fits:
+     starting with the oldest, until it fits. The newest
+     `keepRecentToolResults` results are never touched. Nothing is taken from
+     the model before it must be; a long session carries its results along.
+   - `after_turn` — whether or not the history fits: the turn underway and
+     the one before it are left alone; of the results before them, the newest
+     `keepRecentToolTokens` tokens stay and what is older becomes a note —
+     if that frees at least 20,000 tokens. A long session stays small; the
+     model reads a result again when it needs it.
+   - `off` — never. Results stay as returned until their turn is left out or
+     summarised in step 2.
+
+   What the `skill` tool returned is never a note: it is instructions, not a
+   result the agent has dealt with. A result shown as a note once stays that
+   note in every later call, whatever is chosen later — a history whose
+   beginning changes from call to call costs the provider's prompt cache
+   every time. The result itself is still in the session: an agent that has
+   the `fetch_tool_result` tool reads it again by the id the note names.
 2. **The oldest turns are left out.** Turns are left out whole, so a tool call
    never loses its result, and the turn underway is always sent whole. With
    `compact`, the turns left out are summarised first — together with the
@@ -82,7 +94,9 @@ it:
   "strategy": "compact",
   "maxConversationRatio": 0.8,
   "maxMessages": 20,
+  "toolResultPruning": "when_full",
   "keepRecentToolResults": 3,
+  "keepRecentToolTokens": 40000,
   "summaryPlacement": "system_prompt"
 }
 ```
@@ -92,10 +106,13 @@ it:
 | `strategy` | `window` | `none`, `full`, `window` or `compact`. |
 | `maxConversationRatio` | `0.8` | Share of the model's context window the history may take. A share, not tokens: the same agent keeps working when it is given a model with another window. |
 | `maxMessages` | no limit | At most so many messages are sent, counted in whole turns. |
-| `keepRecentToolResults` | `3` | The newest tool results are never shortened. |
+| `toolResultPruning` | `when_full` | When an old tool result is shown as a note: `when_full`, `after_turn` or `off`. |
+| `keepRecentToolResults` | `3` | `when_full`: the newest tool results are never shortened. |
+| `keepRecentToolTokens` | `40000` | `after_turn`: so many tokens of the newest tool results stay as returned. |
 | `summaryPlacement` | `system_prompt` | Where the summary of `compact` goes: `system_prompt` or `user_message`. |
 
-`full` and `none` read none of the other fields.
+`full` and `none` read none of the other fields. A key that is none of
+these is refused when the agent form is saved.
 
 ### `memoryConfig` in agent files of the flat shape
 
@@ -110,7 +127,8 @@ follows:
 | `summarizing_window` | `compact` if `autoSummarize` is `true`, else `window`; `maxConversationRatio` and `summaryPlacement` are taken over |
 | `auto_compact` | `compact`; `compactAtRatio` becomes `maxConversationRatio`, `summaryPlacement` is taken over |
 
-Every other field of the flat shape — `toolResultEviction`,
+A `toolResultEviction` object, whatever its thresholds, becomes
+`toolResultPruning: after_turn`. Every other field of the flat shape —
 `compressToolResults`, `maxMessageRatio`, `maxHistoryFetch` and the
 thresholds beside them — is not read.
 

@@ -150,6 +150,10 @@ final class EarlierAgentJson {
             default -> throw new IllegalArgumentException(
                     "There is no memory setting of kind '" + config.path("kind").asText("") + "'");
         }
+        // Its thresholds were per result; what it asked for is that results go once their turn is over.
+        if (config.hasNonNull("toolResultEviction")) {
+            memory.put("toolResultPruning", "after_turn");
+        }
         return memory;
     }
 

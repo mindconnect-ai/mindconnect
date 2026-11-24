@@ -29,6 +29,9 @@ public final class SkillPlugin implements Plugin {
      */
     public static final String SKILLS = "skills";
 
+    /** The name of the tool that loads a skill, for whoever treats what it returns unlike other tool results. */
+    public static final String TOOL = LoadSkillTool.NAME;
+
     @Override
     public String name() {
         return "skills";

@@ -99,6 +99,16 @@ class AgentJsonTest {
     }
 
     @Test
+    void anEarlierAgentThatEvictedToolResultsPrunesThemAfterTheTurn() {
+        ManagedAgent read = files.read("""
+                {"name": "reader", "memoryConfig": {"kind": "auto_compact",
+                 "toolResultEviction": {"afterTurns": 1, "aboveTokens": 500}}}""");
+
+        assertThat(read.definition().metadata().get("memory")).isEqualTo(
+                java.util.Map.of("strategy", "compact", "toolResultPruning", "after_turn"));
+    }
+
+    @Test
     void anEarlierAgentOtherAgentsMayNotCallStaysSo() {
         ManagedAgent read = files.read("{\"name\": \"titles\", \"callableByAgents\": false}");
 
