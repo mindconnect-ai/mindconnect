@@ -90,6 +90,18 @@ public final class McArchRules {
             .should(notDependOnAdaptersOfOtherModules())
             .as("D2: an adapter does not import another module's adapter"));
 
+    /**
+     * D2: a module keeps things in memory, on files and in Postgres from one
+     * jar, and mc-jdbc is an optional dependency of it. A class outside the
+     * database packages that touched JDBC would fail at run time in an
+     * installation that has no database, where no compiler says so.
+     */
+    @ArchTest
+    static final ArchRule jdbcOnlyInDatabasePackages = FreezingArchRule.freeze(
+        noClasses().that().resideOutsideOfPackages("..pg..", "..jdbc..", "..pgvector..")
+            .should().dependOnClassesThat().resideInAnyPackage("ai.mindconnect.jdbc..", "java.sql..")
+            .as("D2: only a pg, jdbc or pgvector package uses JDBC"));
+
     /** D1: Spring wiring lives in springstarter/, an -app module or a REST/UI library, not in a library. */
     @ArchTest
     static final ArchRule springWiringOnlyAtTheEdge = FreezingArchRule.freeze(

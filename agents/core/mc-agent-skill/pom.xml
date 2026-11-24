@@ -16,10 +16,18 @@
     <packaging>jar</packaging>
     <description>
         Skills — instructions an agent loads when it needs them — and where
-        they are kept: in memory or on files.
+        they are kept: in memory, on files or in Postgres. The Postgres store
+        needs mc-jdbc and a driver, which this module does not bring.
     </description>
 
     <dependencies>
+        <!-- Only the Postgres store needs it: whoever keeps skills in a database brings mc-jdbc and a driver. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jdbc</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-scope</artifactId>

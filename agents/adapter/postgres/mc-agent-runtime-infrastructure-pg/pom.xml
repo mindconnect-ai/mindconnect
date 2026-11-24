@@ -56,11 +56,6 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-skill-pg</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-trace-pg</artifactId>
             <version>${project.version}</version>
         </dependency>

@@ -1,5 +1,5 @@
 #
-#Mon Nov 23 15:17:33 CET 2026
+#Tue Nov 24 23:07:34 CET 2026
 Conventions\:\ SLF4J\ everywhere,\ never\ java.util.logging=cd78fff1-d53f-47c1-8991-95be46ad0614
 Conventions\:\ one\ constructor\ per\ class=0de44684-b4fd-47b2-9c94-a4ae5effacd7
 D1\:\ -core\ modules\ and\ engines\ know\ no\ framework=c00eb8ea-5b0e-43f3-b5ad-f5d9c259559a
@@ -8,6 +8,7 @@ D1\:\ a\ -core\ module\ holds\ domain\ and\ ports,\ adapters\ live\ in\ the\ sib
 D2\:\ an\ adapter\ does\ not\ import\ another\ module's\ adapter=ca625b56-6cec-45d8-af2d-b65b70e1fdc3
 D2\:\ domain\ <-\ port\ <-\ service\ <-\ adapter=1b5f04d4-a6a3-43a5-b3ed-f7dbb3cbcada
 D2\:\ no\ cycles\ between\ packages=fa24afbf-960b-424d-88f7-824ecec0f0ac
+D2\:\ only\ a\ pg,\ jdbc\ or\ pgvector\ package\ uses\ JDBC=3bb17d77-e49c-499c-bdc5-459dd3f91c07
 D3\:\ a\ class\ depends\ on\ at\ most\ 25\ other\ classes\ of\ the\ project=c68c5773-9f77-4ac0-9c07-9843982af2cb
 D3\:\ a\ class\ has\ at\ most\ 30\ methods=520fa747-8c16-40f3-9e8e-6d0e64ba3fee
 D3\:\ a\ constructor\ takes\ at\ most\ 7\ parameters\ (a\ record\ is\ exempt)=32c87bda-aa9d-4e62-98d0-b13c612bc2d2

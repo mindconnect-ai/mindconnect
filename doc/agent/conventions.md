@@ -138,7 +138,7 @@ one fails the build, and the store only shrinks.
 | Rule | Checks |
 | --- | --- |
 | D1 | no framework in a `-core` module or an engine; no `adapter` package in a `-core` module; Spring wiring only at the edge |
-| D2 | `domain` ← `port` ← `service` ← `adapter`; an adapter does not import another module's adapter; no cycles between packages |
+| D2 | `domain` ← `port` ← `service` ← `adapter`; an adapter does not import another module's adapter; no cycles between packages; only a `pg`, `jdbc` or `pgvector` package uses JDBC |
 | D3 | a constructor takes at most 7 parameters, a record is exempt; a class has at most 30 methods; a class depends on at most 25 other classes of the project |
 | D4 | no class ending in Helper, Util(s), Support, Commons, Holder, Manager; no method starting with process, handle, do unless a supertype names it |
 | Conventions | one constructor per class; SLF4J, never `java.util.logging` |
