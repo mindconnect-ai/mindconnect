@@ -1,12 +1,16 @@
 package ai.mindconnect.agentrest.service;
 
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
+import ai.mindconnect.llm.audio.domain.SpeechRequest;
+import ai.mindconnect.llm.audio.domain.SpeechResult;
+import ai.mindconnect.llm.audio.port.in.LlmSpeech;
 import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -35,13 +39,16 @@ public class LlmConfigTestService {
     private final RoutingLlmChatService chatService;
     private final ObjectProvider<LlmEmbeddings> embeddingsProvider;
     private final ObjectProvider<LlmTranscription> transcriptionProvider;
+    private final ObjectProvider<LlmSpeech> speechProvider;
 
     public LlmConfigTestService(RoutingLlmChatService chatService,
                                 ObjectProvider<LlmEmbeddings> embeddingsProvider,
-                                ObjectProvider<LlmTranscription> transcriptionProvider) {
+                                ObjectProvider<LlmTranscription> transcriptionProvider,
+                                ObjectProvider<LlmSpeech> speechProvider) {
         this.chatService = chatService;
         this.embeddingsProvider = embeddingsProvider;
         this.transcriptionProvider = transcriptionProvider;
+        this.speechProvider = speechProvider;
     }
 
     /**
@@ -60,6 +67,9 @@ public class LlmConfigTestService {
         if (config.isSpeechToText()) {
             // Nothing to send as text — this type is tested with a recording.
             return Result.error("A speech-to-text config is tested by uploading a recording", 0);
+        }
+        if (config.type() == LlmConfigType.TEXT_TO_SPEECH) {
+            return testSpeech(config, message).result();
         }
         long t0 = System.currentTimeMillis();
         LlmRequest req = LlmRequest.streaming(config.name(), List.of(LlmMessage.user(message)));
@@ -159,6 +169,41 @@ public class LlmConfigTestService {
             String detail = describeCause(e);
             log.warn("Transcription test '{}' failed after {} ms: {}", config.name(), durMs, detail, e);
             return Result.error(detail, durMs);
+        }
+    }
+
+    /**
+     * Text-to-speech configs: the text is spoken and the audio comes back with
+     * the result, so the admin hears the voice rather than reads about it.
+     * By name, like the other tests, so an alias is followed.
+     */
+    public SpeechTest testSpeech(LlmConfig config, String text) {
+        long t0 = System.currentTimeMillis();
+        LlmSpeech speech = speechProvider.getIfAvailable();
+        if (speech == null) {
+            return SpeechTest.failed(Result.error("No speech gateway configured in this application", 0));
+        }
+        if (text == null || text.isBlank()) {
+            return SpeechTest.failed(Result.error("Enter a text to speak", 0));
+        }
+        try {
+            SpeechResult audio = speech.synthesize(config.name(), SpeechRequest.of(text));
+            long durMs = System.currentTimeMillis() - t0;
+            log.info("Speech test '{}' OK in {} ms ({} bytes)", config.name(), durMs, audio.audio().length);
+            String meta = audio.contentType() + " · " + Math.max(1, audio.audio().length / 1024) + " KB";
+            return new SpeechTest(Result.ok(text, 0, 0, durMs, meta), audio.audio(), audio.contentType());
+        } catch (Exception e) {
+            long durMs = System.currentTimeMillis() - t0;
+            String detail = describeCause(e);
+            log.warn("Speech test '{}' failed after {} ms: {}", config.name(), durMs, detail, e);
+            return SpeechTest.failed(Result.error(detail, durMs));
+        }
+    }
+
+    /** A speech test's outcome plus, when it worked, the spoken audio. */
+    public record SpeechTest(Result result, byte[] audio, String contentType) {
+        static SpeechTest failed(Result result) {
+            return new SpeechTest(result, null, null);
         }
     }
 

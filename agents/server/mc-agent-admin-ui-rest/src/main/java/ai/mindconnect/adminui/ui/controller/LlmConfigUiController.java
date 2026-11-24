@@ -33,6 +33,7 @@ import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -536,6 +537,31 @@ public class LlmConfigUiController {
                     LlmConfigTestService.Result result = testService.testTranscription(
                             c, bytes, filename, audio.getContentType());
                     return ResponseEntity.ok(testPatch(c, null, result));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Executes a text-to-speech test. On success the answer is the audio
+     * itself — the dialog's script plays it and writes the meta line — so
+     * nothing has to be kept on the server between two requests. A failure
+     * comes back as the dialog with the error, like every other test.
+     */
+    @PostMapping("/{id}/test-speech")
+    public ResponseEntity<?> runSpeechTest(@PathVariable("id") String idValue,
+                                           @RequestBody Map<String, Object> raw) {
+        LlmConfigId id = LlmConfigId.of(idValue);
+        String text = new FormBody(raw).str("message");
+        return repository.findById(id)
+                .<ResponseEntity<?>>map(c -> {
+                    LlmConfigTestService.SpeechTest test = testService.testSpeech(c, text);
+                    if (!test.result().ok()) return ResponseEntity.ok(testPatch(c, text, test.result()));
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.parseMediaType(test.contentType()))
+                            // A header carries ASCII only, so no middle dots here.
+                            .header("X-Mc-Test-Meta", "OK - " + test.result().durationMs() + " ms - "
+                                    + test.contentType() + " - " + Math.max(1, test.audio().length / 1024) + " KB")
+                            .body(test.audio());
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

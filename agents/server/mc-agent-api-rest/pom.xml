@@ -27,6 +27,10 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-audio-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-vector-store-tools</artifactId>
         </dependency>
         <!-- Ingestion runs the store template's workflow; brings the workflow

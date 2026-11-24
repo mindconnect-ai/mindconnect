@@ -10,5 +10,6 @@
   Spoken output comes from the new LLM config type `TEXT_TO_SPEECH`, reached
   through `LlmSpeech` in `mc-llm-audio-core` with an adapter for the
   OpenAI-compatible speech endpoint in `mc-llm-audio`; the admin UI offers
-  the type in the LLM config form. Settings live under `mindconnect.voice.*`
+  the type in the LLM config form, and its Test button speaks a text and
+  plays the answer in the dialog. Settings live under `mindconnect.voice.*`
   (`speech-to-text` and `text-to-speech` name the configs to use).

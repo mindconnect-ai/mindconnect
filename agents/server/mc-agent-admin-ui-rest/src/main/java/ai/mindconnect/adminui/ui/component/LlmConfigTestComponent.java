@@ -63,6 +63,9 @@ public final class LlmConfigTestComponent implements UiComponent {
         if (type == LlmConfigType.SPEECH_TO_TEXT) {
             return renderTranscription();
         }
+        if (type == LlmConfigType.TEXT_TO_SPEECH) {
+            return renderSpeech();
+        }
         boolean embedding = type == LlmConfigType.EMBEDDING;
         var form = UiForm.of(id(), null)
                 .field(UiField.textarea("message", embedding ? "Text" : "Message",
@@ -119,6 +122,32 @@ public final class LlmConfigTestComponent implements UiComponent {
                 .child(actions)
                 .child(UiText.of(id() + "-record-status", "Or speak: Record starts, Stop transcribes.")
                         .<UiText>withCssClass("llm-record-status"));
+        if (result != null) stack.child(renderResult());
+        return stack;
+    }
+
+    /**
+     * The text-to-speech shape: a text and a Speak button whose trigger runs
+     * in the browser (INVOKE → the handler in speech-test.js). It posts the
+     * text, plays the audio that comes back and writes the meta line below; a
+     * failure comes back as this dialog with the error.
+     */
+    private UiNode renderSpeech() {
+        var speak = ai.mindconnect.ui.model.UiTrigger.invoke("mc-test-speech", id());
+        speak.setUrl("/admin/api/llm-configs/" + config.id().value() + "/test-speech");
+        var form = UiForm.of(id(), null)
+                .field(UiField.textarea("message", "Text",
+                                previousMessage == null ? "Hallo, so klinge ich. Klappt die Sprachausgabe?"
+                                        : previousMessage)
+                        .asEditable().asRequired()
+                        .hint("Spoken with the config's model and voice — the audio plays right here."))
+                .action(UiAction.primary("speak", "Speak").icon("volume-2").onClick(speak))
+                .action(UiAction.secondary("close", "Close").icon("close")
+                        .dispatch("POST", "/admin/api/llm-configs/test-dialog/close"));
+        var stack = UiStack.of(id() + "-stack")
+                .child(form)
+                .child(UiText.of(id() + "-speech-status", "Speak sends the text and plays the answer.")
+                        .<UiText>withCssClass("llm-speech-status"));
         if (result != null) stack.child(renderResult());
         return stack;
     }
