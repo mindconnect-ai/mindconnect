@@ -4,7 +4,6 @@ import ai.mindconnect.adminui.service.MigrationService.FieldDiff;
 import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
@@ -49,7 +48,7 @@ class MigrationServiceFileRepoTest {
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, json, ScopeSupplier.fixed(new Namespace("test"))), ENCRYPTION);
         service = new MigrationService(repo,
-                new InMemoryAgentDefinitionRepository(ScopeSupplier.local()), new InMemorySkillRepository(ScopeSupplier.local()), new InMemoryWorkflowDataRepository(),
+                new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider.fixed("test"))), new InMemorySkillRepository(ScopeSupplier.local()), new InMemoryWorkflowDataRepository(),
                 json, encryption);
     }
 

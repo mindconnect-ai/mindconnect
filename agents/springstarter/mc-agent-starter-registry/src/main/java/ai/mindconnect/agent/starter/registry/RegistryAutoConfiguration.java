@@ -14,7 +14,7 @@ import ai.mindconnect.agent.registry.port.out.RegistryClient;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.agent.registry.service.RegistryService;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -68,7 +68,8 @@ import java.util.function.Consumer;
  */
 @AutoConfiguration(afterName = {
         "ai.mindconnect.agent.starter.file.FilePersistenceAutoConfiguration",
-        "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig"})
+        "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig",
+        "ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration"})
 @ConditionalOnProperty(prefix = "mindconnect.registry", name = "enabled",
         havingValue = "true", matchIfMissing = true)
 public class RegistryAutoConfiguration {
@@ -176,10 +177,10 @@ public class RegistryAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(AgentDefinitionRepository.class)
+    @ConditionalOnBean(AgentManagement.class)
     @ConditionalOnMissingBean
-    public AgentDefinitionInstaller agentDefinitionRegistryInstaller(AgentDefinitionRepository repository) {
-        return new AgentDefinitionInstaller(repository);
+    public AgentDefinitionInstaller agentDefinitionRegistryInstaller(AgentManagement agents) {
+        return new AgentDefinitionInstaller(agents);
     }
 
     /**

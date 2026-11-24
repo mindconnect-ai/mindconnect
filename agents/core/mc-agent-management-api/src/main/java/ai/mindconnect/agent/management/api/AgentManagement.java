@@ -21,10 +21,13 @@ public interface AgentManagement {
     Optional<ManagedAgent> findByName(String name);
 
     /**
-     * Stores a new agent. Its id, its times and its version are given here;
-     * whatever the argument says of them is ignored.
+     * Stores a new agent. An id the argument brings is kept — an agent read
+     * from a file stays the one it was — and one is given here when it brings
+     * none. Its times and its version are given here; whatever the argument
+     * says of them is ignored.
      *
      * @throws IllegalArgumentException if another agent has the name
+     * @throws IllegalStateException    if there is an agent of that id already
      */
     ManagedAgent create(ManagedAgent agent);
 

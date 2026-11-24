@@ -62,7 +62,8 @@ class RepositoryAgentManagementTest {
         assertThat(created.createdAt()).isNotNull();
         assertThat(agents.find(created.id())).contains(created);
         assertThat(agents.findByName("researcher")).contains(created);
-        assertThat(created.definition()).isEqualTo(definition("researcher"));
+        assertThat(created.definition()).as("as given, and saying whose it is")
+                .isEqualTo(identified(definition("researcher"), created.id()));
         assertThatThrownBy(() -> agents.create(ManagedAgent.of(definition("researcher"))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -121,8 +122,17 @@ class RepositoryAgentManagementTest {
         agents.create(ManagedAgent.of(definition("draft")).withStatus(ManagedAgent.Status.DRAFT));
         ManagedAgentResolver resolver = new ManagedAgentResolver(agents);
 
-        assertThat(resolver.resolve("researcher", null)).contains(definition("researcher"));
+        assertThat(resolver.resolve("researcher", null))
+                .contains(identified(definition("researcher"), agents.findByName("researcher").orElseThrow().id()));
         assertThat(resolver.resolve("draft", null)).isEmpty();
         assertThat(resolver.resolve("nobody", null)).isEmpty();
+    }
+
+    /** The definition as it is stored: with its agent's id in its metadata. */
+    private static AgentDefinition identified(AgentDefinition definition, AgentId id) {
+        Map<String, Object> metadata = new java.util.HashMap<>(definition.metadata());
+        metadata.put(ManagedAgent.AGENT_ID, id.value());
+        return new AgentDefinition(definition.name(), definition.description(), definition.instructions(),
+                definition.modelSettings(), definition.tools(), definition.maxRounds(), metadata);
     }
 }

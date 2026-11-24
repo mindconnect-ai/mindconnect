@@ -3,7 +3,9 @@ package ai.mindconnect.agent.management;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.ConcurrentModificationException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -46,10 +48,11 @@ public final class RepositoryAgentManagement implements AgentManagement {
 
     @Override
     public ManagedAgent create(ManagedAgent agent) {
-        AgentId id = AgentId.of(UUID.randomUUID().toString());
+        // An agent that comes with an id — from a file — keeps it: what refers to it elsewhere still does.
+        AgentId id = agent.id() != null ? agent.id() : AgentId.of(UUID.randomUUID().toString());
         requireFreeName(agent.definition().name(), id);
         Instant now = Instant.now();
-        return agents.create(new ManagedAgent(id, agent.definition(), agent.group(), agent.icon(),
+        return agents.create(new ManagedAgent(id, identified(agent.definition(), id), agent.group(), agent.icon(),
                 agent.welcomeMessage(), agent.status(), now, now, 1));
     }
 
@@ -63,7 +66,7 @@ public final class RepositoryAgentManagement implements AgentManagement {
             ManagedAgent changed = change.apply(stored);
             requireFreeName(changed.definition().name(), id);
             // The identity, the time of creation and the count of changes are not the caller's to set.
-            return new ManagedAgent(id, changed.definition(), changed.group(), changed.icon(),
+            return new ManagedAgent(id, identified(changed.definition(), id), changed.group(), changed.icon(),
                     changed.welcomeMessage(), changed.status(), stored.createdAt(), Instant.now(),
                     stored.version() + 1);
         }).orElseThrow(() -> new IllegalArgumentException("There is no agent " + id.value()));
@@ -74,14 +77,26 @@ public final class RepositoryAgentManagement implements AgentManagement {
         ManagedAgent original = agents.find(id).orElseThrow(() ->
                 new IllegalArgumentException("There is no agent " + id.value()));
         AgentDefinition definition = original.definition();
-        return create(original.withDefinition(new AgentDefinition(freeNameLike(definition.name()),
+        return create(new ManagedAgent(null, new AgentDefinition(freeNameLike(definition.name()),
                 definition.description(), definition.instructions(), definition.modelSettings(),
-                definition.tools(), definition.maxRounds(), definition.metadata())));
+                definition.tools(), definition.maxRounds(), definition.metadata()),
+                original.group(), original.icon(), original.welcomeMessage(), original.status(), null, null, 0));
     }
 
     @Override
     public void delete(AgentId id) {
         agents.delete(id);
+    }
+
+    /** The definition saying whose it is: the tools it binds read there which agent calls them. */
+    private static AgentDefinition identified(AgentDefinition definition, AgentId id) {
+        if (id.value().equals(definition.metadata().get(ManagedAgent.AGENT_ID))) {
+            return definition;
+        }
+        Map<String, Object> metadata = new HashMap<>(definition.metadata());
+        metadata.put(ManagedAgent.AGENT_ID, id.value());
+        return new AgentDefinition(definition.name(), definition.description(), definition.instructions(),
+                definition.modelSettings(), definition.tools(), definition.maxRounds(), metadata);
     }
 
     private void requireFreeName(String name, AgentId owner) {

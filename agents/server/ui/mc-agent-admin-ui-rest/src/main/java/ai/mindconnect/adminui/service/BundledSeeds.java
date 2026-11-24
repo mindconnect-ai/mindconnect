@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.format.AgentJson;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.domain.SkillSource;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -27,7 +28,7 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>{@code llm-configs/*.json} — an {@link LlmConfig}, identified by its {@code name};</li>
- *   <li>{@code agent-definitions/*.json} — an {@link AgentDefinition}, by its {@code name};</li>
+ *   <li>{@code agent-definitions/*.json} — a {@link ManagedAgent}, by its name;</li>
  *   <li>{@code skills/*.md} — a {@code SKILL.md}, by the name in its front matter
  *       (the file name when it has none);</li>
  *   <li>{@code workflows/*.json} — a {@link WorkflowData}, by its file name without
@@ -119,11 +120,18 @@ public final class BundledSeeds {
         return seeds;
     }
 
-    public List<Seed<AgentDefinition>> agents() {
-        List<Seed<AgentDefinition>> seeds = new ArrayList<>();
+    /** Shipped agents, in the stored form or the one the earlier runtime wrote, see {@link AgentJson}. */
+    public List<Seed<ManagedAgent>> agents() {
+        AgentJson files = new AgentJson(objectMapper);
+        List<Seed<ManagedAgent>> seeds = new ArrayList<>();
         for (Resource resource : scan(Kind.AGENT)) {
-            read(resource, AgentDefinition.class, objectMapper)
-                    .ifPresent(agent -> seeds.add(new Seed<>(Kind.AGENT, agent.name(), agent)));
+            try {
+                ManagedAgent agent = files.read(
+                        new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+                seeds.add(new Seed<>(Kind.AGENT, agent.definition().name(), agent));
+            } catch (Exception e) {
+                log.warn("Failed to read an agent from {}: {}", resource.getFilename(), e.getMessage());
+            }
         }
         return seeds;
     }
@@ -169,7 +177,7 @@ public final class BundledSeeds {
         return llmConfigs().stream().filter(seed -> seed.name().equals(name)).map(Seed::record).findFirst();
     }
 
-    public Optional<AgentDefinition> agent(String name) {
+    public Optional<ManagedAgent> agent(String name) {
         return agents().stream().filter(seed -> seed.name().equals(name)).map(Seed::record).findFirst();
     }
 

@@ -52,7 +52,13 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-core</artifactId>
+            <artifactId>mc-agent-management</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-skill</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

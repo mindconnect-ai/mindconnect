@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.tool.AgentToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
@@ -35,7 +36,7 @@ import ai.mindconnect.agent.tool.AgentTool;
 public final class AgentDefinitionMapper {
 
     /** Metadata of the agent: its id in the application's repository. */
-    public static final String AGENT_ID = "id";
+    public static final String AGENT_ID = ManagedAgent.AGENT_ID;
 
     private static final int DEFAULT_MAX_ROUNDS = 10;
 
@@ -85,19 +86,7 @@ public final class AgentDefinitionMapper {
 
     /** How an agent's definition binds a tool, from what the agent's tool page set for it. */
     public static ToolBinding binding(AgentTool tool) {
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put(RegistryToolResolver.TOOL_ID, tool.id().value());
-        metadata.put(RegistryToolResolver.OVERRIDES, tool.overrides());
-        if (tool.description() != null) {
-            metadata.put(RegistryToolResolver.DESCRIPTION, tool.description());
-        }
-        if (tool.maxResultChars() != null) {
-            metadata.put(RegistryToolResolver.MAX_RESULT_CHARS, tool.maxResultChars());
-        }
-        if (tool.needsApproval()) {
-            metadata.put(PermissionPlugin.NEEDS_APPROVAL, true);
-        }
-        return new ToolBinding(tool.name(), tool.deferred(), metadata);
+        return AgentToolBinding.of(tool);
     }
 
     /** Every skill is no entry at all, none is an empty list, and the ones named are the list. */

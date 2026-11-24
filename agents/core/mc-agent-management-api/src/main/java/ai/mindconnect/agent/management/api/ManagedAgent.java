@@ -34,6 +34,9 @@ public record ManagedAgent(
         long version
 ) {
 
+    /** Metadata of the definition: the agent's id, where the tools read whose agent calls them. */
+    public static final String AGENT_ID = "id";
+
     /** Whether an agent is in use. Only an {@link #ACTIVE} one is found by name when another agent calls it. */
     public enum Status {
         DRAFT,

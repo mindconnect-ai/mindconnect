@@ -3,8 +3,8 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.adminui.service.BundledSeeds.Kind;
 import ai.mindconnect.adminui.service.BundledSeeds.Seed;
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.extension.domain.ExtensionManifest;
@@ -86,13 +86,13 @@ public class NamespaceSeeder {
 
     private final BundledSeeds seeds;
     private final LlmConfigRepository llmConfigs;
-    private final AgentDefinitionRepository agents;
+    private final AgentManagement agents;
     private final SkillRepository skills;
     private final WorkflowDataRepository workflows;
     private final InstalledSeedRepository installedSeeds;
     private final ExtensionService extensions;
 
-    public NamespaceSeeder(BundledSeeds seeds, LlmConfigRepository llmConfigs, AgentDefinitionRepository agents,
+    public NamespaceSeeder(BundledSeeds seeds, LlmConfigRepository llmConfigs, AgentManagement agents,
                            SkillRepository skills, WorkflowDataRepository workflows,
                            InstalledSeedRepository installedSeeds, ExtensionService extensions) {
         this.seeds = Objects.requireNonNull(seeds, "seeds");
@@ -186,7 +186,7 @@ public class NamespaceSeeder {
     private void save(Seed<?> seed) {
         switch (seed.kind()) {
             case LLM_CONFIG -> llmConfigs.save((LlmConfig) seed.record());
-            case AGENT -> agents.save((AgentDefinition) seed.record());
+            case AGENT -> agents.create((ManagedAgent) seed.record());
             case SKILL -> skills.save((Skill) seed.record());
             case WORKFLOW -> workflows.save(seed.name(), (WorkflowData) seed.record());
         }

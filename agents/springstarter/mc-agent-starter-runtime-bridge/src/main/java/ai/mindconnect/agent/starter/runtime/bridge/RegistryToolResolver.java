@@ -9,6 +9,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.management.tool.AgentToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
@@ -29,15 +30,6 @@ import ai.mindconnect.agent.tool.ToolRegistry;
  * it is asked with, built from the agent's tool entry and the session.
  */
 final class RegistryToolResolver implements ToolResolver {
-
-    /** Metadata of a tool entry: the entry's id in the stored agent definition. */
-    static final String TOOL_ID = "agentToolId";
-    /** Metadata of a tool entry: the parameters this agent fixed in advance. */
-    static final String OVERRIDES = "overrides";
-    /** Metadata of a tool entry: the description this agent gives the tool. */
-    static final String DESCRIPTION = "description";
-    /** Metadata of a tool entry: how long a result may be for this agent. */
-    static final String MAX_RESULT_CHARS = "maxResultChars";
 
     /** Metadata of a session: the directory its tools work in. */
     static final String WORKING_DIRECTORY = "workingDir";
@@ -87,18 +79,8 @@ final class RegistryToolResolver implements ToolResolver {
         return new ToolDefinition(tool.name(), tool.description(), tool.parametersSchema());
     }
 
-    @SuppressWarnings("unchecked")
     static AgentTool agentTool(ToolBinding binding) {
-        Map<String, Object> metadata = binding.metadata();
-        return new AgentTool(
-                metadata.get(TOOL_ID) instanceof String id ? AgentToolId.of(id) : AgentToolId.random(),
-                binding.name(),
-                (String) metadata.get(DESCRIPTION),
-                metadata.get(OVERRIDES) instanceof Map<?, ?> overrides ? (Map<String, Object>) overrides : Map.of(),
-                true,
-                binding.deferred(),
-                Boolean.TRUE.equals(metadata.get(PermissionPlugin.NEEDS_APPROVAL)),
-                metadata.get(MAX_RESULT_CHARS) instanceof Number limit ? limit.intValue() : null);
+        return AgentToolBinding.agentTool(binding);
     }
 
     private static ToolCallScope scope(AgentDefinition agent, Session session) {

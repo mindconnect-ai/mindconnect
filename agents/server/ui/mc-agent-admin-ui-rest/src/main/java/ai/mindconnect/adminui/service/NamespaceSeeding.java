@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
@@ -60,7 +60,7 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
     private final ThreadLocal<NamespaceSeeder.Report> ranHere = new ThreadLocal<>();
 
     @Autowired
-    public NamespaceSeeding(LlmConfigRepository llmConfigs, AgentDefinitionRepository agents,
+    public NamespaceSeeding(LlmConfigRepository llmConfigs, AgentManagement agents,
                             SkillRepository skills, WorkflowDataRepository workflows,
                             InstalledSeedRepository installedSeeds, ExtensionService extensions,
                             ObjectMapper objectMapper, ObjectProvider<ScopeSupplier> scope,
