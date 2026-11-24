@@ -82,6 +82,8 @@
         <module>adapter/postgres/mc-agent-tools-usermemory-pg</module>
         <module>core/mc-agent-management-api</module>
         <module>engine/mc-agent-management</module>
+        <module>demo/mc-agent-simple-demo</module>
+        <module>demo/mc-extension-demo</module>
         <module>engine/mc-agent-runtime-infrastructure</module>
         <module>adapter/postgres/mc-agent-runtime-infrastructure-pg</module>
         <module>adapter/postgres/mc-agent-runtime-engine-pg</module>

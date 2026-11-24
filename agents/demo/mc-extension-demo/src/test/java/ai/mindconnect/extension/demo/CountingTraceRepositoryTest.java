@@ -46,10 +46,20 @@ class CountingTraceRepositoryTest {
     }
 
     @Test
-    void the_feature_says_who_it_is() {
-        DemoFeature feature = new DemoFeature();
+    void the_plugin_says_who_it_is() {
+        assertThat(new DemoPlugin().name()).isEqualTo("demo-dungeon");
+    }
 
-        assertThat(feature.name()).isEqualTo("demo-dungeon");
-        assertThat(feature.dependsOn()).isEmpty();
+    @Test
+    void the_plugin_counts_on_the_trace_store_the_host_provided_before_it() {
+        Recording store = new Recording();
+        ai.mindconnect.plugin.PluginRegistry registry = new ai.mindconnect.plugin.DefaultPluginRegistry();
+        registry.provide(LlmCallTraceRepository.class, () -> store);
+
+        registry.install(new DemoPlugin());
+        registry.get(LlmCallTraceRepository.class).save(null);
+
+        assertThat(registry.get(LlmCallCounter.class).calls()).isEqualTo(1);
+        assertThat(store.saved).hasSize(1);
     }
 }

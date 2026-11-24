@@ -1,9 +1,19 @@
 package ai.mindconnect.extension.demo;
 
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.builder.AgentRuntime;
+import ai.mindconnect.agent.loop.domain.TurnEvent;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.SessionAgent;
+import ai.mindconnect.agent.management.api.SessionDirectories;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.api.domain.Turn;
+import ai.mindconnect.agent.runtime.api.domain.TurnId;
+import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
+import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
+import ai.mindconnect.agent.runtime.api.port.in.Subscription;
+import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.ui.model.UiPage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +54,9 @@ public class DungeonController {
     private static final Logger log = LoggerFactory.getLogger(DungeonController.class);
     static final String AGENT = "dungeon-master";
 
+    /** How long a page waits for the game master's reply. */
+    private static final Duration ANSWER_WAIT = Duration.ofMinutes(5);
+
     private final AgentRuntime runtime;
     private final ScopeSupplier scope;
     private final Random random = new Random();
@@ -76,7 +89,7 @@ public class DungeonController {
     @GetMapping("/stats")
     public UiPage stats() {
         int days = 30;
-        List<DiceRoll> rolls = runtime.beans().find(DiceRollRepository.class)
+        List<DiceRoll> rolls = runtime.find(DiceRollRepository.class)
                 .map(store -> store.since(Instant.now().minus(Duration.ofDays(days))))
                 .orElse(List.of());
         return DiceStatsPage.render(DiceStats.of(rolls, ZoneId.systemDefault()), days);
@@ -90,8 +103,11 @@ public class DungeonController {
         Optional<Scenario> scenario = scenarios().flatMap(s -> s.store().find(scenarioId));
         if (scenario.isEmpty()) return lobby("No such scenario: " + scenarioId);
         try {
-            SessionId session = runtime.openSession(AGENT, me()).id();
-            Adventure adventure = Adventure.start(scenario.get(), session.value(), me().value());
+            String session = runtime.service(SessionManagement.class).open(
+                    ai.mindconnect.agent.runtime.api.domain.UserId.of(me().value()), null,
+                    new SessionAgent.Ref(runtime.service(AgentManagement.class).findByName(AGENT).orElseThrow().id()),
+                    null, SessionDirectories.NONE).id().value();
+            Adventure adventure = Adventure.start(scenario.get(), session, me().value());
             adventures().orElseThrow().store().save(adventure);
             return turn(adventure, "We play the scenario \"" + scenario.get().title() + "\". Premise: "
                     + scenario.get().premise() + "\n\nStart the adventure: set the scene in a few sentences, tell me who I am "
@@ -131,7 +147,7 @@ public class DungeonController {
     public UiPage roll(@PathVariable("sides") int sides, @RequestBody Map<String, Object> form) {
         Optional<Adventure> adventure = adventure(text(form, "adventureId"));
         if (adventure.isEmpty()) return lobby("No such adventure.");
-        DiceTool dice = new DiceTool(random, runtime.beans().find(DiceRollRepository.class)
+        DiceTool dice = new DiceTool(random, runtime.find(DiceRollRepository.class)
                 .<Consumer<DiceRoll>>map(store -> store::append).orElse(roll -> { }));
         String result = dice.execute(Map.of("sides", sides, "count", 1));
         String value = result.substring(result.indexOf(':') + 2, result.indexOf(" ("));
@@ -141,7 +157,7 @@ public class DungeonController {
     /** One turn: what the player said goes to the game master, both lines join the story, the record is saved. */
     private UiPage turn(Adventure adventure, String message, String shownAsPlayer) {
         try {
-            String reply = runtime.chat(SessionId.of(adventure.sessionId()), message, event -> { });
+            String reply = ask(adventure.sessionId(), message);
             // The game master may have saved state during the turn: reload before appending the lines.
             Adventure current = adventure(adventure.id()).orElse(adventure);
             Adventure next = shownAsPlayer == null
@@ -155,31 +171,80 @@ public class DungeonController {
         }
     }
 
+    /**
+     * One turn of the game master, waited for: the page is answered with the
+     * reply. A turn that stops to ask — a tool that needs approval — has
+     * nobody to answer it on this page, so it is given up.
+     */
+    private String ask(String sessionId, String message) {
+        TurnId turnId = runtime.turns().submit(TurnRequest.text(
+                ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId), message));
+        java.util.concurrent.CompletableFuture<Turn> ended = new java.util.concurrent.CompletableFuture<>();
+        Subscription following = runtime.turns().subscribe(turnId, new TurnListener() {
+            @Override
+            public void onEvent(TurnEvent event) {
+            }
+
+            @Override
+            public void onFinished(Turn turn) {
+                ended.complete(turn);
+            }
+        });
+        try {
+            long deadline = System.nanoTime() + ANSWER_WAIT.toNanos();
+            while (!ended.isDone()) {
+                Turn now = runtime.turns().find(turnId).orElseThrow();
+                if (now.status().isFinal()) {
+                    ended.complete(now);
+                } else if (!now.interruptions().isEmpty() || System.nanoTime() > deadline) {
+                    runtime.turns().cancel(turnId);
+                    throw new IllegalStateException(now.interruptions().isEmpty()
+                            ? "no answer within " + ANSWER_WAIT.toMinutes() + " min"
+                            : "the game master asked for an approval nobody can give here");
+                } else {
+                    Thread.sleep(50);
+                }
+            }
+            Turn turn = ended.join();
+            if (turn.status() != TurnStatus.COMPLETED || turn.outcome() == null) {
+                throw new IllegalStateException(turn.error() != null ? turn.error()
+                        : "the turn ended " + turn.status().name().toLowerCase(java.util.Locale.ROOT));
+            }
+            return turn.outcome().text() == null ? "" : turn.outcome().text();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            runtime.turns().cancel(turnId);
+            throw new IllegalStateException("interrupted", e);
+        } finally {
+            following.close();
+        }
+    }
+
     private Optional<Adventure> adventure(String id) {
         if (id == null) return Optional.empty();
         return adventures().flatMap(store -> store.store().find(id)).filter(a -> me().value().equals(a.userId()));
     }
 
     private Optional<ScenarioStore> scenarios() {
-        return runtime.beans().find(ScenarioStore.class);
+        return runtime.find(ScenarioStore.class);
     }
 
     private Optional<AdventureStore> adventures() {
-        return runtime.beans().find(AdventureStore.class);
+        return runtime.find(AdventureStore.class);
     }
 
     private UserId me() {
         return scope.get().userIfAny().orElse(UserId.of("demo"));
     }
 
-    /** What the decorator counted — the bean the demo feature registered in the runtime, if the feature is installed. */
+    /** What the decorator counted — the service the demo plugin provides in the runtime, if the plugin is installed. */
     private long llmCalls() {
-        return runtime.beans().find(LlmCallCounter.class).map(LlmCallCounter::calls).orElse(-1L);
+        return runtime.find(LlmCallCounter.class).map(LlmCallCounter::calls).orElse(-1L);
     }
 
     /** The agent is seeded from the jar's {@code initial-data} — into the start-up namespace; elsewhere it may be missing. */
     private String agentMissingNote() {
-        if (runtime.agentDefinitions().findByName(AGENT).isPresent()) return null;
+        if (runtime.service(AgentManagement.class).findByName(AGENT).isPresent()) return null;
         return "The agent '" + AGENT + "' is not installed in this namespace yet — Install → Migrations imports it.";
     }
 

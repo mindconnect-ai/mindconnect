@@ -2,7 +2,7 @@
   "id": "demo-dungeon",
   "name": "Dungeon demo",
   "version": "0.1.0",
-  "description": "A worked example of an extension: a game master agent that plays one of several scenarios from the extension's own store and saves the character's state through a tool, a dice tool, a runtime feature that decorates a core port, and two screens — play, and see which die face fell most per day.",
+  "description": "A worked example of an extension: a game master agent that plays one of several scenarios from the extension's own store and saves the character's state through a tool, a dice tool, a plugin that decorates a core port, and two screens — play, and see which die face fell most per day.",
   "vendor": {
     "id": "mindconnect",
     "name": "Mindconnect",
@@ -24,7 +24,7 @@
       ]
     },
     "features": [
-      "ai.mindconnect.extension.demo.DemoFeature"
+      "ai.mindconnect.extension.demo.DemoPlugin"
     ],
     "content": {
       "agents": [

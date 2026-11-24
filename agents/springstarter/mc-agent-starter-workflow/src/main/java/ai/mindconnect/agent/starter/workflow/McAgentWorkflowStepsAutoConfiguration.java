@@ -3,7 +3,7 @@ package ai.mindconnect.agent.starter.workflow;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolCallScope;
 
-import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -18,8 +18,6 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 
-import java.util.concurrent.ExecutionException;
-
 /**
  * Publishes the {@link AgentInvoker} that lets agent-call workflow steps run a
  * full chat turn in-process. Steps are instantiated by the ServiceLoader-driven
@@ -32,11 +30,22 @@ public class McAgentWorkflowStepsAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(McAgentWorkflowStepsAutoConfiguration.class);
 
-    /** The user a run on nobody's behalf calls agents and tools as. */
     /**
      * @param timeout how long an agent-call step waits for the agent's answer
      *                ({@code mindconnect.workflow.agent-call-timeout}, ISO-8601, default ten minutes)
      */
+    @Bean
+    @ConditionalOnBean(AgentRuntime.class)
+    AgentInvoker workflowAgentInvoker(AgentRuntime runtime,
+                                      @org.springframework.beans.factory.annotation.Value(
+                                              "${mindconnect.workflow.agent-call-timeout:PT10M}")
+                                      java.time.Duration timeout) {
+        AgentInvoker invoker = new RuntimeAgentInvoker(runtime, timeout);
+        AgentInvokers.set(invoker);
+        log.info("Agent-call workflow step wired to the in-process agent runtime");
+        return invoker;
+    }
+
     @Bean
     ToolInvoker workflowToolInvoker(ToolRegistry toolRegistry) {
         ToolInvoker invoker = new ToolInvoker() {
