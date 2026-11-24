@@ -27,6 +27,7 @@ const sidebars = {
         },
         'agents/cli',
         'agents/rest-api',
+        'agents/voice',
         'agents/authentication',
         'agents/llm-gateway',
         {

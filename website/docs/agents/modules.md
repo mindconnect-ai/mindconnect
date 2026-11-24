@@ -18,6 +18,8 @@ carry the implementations.
 | `mc-agent-memory-strategies` | The [memory strategies](./memory.md) — keep everything, window, summarizing window, auto-compact. Swap this module to change memory behaviour. |
 | `mc-llm-gateway-core` | The [gateway's](./llm-gateway.md) core: chat/streaming types and the ports (`LlmChat`, `LlmGateway`, `LlmConfigRepository`) — light enough to be a compile dependency of anything. |
 | `mc-llm-gateway` | The gateway implementation: provider adapters, routing, retry/throttle decorators. |
+| `mc-llm-audio-core` | Spoken output: `LlmSpeech` and `SpeechGateway`, routed by config name like chat and transcription. |
+| `mc-llm-audio` | The speech adapter for the OpenAI-compatible endpoint `POST /v1/audio/speech`. |
 | `mc-message-repository-core` | Conversations, participants and messages as plain domain types, their ports, and the `ConversationService` use case. |
 | `mc-message-repository` | File-backed and in-memory implementations of those ports. |
 | `mc-credentials` | User credentials store: OAuth2 tokens + API keys, encrypted at rest, with auto-refresh and a vendor OAuth handler SPI. |
@@ -105,6 +107,7 @@ next step.
 |--------|---------|
 | `mc-agent-api-rest` | The REST controllers and DTOs as a library (no Boot main) |
 | `mc-agent-api-app` | Agent server (REST, streaming via SSE) — embeds `mc-agent-api-rest` |
+| `mc-agent-voice-ws` | [Voice conversations](./voice.md) over a WebSocket (`/api/voice`); a server adds it as a dependency and the endpoint registers itself |
 | `mc-agent-admin-ui-rest` | The [Admin UI](./admin-ui/index.md) itself as an embeddable library: controllers serving UiNode JSON under `/admin/api/**`, pages, components, SPA assets |
 | `mc-agent-admin-ui-app` | Admin UI Spring Boot application |
 

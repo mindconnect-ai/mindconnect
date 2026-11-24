@@ -184,6 +184,8 @@ a chat's copy.
 | `GEMINI_MODEL` | `gemini-default` | Override model id (default `gemini-2.0-flash`) |
 | `SPEECH_TO_TEXT_MODEL` | `speech-to-text` | Override model id (default `whisper-1`) |
 | `SPEECH_TO_TEXT_BASE_URL` | `speech-to-text` | Where the transcription endpoint lives (default `https://api.openai.com`) — point it at Groq or a local Whisper server |
+| `TEXT_TO_SPEECH_MODEL` | `text-to-speech` | Override model id (default `gpt-4o-mini-tts`) |
+| `TEXT_TO_SPEECH_BASE_URL` | `text-to-speech` | Where the speech endpoint lives (default `https://api.openai.com`) |
 
 Local providers (`lm-studio-default`, `gemma-reader`, `embeddings`) need **no**
 key — they talk to LM Studio at `http://localhost:1234`.

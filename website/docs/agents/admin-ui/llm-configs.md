@@ -45,10 +45,12 @@ own name for a model.
 The form also covers:
 
 - **Type** — `Chat`, `Embedding` (embedding configs power the vector store)
-  or `Speech to text` (since 0.5.3: a Whisper-style model that turns a
-  recording into text). Only chat configs have sampling settings; a
-  speech-to-text config takes its language, prompt and response format
-  from the provider parameters;
+  `Speech to text` (since 0.5.3: a Whisper-style model that turns a
+  recording into text) or `Text to speech` (a model that speaks a text, used
+  by [voice conversations](../voice.md)). Only chat configs have sampling
+  settings; a speech-to-text config takes its language, prompt and response
+  format from the provider parameters, a text-to-speech config its voice,
+  response format, instructions and speed;
 - **Capabilities** (chat configs) — what the model reads and does: tool
   calling, vision (images), documents (PDF), audio input. Vision and documents
   steer the runtime: an image or PDF sent with a message reaches the model as
@@ -78,6 +80,11 @@ A fresh installation is seeded with a `speech-to-text` config: OpenAI's
 Groq or a local Whisper server to use it without an OpenAI key, and
 `SPEECH_TO_TEXT_MODEL` at another model — the seed pins no response format,
 so switching the model cannot collide with one.
+
+It is also seeded with a `text-to-speech` config: OpenAI's `gpt-4o-mini-tts`
+with the voice `nova`, behind the same key. `TEXT_TO_SPEECH_MODEL` and
+`TEXT_TO_SPEECH_BASE_URL` move it elsewhere; the voice is a provider
+parameter in the form.
 
 ## Pricing {#pricing}
 
@@ -253,6 +260,12 @@ browser-only — the recording is made and posted by the page, the server sees a
 ordinary upload. The microphone needs a secure context, so this works on
 `localhost` and over HTTPS; elsewhere the status line says the browser refused,
 and the drop zone still does the job.
+
+A `Text to speech` config is tested with a text: **Speak** posts it to
+`POST /admin/api/llm-configs/{id}/test-speech`, the audio comes back and plays
+in the dialog, and the status line shows how long it took and how much
+arrived. A failure comes back as the dialog with the error, like any other
+test.
 
 Test a cloud config right after creating it, to confirm the API key and
 `baseUrl` before wiring it into an agent.

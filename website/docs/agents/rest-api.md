@@ -392,6 +392,12 @@ A job is readable only by the user who submitted it, and the recording is that
 user's file. A job from before requesters were recorded stays readable by
 anyone who has its id.
 
+## Voice
+
+Spoken conversations with an agent run over a WebSocket, `/api/voice`:
+audio in, transcript, the answer as tokens and spoken back sentence by
+sentence. See [Voice conversations](./voice.md).
+
 ## Beyond chat
 
 The same server exposes LLM configurations, the file store, session
