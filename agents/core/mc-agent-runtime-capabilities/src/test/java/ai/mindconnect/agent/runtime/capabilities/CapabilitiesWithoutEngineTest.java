@@ -182,6 +182,30 @@ class CapabilitiesWithoutEngineTest {
                 .asString().contains("there is no agent named titles you can call");
     }
 
+    @Test
+    void a_projects_agents_are_listed_first_and_called_without_being_named_and_stand_in_for_a_named_one() {
+        AgentDefinition checker = new AgentDefinition("checker", "Checks this project.", "You check.",
+                ModelSettings.NONE, List.of(), 5, Map.of());
+        AgentDefinition researcher = new AgentDefinition("researcher", "Knows this project.", "You research here.",
+                ModelSettings.NONE, List.of(), 5, Map.of());
+        registry.contribute(ai.mindconnect.agent.runtime.capabilities.subagent.ProjectAgentSource.class,
+                (caller, session) -> List.of(checker, researcher));
+        ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
+
+        assertThat(tools.resolve("list_agents", LEAD, SESSION).orElseThrow()
+                .execute(new ToolCall("c1", "list_agents", Map.of(), TurnId.of("t1"), SESSION.id()), SESSION))
+                .isEqualTo(ToolOutput.ok("- checker (this project): Checks this project.\n"
+                        + "- researcher (this project): Knows this project."));
+        assertThat(offered().stream().filter(tool -> tool.name().equals("run_agent")).findFirst().orElseThrow()
+                .description()).endsWith("Available to you: checker, researcher.");
+    }
+
+    /** What the offer hook adds for the lead, whatever the lead itself binds. */
+    private List<ToolDefinition> offered() {
+        ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
+        return registry.run(RuntimeHook.TOOL_OFFER, CONTEXT, context -> tools.tools(context.agent(), context.session()));
+    }
+
     private List<String> offeredNames() {
         ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
         return registry.run(RuntimeHook.TOOL_OFFER, CONTEXT, context -> tools.tools(context.agent(), context.session()).stream()

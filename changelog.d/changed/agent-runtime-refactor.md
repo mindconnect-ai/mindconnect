@@ -96,3 +96,6 @@
   offset, and `fetch_tool_result` — now offered to every agent that has tools —
   reads on with `offset` and `limit`. The per-tool limit no longer cuts the
   result: the session keeps it whole.
+- Agents a project keeps in `.mindconnect/agents/*.md` are found again:
+  `list_agents` shows them first, `run_agent` calls them without a roster
+  entry, and they may use no more than the agent calling them.

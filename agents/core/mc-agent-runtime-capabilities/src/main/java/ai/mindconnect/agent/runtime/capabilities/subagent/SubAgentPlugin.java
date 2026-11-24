@@ -117,12 +117,13 @@ public final class SubAgentPlugin implements Plugin {
                 if (subAgentsOf(caller).isEmpty()) {
                     return Optional.empty();
                 }
-                RunAgentTool single = new RunAgentTool(caller, agents, registry.supplier(SessionService.class),
+                Roster roster = new Roster(caller, agents, () -> registry.all(ProjectAgentSource.class));
+                RunAgentTool single = new RunAgentTool(roster, registry.supplier(SessionService.class),
                         inherited, maxDepth);
                 return switch (toolName) {
                     case RunAgentTool.NAME -> Optional.of(single);
                     case RunAgentsTool.NAME -> Optional.of(new RunAgentsTool(single));
-                    case ListAgentsTool.NAME -> Optional.of(new ListAgentsTool(caller, agents));
+                    case ListAgentsTool.NAME -> Optional.of(new ListAgentsTool(roster));
                     default -> Optional.empty();
                 };
             }
@@ -131,7 +132,8 @@ public final class SubAgentPlugin implements Plugin {
         registry.after(RuntimeHook.TOOL_OFFER, (context, tools) -> {
             List<ToolDefinition> offered = new ArrayList<>(tools);
             if (!subAgentsOf(context.agent()).isEmpty()) {
-                offered.add(RunAgentTool.definition(context.agent()));
+                offered.add(RunAgentTool.definition(new Roster(context.agent(), agents,
+                        () -> registry.all(ProjectAgentSource.class)).names(context.session())));
                 offered.add(RunAgentsTool.DEFINITION);
                 offered.add(ListAgentsTool.DEFINITION);
             }

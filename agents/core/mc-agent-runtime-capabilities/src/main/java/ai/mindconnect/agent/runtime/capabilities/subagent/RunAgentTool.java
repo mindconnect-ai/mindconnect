@@ -15,7 +15,6 @@ import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
-import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 
 /**
@@ -43,16 +42,13 @@ final class RunAgentTool implements Tool {
                             "description", "The task or question to send to the agent")),
             "required", List.of(AGENT, MESSAGE));
 
-    private final AgentDefinition caller;
-    private final AgentResolver agents;
+    private final Roster roster;
     private final Supplier<SessionService> sessions;
     private final Predicate<String> inherited;
     private final int maxDepth;
 
-    RunAgentTool(AgentDefinition caller, AgentResolver agents, Supplier<SessionService> sessions,
-                 Predicate<String> inherited, int maxDepth) {
-        this.caller = caller;
-        this.agents = agents;
+    RunAgentTool(Roster roster, Supplier<SessionService> sessions, Predicate<String> inherited, int maxDepth) {
+        this.roster = roster;
         this.sessions = sessions;
         this.inherited = inherited;
         this.maxDepth = maxDepth;
@@ -62,14 +58,14 @@ final class RunAgentTool implements Tool {
     static final ToolDefinition CATALOGUED = new ToolDefinition(NAME, DESCRIPTION, PARAMETERS);
 
     /** With the names in it: a model reads a tool's description far more reliably than it calls list_agents. */
-    static ToolDefinition definition(AgentDefinition caller) {
-        return new ToolDefinition(NAME, DESCRIPTION + " Available to you: "
-                + String.join(", ", SubAgentPlugin.subAgentsOf(caller)) + ".", PARAMETERS);
+    static ToolDefinition definition(List<String> names) {
+        return new ToolDefinition(NAME, DESCRIPTION + " Available to you: " + String.join(", ", names) + ".",
+                PARAMETERS);
     }
 
     @Override
     public ToolDefinition definition() {
-        return definition(caller);
+        return definition(roster.namedByCaller());
     }
 
     @Override
@@ -97,12 +93,9 @@ final class RunAgentTool implements Tool {
                 || !(task.get(MESSAGE) instanceof String message) || message.isBlank()) {
             throw new IllegalArgumentException("a task needs the agent's \"name\" and a \"message\"");
         }
-        AgentDefinition agent = SubAgentPlugin.subAgentsOf(caller).contains(name)
-                ? agents.resolve(name, session).filter(SubAgentPlugin::callable).orElse(null) : null;
-        if (agent == null) {
-            throw new IllegalArgumentException("there is no agent named " + name + " you can call. Available to you: "
-                    + String.join(", ", SubAgentPlugin.subAgentsOf(caller)));
-        }
+        AgentDefinition agent = roster.find(name, session).orElseThrow(() -> new IllegalArgumentException(
+                "there is no agent named " + name + " you can call. Available to you: "
+                        + String.join(", ", roster.names(session))));
         if (depthOf(session) + 1 > maxDepth) {
             throw new IllegalArgumentException("Sub-agent depth limit (" + maxDepth + ") exceeded");
         }

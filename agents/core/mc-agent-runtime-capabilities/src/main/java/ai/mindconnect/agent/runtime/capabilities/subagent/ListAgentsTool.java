@@ -4,12 +4,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
-import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 
 /** Tells an agent which agents it can hand a task to, and what each is for. */
@@ -21,12 +19,10 @@ final class ListAgentsTool implements Tool {
             "Lists the agents you can call with run_agent, with their names and descriptions.",
             Map.of("type", "object", "properties", Map.of(), "required", List.of()));
 
-    private final AgentDefinition caller;
-    private final AgentResolver agents;
+    private final Roster roster;
 
-    ListAgentsTool(AgentDefinition caller, AgentResolver agents) {
-        this.caller = caller;
-        this.agents = agents;
+    ListAgentsTool(Roster roster) {
+        this.roster = roster;
     }
 
     @Override
@@ -36,11 +32,9 @@ final class ListAgentsTool implements Tool {
 
     @Override
     public ToolOutput execute(ToolCall call, Session session) {
-        return ToolOutput.ok(SubAgentPlugin.subAgentsOf(caller).stream()
-                .map(name -> agents.resolve(name, session))
-                .flatMap(java.util.Optional::stream)
-                .filter(SubAgentPlugin::callable)
-                .map(agent -> "- " + agent.name() + ": " + agent.description())
+        return ToolOutput.ok(roster.entries(session).stream()
+                .map(entry -> "- " + entry.agent().name() + (entry.ofProject() ? " (this project)" : "")
+                        + ": " + entry.agent().description())
                 .collect(Collectors.joining("\n")));
     }
 }

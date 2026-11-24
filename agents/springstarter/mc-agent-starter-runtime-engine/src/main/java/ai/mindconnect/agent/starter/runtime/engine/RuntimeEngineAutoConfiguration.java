@@ -63,6 +63,7 @@ import ai.mindconnect.agent.runtime.infrastructure.FilePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.FileStorePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.InMemoryStorePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.LlmPlugin;
+import ai.mindconnect.agent.runtime.infrastructure.ProjectAgentPlugin;
 import ai.mindconnect.agent.runtime.infrastructure.SkillSourcePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.StorePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.UserSkillDirectory;
@@ -190,6 +191,7 @@ public class RuntimeEngineAutoConfiguration {
                         env.getProperty("mindconnect.agent.instructions.user-dir", "")))
                 .plugin(new SkillSourcePlugin(
                         UserSkillDirectory.of(env.getProperty("mindconnect.agent.skills.user-dir", ""))))
+                .plugin(new ProjectAgentPlugin())
                 .plugin(new ManagementPlugin())
                 .plugin(new UserStreamPlugin())
                 .plugin(new AttachmentPlugin())
