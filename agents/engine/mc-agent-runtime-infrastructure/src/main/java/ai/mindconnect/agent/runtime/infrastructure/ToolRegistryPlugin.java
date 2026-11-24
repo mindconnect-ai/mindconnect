@@ -37,7 +37,8 @@ public final class ToolRegistryPlugin implements Plugin {
     /**
      * A layer over the registry, for a plugin that has a say in which tools
      * there are: every contributed one wraps what the ones before it left,
-     * so the last has the last word.
+     * so the last has the last word. What an operator set for a tool is
+     * applied over all of them.
      */
     @FunctionalInterface
     public interface Layer {
@@ -89,16 +90,17 @@ public final class ToolRegistryPlugin implements Plugin {
             // Deferred: the tools bind their providers on warmUp, once the host is up.
             tools = SpiToolRegistry.deferred(registry.get(ToolEnvironment.class));
             ToolRegistry offered = ConfiguredToolRegistry.of(tools, disabledTools);
-            ToolRegistry configured = registry.find(ToolRepository.class)
-                    .<ToolRegistry>map(operator -> new OverlayToolRegistry(offered, operator))
-                    .orElse(offered);
-            ToolRegistry effective = configured;
             for (Layer layer : registry.all(Layer.class)) {
-                effective = layer.over(effective);
+                offered = layer.over(offered);
             }
-            ToolRegistry layered = effective;
-            registry.get(ToolRegistryRef.class).set(layered);
-            return layered;
+            // The operator's settings outermost: whoever shows them unwraps this one registry to see
+            // the tools they were made for, the ones switched off included.
+            ToolRegistry source = offered;
+            ToolRegistry effective = registry.find(ToolRepository.class)
+                    .<ToolRegistry>map(operator -> new OverlayToolRegistry(source, operator))
+                    .orElse(source);
+            registry.get(ToolRegistryRef.class).set(effective);
+            return effective;
         });
         // Whoever keeps tools in their own account: a service of the runtime or of the host, or nobody.
         RegistryToolResolver resolver = new RegistryToolResolver(registry.supplier(ToolRegistry.class),

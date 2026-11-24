@@ -98,3 +98,5 @@
 - Agents a project keeps in `.mindconnect/agents/*.md` are found again:
   `list_agents` shows them first, `run_agent` calls them without a roster
   entry, and they may use no more than the agent calling them.
+- A tool switched off in the tool catalog keeps its row, marked "(off)", so
+  it can be switched on again there.
