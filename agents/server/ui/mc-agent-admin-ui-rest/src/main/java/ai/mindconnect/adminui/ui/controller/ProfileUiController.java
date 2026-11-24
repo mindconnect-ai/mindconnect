@@ -70,60 +70,58 @@ public class ProfileUiController {
     private final NamespaceService namespaces;
     private final NamespaceMembers members;
     private final ScopeSupplier scope;
-    /** What the installed tools declare they need from a user; null on a host without tools. */
-    private final ToolVariables toolVariables;
-    /** What they ask to be connected, and what this user attached; null likewise. */
-    private final ToolConnections toolConnections;
-    /** What this user keeps in their own tool account; null on a host that keeps none. */
-    private final UserTools userToolsUi;
-    /** Builds the rows of the "My tools" tab — the same ones its own controller renders after a change. */
-    private final UserToolUiController userToolRows;
-    private final Clock clock;
     private final boolean authEnabled;
+    /** What the installed tools declare they need from a user; null on a host without tools. */
+    private ToolVariables toolVariables;
+    /** What they ask to be connected, and what this user attached; null likewise. */
+    private ToolConnections toolConnections;
+    /** What this user keeps in their own tool account; null on a host that keeps none. */
+    private UserTools userToolsUi;
+    /** Builds the rows of the "My tools" tab — the same ones its own controller renders after a change. */
+    private UserToolUiController userToolRows;
     /** The "Memory" tab — what agents remember about the user; null leaves the tab out. */
     private UserMemoryUiController memoryUi;
     /** Whose zone is what — the users' own, else the installation's ({@code mindconnect.time-zone}). */
     private TimeZones zones;
+    private Clock clock = Clock.systemUTC();
 
-    @org.springframework.beans.factory.annotation.Autowired
     public ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
                                NamespaceMembers members, ScopeSupplier scope,
-                               org.springframework.beans.factory.ObjectProvider<ToolVariables> toolVariables,
-                               org.springframework.beans.factory.ObjectProvider<ToolConnections> toolConnections,
-                               org.springframework.beans.factory.ObjectProvider<UserTools> userTools,
-                               org.springframework.beans.factory.ObjectProvider<UserToolUiController> userToolRows,
-                               org.springframework.beans.factory.ObjectProvider<TimeZones> zones,
-                               org.springframework.beans.factory.ObjectProvider<UserMemoryUiController> memoryUi,
                                @org.springframework.beans.factory.annotation.Value("${mindconnect.auth.enabled:false}")
                                boolean authEnabled) {
-        this(tokens, users, namespaces, members, scope, toolVariables.getIfAvailable(),
-                toolConnections.getIfAvailable(), userTools.getIfAvailable(), userToolRows.getIfAvailable(),
-                Clock.systemUTC(), authEnabled);
-        timeZones(zones.getIfAvailable());
-        this.memoryUi = memoryUi.getIfAvailable();
-    }
-
-    ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
-                        NamespaceMembers members, ScopeSupplier scope, Clock clock, boolean authEnabled) {
-        this(tokens, users, namespaces, members, scope, null, null, null, null, clock, authEnabled);
-    }
-
-    ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
-                        NamespaceMembers members, ScopeSupplier scope, ToolVariables toolVariables,
-                        ToolConnections toolConnections, UserTools userToolsUi,
-                        UserToolUiController userToolRows, Clock clock, boolean authEnabled) {
-        this.userToolsUi = userToolsUi;
-        this.userToolRows = userToolRows;
-        this.toolConnections = toolConnections;
-        this.toolVariables = toolVariables;
         this.tokens = tokens;
         this.users = users;
         this.namespaces = namespaces;
         this.members = members;
         this.scope = scope;
-        this.clock = clock;
         this.authEnabled = authEnabled;
         this.zones = new UserTimeZones(users);
+    }
+
+    /**
+     * What a host may or may not have: the tool modules' tabs, the memory tab, its own way of
+     * resolving zones. Kept out of the constructor because none of it is needed for a profile —
+     * each tab says so, or is left out, where its part is missing.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    void optionalParts(org.springframework.beans.factory.ObjectProvider<ToolVariables> toolVariables,
+                       org.springframework.beans.factory.ObjectProvider<ToolConnections> toolConnections,
+                       org.springframework.beans.factory.ObjectProvider<UserTools> userTools,
+                       org.springframework.beans.factory.ObjectProvider<UserToolUiController> userToolRows,
+                       org.springframework.beans.factory.ObjectProvider<TimeZones> zones,
+                       org.springframework.beans.factory.ObjectProvider<UserMemoryUiController> memoryUi) {
+        this.toolVariables = toolVariables.getIfAvailable();
+        this.toolConnections = toolConnections.getIfAvailable();
+        this.userToolsUi = userTools.getIfAvailable();
+        this.userToolRows = userToolRows.getIfAvailable();
+        this.memoryUi = memoryUi.getIfAvailable();
+        timeZones(zones.getIfAvailable());
+    }
+
+    /** The clock a token's lifetime is counted from — for tests. */
+    ProfileUiController clock(Clock clock) {
+        this.clock = clock;
+        return this;
     }
 
     /** Where the installation's zone comes from — for a host that resolves zones its own way, and for tests. */
@@ -135,16 +133,18 @@ public class ProfileUiController {
     @GetMapping
     public UiPage profile(@AuthenticationPrincipal OidcUser user) {
         UserId id = userId(user);
-        return new ProfilePage(id, namespaces.actor(id), users.find(id).orElse(null),
-                user == null ? null : user.getFullName(),
-                user == null ? null : user.getEmail(),
-                tokens.list(id), authEnabled,
-                namespaces.forUser(id), namespaces.defaultNamespace(), namespaces.defaultIsOpen(),
-                scope.namespace(), toolVariableRows(id),
-                connectionCards(id), toolConnections != null && toolConnections.available(),
-                userToolRows == null ? List.of() : userToolRows.rows(id),
-                userToolsUi == null ? java.util.Map.of() : userToolsUi.catalogue(),
-                userToolsUi != null && userToolsUi.available()).timeZone(zones.zoneOf(id))
+        return new ProfilePage(
+                new ProfilePage.Account(id, namespaces.actor(id), users.find(id).orElse(null),
+                        user == null ? null : user.getFullName(), user == null ? null : user.getEmail(),
+                        tokens.list(id), authEnabled),
+                new ProfilePage.NamespaceChoice(namespaces.forUser(id), namespaces.defaultNamespace(),
+                        namespaces.defaultIsOpen(), scope.namespace()),
+                new ProfilePage.ToolSetup(toolVariableRows(id), connectionCards(id),
+                        toolConnections != null && toolConnections.available(),
+                        userToolRows == null ? List.of() : userToolRows.rows(id),
+                        userToolsUi == null ? java.util.Map.of() : userToolsUi.catalogue(),
+                        userToolsUi != null && userToolsUi.available()))
+                .timeZone(zones.zoneOf(id))
                 .memoryTab(memoryUi == null ? null : memoryUi.tab(id).orElse(null))
                 .render();
     }

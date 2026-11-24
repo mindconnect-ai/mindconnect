@@ -103,69 +103,60 @@ public class ProfilePage extends AdminPage {
     private UiNode memoryTab;
 
     /**
+     * Who is signed in, as the Account tab shows it.
+     *
      * @param me          who the signed-in user is to a namespace — id and the address they are
      *                    listed under, which the namespace service answers
      * @param user        the stored user record; null before it was first recorded
      * @param displayName the name the login carries; null to fall back to the record
      * @param email       the e-mail the login carries; null to fall back to the record
      * @param authEnabled whether this installation checks tokens at all
-     * @param namespaces  the namespaces the user may work in, the default one first
-     * @param active      the namespace the user is in right now
      */
-    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
-                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
-                       Namespace active) {
-        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace, true, active);
-    }
+    public record Account(UserId userId, Actor me, User user, String displayName, String email,
+                          List<ApiToken> tokens, boolean authEnabled) { }
 
-    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
-                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
-                       boolean defaultOpen, Namespace active) {
-        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace,
-                defaultOpen, active, List.of());
-    }
+    /**
+     * Where the user may work.
+     *
+     * @param all              the namespaces the user may work in, the default one first
+     * @param defaultOpen      whether the default namespace still takes every signed-in user
+     * @param active           the namespace the user is in right now
+     */
+    public record NamespaceChoice(List<NamespaceDefinition> all, Namespace defaultNamespace, boolean defaultOpen,
+                                  Namespace active) { }
 
-    /** The page with what the installed tools ask of this user beside their own variables. */
-    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
-                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
-                       boolean defaultOpen, Namespace active, List<ToolVariableRow> toolVariables) {
-        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace,
-                defaultOpen, active, toolVariables, List.of(), false);
-    }
+    /**
+     * What the installed tools ask of this user and what the user keeps for them. Empty lists
+     * and {@code false} on a host that has no tools, keeps no connections or no per-user tools.
+     *
+     * @param variables       what the tools declare they need from this user
+     * @param connections     what they ask this user to connect, with what is attached
+     * @param connectionStore whether the host keeps connections at all
+     * @param userTools       what this user keeps in their own tool account, and what they could add
+     * @param userToolStore   whether the host keeps per-user tools at all
+     */
+    public record ToolSetup(List<ToolVariableRow> variables, List<ConnectionsComponent.Card> connections,
+                            boolean connectionStore, List<UserToolsComponent.Row> userTools,
+                            Map<String, java.util.Set<String>> catalogue, boolean userToolStore) { }
 
-    /** The page with the accounts this user has attached. */
-    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
-                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
-                       boolean defaultOpen, Namespace active, List<ToolVariableRow> toolVariables,
-                       List<ConnectionsComponent.Card> connections, boolean connectionStore) {
-        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace,
-                defaultOpen, active, toolVariables, connections, connectionStore, List.of(), Map.of(), false);
-    }
-
-    /** The page with what this user keeps in their own tool account. */
-    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
-                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
-                       boolean defaultOpen, Namespace active, List<ToolVariableRow> toolVariables,
-                       List<ConnectionsComponent.Card> connections, boolean connectionStore,
-                       List<UserToolsComponent.Row> userTools,
-                       Map<String, java.util.Set<String>> toolCatalogue, boolean userToolStore) {
-        this.userTools = userTools == null ? List.of() : List.copyOf(userTools);
-        this.toolCatalogue = toolCatalogue == null ? Map.of() : Map.copyOf(toolCatalogue);
-        this.userToolStore = userToolStore;
-        this.connections = connections == null ? List.of() : List.copyOf(connections);
-        this.connectionStore = connectionStore;
-        this.toolVariables = toolVariables == null ? List.of() : List.copyOf(toolVariables);
-        this.defaultOpen = defaultOpen;
-        this.userId = userId;
-        this.me = me;
-        this.user = user;
-        this.displayName = displayName;
-        this.email = email;
-        this.tokens = tokens;
-        this.authEnabled = authEnabled;
-        this.namespaces = namespaces;
-        this.defaultNamespace = defaultNamespace;
-        this.active = active;
+    public ProfilePage(Account account, NamespaceChoice namespaces, ToolSetup tools) {
+        this.userId = account.userId();
+        this.me = account.me();
+        this.user = account.user();
+        this.displayName = account.displayName();
+        this.email = account.email();
+        this.tokens = account.tokens();
+        this.authEnabled = account.authEnabled();
+        this.namespaces = namespaces.all();
+        this.defaultNamespace = namespaces.defaultNamespace();
+        this.defaultOpen = namespaces.defaultOpen();
+        this.active = namespaces.active();
+        this.toolVariables = List.copyOf(tools.variables());
+        this.connections = List.copyOf(tools.connections());
+        this.connectionStore = tools.connectionStore();
+        this.userTools = List.copyOf(tools.userTools());
+        this.toolCatalogue = Map.copyOf(tools.catalogue());
+        this.userToolStore = tools.userToolStore();
     }
 
     /**

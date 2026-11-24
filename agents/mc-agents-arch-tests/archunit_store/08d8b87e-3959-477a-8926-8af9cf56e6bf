@@ -25,7 +25,6 @@ ai.mindconnect.adminui.ui.controller.LlmPriceUiController has 2 constructors
 ai.mindconnect.adminui.ui.controller.MemoryAdminUiController has 2 constructors
 ai.mindconnect.adminui.ui.controller.NotificationUiController has 3 constructors
 ai.mindconnect.adminui.ui.controller.OAuthCallbackController has 2 constructors
-ai.mindconnect.adminui.ui.controller.ProfileUiController has 3 constructors
 ai.mindconnect.adminui.ui.controller.UserMemoryUiController has 2 constructors
 ai.mindconnect.adminui.ui.page.AgentDetailPage has 2 constructors
 ai.mindconnect.adminui.ui.page.AgentFormPage has 2 constructors
@@ -33,7 +32,6 @@ ai.mindconnect.adminui.ui.page.AgentListPage has 2 constructors
 ai.mindconnect.adminui.ui.page.LlmConfigDetailPage has 2 constructors
 ai.mindconnect.adminui.ui.page.LlmConfigFormPage has 2 constructors
 ai.mindconnect.adminui.ui.page.NamespacesPage has 2 constructors
-ai.mindconnect.adminui.ui.page.ProfilePage has 5 constructors
 ai.mindconnect.adminui.ui.page.SkillListPage has 2 constructors
 ai.mindconnect.adminui.ui.page.ToolListPage has 2 constructors
 ai.mindconnect.agent.chat.stream.SessionChannels has 2 constructors
