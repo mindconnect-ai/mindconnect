@@ -529,6 +529,8 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("Buy."));
         model.script.add(TurnMessage.assistant("`PASS`"));
         model.script.add(TurnMessage.assistant("Buy. This is not investment advice."));
+        List<SessionEvent> heard = new CopyOnWriteArrayList<>();
+        sessions.subscribe(session.id(), false, heard::add);
 
         Turn ended = awaitRest(turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), advisor).id(), "What now?")));
 
@@ -540,6 +542,15 @@ class EngineWithCapabilitiesTest {
         assertThat(review.instructions()).startsWith("The user asked: What now?. The draft: Buy..");
         assertThat(review.tools()).isEmpty();
         assertThat(review.messages().get(0).text()).contains("<agent_response>\nBuy.\n</agent_response>");
+        // Whoever follows the session hears each reviewer begin and what it decided; a missing one says nothing.
+        assertThat(heard).filteredOn(SessionEvent.Notice.class::isInstance)
+                .extracting(event -> ((SessionEvent.Notice) event).kind() + " " + ((SessionEvent.Notice) event).details())
+                .filteredOn(line -> line.startsWith("review."))
+                .containsExactly(
+                        "review.started {reviewer=lenient}",
+                        "review.finished " + Map.of("reviewer", "lenient", "verdict", "PASSED"),
+                        "review.started {reviewer=editor}",
+                        "review.finished " + Map.of("reviewer", "editor", "verdict", "MODIFIED"));
     }
 
     @Test

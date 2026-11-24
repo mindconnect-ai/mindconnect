@@ -103,3 +103,5 @@
 - A tool card in the chat draws the first 10,000 characters of a long result
   and links to *Download the full result*, which hands out all of it as a text
   file.
+- The chat shows a card while a response reviewer reads the answer
+  ("reviewing…") and its verdict afterwards — passed, modified or blocked.

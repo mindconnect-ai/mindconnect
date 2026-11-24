@@ -11,6 +11,7 @@ import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.management.tool.AgentToolBinding;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.chatui.ui.component.ChatAgent;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.chatui.ui.page.ChatPage;
 import ai.mindconnect.agent.loop.domain.TurnEvent;
@@ -44,6 +45,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.ToolState;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -1901,6 +1903,25 @@ public class ChatUiController {
                 }
             }
         };
+        // Reviewers run after the answer is on screen. Without a card the chat
+        // just sits there, which makes a finished-looking turn feel stuck.
+        List<TaskCardComponent> reviewerVerdicts = new ArrayList<>();
+        Consumer<SessionEvent.Notice> onReview = notice -> {
+            String reviewer = String.valueOf(notice.details().get(ResponseReviewPlugin.REVIEWER));
+            String node = "task-reviewer-" + sessionId.value() + "-" + turnKey + "-" + reviewer;
+            synchronized (liveLock) {
+                if (ResponseReviewPlugin.REVIEW_STARTED.equals(notice.kind())) {
+                    publishPatch(bus, appendCard(liveView, null, TaskCardComponent.runningReviewer(node, reviewer)));
+                } else if (ResponseReviewPlugin.REVIEW_FINISHED.equals(notice.kind())) {
+                    var verdict = TaskCardComponent.doneReviewer(node, reviewer,
+                            String.valueOf(notice.details().get(ResponseReviewPlugin.VERDICT)), null);
+                    publishPatch(bus, liveView.streamTaskUpdate(verdict));
+                    // Kept for after the turn: the list is rebuilt from the
+                    // stored history then, and a review is not part of it.
+                    reviewerVerdicts.add(verdict);
+                }
+            }
+        };
         Consumer<List<Interruption>> asked = interruptions -> {
             synchronized (liveLock) {
                 closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
@@ -1922,6 +1943,7 @@ public class ChatUiController {
                 case SessionEvent.TurnReported reported when own -> onEvent.accept(reported.event());
                 case SessionEvent.TurnReported reported ->
                     onSubAgentEvent.accept(reported.sessionId(), reported.event());
+                case SessionEvent.Notice notice when own -> onReview.accept(notice);
                 default -> { }
             }
         });
@@ -1974,6 +1996,13 @@ public class ChatUiController {
                 // (assistant message, historic task cards, updated tokens).
                 ChatPage finalView = buildChatPage(session, agent);
                 publishPatch(bus, finalView.streamDone(typingId));
+                // After the rebuild, or it would wipe them. They sit below
+                // the answer, which is also when they ran.
+                synchronized (liveLock) {
+                    for (TaskCardComponent verdict : reviewerVerdicts) {
+                        publishPatch(bus, finalView.streamTaskStart(verdict));
+                    }
+                }
 
                 // "done" ends the TURN, not the stream: subscribers stay
                 // attached and are still there when the next turn — possibly

@@ -16,11 +16,13 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.hook.AgentContext;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
+import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.capabilities.guard.GuardResolver;
 import ai.mindconnect.agent.runtime.capabilities.guard.OutputGuard;
@@ -43,6 +45,22 @@ public final class ResponseReviewPlugin implements Plugin {
 
     /** The key in an agent's metadata that names its reviewers: a list of agent names, in the order they review. */
     public static final String REVIEWERS = "responseReviewers";
+
+    /**
+     * The {@link SessionEvent.Notice} that a reviewer has begun: the answer
+     * is written, and whoever shows the turn would otherwise show nothing
+     * while it is read. Its details name the {@link #REVIEWER}.
+     */
+    public static final String REVIEW_STARTED = "review.started";
+
+    /** The notice that a reviewer is done; its details name the {@link #REVIEWER} and its {@link #VERDICT}. */
+    public static final String REVIEW_FINISHED = "review.finished";
+
+    /** In a review notice: the reviewing agent's name. */
+    public static final String REVIEWER = "reviewer";
+
+    /** In a {@link #REVIEW_FINISHED} notice: {@code PASSED}, {@code MODIFIED}, {@code BLOCKED} or {@code FAILED}. */
+    public static final String VERDICT = "verdict";
 
     private static final Logger LOG = LoggerFactory.getLogger(ResponseReviewPlugin.class);
     private static final int MESSAGES_BEFORE = 10;
@@ -94,16 +112,22 @@ public final class ResponseReviewPlugin implements Plugin {
                     LOG.warn("There is no reviewer '{}'; the answer goes on without its review", name);
                     continue;
                 }
+                notify(registry, context, REVIEW_STARTED, Map.of(REVIEWER, name));
                 String verdict = ask(registry, context, reviewer.get(), question, response, before).strip();
                 if (verdict.regionMatches(true, 0, BLOCK, 0, BLOCK.length())) {
                     response = verdict.substring(BLOCK.length()).strip();
+                    notify(registry, context, REVIEW_FINISHED, Map.of(REVIEWER, name, VERDICT, "BLOCKED"));
                     break;
                 }
-                if (!verdict.isEmpty() && !PASS.matcher(verdict).matches()) {
+                boolean rewritten = !verdict.isEmpty() && !PASS.matcher(verdict).matches();
+                if (rewritten) {
                     response = verdict;
                 }
+                notify(registry, context, REVIEW_FINISHED,
+                        Map.of(REVIEWER, name, VERDICT, rewritten ? "MODIFIED" : "PASSED"));
             } catch (RuntimeException e) {
                 LOG.warn("Reviewer '{}' failed; the answer goes on without its review: {}", name, e.toString());
+                notify(registry, context, REVIEW_FINISHED, Map.of(REVIEWER, name, VERDICT, "FAILED"));
             }
         }
         if (response.strip().equals(answer.text().strip())) {
@@ -111,6 +135,13 @@ public final class ResponseReviewPlugin implements Plugin {
         }
         return new TurnMessage(answer.id(), answer.turnId(), answer.type(),
                 List.of(new ContentPart.Text(response)), answer.toolCalls(), answer.metadata());
+    }
+
+    /** Tells whoever follows the session; nobody, where the runtime has no one to tell. */
+    private static void notify(PluginRegistry registry, AgentContext context, String kind,
+                               Map<String, Object> details) {
+        registry.find(SessionEventPublisher.class).ifPresent(events -> events.publish(
+                new SessionEvent.Notice(context.session().id(), context.turnId(), kind, details)));
     }
 
     private static int lastIndexOfUser(List<TurnMessage> said) {
