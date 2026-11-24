@@ -48,8 +48,8 @@ known). Three steps, in this order, each only as far as needed:
    result the agent has dealt with. A result shown as a note once stays that
    note in every later call, whatever is chosen later — a history whose
    beginning changes from call to call costs the provider's prompt cache
-   every time. The result itself is still in the session: an agent that has
-   the `fetch_tool_result` tool reads it again by the id the note names.
+   every time. The result itself is still in the session: the agent reads
+   it again with `fetch_tool_result`, by the id the note names.
 2. **The oldest turns are left out.** Turns are left out whole, so a tool call
    never loses its result, and the turn underway is always sent whole. With
    `compact`, the turns left out are summarised first — together with the
@@ -152,11 +152,25 @@ asks memory to summarise now:
 | `compact` | Summarises everything before the last turn, together with the summary there already is. The last turn stays as said. |
 | `window`, `full`, `none` | **Nothing** — these strategies keep no summary. |
 
-## Related: per-tool result caps
+## Related: how much of a tool result the model reads
 
-Independent of the memory strategy, every tool reference on an agent can set
-**`maxResultChars`** (tool form: *Max result chars*): the tool's output is cut
-before it is kept, with a visible truncation note. Unlike a result memory
-shows as a note this is **real loss** — the cut part never reaches the
-store — so it is opt-in per tool, meant for tools known to over-produce. A
-runtime-wide cap of 100,000 characters applies to every tool regardless.
+Independent of the memory strategy, the model is shown a tool result one page
+at a time. A result longer than the page ends with
+
+`… [showing characters 0-30000 of 184211. Read on with fetch_tool_result: id=<message id>, offset=30000]`
+
+and the model reads on with `fetch_tool_result` (`id`, `offset`, optional
+`limit`; one page per call, the last line names the next offset). Every agent
+that has tools is offered that tool. Nothing is lost: the session keeps the
+result whole, and the chat shows all of it.
+
+The page is **`maxResultChars`**, 30,000 characters unless set:
+
+- for the agent — `definition.metadata.maxResultChars`, agent form: *Max tool
+  result chars*;
+- for one tool of the agent — `maxResultChars` on the tool reference, tool
+  form: *Max result chars*; it takes the place of the agent's.
+
+Separately, a runtime-wide cap of 100,000 characters applies to what a session
+keeps of one result. A result past it is cut before it is kept, with a visible
+truncation note — that cut is real loss, and reading on ends there.

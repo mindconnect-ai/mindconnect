@@ -110,6 +110,17 @@ class AgentUiControllerTest {
     }
 
     @Test
+    void theFormSetsHowMuchOfAToolResultTheModelIsShown_andBlankIsTheDefaultAgain() {
+        controller.update(scout.id().value(), Map.of("name", "Scout", "maxToolResultChars", 5000), user("alice"));
+        assertThat(agents.find(scout.id()).orElseThrow().definition().metadata())
+                .containsEntry("maxResultChars", 5000);
+
+        controller.update(scout.id().value(), Map.of("name", "Scout", "maxToolResultChars", ""), user("alice"));
+        assertThat(agents.find(scout.id()).orElseThrow().definition().metadata())
+                .doesNotContainKey("maxResultChars");
+    }
+
+    @Test
     void someoneElsesSessionIsNotDeleted() {
         ResponseEntity<?> response = controller.deleteSession(scout.id().value(), ALICES.value(), user("bob"));
 

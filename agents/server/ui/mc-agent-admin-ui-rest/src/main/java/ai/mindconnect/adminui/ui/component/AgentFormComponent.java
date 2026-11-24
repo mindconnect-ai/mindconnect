@@ -7,6 +7,7 @@ import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.runtime.capabilities.toolresult.ToolResultPlugin;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -153,6 +154,13 @@ public final class AgentFormComponent implements UiComponent {
                         isNew ? 10 : definition.maxRounds())
                         .asEditable()
                         .hint("Maximum tool-call rounds per turn (defaults to 10, raise to 30+ for deep research)"))
+                .field(UiField.number(MAX_TOOL_RESULT_CHARS, "Max tool result chars",
+                        isNew ? null : definition.metadata().get(ToolResultPlugin.MAX_RESULT_CHARS))
+                        .asEditable()
+                        .hint("How many characters of one tool result the model is shown at a time (blank: "
+                                + ToolResultPlugin.DEFAULT_PAGE_CHARS + "). A longer result ends with a line "
+                                + "saying how to read on with fetch_tool_result; the chat keeps it whole. "
+                                + "A tool can have a limit of its own in the Tools tab"))
                 .field(UiField.textarea("memoryConfig", "Memory (JSON)",
                         isNew ? null : memoryJson())
                         .asEditable()
@@ -252,6 +260,9 @@ public final class AgentFormComponent implements UiComponent {
 
     /** The form field carrying the skills mode. */
     public static final String SKILLS_MODE = "skillsMode";
+
+    /** The form field for the agent's page of a tool result; the tool form has a field of the stored name. */
+    public static final String MAX_TOOL_RESULT_CHARS = "maxToolResultChars";
 
     /** The mode a form submitted, or {@link AgentSetting#ALL} for anything it did not name. */
     public static String skillsMode(String raw) {

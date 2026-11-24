@@ -23,6 +23,7 @@ import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.runtime.capabilities.toolresult.ToolResultPlugin;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
@@ -242,6 +243,13 @@ public class AgentUiController {
             metadata.put(SubAgentPlugin.CALLABLE, false);
         }
         metadata.put(ResponseReviewPlugin.REVIEWERS, body.strList("responseReviewers"));
+        // Blank is the default page: no entry, so a later default reaches this agent too.
+        Integer page = body.numOrNull(AgentFormComponent.MAX_TOOL_RESULT_CHARS);
+        if (page != null && page > 0) {
+            metadata.put(ToolResultPlugin.MAX_RESULT_CHARS, page);
+        } else if (body.str(AgentFormComponent.MAX_TOOL_RESULT_CHARS) != null) {
+            metadata.remove(ToolResultPlugin.MAX_RESULT_CHARS);
+        }
         // Every skill is no entry at all, none is an empty list, and the ones ticked are the list.
         switch (AgentFormComponent.skillsMode(body.str(AgentFormComponent.SKILLS_MODE))) {
             case AgentSetting.NONE -> metadata.put(SkillPlugin.SKILLS, List.of());

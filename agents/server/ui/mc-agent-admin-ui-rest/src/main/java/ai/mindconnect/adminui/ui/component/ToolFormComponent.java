@@ -152,11 +152,10 @@ public final class ToolFormComponent implements UiComponent {
                 .field(UiField.number("maxResultChars", "Max result chars",
                         isNew ? null : tool.maxResultChars())
                         .asEditable()
-                        .hint("Cut this tool's result after N characters at persist time (with a "
-                                + "visible truncation note) — the cut part is really gone. Leave "
-                                + "blank for no per-tool cap; a runtime safety cap of 100k always "
-                                + "applies. For lossless shrinking use the memory strategy's "
-                                + "tool-result compression instead"));
+                        .hint("How many characters of this tool's result the model is shown at a "
+                                + "time, in place of the agent's own limit. A longer result ends "
+                                + "with a line saying how to read on with fetch_tool_result; "
+                                + "nothing is lost. Leave blank for the agent's limit"));
 
         String backHref = "/admin/agents/" + agent.id().value() + "?section=tools"
                 + (isNew ? "" : "&row=" + tool.id().value());

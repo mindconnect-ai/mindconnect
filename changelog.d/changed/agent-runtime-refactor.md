@@ -90,3 +90,9 @@
   never pruned. `toolResultEviction` of an agent file written before 1.0 is
   read as `after_turn`. A memory setting with an unknown key is refused when
   the agent form is saved.
+- A long tool result reaches the model one page at a time (30,000 characters;
+  `maxResultChars` per agent, agent form: *Max tool result chars*, or per tool
+  as before). The page ends with a line naming the result's id and the next
+  offset, and `fetch_tool_result` — now offered to every agent that has tools —
+  reads on with `offset` and `limit`. The per-tool limit no longer cuts the
+  result: the session keeps it whole.
