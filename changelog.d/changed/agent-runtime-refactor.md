@@ -59,8 +59,7 @@
 - **tools:** **`fetch_tool_result` reads a result that memory replaced with a
   note, by the id the note names.** An old tool result is shown to the model as
   `[Tool result removed to save context: N tokens, id=…]` and stays in the
-  session; a result is no longer summarised by a model on the way in, only cut
-  at its binding's `maxResultChars`, at most 100,000 characters.
+  session; a result is no longer summarised by a model on the way in.
 - **sub-agents:** **the depth sub-agents may be nested to is a setting,**
   `mindconnect.agent.sub-agents.max-depth` (default 5). A call beyond it fails
   with an error the calling agent reads.
@@ -94,8 +93,8 @@
   `maxResultChars` per agent, agent form: *Max tool result chars*, or per tool
   as before). The page ends with a line naming the result's id and the next
   offset, and `fetch_tool_result` — now offered to every agent that has tools —
-  reads on with `offset` and `limit`. The per-tool limit no longer cuts the
-  result: the session keeps it whole.
+  reads on with `offset` and `limit`. No limit cuts the result any more, the
+  runtime-wide cap of 100,000 characters included: the session keeps it whole.
 - Agents a project keeps in `.mindconnect/agents/*.md` are found again:
   `list_agents` shows them first, `run_agent` calls them without a roster
   entry, and they may use no more than the agent calling them.

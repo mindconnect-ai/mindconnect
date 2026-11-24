@@ -171,6 +171,5 @@ The page is **`maxResultChars`**, 30,000 characters unless set:
 - for one tool of the agent — `maxResultChars` on the tool reference, tool
   form: *Max result chars*; it takes the place of the agent's.
 
-Separately, a runtime-wide cap of 100,000 characters applies to what a session
-keeps of one result. A result past it is cut before it is kept, with a visible
-truncation note — that cut is real loss, and reading on ends there.
+There is no cap on the result itself: what a tool returns is kept as it is,
+and reading on reaches all of it.

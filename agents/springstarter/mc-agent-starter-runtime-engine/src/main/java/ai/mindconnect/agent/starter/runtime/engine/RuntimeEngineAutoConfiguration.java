@@ -195,7 +195,7 @@ public class RuntimeEngineAutoConfiguration {
                 .plugin(new ManagementPlugin())
                 .plugin(new UserStreamPlugin())
                 .plugin(new AttachmentPlugin())
-                .plugin(new ToolResultPlugin(ToolResultPlugin.DEFAULT_MAX_RESULT_CHARS))
+                .plugin(new ToolResultPlugin())
                 .plugin(new TodoPlugin())
                 .plugin(new UserMemoryPlugin())
                 // In place of the builder's own: what a session keeps, it keeps in the session.

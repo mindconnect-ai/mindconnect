@@ -1,7 +1,6 @@
 package ai.mindconnect.agent.runtime.capabilities.toolresult;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,7 +36,7 @@ import ai.mindconnect.plugin.PluginRegistry;
 
 /**
  * The model reads a long result a page at a time and reads on by its id; the
- * session keeps the result whole, up to the cap of the runtime.
+ * session keeps the result whole.
  */
 class ToolResultPluginTest {
 
@@ -65,7 +64,7 @@ class ToolResultPluginTest {
 
     ToolResultPluginTest() {
         registry.provide(SessionStore.class, ToolResultPluginTest::store);
-        registry.install(new ToolResultPlugin(100));
+        registry.install(new ToolResultPlugin());
     }
 
     @Test
@@ -125,26 +124,10 @@ class ToolResultPluginTest {
     }
 
     @Test
-    void a_result_past_the_cap_of_the_runtime_is_cut_before_it_is_kept_and_says_so() {
-        assertThat(produced("web_search", ToolOutput.ok("x".repeat(100)))).isEqualTo(ToolOutput.ok("x".repeat(100)));
-        assertThat(produced("web_search", ToolOutput.ok("x".repeat(101))))
-                .isEqualTo(ToolOutput.ok("x".repeat(100) + "\n… [output truncated after 100 characters]"));
-        // The limit of a binding is a page for the model, not a cut: the session keeps the result.
-        assertThat(produced("bash", ToolOutput.ok(LONG))).isEqualTo(ToolOutput.ok(LONG));
-    }
-
-    @Test
-    void a_failure_stays_one_and_what_is_no_result_is_left_alone() {
-        assertThat(produced("bash", ToolOutput.failed("Error: " + "x".repeat(100))))
-                .isEqualTo(ToolOutput.failed("Error: " + "x".repeat(93)
-                        + "\n… [output truncated after 100 characters]"));
-        ToolOutput asks = ToolOutput.interrupt("tool_approval", Map.of());
-        assertThat(produced("bash", asks)).isSameAs(asks);
-    }
-
-    @Test
-    void a_cap_that_is_none_is_refused() {
-        assertThatThrownBy(() -> new ToolResultPlugin(0)).isInstanceOf(IllegalArgumentException.class);
+    void what_a_tool_returns_is_kept_as_it_is_however_long() {
+        // The page is what the model is shown; the session has the result, and reading on reaches all of it.
+        assertThat(produced("bash", ToolOutput.ok("x".repeat(1_000_000))))
+                .isEqualTo(ToolOutput.ok("x".repeat(1_000_000)));
     }
 
     @Test

@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
-import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
-import ai.mindconnect.agent.runtime.api.hook.ToolInvocation;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.agent.loop.domain.ContentPart;
@@ -29,10 +27,6 @@ import ai.mindconnect.plugin.PluginRegistry;
  * limit is the agent's ({@value #MAX_RESULT_CHARS} in its metadata), and a
  * tool known to over-produce gets one of its own in the agent's binding.
  *
- * <p>What a session keeps has a cap of its own, the runtime's: a result past
- * it is cut before it is kept, and that cut is real loss — it keeps megabyte
- * dumps out of the store and the page.
- *
  * <p>Installed before memory: memory counts what the model is sent, and
  * that is the page, not the result.
  */
@@ -48,21 +42,8 @@ public final class ToolResultPlugin implements Plugin {
     /** The page of an agent that names none: what a model reads without losing the thread. */
     public static final int DEFAULT_PAGE_CHARS = 30_000;
 
-    /** The cap for a runtime that names none: far above anything a model reads. */
-    public static final int DEFAULT_MAX_RESULT_CHARS = 100_000;
-
     /** The tool that reads on in a result the model was shown a page of, or one memory has set aside. */
     public static final String FETCH_TOOL = "fetch_tool_result";
-
-    private final int maxResultChars;
-
-    /** @param maxResultChars the cap on what a session keeps of one result */
-    public ToolResultPlugin(int maxResultChars) {
-        if (maxResultChars <= 0) {
-            throw new IllegalArgumentException("The cap on a tool result must be positive, not " + maxResultChars);
-        }
-        this.maxResultChars = maxResultChars;
-    }
 
     /** How many characters of a result of this tool the agent's model is shown at a time. */
     static int pageChars(AgentDefinition agent, Object toolName) {
@@ -94,17 +75,7 @@ public final class ToolResultPlugin implements Plugin {
             offered.add(FetchToolResultTool.DEFINITION);
             return offered;
         });
-        registry.after(RuntimeHook.TOOL_CALL, this::kept);
         registry.before(RuntimeHook.MODEL_CALL, call -> BeforeOutcome.proceed(call.with(paged(call))));
-    }
-
-    private ToolOutput kept(ToolInvocation invocation, ToolOutput output) {
-        if (!(output instanceof ToolOutput.Completed done) || done.text() == null
-                || done.text().length() <= maxResultChars) {
-            return output;
-        }
-        return new ToolOutput.Completed(done.text().substring(0, maxResultChars)
-                + "\n… [output truncated after " + maxResultChars + " characters]", done.failed());
     }
 
     private static ModelRequest paged(ModelCall call) {
