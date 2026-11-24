@@ -88,6 +88,8 @@ and the rule it violates.
   Found 2026-11-24 in feature/agent-runtime-refactor by the maintainer and the agent. Size: one wave. Rule: –.
 - [ ] **agents/core/mc-agent-runtime-api, agents/engine/mc-agent-runtime-infrastructure** `SessionService.lifecycle(UserId, …)` and `lifecycleOfAll(…)` have no caller in the server: the chat's session list still reads `UserChannels`, fed by `UserEventFeed`, and the task monitor reads the task queue. `UserEventFeed` cannot move to a subscription as it is — a contributed listener hears every namespace, a subscription only the one it was made in — so the runtime's lifecycle channel and the server's user stream do the same job twice. Decide which one a list of sessions reads, and have the other go or build on it.
   Found 2026-11-24 in feature/agent-runtime-refactor by the maintainer and the agent. Size: one wave. Rule: reuse.
+- [ ] **common/mc-common** `EncryptionHelper` encrypts stored secrets (LLM keys, connection credentials, namespace and user variables) with `Cipher.getInstance("AES")`, which in Java is AES/ECB/PKCS5Padding: no IV, no authentication. Equal plaintext blocks give equal ciphertext blocks — two stored values that begin with the same 16 bytes begin with the same ciphertext, seen in the data directory during the manual regression run — and a changed ciphertext is not detected. AES-GCM with a random nonce per value is the fitting mode; stored `enc:` values need a version tag so the earlier ones are still read and are rewritten on the next save.
+  Found 2026-11-24 in feature/agent-runtime-refactor by the agent, in the manual regression case namespaces/variables-precedence. Size: one wave. Rule: –.
 
 ## Closed
 
