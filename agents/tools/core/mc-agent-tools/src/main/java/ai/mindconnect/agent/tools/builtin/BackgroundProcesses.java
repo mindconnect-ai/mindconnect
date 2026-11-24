@@ -82,14 +82,19 @@ final class BackgroundProcesses {
     }
 
     /**
-     * Ends a process and all of its descendants — children first, so a
-     * shell's death does not orphan the server it started.
+     * Ends a process and all of its descendants, each parent before its
+     * children: a shell that outlives the command it was running sees it die
+     * and goes on with the next one. The children are noted first — once
+     * their parent is dead they are nobody's children any more, but a handle
+     * still reaches them.
      */
     static void killTree(ProcessHandle root) {
-        try (Stream<ProcessHandle> descendants = root.descendants()) {
-            descendants.forEach(ProcessHandle::destroyForcibly);
+        List<ProcessHandle> children;
+        try (Stream<ProcessHandle> noted = root.children()) {
+            children = noted.toList();
         }
         root.destroyForcibly();
+        children.forEach(BackgroundProcesses::killTree);
     }
 
     private static String key(SessionId sessionId) {
