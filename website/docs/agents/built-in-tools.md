@@ -82,6 +82,11 @@ additional directory. On a server a working directory must lie under
 `mindconnect.tools.working-dir-root`, by default the user's home; the CLI
 sets that root to `/` and works where it was launched.
 
+Deleting a session leaves its directory on disk: what an agent wrote there
+is not removed with the chat. A host that wants the directories gone — a
+server where they would pile up — contributes a `SessionDirectoryCleanup` as
+a `SessionCleanup` when it assembles the runtime.
+
 A session with no directory at all — one written before 0.5.2, a runtime
 without a users' home — falls back to the tool's own `baseDir` override,
 then the **base directory** (`mindconnect.tools.base-dir`), which defaults

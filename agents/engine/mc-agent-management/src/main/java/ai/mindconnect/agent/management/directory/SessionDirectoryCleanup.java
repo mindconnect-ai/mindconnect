@@ -12,10 +12,14 @@ import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionCleanup;
 
 /**
- * A session's own directory under its user's home goes with it — its
- * uploads, notes and logs are nobody else's, and on a server they would
- * pile up. Only that directory: one the user chose is theirs and is never
- * touched. Links inside are removed, not followed.
+ * Removes a deleted session's own directory under its user's home — its
+ * uploads, notes and logs, which on a server would pile up. Only that
+ * directory: one the user chose is theirs and is never touched. Links
+ * inside are removed, not followed.
+ *
+ * <p>Not installed by any plugin: deleting a chat must not take files
+ * with it unless the host decided so. A server that wants it contributes
+ * one as a {@link SessionCleanup}.
  */
 public final class SessionDirectoryCleanup implements SessionCleanup {
 

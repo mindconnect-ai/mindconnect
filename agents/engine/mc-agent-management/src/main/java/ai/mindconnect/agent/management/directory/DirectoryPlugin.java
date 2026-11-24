@@ -2,7 +2,6 @@ package ai.mindconnect.agent.management.directory;
 
 import java.nio.file.Path;
 
-import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.plugin.Plugin;
@@ -58,9 +57,8 @@ public final class DirectoryPlugin implements Plugin {
         registry.provide(WorkingDirBrowser.class, () -> new WorkingDirBrowser(registry.get(WorkingDirPolicy.class)));
         registry.provide(SessionDirectoryPolicy.class, () -> new RootedSessionDirectoryPolicy(
                 registry.get(WorkingDirPolicy.class), registry.get(UserHome.class)));
-        SessionCleanup removesDirectory = session ->
-                new SessionDirectoryCleanup(registry.get(UserHome.class)).deleted(session);
-        registry.contribute(SessionCleanup.class, removesDirectory);
+        // A deleted session leaves its directory: files are not this plugin's to remove.
+        // A host that wants them gone contributes a SessionDirectoryCleanup.
         new DirectoryPromptPlugin(InstructionFileReader.of(instructionsUserDir == null ? "" : instructionsUserDir))
                 .install(registry);
     }
