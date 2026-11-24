@@ -52,6 +52,8 @@
         <module>core/mc-agent-protocol-mc-runtime</module>
         <module>core/mc-llm-gateway-core</module>
         <module>core/mc-llm-gateway</module>
+        <module>core/mc-llm-audio-core</module>
+        <module>core/mc-llm-audio</module>
         <module>adapter/postgres/mc-llm-gateway-pg</module>
         <module>adapter/postgres/mc-message-repository-pg</module>
         <module>adapter/postgres/mc-agent-runtime-pg</module>
@@ -106,6 +108,7 @@
         <module>server/mc-agent-api-rest</module>
         <module>server/mc-agent-security</module>
         <module>server/mc-agent-api-responses-rest</module>
+        <module>server/mc-agent-voice-ws</module>
         <module>server/mc-agent-api-app</module>
         <module>server/mc-agent-chat-ui-rest</module>
         <module>server/mc-agent-registry-admin-ui-rest</module>

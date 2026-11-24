@@ -64,13 +64,13 @@ public record LmStudioModel(
 
     /**
      * Whether this model fits a config of the given type. LM Studio serves no
-     * transcription models — it reports only LLM, VLM and embedding kinds — so
-     * a speech-to-text config finds nothing here and points elsewhere.
+     * transcription or speech models — it reports only LLM, VLM and embedding kinds — so
+     * an audio config finds nothing here and points elsewhere.
      */
     public boolean appliesTo(LlmConfigType type) {
         return switch (type) {
             case EMBEDDING -> kind == Kind.EMBEDDING;
-            case SPEECH_TO_TEXT -> false;
+            case SPEECH_TO_TEXT, TEXT_TO_SPEECH -> false;
             case CHAT -> kind == Kind.LLM || kind == Kind.VLM;
         };
     }

@@ -17,5 +17,13 @@ public enum LlmConfigType {
      * {@link ai.mindconnect.llm.port.in.LlmTranscription}; sampling settings
      * and the context window do not apply.
      */
-    SPEECH_TO_TEXT
+    SPEECH_TO_TEXT,
+    /**
+     * Text-to-speech model: turns text into spoken audio (OpenAI's
+     * {@code tts-1} and {@code gpt-4o-mini-tts}, and servers that speak the
+     * same endpoint). Reached through the {@code LlmSpeech} port of
+     * {@code mc-llm-audio-core}; sampling settings and the context window do
+     * not apply.
+     */
+    TEXT_TO_SPEECH
 }

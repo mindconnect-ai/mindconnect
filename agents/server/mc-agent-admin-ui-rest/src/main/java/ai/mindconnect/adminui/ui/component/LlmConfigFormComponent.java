@@ -199,6 +199,7 @@ public final class LlmConfigFormComponent implements UiComponent {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-type-cfg", switch (type) {
             case EMBEDDING -> "Embedding settings";
             case SPEECH_TO_TEXT -> "Speech-to-text settings";
+            case TEXT_TO_SPEECH -> "Text-to-speech settings";
             case CHAT -> "Chat settings";
         });
         Integer contextWindow = prefill != null && prefill.contextWindowTokens() != null
@@ -210,6 +211,10 @@ public final class LlmConfigFormComponent implements UiComponent {
             // provider parameters and render in the group below.
             return group.hint("A transcription call has no sampling settings. Language, prompt "
                     + "and response format are provider parameters, in the group below.");
+        }
+        if (type == LlmConfigType.TEXT_TO_SPEECH) {
+            return group.hint("A speech call has no sampling settings. The voice (e.g. nova) and "
+                    + "instructions for the speaking style are provider parameters, in the group below.");
         }
         if (type == LlmConfigType.EMBEDDING) {
             group.field(UiField.number("contextWindowTokens", "Max Input Tokens", contextWindow).asEditable()
@@ -421,7 +426,8 @@ public final class LlmConfigFormComponent implements UiComponent {
                         type == null ? LlmConfigType.CHAT.name() : type,
                         List.of(UiField.Option.of("CHAT", "Chat"),
                                 UiField.Option.of("EMBEDDING", "Embedding"),
-                                UiField.Option.of("SPEECH_TO_TEXT", "Speech to text")))
+                                UiField.Option.of("SPEECH_TO_TEXT", "Speech to text"),
+                                UiField.Option.of("TEXT_TO_SPEECH", "Text to speech")))
                         .asEditable()
                         .hint("Embedding models turn text into vectors (vector stores / semantic "
                                 + "search); speech-to-text models turn a recording into text. "
@@ -574,6 +580,7 @@ public final class LlmConfigFormComponent implements UiComponent {
         return switch (type) {
             case EMBEDDING -> "embedding";
             case SPEECH_TO_TEXT -> "speech-to-text";
+            case TEXT_TO_SPEECH -> "text-to-speech";
             case CHAT -> "chat";
         };
     }

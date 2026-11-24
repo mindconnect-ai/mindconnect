@@ -1,0 +1,12 @@
+{
+  "id": "00000001-0000-0000-0000-000000000013",
+  "name": "text-to-speech",
+  "provider": "OPENAI",
+  "model": "${TEXT_TO_SPEECH_MODEL:gpt-4o-mini-tts}",
+  "baseUrl": "${TEXT_TO_SPEECH_BASE_URL:https://api.openai.com}",
+  "apiKey": "${OPENAI_API_KEY}",
+  "additionalParams": {
+    "voice": "nova"
+  },
+  "type": "TEXT_TO_SPEECH"
+}

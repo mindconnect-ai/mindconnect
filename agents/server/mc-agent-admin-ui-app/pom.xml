@@ -31,6 +31,11 @@
             <artifactId>mc-agent-api-responses-rest</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Spoken conversations with an agent over WebSocket (/api/voice) -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-voice-ws</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tools</artifactId>

@@ -92,6 +92,7 @@ public final class LlmConfigDetailComponent implements UiComponent {
         return switch (config.type()) {
             case EMBEDDING -> "Embedding";
             case SPEECH_TO_TEXT -> "Speech to text";
+            case TEXT_TO_SPEECH -> "Text to speech";
             case CHAT -> "Chat";
         };
     }

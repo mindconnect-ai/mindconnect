@@ -184,6 +184,16 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-llm-audio-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-llm-audio</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-llm-gateway</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -385,6 +395,11 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-api-rest</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-voice-ws</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
