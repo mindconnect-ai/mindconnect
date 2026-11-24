@@ -74,8 +74,8 @@ public final class ChatSettingsComponent implements UiComponent {
      * What the model and the prompt field show once an agent is picked in the
      * dialog, so they say what Apply will do: a different agent takes over
      * with its own model and prompt; the chat's current agent shows what the
-     * chat runs on now, its own overrides included; no agent keeps what the
-     * fields hold, since those two then are the chat.
+     * chat runs on now; the chat's own settings keep what the fields hold,
+     * since those two then are the chat's.
      *
      * @param picked    the agent picked, {@code null} for none
      * @param current   the chat's own values today
@@ -108,12 +108,13 @@ public final class ChatSettingsComponent implements UiComponent {
 
     /**
      * The agent, first because it overrules the other two: picking a different
-     * one hands the chat over completely. Staying on the one it has leaves the
-     * two fields below acting as this chat's own overrides.
+     * one hands the chat over completely. A chat that changed anything runs on
+     * settings of its own and is shown on the first entry: there is no agent
+     * it still follows.
      */
     private UiField agentField() {
         List<UiField.Option> options = new ArrayList<>();
-        options.add(UiField.Option.of("", "— no agent: the model and prompt below —"));
+        options.add(UiField.Option.of("", "— this chat's own settings: the model and prompt below —"));
         agents.forEach(a -> options.add(UiField.Option.of(a.id().value(), label(a))));
         return UiField.select("agentId", "Agent",
                         currentAgentId == null ? "" : currentAgentId.value(), options)
@@ -123,8 +124,9 @@ public final class ChatSettingsComponent implements UiComponent {
                 .onChange(trigger(on(ChatUiController.class)
                         .settingsAgentPicked(sessionId.value(), null, null), id()))
                 .hint("An agent brings its own prompt, model and tools. Switch to a different "
-                        + "one and it takes over; stay on this one and the two fields below "
-                        + "override it for this chat alone");
+                        + "one and it takes over. Change the model or the prompt below and this "
+                        + "chat keeps its own settings: what is changed on the agent later no "
+                        + "longer reaches it");
     }
 
     /** An agent reads as what it is for, not just what it is called. */

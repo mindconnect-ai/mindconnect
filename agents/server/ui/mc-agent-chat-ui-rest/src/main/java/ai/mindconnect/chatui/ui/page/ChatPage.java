@@ -101,9 +101,9 @@ public final class ChatPage {
      * The tools the registry can hand out here, so the "+" menu's Tools badge
      * counts what the Tools picker counts — a binding without a row is not in it.
      */
-    /** Whether the chat runs on a prompt of its own, not its agent's — the header says so. */
-    public ChatPage withOwnPrompt(boolean ownPrompt) {
-        messages.withCustomPrompt(ownPrompt);
+    /** Whether the chat runs on settings of its own and no longer follows its agent — the header says so. */
+    public ChatPage withOwnSettings(boolean ownSettings) {
+        messages.withOwnSettings(ownSettings);
         return this;
     }
 

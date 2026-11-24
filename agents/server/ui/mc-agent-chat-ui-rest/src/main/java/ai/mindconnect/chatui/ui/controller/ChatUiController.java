@@ -795,13 +795,13 @@ public class ChatUiController {
         def.definition().tools().forEach(t -> out.putIfAbsent(t.name(), t.deferred()));
         return out;
     }
-    /** Does the chat run on a prompt other than that of the stored agent its definition was taken from? */
-    private boolean ownPrompt(ManagedSession session, ManagedAgent effective) {
-        return session.agent() instanceof SessionAgent.Own own && own.origin() != null
-                && agents.find(own.origin())
-                        .map(origin -> !java.util.Objects.equals(origin.definition().instructions(),
-                                effective.definition().instructions()))
-                        .orElse(false);
+    /**
+     * Does the chat run on a definition of its own that was taken from a
+     * stored agent? Whatever it changed — the prompt, the model, one tool —
+     * it no longer follows that agent, and the header must not claim it does.
+     */
+    private static boolean ownSettings(ManagedSession session) {
+        return session.agent() instanceof SessionAgent.Own own && own.origin() != null;
     }
 
     /**
@@ -1309,7 +1309,7 @@ public class ChatUiController {
                         buildSubAgentCards(SessionOwnership.idOf(session), toolCallId, running, in, out))
                 .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
                         llmConfigRepository, ChatAgent.model(agent)))
-                .withOwnPrompt(ownPrompt(session, agent))
+                .withOwnSettings(ownSettings(session))
                 .withBubbledApprovals(bubbledApprovalCards(SessionOwnership.idOf(session)))
                 .withHostLinks(hostLinks)
                 .withOfferedTools(offeredToolNames());

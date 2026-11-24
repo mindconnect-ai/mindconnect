@@ -105,3 +105,8 @@
   file.
 - The chat shows a card while a response reviewer reads the answer
   ("reviewing…") and its verdict afterwards — passed, modified or blocked.
+- A chat that changed its model, its prompt, a tool or a sub-agent runs on
+  settings of its own and no longer follows its agent. The header says so for
+  every such chat (`own settings`, before only for a changed prompt), and the
+  settings dialog names the state "this chat's own settings" instead of
+  "no agent". Picking the agent again in the dialog makes the chat follow it.

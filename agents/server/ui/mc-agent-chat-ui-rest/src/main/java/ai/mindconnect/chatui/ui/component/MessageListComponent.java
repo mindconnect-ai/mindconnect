@@ -80,8 +80,8 @@ public final class MessageListComponent implements UiComponent {
     private SessionId parentSessionId;
     /** This conversation's title, when it has one — the header's subject. */
     private String sessionTitle;
-    /** Whether this chat replaced its agent's system prompt with its own. */
-    private boolean customPrompt;
+    /** Whether this chat runs on settings of its own, taken from its agent and changed since. */
+    private boolean ownSettings;
     /** Bubbled sub-agent approval cards (from the ToolApprovalRepository), rendered after the history. */
     private List<UiList.Item> bubbledApprovalCards = List.of();
     /** The host's overflow menu (parent session, back to agent, memory/trace
@@ -119,14 +119,14 @@ public final class MessageListComponent implements UiComponent {
     }
 
     /**
-     * Marks that this chat runs on its own system prompt rather than the
-     * agent's. The badge says so: the header still names the agent, because
-     * its tools and the agents it may call are still the agent's — but the
-     * name would be misleading on its own. Returns {@code this} for fluent
-     * chaining.
+     * Marks that this chat runs on settings of its own rather than the
+     * agent's. The badge says so: the header still names the agent the
+     * settings were taken from, but the name would be misleading on its own —
+     * what is changed on that agent no longer reaches this chat. Returns
+     * {@code this} for fluent chaining.
      */
-    public MessageListComponent withCustomPrompt(boolean customPrompt) {
-        this.customPrompt = customPrompt;
+    public MessageListComponent withOwnSettings(boolean ownSettings) {
+        this.ownSettings = ownSettings;
         return this;
     }
 
@@ -207,11 +207,11 @@ public final class MessageListComponent implements UiComponent {
         // Titled: the badge names the agent, because the header names the
         // conversation. Untitled: the header already names the agent, so the
         // badge is only worth drawing when there is something else to say —
-        // and an overridden prompt is exactly that, on the chat where the
-        // header would otherwise claim the agent's own.
+        // and settings of its own are exactly that, on the chat where the
+        // header would otherwise claim the agent's.
         String badge = titled
-                ? (customPrompt ? agentName + " · own prompt" : agentName)
-                : (customPrompt ? "own prompt" : null);
+                ? (ownSettings ? agentName + " · own settings" : agentName)
+                : (ownSettings ? "own settings" : null);
         if (badge != null) {
             tools.child(ai.mindconnect.ui.model.UiText.of(id() + "-agent", badge)
                     .<ai.mindconnect.ui.model.UiText>withCssClass("chat-agent-badge"));
