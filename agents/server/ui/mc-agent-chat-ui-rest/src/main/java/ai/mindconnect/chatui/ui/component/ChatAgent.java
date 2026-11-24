@@ -98,8 +98,7 @@ public final class ChatAgent {
 
     /** The agents this one may hand work to, empty when it may call nobody. */
     public static List<String> roster(ManagedAgent agent) {
-        return agent.definition().metadata().get(SubAgentPlugin.SUB_AGENTS) instanceof List<?> named
-                ? named.stream().map(String::valueOf).toList() : List.of();
+        return SubAgentPlugin.subAgentsOf(agent.definition());
     }
 
     /** The definition on another prompt and another model, everything else as it is. */
@@ -115,12 +114,5 @@ public final class ChatAgent {
     public static AgentDefinition withTools(AgentDefinition definition, List<ToolBinding> tools) {
         return new AgentDefinition(definition.name(), definition.description(), definition.instructions(),
                 definition.modelSettings(), tools, definition.maxRounds(), definition.metadata());
-    }
-
-    public static AgentDefinition withRoster(AgentDefinition definition, List<String> names) {
-        Map<String, Object> metadata = new HashMap<>(definition.metadata());
-        metadata.put(SubAgentPlugin.SUB_AGENTS, List.copyOf(names));
-        return new AgentDefinition(definition.name(), definition.description(), definition.instructions(),
-                definition.modelSettings(), definition.tools(), definition.maxRounds(), metadata);
     }
 }

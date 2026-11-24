@@ -85,9 +85,19 @@ public final class ResponseReviewPlugin implements Plugin {
         });
     }
 
-    private static TurnMessage reviewed(PluginRegistry registry, AgentContext context, TurnMessage answer) {
-        List<String> reviewers = context.agent().metadata().get(REVIEWERS) instanceof List<?> named
+    /** The agents that review an agent's answers, in the order they review; none when it names none. */
+    public static List<String> reviewersOf(AgentDefinition agent) {
+        return agent.metadata().get(REVIEWERS) instanceof List<?> named
                 ? named.stream().map(String::valueOf).toList() : List.of();
+    }
+
+    /** The agent with these reviewers, in this order. */
+    public static AgentDefinition withReviewers(AgentDefinition agent, List<String> names) {
+        return agent.with(REVIEWERS, List.copyOf(names));
+    }
+
+    private static TurnMessage reviewed(PluginRegistry registry, AgentContext context, TurnMessage answer) {
+        List<String> reviewers = reviewersOf(context.agent());
         if (reviewers.isEmpty()) {
             return answer;
         }

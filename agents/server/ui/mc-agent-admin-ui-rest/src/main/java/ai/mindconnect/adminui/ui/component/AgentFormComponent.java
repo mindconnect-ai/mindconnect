@@ -103,8 +103,8 @@ public final class AgentFormComponent implements UiComponent {
 
         // Reviewer candidates: the agents filed under the reviewer group.
         // Roster candidates: every other agent.
-        List<String> reviewers = isNew ? List.of() : AgentSetting.names(definition, ResponseReviewPlugin.REVIEWERS);
-        List<String> roster = isNew ? List.of() : AgentSetting.names(definition, SubAgentPlugin.SUB_AGENTS);
+        List<String> reviewers = isNew ? List.of() : ResponseReviewPlugin.reviewersOf(definition);
+        List<String> roster = isNew ? List.of() : SubAgentPlugin.subAgentsOf(definition);
         List<UiField.Option> reviewerOptions = candidates(
                 other -> AgentSetting.REVIEWER_GROUP.equals(AgentSetting.group(other)), reviewers);
         List<UiField.Option> rosterOptions = candidates(other -> SubAgentPlugin.callable(other.definition()), roster);
@@ -119,7 +119,7 @@ public final class AgentFormComponent implements UiComponent {
                 .icon(isNew ? AgentSetting.DEFAULT_ICON : AgentSetting.icon(agent));
 
         String skillsMode = isNew ? AgentSetting.ALL : AgentSetting.skillsMode(definition);
-        List<String> skillNames = isNew ? List.of() : AgentSetting.names(definition, SkillPlugin.SKILLS);
+        List<String> skillNames = isNew ? List.of() : SkillPlugin.skillsOf(definition).orElse(List.of());
         var form = UiForm.of(id(), null)
                 .field(UiField.text("name", "Name", isNew ? null : definition.name())
                         .asEditable().asRequired())

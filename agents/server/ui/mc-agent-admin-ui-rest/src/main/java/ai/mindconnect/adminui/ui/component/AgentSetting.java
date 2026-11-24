@@ -65,28 +65,9 @@ public final class AgentSetting {
         return name.isEmpty() ? null : name;
     }
 
-    /** The agent names a capability reads under {@code key}: the roster, the reviewers. */
-    public static List<String> names(AgentDefinition definition, String key) {
-        return definition.metadata().get(key) instanceof List<?> named
-                ? named.stream().map(String::valueOf).toList() : List.of();
-    }
-
     /** {@link #ALL} without an entry, {@link #NONE} for an empty one, else {@link #SPECIFIC}. */
     public static String skillsMode(AgentDefinition definition) {
-        if (!(definition.metadata().get(SkillPlugin.SKILLS) instanceof List<?> picked)) return ALL;
-        return picked.isEmpty() ? NONE : SPECIFIC;
-    }
-
-    /** The definition with another value under {@code key}; {@code null} takes the entry away. */
-    public static AgentDefinition with(AgentDefinition definition, String key, Object value) {
-        Map<String, Object> metadata = new HashMap<>(definition.metadata());
-        if (value == null) {
-            metadata.remove(key);
-        } else {
-            metadata.put(key, value);
-        }
-        return new AgentDefinition(definition.name(), definition.description(), definition.instructions(),
-                definition.modelSettings(), definition.tools(), definition.maxRounds(), metadata);
+        return SkillPlugin.skillsOf(definition).map(picked -> picked.isEmpty() ? NONE : SPECIFIC).orElse(ALL);
     }
 
     /** The agent's tools as the tool pages edit them. */

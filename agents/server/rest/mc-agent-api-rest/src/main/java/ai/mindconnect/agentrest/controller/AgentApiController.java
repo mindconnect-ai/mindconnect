@@ -169,22 +169,22 @@ public class AgentApiController {
         log.info("PUT /api/agents/{}", agentId);
         return changeAgent(agentId, req.version(), stored -> {
             AgentDefinition definition = stored.definition();
-            Map<String, Object> metadata = new java.util.HashMap<>(definition.metadata());
+            AgentDefinition settings = definition;
             if (req.responseReviewers() != null) {
-                metadata.put(ResponseReviewPlugin.REVIEWERS, List.copyOf(req.responseReviewers()));
+                settings = ResponseReviewPlugin.withReviewers(settings, req.responseReviewers());
             }
             if (req.callableAgents() != null) {
-                metadata.put(SubAgentPlugin.SUB_AGENTS, List.copyOf(req.callableAgents()));
+                settings = SubAgentPlugin.withSubAgents(settings, req.callableAgents());
             }
             if (req.skills() != null) {
-                // Every skill is no entry at all, none is an empty list, and the ones named are the list.
-                switch (req.skills().mode() == null ? "ALL" : req.skills().mode().toUpperCase(java.util.Locale.ROOT)) {
-                    case "NONE" -> metadata.put(SkillPlugin.SKILLS, List.of());
-                    case "SPECIFIC" -> metadata.put(SkillPlugin.SKILLS,
-                            req.skills().names() == null ? List.of() : List.copyOf(req.skills().names()));
-                    case "ALL" -> metadata.remove(SkillPlugin.SKILLS);
+                settings = switch (req.skills().mode() == null ? "ALL"
+                        : req.skills().mode().toUpperCase(java.util.Locale.ROOT)) {
+                    case "NONE" -> SkillPlugin.withSkills(settings, List.of());
+                    case "SPECIFIC" -> SkillPlugin.withSkills(settings,
+                            req.skills().names() == null ? List.of() : req.skills().names());
+                    case "ALL" -> SkillPlugin.withEverySkill(settings);
                     default -> throw new IllegalArgumentException("There is no skills mode " + req.skills().mode());
-                }
+                };
             }
             return stored.withDefinition(new AgentDefinition(
                             req.name() != null ? req.name() : definition.name(),
@@ -194,7 +194,7 @@ public class AgentApiController {
                                     : definition.modelSettings(),
                             definition.tools(),
                             req.maxIterations() != null ? req.maxIterations() : definition.maxRounds(),
-                            metadata))
+                            settings.metadata()))
                     .shownAs(stored.group(), stored.icon(),
                             req.welcomeMessage() != null ? req.welcomeMessage() : stored.welcomeMessage());
         });

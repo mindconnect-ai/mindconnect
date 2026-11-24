@@ -1,6 +1,8 @@
 package ai.mindconnect.agent.runtime.capabilities.skill;
 
 import java.util.ArrayList;
+import java.util.Optional;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -71,8 +73,24 @@ public final class SkillPlugin implements Plugin {
                 .toList();
     }
 
+    /** The skills an agent may load; empty when it may load every skill, an empty list when none. */
+    public static Optional<List<String>> skillsOf(AgentDefinition agent) {
+        return agent.metadata().get(SKILLS) instanceof List<?> picked
+                ? Optional.of(picked.stream().map(String::valueOf).toList()) : Optional.empty();
+    }
+
+    /** The agent with every skill in reach, also the ones added later: no entry at all. */
+    public static AgentDefinition withEverySkill(AgentDefinition agent) {
+        return agent.with(SKILLS, null);
+    }
+
+    /** The agent with only these skills in reach; an empty list is none. */
+    public static AgentDefinition withSkills(AgentDefinition agent, List<String> names) {
+        return agent.with(SKILLS, List.copyOf(names));
+    }
+
     private static boolean mayLoad(AgentContext context, String skillName) {
-        return !(context.agent().metadata().get(SKILLS) instanceof List<?> picked) || picked.contains(skillName);
+        return skillsOf(context.agent()).map(picked -> picked.contains(skillName)).orElse(true);
     }
 
     private static String listing(List<SkillSummary> skills) {

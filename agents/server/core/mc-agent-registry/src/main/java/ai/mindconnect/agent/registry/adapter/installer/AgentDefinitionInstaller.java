@@ -81,17 +81,13 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
                 .filter(agent -> switch (type) {
                     case LLM_CONFIG -> name.equals(agent.modelSettings().model());
                     case AGENT -> !name.equals(agent.name())
-                            && (named(agent, SubAgentPlugin.SUB_AGENTS, name)
-                                    || named(agent, ResponseReviewPlugin.REVIEWERS, name));
-                    case SKILL -> named(agent, SkillPlugin.SKILLS, name);
+                            && (SubAgentPlugin.subAgentsOf(agent).contains(name)
+                                    || ResponseReviewPlugin.reviewersOf(agent).contains(name));
+                    case SKILL -> SkillPlugin.skillsOf(agent).map(picked -> picked.contains(name)).orElse(false);
                     default -> false;
                 })
                 .map(AgentDefinition::name)
                 .toList();
-    }
-
-    private static boolean named(AgentDefinition agent, String setting, String name) {
-        return agent.metadata().get(setting) instanceof List<?> names && names.contains(name);
     }
 
     @Override

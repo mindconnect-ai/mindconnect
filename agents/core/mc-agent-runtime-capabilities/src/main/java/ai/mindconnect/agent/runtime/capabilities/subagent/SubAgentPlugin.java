@@ -50,6 +50,16 @@ public final class SubAgentPlugin implements Plugin {
         return !Boolean.FALSE.equals(agent.metadata().get(CALLABLE));
     }
 
+    /** The agent, callable by others or not. Absent means callable, and most agents are: only "no" is written down. */
+    public static AgentDefinition withCallable(AgentDefinition agent, boolean callable) {
+        return agent.with(CALLABLE, callable ? null : false);
+    }
+
+    /** The agent with these as the agents it may hand a task to. */
+    public static AgentDefinition withSubAgents(AgentDefinition agent, List<String> names) {
+        return agent.with(SUB_AGENTS, List.copyOf(names));
+    }
+
     /** The agents an agent may hand a task to; none when it names none. */
     public static List<String> subAgentsOf(AgentDefinition agent) {
         return agent.metadata().get(SUB_AGENTS) instanceof List<?> names

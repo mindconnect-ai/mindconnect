@@ -7,6 +7,7 @@ import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import java.util.List;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
@@ -139,13 +140,13 @@ public final class AgentDetailComponent implements UiComponent {
         return switch (AgentSetting.skillsMode(definition)) {
             case AgentSetting.NONE -> "none";
             case AgentSetting.ALL -> "all skills";
-            default -> String.join(", ", AgentSetting.names(definition, SkillPlugin.SKILLS));
+            default -> String.join(", ", SkillPlugin.skillsOf(definition).orElse(List.of()));
         };
     }
 
     /** The roster, or the word for having none — which means no other agent. */
     private String callableAgentsSummary() {
-        var roster = AgentSetting.names(definition, SubAgentPlugin.SUB_AGENTS);
+        var roster = SubAgentPlugin.subAgentsOf(definition);
         return roster.isEmpty() ? "none" : String.join(", ", roster);
     }
 

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.api.domain;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,6 +49,21 @@ public record AgentDefinition(
     /** This agent with other model settings: how a turn keeps the settings it runs with. */
     public AgentDefinition withModelSettings(ModelSettings settings) {
         return new AgentDefinition(name, description, instructions, settings, tools, maxRounds, metadata);
+    }
+
+    /**
+     * This definition with another value under {@code key} of its metadata;
+     * {@code null} takes the entry away. How a capability's setting is
+     * changed without knowing the rest of the definition.
+     */
+    public AgentDefinition with(String key, Object value) {
+        Map<String, Object> changed = new HashMap<>(metadata);
+        if (value == null) {
+            changed.remove(key);
+        } else {
+            changed.put(key, value);
+        }
+        return new AgentDefinition(name, description, instructions, modelSettings, tools, maxRounds, changed);
     }
 
     /** Whether the agent may use the tool at all, offered at once or not. */

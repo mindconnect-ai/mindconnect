@@ -1241,7 +1241,7 @@ public class ChatUiController {
         // binding's approval flag or mount directory survives the next click.
         var changed = ChatAgent.withTools(effective.definition(), pickTools(effective, chosen));
         if (roster != null) {
-            changed = ChatAgent.withRoster(changed, roster.names());
+            changed = SubAgentPlugin.withSubAgents(changed, roster.names());
         }
         // Switching a tool on and straight back off writes nothing: a chat that refers to its agent
         // keeps referring to it until something really differs.
