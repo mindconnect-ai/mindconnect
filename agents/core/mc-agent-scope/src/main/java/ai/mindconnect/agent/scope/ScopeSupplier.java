@@ -1,4 +1,4 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.agent.scope;
 
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;

@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.tools.todo.adapter;
 
 import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 
 import ai.mindconnect.agent.tools.todo.TodoList;

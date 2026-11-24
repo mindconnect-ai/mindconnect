@@ -1,8 +1,8 @@
 package ai.mindconnect.user.adapter.env;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.user.adapter.memory.InMemoryUserRepository;

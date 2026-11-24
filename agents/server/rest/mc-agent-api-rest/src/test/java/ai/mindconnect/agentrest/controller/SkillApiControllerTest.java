@@ -1,6 +1,6 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
 import ai.mindconnect.agent.skill.domain.Skill;
 import org.junit.jupiter.api.Test;

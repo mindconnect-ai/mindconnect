@@ -26,6 +26,11 @@
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Channel: the SSE bus's sequencing, replay buffer and fan-out.
              Reached transitively through the runtime today; named here because

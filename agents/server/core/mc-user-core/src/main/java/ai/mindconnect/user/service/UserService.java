@@ -1,6 +1,6 @@
 package ai.mindconnect.user.service;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.user.domain.User;

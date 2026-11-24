@@ -1,6 +1,6 @@
 package ai.mindconnect.namespace.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
 import ai.mindconnect.namespace.domain.Actor;

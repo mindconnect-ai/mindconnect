@@ -6,7 +6,7 @@ import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.engine.service.RuntimeTask;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.Subscription;
@@ -76,7 +76,7 @@ public class TaskMonitor implements TaskListener {
     public record TaskView(TaskRecord task, String label, String detail, String owner, SessionId sessionId) {
         public String id() { return task.id(); }
         /** The namespace the task was submitted in; empty for a task nobody stamped. */
-        public Optional<ai.mindconnect.agent.Namespace> namespace() {
+        public Optional<ai.mindconnect.agent.scope.Namespace> namespace() {
             return namespaceOf(task);
         }
         public TaskStatus status() { return task.status(); }
@@ -86,7 +86,7 @@ public class TaskMonitor implements TaskListener {
     /** The whole board at one instant. */
     public record Snapshot(List<TaskView> active, List<TaskView> recent, Instant at) {
         /** The board as one namespace sees it: its own tasks, plus any nobody stamped. */
-        public Snapshot in(ai.mindconnect.agent.Namespace namespace) {
+        public Snapshot in(ai.mindconnect.agent.scope.Namespace namespace) {
             if (namespace == null) return this;
             return new Snapshot(
                     active.stream().filter(v -> v.namespace().map(namespace::equals).orElse(true)).toList(),
@@ -208,32 +208,32 @@ public class TaskMonitor implements TaskListener {
     }
 
     /** The badge's numbers as one namespace sees them; null counts everything. */
-    public Counts counts(ai.mindconnect.agent.Namespace namespace) {
+    public Counts counts(ai.mindconnect.agent.scope.Namespace namespace) {
         int running = countIn(TaskStatus.RUNNING, namespace);
         int waiting = countIn(TaskStatus.QUEUED, namespace) + countIn(TaskStatus.SUSPENDED, namespace);
         return new Counts(running, waiting);
     }
 
-    private int countIn(TaskStatus status, ai.mindconnect.agent.Namespace namespace) {
+    private int countIn(TaskStatus status, ai.mindconnect.agent.scope.Namespace namespace) {
         List<TaskRecord> records = queue.byStatus(status, QUERY_LIMIT);
         if (namespace == null) return records.size();
         return (int) records.stream().filter(task -> inNamespace(task, namespace)).count();
     }
 
     /** Whether {@code task} belongs to {@code namespace} — or to nobody, which every namespace sees. */
-    static boolean inNamespace(TaskRecord task, ai.mindconnect.agent.Namespace namespace) {
+    static boolean inNamespace(TaskRecord task, ai.mindconnect.agent.scope.Namespace namespace) {
         return namespaceOf(task).map(namespace::equals).orElse(true);
     }
 
     /** The namespace the task was submitted in; empty for a task that carries none. */
-    private static Optional<ai.mindconnect.agent.Namespace> namespaceOf(TaskRecord task) {
-        return RuntimeTask.of(task).map(RuntimeTask::namespace).map(ai.mindconnect.agent.Namespace::new);
+    private static Optional<ai.mindconnect.agent.scope.Namespace> namespaceOf(TaskRecord task) {
+        return RuntimeTask.of(task).map(RuntimeTask::namespace).map(ai.mindconnect.agent.scope.Namespace::new);
     }
 
     /** The board right now — for the dialog; the stream sends the same. */
     public Snapshot snapshot() {
         Map<SessionId, Optional<ManagedSession>> sessionCache = new HashMap<>();
-        Map<ai.mindconnect.agent.Namespace, Boolean> existing = new HashMap<>();
+        Map<ai.mindconnect.agent.scope.Namespace, Boolean> existing = new HashMap<>();
 
         List<TaskRecord> active = new ArrayList<>();
         active.addAll(queue.byStatus(TaskStatus.RUNNING, QUERY_LIMIT));
@@ -256,7 +256,7 @@ public class TaskMonitor implements TaskListener {
 
     private TaskView view(TaskRecord task,
                           Map<SessionId, Optional<ManagedSession>> sessionCache,
-                          Map<ai.mindconnect.agent.Namespace, Boolean> existing) {
+                          Map<ai.mindconnect.agent.scope.Namespace, Boolean> existing) {
         Optional<RuntimeTask> known = RuntimeTask.of(task);
         SessionId sessionId = sessionIdOf(known);
         // The session lives in the task's namespace: look it up there, whatever namespace the
@@ -301,21 +301,21 @@ public class TaskMonitor implements TaskListener {
      * Runs {@code body} bound to the namespace the task was submitted in, when there is one to bind —
      * and finds nothing, without touching that namespace's stores, when it no longer exists.
      */
-    private <T> Optional<T> inScopeOf(TaskRecord task, Map<ai.mindconnect.agent.Namespace, Boolean> existing,
+    private <T> Optional<T> inScopeOf(TaskRecord task, Map<ai.mindconnect.agent.scope.Namespace, Boolean> existing,
                                       java.util.function.Supplier<Optional<T>> body) {
         if (scope instanceof ThreadBoundScopeSupplier bound) {
             Optional<RuntimeTask> stamped = RuntimeTask.of(task).filter(known -> known.namespace() != null);
             if (stamped.isEmpty()) return body.get();
-            ai.mindconnect.agent.Namespace namespace = new ai.mindconnect.agent.Namespace(stamped.get().namespace());
+            ai.mindconnect.agent.scope.Namespace namespace = new ai.mindconnect.agent.scope.Namespace(stamped.get().namespace());
             if (!existing.computeIfAbsent(namespace, this::exists)) return Optional.empty();
-            return bound.runIn(ai.mindconnect.agent.Scope.of(namespace,
+            return bound.runIn(ai.mindconnect.agent.scope.Scope.of(namespace,
                     stamped.get().user() == null ? null : UserId.of(stamped.get().user())), body);
         }
         return body.get();
     }
 
     /** Whether {@code namespace} is still there; without a namespace service every one is. */
-    private boolean exists(ai.mindconnect.agent.Namespace namespace) {
+    private boolean exists(ai.mindconnect.agent.scope.Namespace namespace) {
         if (namespaces == null) return true;
         try {
             return namespaces.find(namespace).isPresent();

@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.starter.namespace;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;

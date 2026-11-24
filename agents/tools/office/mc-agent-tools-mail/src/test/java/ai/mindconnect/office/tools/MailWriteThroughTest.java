@@ -1,6 +1,6 @@
 package ai.mindconnect.office.tools;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.mail.Location;
 import ai.mindconnect.mail.MailAccounts;

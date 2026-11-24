@@ -2,9 +2,9 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.adminui.namespaces.GuardedRepositories;
 import ai.mindconnect.adminui.namespaces.NamespaceWriteGuard;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
@@ -173,7 +173,7 @@ class NamespaceSeedingTest {
     }
 
     private static AgentManagement agentStore() {
-        return new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.ScopeSupplier.fixed(new ai.mindconnect.agent.Namespace("test"))));
+        return new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test"))));
     }
 
     private List<String> ledger(Namespace namespace) {

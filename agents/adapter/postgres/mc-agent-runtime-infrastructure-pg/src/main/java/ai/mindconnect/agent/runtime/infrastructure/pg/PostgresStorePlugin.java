@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.infrastructure.pg;
 
 import java.nio.file.Path;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.pg.PgSessionRepository;

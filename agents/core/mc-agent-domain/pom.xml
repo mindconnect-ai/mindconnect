@@ -15,12 +15,12 @@
     <name>mc-agent-domain</name>
     <packaging>jar</packaging>
     <description>
-        The shared vocabulary of the agents area, package ai.mindconnect.agent:
-        Namespace (the tenant), NamespacedId (the shape every tenant-owned id
-        has), UserId and AuthenticationInfo. A type belongs here only when two
-        modules that do not depend on each other need it; every other id lives
-        beside its entity. Dependency-free — every other agents module builds
-        on it, nothing outside the area knows it.
+        The ids the agents area shares, package ai.mindconnect.agent:
+        SessionId, UserId, AgentId and EntityId, the shape every entity id
+        has. A type belongs here only when two modules that do not depend on
+        each other need it; every other id lives beside its entity.
+        Dependency-free — every other agents module builds on it, nothing
+        outside the area knows it.
     </description>
 
     <dependencies>

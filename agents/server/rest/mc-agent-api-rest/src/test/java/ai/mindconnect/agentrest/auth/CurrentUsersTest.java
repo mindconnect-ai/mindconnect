@@ -1,7 +1,7 @@
 package ai.mindconnect.agentrest.auth;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.message.domain.ConversationId;

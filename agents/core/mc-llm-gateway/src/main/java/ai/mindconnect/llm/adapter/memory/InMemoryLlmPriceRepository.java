@@ -1,7 +1,7 @@
 package ai.mindconnect.llm.adapter.memory;
 
-import ai.mindconnect.agent.PerNamespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.domain.LlmPriceId;
 import ai.mindconnect.llm.domain.LlmPriceList;

@@ -1,6 +1,6 @@
 package ai.mindconnect.filestore.filesystem;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.FileStoreBackend;
 

@@ -3,9 +3,9 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.adminui.service.TaskMonitor.CancelResult;
 import ai.mindconnect.adminui.service.TaskMonitor.Snapshot;
 import ai.mindconnect.adminui.service.TaskMonitor.TaskView;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.management.RepositorySessionManagement;
@@ -215,7 +215,7 @@ class TaskMonitorTest {
                 "sessionId", SessionId.random().value(), "namespace", "other")));
         String unstamped = submitTurn();
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
-        ai.mindconnect.agent.Namespace ns = new ai.mindconnect.agent.Namespace("acme");
+        ai.mindconnect.agent.scope.Namespace ns = new ai.mindconnect.agent.scope.Namespace("acme");
 
         // A task between QUEUED and RUNNING is in neither list for an instant — the monitor reads
         // one status after the other. Every worker blocks until released, so wait until all three

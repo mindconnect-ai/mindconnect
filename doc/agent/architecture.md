@@ -62,8 +62,8 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
   core/adapter seam (`-core` modules carry domain + ports, siblings the implementations)
   - `mc-agents-parent/` — the area parent POM
   - `core/` — libraries (no runnable apps)
-    - `mc-agent-domain`: the area's shared vocabulary, package `ai.mindconnect.agent` —
-      `Namespace`, `EntityId`, `UserId`, plus `AgentId` and `SessionId`: the tool SPI, the
+    - `mc-agent-domain`: the area's shared ids, package `ai.mindconnect.agent` —
+      `EntityId`, `UserId`, `AgentId` and `SessionId`, nothing else: the tool SPI, the
       runtime API (`mc-agent-runtime-api`) and the management API name a session, a user and
       an agent by these, so nothing converts between them. Depends on `jackson-annotations` only. A
       type is admitted only when two modules that do not depend on each other need it; every
@@ -71,8 +71,10 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       …) lives in the module that owns its entity. Every entity is addressed by such a record
       — `record XId(String value) implements EntityId` — never by a bare `UUID` or `String`;
       in JSON an id is its plain value. Ids, domain objects, ports and services carry no
-      namespace: persistence adapters (File, Pg, the file-store backends, `VectorStores`) take
-      the `ScopeSupplier` in their constructor and ask it on every call for the namespace to
+      namespace. `mc-agent-scope` (package `ai.mindconnect.agent.scope`) says who works where:
+      `Namespace`, `Scope`, `ScopeSupplier`, and `PerNamespace` for stores that keep their data
+      in memory. Persistence adapters (File, Pg, the file-store backends, `VectorStores`) and
+      the runtime take the `ScopeSupplier` in their constructor and ask it on every call for the namespace to
       work in — one adapter serves every namespace (`Scope` =
       namespace + optional `UserId` + host attributes; a library embeds with `ScopeSupplier.fixed`,
       a server binds a `ThreadBoundScopeSupplier` per request and per queued task via `ScopeTaskAdvisor`;

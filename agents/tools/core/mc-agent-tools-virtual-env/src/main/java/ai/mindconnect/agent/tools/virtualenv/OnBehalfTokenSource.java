@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.tools.virtualenv;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolCallScope;
 
 import java.util.Optional;

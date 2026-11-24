@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.adminui.service.BundledSeeds.Kind;
 import ai.mindconnect.adminui.service.BundledSeeds.Seed;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.skill.domain.Skill;

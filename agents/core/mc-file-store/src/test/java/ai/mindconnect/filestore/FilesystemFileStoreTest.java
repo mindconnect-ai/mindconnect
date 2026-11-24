@@ -1,8 +1,8 @@
 package ai.mindconnect.filestore;
 
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

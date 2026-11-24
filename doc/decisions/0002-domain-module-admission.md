@@ -4,7 +4,7 @@ Status: accepted · 2026-09-11 · Concept: mc-sandbox/agents/doc/concepts/15-mod
 
 ## Decision
 `agents/core/mc-agent-domain` (package `ai.mindconnect.agent`) is the area's
-shared vocabulary: `Namespace`, `EntityId`, `UserId`, `AgentId`, `SessionId`. A type is admitted only when two modules that do not
+shared ids: `EntityId`, `UserId`, `AgentId`, `SessionId`. A type is admitted only when two modules that do not
 depend on each other need it. It depends on `jackson-annotations` only.
 
 ## Why
@@ -21,4 +21,7 @@ The runtime API and the management API use these ids too (2026-11-24): while
 the runtime was rebuilt they had `SessionId`, `UserId` and `AgentId` of their
 own, and every module between the runtime and the server converted between
 two records of the same shape. `AuthenticationInfo` went when nothing used it
-any more.
+any more. `Namespace`, `Scope`, `ScopeSupplier` and `PerNamespace` are not ids;
+they moved to `mc-agent-scope` (`ai.mindconnect.agent.scope`), which says who
+works where and builds on these ids. The runtime asks the `ScopeSupplier` too,
+in place of a namespace and a user provider of its own.

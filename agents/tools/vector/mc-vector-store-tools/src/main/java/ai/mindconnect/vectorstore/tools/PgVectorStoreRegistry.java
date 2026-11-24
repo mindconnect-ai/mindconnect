@@ -1,6 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.vectorstore.embedding.EntityRef;

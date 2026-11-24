@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.agent.chat.stream.UserChannels;
 import ai.mindconnect.agent.chat.stream.UserEvent;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.message.domain.ChatTurnId;
@@ -78,7 +78,7 @@ class UserStreamTest {
             return TaskOutcome.done("ok");
         });
         monitor = new TaskMonitor(queue, TaskMonitorTest.runtimeWithAlicesSession(ALICE_SESSION,
-                ai.mindconnect.agent.ScopeSupplier.fixed(new ai.mindconnect.agent.Namespace("test"))));
+                ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test"))));
         userChannels = new UserChannels();
         stream = new UserStream(Optional.of(monitor), userChannels, new ObjectMapper());
     }
@@ -123,11 +123,11 @@ class UserStreamTest {
 
     @Test
     void theBoardFollowsTheNamespaceTheViewerMayStillWorkIn() throws Exception {
-        var remembered = new java.util.concurrent.atomic.AtomicReference<>(Optional.of(new ai.mindconnect.agent.Namespace("acme")));
+        var remembered = new java.util.concurrent.atomic.AtomicReference<>(Optional.of(new ai.mindconnect.agent.scope.Namespace("acme")));
         var namespaced = new UserStream(Optional.of(monitor), userChannels, new ObjectMapper(), user -> remembered.get());
         try {
             var emitter = new CapturingEmitter();
-            namespaced.attach(emitter, "alice", ai.mindconnect.agent.Namespace.DEFAULT);
+            namespaced.attach(emitter, "alice", ai.mindconnect.agent.scope.Namespace.DEFAULT);
 
             String acme = queue.submit(TaskSubmission.of("turn", Map.of(
                     "sessionId", ALICE_SESSION.value(), "agent", Map.of("name", "Scout"),

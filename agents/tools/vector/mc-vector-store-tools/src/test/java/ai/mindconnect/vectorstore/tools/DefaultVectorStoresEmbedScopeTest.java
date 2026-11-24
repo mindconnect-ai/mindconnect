@@ -1,7 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;

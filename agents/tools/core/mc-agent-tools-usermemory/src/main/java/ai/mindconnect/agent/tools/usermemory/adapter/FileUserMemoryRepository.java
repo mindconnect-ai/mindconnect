@@ -3,7 +3,7 @@ package ai.mindconnect.agent.tools.usermemory.adapter;
 import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tools.usermemory.MemoryEntry;

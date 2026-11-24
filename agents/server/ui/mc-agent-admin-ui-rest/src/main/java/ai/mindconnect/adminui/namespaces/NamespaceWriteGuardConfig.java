@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.namespaces;
 
 import ai.mindconnect.agent.management.api.AgentManagement;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;

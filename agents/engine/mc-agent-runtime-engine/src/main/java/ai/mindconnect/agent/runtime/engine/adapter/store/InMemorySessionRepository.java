@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 
 /** Sessions that live as long as the process: for a library user who keeps nothing, and for tests. */

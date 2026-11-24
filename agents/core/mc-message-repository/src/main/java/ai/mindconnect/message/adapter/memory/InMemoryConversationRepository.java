@@ -1,7 +1,7 @@
 package ai.mindconnect.message.adapter.memory;
 
-import ai.mindconnect.agent.PerNamespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.message.domain.ConversationId;
 
 import ai.mindconnect.common.PageRequest;

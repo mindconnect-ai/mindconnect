@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.price;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepositoryContract;

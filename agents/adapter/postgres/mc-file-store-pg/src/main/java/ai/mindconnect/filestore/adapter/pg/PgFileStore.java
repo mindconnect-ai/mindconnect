@@ -1,7 +1,7 @@
 package ai.mindconnect.filestore.adapter.pg;
 
 import ai.mindconnect.agent.EntityId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;

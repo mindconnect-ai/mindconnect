@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.namespaces;
 
 import ai.mindconnect.namespace.domain.Email;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.starter.namespace.HostNamespaces;
 import ai.mindconnect.adminui.branding.Branding;

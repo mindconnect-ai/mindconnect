@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 
 /** Summaries that live as long as the process; a session summarised before a restart is summarised again. */
 public final class InMemorySummaryStore implements SummaryStore {

@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.pg;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.message.port.out.ConversationRepository;
 import ai.mindconnect.message.port.out.MessageRepository;

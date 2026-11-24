@@ -5,8 +5,8 @@ import java.util.Deque;
 import java.util.List;
 import java.util.function.Supplier;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.loop.domain.LlmAnswer;
 import ai.mindconnect.agent.loop.domain.TurnMessage;

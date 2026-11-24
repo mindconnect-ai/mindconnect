@@ -41,6 +41,7 @@
         <module>mc-java-parent</module>
         <module>agents/mc-agents-parent</module>
         <module>agents/core/mc-agent-domain</module>
+        <module>agents/core/mc-agent-scope</module>
         <module>workflow/mc-workflow-parent</module>
 
         <!-- common -->

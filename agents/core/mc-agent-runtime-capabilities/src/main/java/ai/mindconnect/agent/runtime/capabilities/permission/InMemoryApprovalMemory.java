@@ -4,7 +4,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 
 /** Approvals that live as long as the process. */
 public final class InMemoryApprovalMemory implements ApprovalMemory {

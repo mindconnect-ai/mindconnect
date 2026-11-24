@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.memory;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.message.service.ConversationService;

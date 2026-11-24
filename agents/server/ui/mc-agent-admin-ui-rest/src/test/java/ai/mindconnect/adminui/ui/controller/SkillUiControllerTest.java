@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.controller;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;

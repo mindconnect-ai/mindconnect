@@ -20,9 +20,9 @@ public class UserStreamController {
 
     private final UserStream userStream;
 
-    private final ai.mindconnect.agent.ScopeSupplier scope;
+    private final ai.mindconnect.agent.scope.ScopeSupplier scope;
 
-    public UserStreamController(UserStream userStream, ai.mindconnect.agent.ScopeSupplier scope) {
+    public UserStreamController(UserStream userStream, ai.mindconnect.agent.scope.ScopeSupplier scope) {
         this.scope = scope;
         this.userStream = userStream;
     }

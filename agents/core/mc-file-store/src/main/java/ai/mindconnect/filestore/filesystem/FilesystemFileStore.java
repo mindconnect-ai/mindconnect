@@ -1,7 +1,7 @@
 package ai.mindconnect.filestore.filesystem;
 
 import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.EntityId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;

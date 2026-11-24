@@ -7,7 +7,7 @@ import ai.mindconnect.agent.management.api.SessionAttachment;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agentrest.service.ChatOpening;
 import ai.mindconnect.agentrest.service.SessionFileService;
-import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;

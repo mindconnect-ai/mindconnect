@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.trace.adapter.pg;
 
 import ai.mindconnect.agent.EntityId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.trace.domain.TraceContext;

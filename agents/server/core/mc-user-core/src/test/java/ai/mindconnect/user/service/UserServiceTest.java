@@ -105,30 +105,30 @@ class UserServiceTest {
         service.recordLogin(ALICE, "sub-1", "iss", "Alice", "alice@example.com");
 
         assertThat(service.activeNamespace(ALICE)).isEmpty();
-        service.selectNamespace(ALICE, new ai.mindconnect.agent.Namespace("acme"));
-        assertThat(service.activeNamespace(ALICE)).contains(new ai.mindconnect.agent.Namespace("acme"));
+        service.selectNamespace(ALICE, new ai.mindconnect.agent.scope.Namespace("acme"));
+        assertThat(service.activeNamespace(ALICE)).contains(new ai.mindconnect.agent.scope.Namespace("acme"));
 
         clock.advance(UserService.LOGIN_RESOLUTION.plusSeconds(1));
         service.recordLogin(ALICE, "sub-1", "iss", "Alice Smith", "alice@example.com");
-        assertThat(service.activeNamespace(ALICE)).contains(new ai.mindconnect.agent.Namespace("acme"));
+        assertThat(service.activeNamespace(ALICE)).contains(new ai.mindconnect.agent.scope.Namespace("acme"));
         assertThat(service.find(ALICE)).map(User::displayName).contains("Alice Smith");
     }
 
     @Test
     void choosingAgainWithTheSameNamespaceDoesNotWrite() {
         service.recordLogin(ALICE, "sub-1", "iss", "Alice", "alice@example.com");
-        service.selectNamespace(ALICE, new ai.mindconnect.agent.Namespace("acme"));
+        service.selectNamespace(ALICE, new ai.mindconnect.agent.scope.Namespace("acme"));
         int saves = users.saves;
 
-        service.selectNamespace(ALICE, new ai.mindconnect.agent.Namespace("acme"));
+        service.selectNamespace(ALICE, new ai.mindconnect.agent.scope.Namespace("acme"));
 
         assertThat(users.saves).isEqualTo(saves);
     }
 
     @Test
     void anUnknownUserGetsARecordForTheirChoice() {
-        service.selectNamespace(UserId.of("bob"), new ai.mindconnect.agent.Namespace("acme"));
+        service.selectNamespace(UserId.of("bob"), new ai.mindconnect.agent.scope.Namespace("acme"));
 
-        assertThat(service.activeNamespace(UserId.of("bob"))).contains(new ai.mindconnect.agent.Namespace("acme"));
+        assertThat(service.activeNamespace(UserId.of("bob"))).contains(new ai.mindconnect.agent.scope.Namespace("acme"));
     }
 }

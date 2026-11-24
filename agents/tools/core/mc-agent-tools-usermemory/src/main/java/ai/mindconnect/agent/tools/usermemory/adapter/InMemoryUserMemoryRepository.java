@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.tools.usermemory.adapter;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.PerNamespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
 import ai.mindconnect.agent.tools.usermemory.UserMemoryRepository;

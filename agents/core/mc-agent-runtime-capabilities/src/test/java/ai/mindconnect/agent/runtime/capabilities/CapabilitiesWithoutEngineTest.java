@@ -40,8 +40,8 @@ import org.junit.jupiter.api.BeforeEach;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillResolver;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillSummary;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import org.junit.jupiter.api.Test;
 
 /**

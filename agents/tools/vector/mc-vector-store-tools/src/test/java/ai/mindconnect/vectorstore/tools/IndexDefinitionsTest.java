@@ -1,7 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
 import ai.mindconnect.vectorstore.embedding.EntityType;

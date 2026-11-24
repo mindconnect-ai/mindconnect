@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.trace.adapter;
 
 import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ChatTurnId;

@@ -17,6 +17,11 @@
     <description>Admin UI backend — serves UiNode JSON for agent and LLM config management</description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- The OpenAI Responses API, served by the same process as the admin UI. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

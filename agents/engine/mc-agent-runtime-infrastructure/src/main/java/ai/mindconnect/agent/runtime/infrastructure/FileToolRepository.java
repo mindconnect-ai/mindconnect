@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.infrastructure;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolRepository;
 import ai.mindconnect.agent.tool.ToolSettings;
 import ai.mindconnect.common.util.AtomicFiles;

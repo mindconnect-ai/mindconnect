@@ -2,8 +2,8 @@ package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.service.NamespaceMembers;
 import ai.mindconnect.adminui.ui.page.NamespacesPage;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.agent.starter.namespace.NamespaceSelection;

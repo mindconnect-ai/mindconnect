@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.ui.page;
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.ConnectionsComponent;
 import ai.mindconnect.adminui.ui.component.UserToolsComponent;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolVariable;
 import ai.mindconnect.namespace.domain.Actor;

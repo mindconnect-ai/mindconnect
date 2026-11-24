@@ -1,6 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 
 import java.nio.file.Path;
 

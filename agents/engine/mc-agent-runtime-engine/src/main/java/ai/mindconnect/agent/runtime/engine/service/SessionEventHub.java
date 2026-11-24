@@ -18,7 +18,7 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionLifecycleListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionStreamListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 

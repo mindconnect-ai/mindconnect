@@ -1,7 +1,7 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;

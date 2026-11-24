@@ -23,6 +23,10 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-gateway-core</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>

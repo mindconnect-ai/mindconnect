@@ -3,7 +3,7 @@ package ai.mindconnect.agent.runtime.infrastructure;
 import java.nio.file.Path;
 import java.util.Map;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.filestore.FileStore;

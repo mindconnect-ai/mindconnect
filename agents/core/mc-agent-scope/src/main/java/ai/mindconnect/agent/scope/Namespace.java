@@ -1,4 +1,4 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.agent.scope;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

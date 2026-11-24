@@ -1,6 +1,6 @@
 package ai.mindconnect.extension.adapter.pg;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.extension.domain.InstalledSeed;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.jdbc.DocumentTable;

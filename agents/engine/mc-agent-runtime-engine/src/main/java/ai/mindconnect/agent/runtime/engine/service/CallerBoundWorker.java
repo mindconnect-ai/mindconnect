@@ -3,10 +3,10 @@ package ai.mindconnect.agent.runtime.engine.service;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskRecord;

@@ -1,4 +1,6 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.agent.scope;
+
+import ai.mindconnect.agent.UserId;
 
 import org.junit.jupiter.api.Test;
 

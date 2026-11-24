@@ -1,6 +1,6 @@
 package ai.mindconnect.namespace.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.namespace.port.out.NamespacePurge;
 import ai.mindconnect.namespace.service.NamespaceService;

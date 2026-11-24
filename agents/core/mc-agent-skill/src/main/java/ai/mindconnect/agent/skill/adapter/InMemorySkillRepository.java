@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.skill.adapter;
 
-import ai.mindconnect.agent.PerNamespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.domain.SkillId;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;

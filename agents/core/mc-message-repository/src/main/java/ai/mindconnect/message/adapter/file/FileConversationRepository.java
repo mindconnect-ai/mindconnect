@@ -1,7 +1,7 @@
 package ai.mindconnect.message.adapter.file;
 
 import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.message.domain.ConversationId;
 
 import ai.mindconnect.common.PageRequest;

@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.starter.namespace;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 
 import java.util.Optional;
 import java.util.Set;

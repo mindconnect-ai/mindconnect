@@ -150,12 +150,12 @@ class McpGatewayAutoConfigurationTest {
         McpStoreFactory mcpStoreFactory() {
             return new McpStoreFactory() {
                 @Override
-                public McpServerRepository serverRepository(ai.mindconnect.agent.ScopeSupplier scope) {
+                public McpServerRepository serverRepository(ai.mindconnect.agent.scope.ScopeSupplier scope) {
                     return REPOSITORY;
                 }
 
                 @Override
-                public McpDiscoveryStore discoveryStore(ai.mindconnect.agent.ScopeSupplier scope) {
+                public McpDiscoveryStore discoveryStore(ai.mindconnect.agent.scope.ScopeSupplier scope) {
                     return new McpDiscoveryStore() {
                         @Override public java.util.Optional<ai.mindconnect.mcp.gateway.McpDiscovery> find(
                                 McpServerId server) { return java.util.Optional.empty(); }

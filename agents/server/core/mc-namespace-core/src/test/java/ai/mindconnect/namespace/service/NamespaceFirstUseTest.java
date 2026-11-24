@@ -1,7 +1,7 @@
 package ai.mindconnect.namespace.service;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

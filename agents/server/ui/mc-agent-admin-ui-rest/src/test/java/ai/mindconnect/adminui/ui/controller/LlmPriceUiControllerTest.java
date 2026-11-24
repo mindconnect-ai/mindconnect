@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;

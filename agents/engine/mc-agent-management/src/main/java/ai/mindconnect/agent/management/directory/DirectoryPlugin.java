@@ -3,7 +3,7 @@ package ai.mindconnect.agent.management.directory;
 import java.nio.file.Path;
 
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 

@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.service;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
 import ai.mindconnect.llm.domain.LlmConfig;

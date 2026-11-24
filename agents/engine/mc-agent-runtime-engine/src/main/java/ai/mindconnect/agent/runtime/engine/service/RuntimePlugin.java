@@ -9,7 +9,7 @@ import ai.mindconnect.agent.runtime.api.port.out.BackgroundWork;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWorker;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.ModelSettingsResolver;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;

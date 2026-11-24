@@ -1,6 +1,6 @@
 package ai.mindconnect.vectorstore.pgvector;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;

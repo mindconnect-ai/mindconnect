@@ -22,6 +22,11 @@
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Agent platform — REST controllers + WebSocket + core server -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

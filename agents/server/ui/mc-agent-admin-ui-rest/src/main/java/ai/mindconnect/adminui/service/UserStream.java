@@ -73,7 +73,7 @@ public class UserStream {
     private final ObjectMapper objectMapper;
     private final Map<SseEmitter, Attached> attached = new ConcurrentHashMap<>();
     /** The namespace a user chose last — asked on every board frame, so a switch shows without a reload. */
-    private final java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespace;
+    private final java.util.function.Function<UserId, Optional<ai.mindconnect.agent.scope.Namespace>> activeNamespace;
     private final ScheduledExecutorService pulse = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "user-stream-heartbeat");
         t.setDaemon(true);
@@ -92,7 +92,7 @@ public class UserStream {
     }
 
     UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
-               java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespace) {
+               java.util.function.Function<UserId, Optional<ai.mindconnect.agent.scope.Namespace>> activeNamespace) {
         this.taskMonitor = taskMonitor.orElse(null);
         this.userChannels = userChannels;
         this.objectMapper = objectMapper;
@@ -130,7 +130,7 @@ public class UserStream {
      * @param attachedIn the namespace the attaching request works in — what the board
      *                   shows until the user chooses another; null shows every namespace
      */
-    public void attach(SseEmitter emitter, String userId, ai.mindconnect.agent.Namespace attachedIn) {
+    public void attach(SseEmitter emitter, String userId, ai.mindconnect.agent.scope.Namespace attachedIn) {
         try {
             emitter.send(SseEmitter.event().comment("attached"));
         } catch (Exception e) {
@@ -141,7 +141,7 @@ public class UserStream {
         Subscription tasks = taskMonitor == null ? null : taskMonitor.subscribe(event -> {
             try {
                 // The board as this viewer sees it: the namespace they chose last, else the one they attached in.
-                ai.mindconnect.agent.Namespace namespace = activeNamespace.apply(viewer).orElse(attachedIn);
+                ai.mindconnect.agent.scope.Namespace namespace = activeNamespace.apply(viewer).orElse(attachedIn);
                 emitter.send(SseEmitter.event()
                         .id(Long.toString(event.seq()))
                         .name("patch")
@@ -166,7 +166,7 @@ public class UserStream {
     }
 
     /** The viewer's remembered namespace — while they may still work there; a member who was removed sees it no more. */
-    private static java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespaceOf(
+    private static java.util.function.Function<UserId, Optional<ai.mindconnect.agent.scope.Namespace>> activeNamespaceOf(
             ai.mindconnect.user.service.UserService users,
             ai.mindconnect.namespace.service.NamespaceService namespaces) {
         if (users == null) return user -> Optional.empty();

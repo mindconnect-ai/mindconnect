@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.starter.workflow;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.common.env.EnvVarResolver;

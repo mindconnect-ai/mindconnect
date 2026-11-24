@@ -1,6 +1,6 @@
 package ai.mindconnect.filestore;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import java.util.Map;
 
 /**

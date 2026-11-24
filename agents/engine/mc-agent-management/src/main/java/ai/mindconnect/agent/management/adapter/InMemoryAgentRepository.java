@@ -9,7 +9,7 @@ import java.util.function.UnaryOperator;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 
 /** Agents that live as long as the process: for a program that defines its agents in code, and for tests. */
 public final class InMemoryAgentRepository implements AgentRepository {

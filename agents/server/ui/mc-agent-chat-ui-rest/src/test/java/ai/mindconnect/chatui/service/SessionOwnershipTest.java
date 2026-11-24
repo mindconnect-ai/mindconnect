@@ -1,11 +1,11 @@
 package ai.mindconnect.chatui.service;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.management.RepositorySessionManagement;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;

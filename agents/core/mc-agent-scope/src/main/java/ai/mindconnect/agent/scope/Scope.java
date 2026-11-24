@@ -1,4 +1,6 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.agent.scope;
+
+import ai.mindconnect.agent.UserId;
 
 import java.util.Map;
 import java.util.Optional;

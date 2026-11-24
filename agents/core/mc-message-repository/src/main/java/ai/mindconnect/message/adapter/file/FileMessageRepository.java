@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.file;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.filerepo.FileRepo;
 import ai.mindconnect.filerepo.RecordLog;

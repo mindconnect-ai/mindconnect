@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.infrastructure;
 
 import java.util.function.Supplier;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;

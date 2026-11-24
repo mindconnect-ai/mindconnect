@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.adminui.service.MigrationService.FieldDiff;
 import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -43,7 +43,7 @@ class MigrationServiceApplyFieldTest {
         llmConfigs = new InMemoryLlmConfigRepository(ScopeSupplier.local());
         service = new MigrationService(
                 llmConfigs,
-                new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.ScopeSupplier.fixed(new ai.mindconnect.agent.Namespace("test")))),
+                new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test")))),
                 new InMemorySkillRepository(ScopeSupplier.local()),
                 new InMemoryWorkflowDataRepository(),
                 new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),

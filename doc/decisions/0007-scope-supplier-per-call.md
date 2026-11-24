@@ -10,7 +10,7 @@ call writes to.
 
 ## Decision
 A persistence adapter — file, Postgres, in-memory, file store, vector store, MCP
-gateway — takes the `ScopeSupplier` (`ai.mindconnect.agent`) in its constructor
+gateway — takes the `ScopeSupplier` (`ai.mindconnect.agent.scope`, module `mc-agent-scope`) in its constructor
 and asks it on every call: one instance serves every namespace. A file adapter
 resolves `<dataDir>/<namespace>/…` per call (`Documents`/`RecordLog` build on a
 `Supplier<FileRepo>`), a Postgres adapter matches its `namespace` column, an

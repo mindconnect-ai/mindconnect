@@ -7,7 +7,7 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWork;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWorker;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskQueue;

@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.RepositorySessionManagement;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
 import ai.mindconnect.agent.management.api.ManagedSession;

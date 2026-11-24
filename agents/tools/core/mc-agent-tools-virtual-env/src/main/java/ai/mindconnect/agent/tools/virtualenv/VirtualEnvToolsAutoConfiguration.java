@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.tools.virtualenv;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.workspace.WorkspaceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
