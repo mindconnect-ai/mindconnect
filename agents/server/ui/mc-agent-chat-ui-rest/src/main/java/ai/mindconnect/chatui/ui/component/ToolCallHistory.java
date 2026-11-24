@@ -31,8 +31,12 @@ public final class ToolCallHistory {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final MessageListComponent.SubAgentTreeProvider subAgentTree;
+    /** Whose messages these are: a long result is downloaded from that session. */
+    private final ai.mindconnect.agent.SessionId sessionId;
 
-    public ToolCallHistory(MessageListComponent.SubAgentTreeProvider subAgentTree) {
+    public ToolCallHistory(ai.mindconnect.agent.SessionId sessionId,
+                           MessageListComponent.SubAgentTreeProvider subAgentTree) {
+        this.sessionId = sessionId;
         this.subAgentTree = subAgentTree;
     }
 
@@ -119,7 +123,8 @@ public final class ToolCallHistory {
                             : TaskCardComponent.doneToolHeader(displayName, duration);
                 }
 
-                String body = TaskCardComponent.taskCardBody(argsByCallId.get(callId), result);
+                String body = TaskCardComponent.taskCardBody(argsByCallId.get(callId), result,
+                        ai.mindconnect.chatui.ui.controller.ToolResultDownloadController.url(sessionId, m.id()));
                 String nodeId = "task-hist-" + m.id();
                 byCallId.put(key, List.of(TaskCardComponent.historic(nodeId, header, body)));
             } catch (Exception ignored) {}

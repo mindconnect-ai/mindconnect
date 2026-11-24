@@ -2168,8 +2168,11 @@ public class ChatUiController {
                 String toolName = String.valueOf(message.metadata().getOrDefault("toolName", "tool"));
                 boolean failed = Boolean.TRUE.equals(message.metadata().get("failed"));
                 log.info("tool {}: {}", failed ? "failed" : "done", toolName);
+                // The session the result is kept in: the sub-agent's for one of its calls, else the chat's.
+                SessionId keptIn = parentTaskId == null ? liveView.sessionId() : taskToSession.get(parentTaskId);
                 finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
-                        parentTaskId, toolName, message.text(), 0, failed);
+                        parentTaskId, toolName, message.text(), 0, failed,
+                        ToolResultDownloadController.url(keptIn, message.id()));
             }
             default -> { }
         }
@@ -2229,15 +2232,18 @@ public class ChatUiController {
                                 String[] openTaskNodeId,
                                 ai.mindconnect.chatui.service.StreamBus bus,
                                 java.util.UUID parentTaskId, String toolName,
-                                String resultOrError, long durationMs, boolean failed) {
+                                String resultOrError, long durationMs, boolean failed,
+                                String fullResultUrl) {
         LiveTask lt = findOpenTool(liveTasks, toolName, parentTaskId);
         if (lt == null) return;
         lt.output = resultOrError;
         lt.durationMs = durationMs;
         lt.done = true;
         var card = failed
-                ? TaskCardComponent.failedTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs)
-                : TaskCardComponent.doneTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs);
+                ? TaskCardComponent.failedTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs,
+                        fullResultUrl)
+                : TaskCardComponent.doneTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs,
+                        fullResultUrl);
         publishPatch(bus, liveView.streamTaskUpdate(card));
         if (lt.nodeId.equals(openTaskNodeId[0])) openTaskNodeId[0] = null;
     }
@@ -2270,7 +2276,7 @@ public class ChatUiController {
                         TaskCardComponent.subAgentAnswer(tid, reason)));
             } else {
                 publishPatch(bus, liveView.streamTaskUpdate(
-                        TaskCardComponent.failedTool(lt.nodeId, lt.name, lt.input, reason, durationMs)));
+                        TaskCardComponent.failedTool(lt.nodeId, lt.name, lt.input, reason, durationMs, null)));
             }
         }
     }

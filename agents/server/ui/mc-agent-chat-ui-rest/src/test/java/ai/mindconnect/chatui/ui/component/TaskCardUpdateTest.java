@@ -22,7 +22,7 @@ class TaskCardUpdateTest {
     @Test
     void aFinishedToolSwapsItsSummaryAndBodyNotTheListItem() throws Exception {
         var done = TaskCardComponent.doneTool("task-tool-top-0-bash", "bash",
-                Map.of("command", "ls"), "a.txt", 12);
+                Map.of("command", "ls"), "a.txt", 12, null);
 
         var ops = done.updateInPlace();
 
@@ -30,6 +30,16 @@ class TaskCardUpdateTest {
                 .containsExactly("task-tool-top-0-bash-summary", "task-tool-top-0-bash-md")
                 .doesNotContain("task-tool-top-0-bash");
         assertThat(json(ops)).doesNotContain("\"type\":\"list\"").contains("bash").contains("a.txt");
+    }
+
+    @Test
+    void aLongOutputIsDrawnAsItsBeginningWithALinkToTheWholeOfIt() {
+        String body = TaskCardComponent.taskCardBody(null, "x".repeat(10_000) + "y".repeat(2_500),
+                "/chat/api/sessions/s1/tool-results/m7");
+
+        assertThat(body).contains("x".repeat(10_000)).doesNotContain("y")
+                .contains("… 2,500 more characters. [Download the full result](/chat/api/sessions/s1/tool-results/m7)");
+        assertThat(TaskCardComponent.taskCardBody(null, "short", "/anywhere")).doesNotContain("Download");
     }
 
     /** The span a live update targets is on the card from the start. */

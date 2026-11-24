@@ -172,4 +172,7 @@ The page is **`maxResultChars`**, 30,000 characters unless set:
   form: *Max result chars*; it takes the place of the agent's.
 
 There is no cap on the result itself: what a tool returns is kept as it is,
-and reading on reaches all of it.
+and reading on reaches all of it. The chat draws the first 10,000 characters of a
+result on its tool card and, for a longer one, a *Download the full result*
+link that hands out the whole of it as a text file — to the chat's owner
+only.

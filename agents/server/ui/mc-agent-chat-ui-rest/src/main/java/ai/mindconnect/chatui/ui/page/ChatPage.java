@@ -254,6 +254,11 @@ public final class ChatPage {
      * <p>Separate from {@link #render()} so a host can put the conversation
      * inside its own shell instead of taking the whole page.
      */
+    /** The chat this page shows. */
+    public SessionId sessionId() {
+        return sessionId;
+    }
+
     public UiSection renderContent() {
         // No attachment strip above the input: the files live behind the "+",
         // which carries their count. A panel that is empty most of the time

@@ -502,6 +502,6 @@ public final class MessageListComponent implements UiComponent {
 
     /** Rebuilds the tool cards of a past turn. */
     private ToolCallHistory toolCallHistory() {
-        return new ToolCallHistory(subAgentTree);
+        return new ToolCallHistory(sessionId, subAgentTree);
     }
 }

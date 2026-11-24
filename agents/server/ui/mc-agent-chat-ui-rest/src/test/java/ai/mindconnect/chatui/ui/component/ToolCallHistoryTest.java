@@ -14,7 +14,8 @@ import org.junit.jupiter.api.Test;
 class ToolCallHistoryTest {
 
     /** No sub-sessions resolve: the card is built from the call alone. */
-    private final ToolCallHistory history = new ToolCallHistory((callId, running, input, result) -> List.of());
+    private final ToolCallHistory history = new ToolCallHistory(ai.mindconnect.agent.SessionId.of("s1"),
+            (callId, running, input, result) -> List.of());
 
     @Test
     void a_finished_batch_of_sub_agents_is_headed_by_the_agents_it_ran() throws Exception {

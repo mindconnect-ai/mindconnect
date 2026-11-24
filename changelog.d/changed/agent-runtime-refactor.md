@@ -100,3 +100,6 @@
   entry, and they may use no more than the agent calling them.
 - A tool switched off in the tool catalog keeps its row, marked "(off)", so
   it can be switched on again there.
+- A tool card in the chat draws the first 10,000 characters of a long result
+  and links to *Download the full result*, which hands out all of it as a text
+  file.
