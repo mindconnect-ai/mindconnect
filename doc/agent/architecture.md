@@ -72,7 +72,7 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       — `record XId(String value) implements EntityId` — never by a bare `UUID` or `String`;
       in JSON an id is its plain value. Ids, domain objects, ports and services carry no
       namespace. `mc-agent-scope` (package `ai.mindconnect.agent.scope`) says who works where:
-      `Namespace`, `Scope`, `ScopeSupplier`, and `PerNamespace` for stores that keep their data
+      `Namespace`, `Scope`, `ScopeSupplier`, and `NamespaceMap` for stores that keep their data
       in memory. Persistence adapters (File, Pg, the file-store backends, `VectorStores`) and
       the runtime take the `ScopeSupplier` in their constructor and ask it on every call for the namespace to
       work in — one adapter serves every namespace (`Scope` =
@@ -214,7 +214,7 @@ the thing to grep for.
   no namespace. A persistence adapter takes the `ScopeSupplier` in its constructor and asks
   it on every call for the namespace (`Scope` = namespace + optional `UserId` + host
   attributes); one adapter serves every namespace — an in-memory one keeps its entries in a
-  `PerNamespace`. A library embeds with
+  `NamespaceMap` and reads the entry of `scope.namespace()`. A library embeds with
   `ScopeSupplier.fixed`; a server binds a `ThreadBoundScopeSupplier` (`mc-namespace-core`) per request and per queued task
   via `ScopeTaskAdvisor`, which resumes a task through `ScopeSupplier.callIn` and so knows no thread binding. Work a namespace needs once per process is a `NamespaceFirstUse`
   (`mc-namespace-core`) registered with `ThreadBoundScopeSupplier.onBind` (example: `NamespaceSeeding`);

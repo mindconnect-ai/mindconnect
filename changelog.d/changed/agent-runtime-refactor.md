@@ -145,7 +145,7 @@
 - Overwriting a registry entry replaces that entry only. What it requires is
   installed when missing and left as it is when already here; before, the
   LLM config an agent requires was overwritten along with the agent.
-- `Namespace`, `Scope`, `ScopeSupplier` and `PerNamespace` moved from
+- `Namespace`, `Scope`, `ScopeSupplier` and `NamespaceMap` (earlier `PerNamespace`) moved from
   `mc-agent-domain` (`ai.mindconnect.agent`) to the new module
   `mc-agent-scope` (`ai.mindconnect.agent.scope`); `mc-agent-domain` holds
   ids only.

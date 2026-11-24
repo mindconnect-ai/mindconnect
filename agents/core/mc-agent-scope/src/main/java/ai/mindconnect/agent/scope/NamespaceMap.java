@@ -10,24 +10,25 @@ import java.util.function.Supplier;
  * instead of a single map, so that one instance serves every namespace the
  * way the file and Postgres adapters do, and a namespace never sees another's
  * entries.
+ *
+ * <p>It only keeps: which namespace a call works in is the caller's to ask
+ * its {@link ScopeSupplier}, so the line that reads an entry shows where the
+ * namespace comes from.
  */
-public final class PerNamespace<T> {
+public final class NamespaceMap<T> {
 
-    private final ScopeSupplier scope;
     private final Supplier<T> empty;
     private final Map<Namespace, T> values = new ConcurrentHashMap<>();
 
     /**
-     * @param scope names the namespace of the current call
      * @param empty makes the value of a namespace seen for the first time
      */
-    public PerNamespace(ScopeSupplier scope, Supplier<T> empty) {
-        this.scope = Objects.requireNonNull(scope, "scope");
+    public NamespaceMap(Supplier<T> empty) {
         this.empty = Objects.requireNonNull(empty, "empty");
     }
 
-    /** The value of the namespace the current call works in. */
-    public T current() {
-        return values.computeIfAbsent(scope.namespace(), namespace -> empty.get());
+    /** The value of {@code namespace}. */
+    public T of(Namespace namespace) {
+        return values.computeIfAbsent(namespace, seen -> empty.get());
     }
 }

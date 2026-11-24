@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.skill.adapter;
 
-import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.NamespaceMap;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.domain.SkillId;
@@ -20,20 +20,22 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class InMemorySkillRepository implements SkillRepository {
 
-    private final PerNamespace<Map<SkillId, Skill>> skills;
+    private final ScopeSupplier scope;
+    private final NamespaceMap<Map<SkillId, Skill>> skills;
 
     public InMemorySkillRepository(ScopeSupplier scope) {
-        this.skills = new PerNamespace<>(scope, ConcurrentHashMap::new);
+        this.scope = scope;
+        this.skills = new NamespaceMap<>(ConcurrentHashMap::new);
     }
 
     @Override
     public List<Skill> findAll() {
-        return skills.current().values().stream().sorted(Comparator.comparing(Skill::name)).toList();
+        return skills.of(scope.namespace()).values().stream().sorted(Comparator.comparing(Skill::name)).toList();
     }
 
     @Override
     public Optional<Skill> findById(SkillId id) {
-        return Optional.ofNullable(skills.current().get(id));
+        return Optional.ofNullable(skills.of(scope.namespace()).get(id));
     }
 
     @Override
@@ -47,12 +49,12 @@ public class InMemorySkillRepository implements SkillRepository {
     @Override
     public Skill save(Skill skill) {
         Skill valid = skill.validated();
-        return skills.current().compute(valid.id(), (id, current) -> valid.withVersion(Versions.next(
+        return skills.of(scope.namespace()).compute(valid.id(), (id, current) -> valid.withVersion(Versions.next(
                 current == null ? null : current.version(), valid.version(), "Skill", id.value())));
     }
 
     @Override
     public void deleteById(SkillId id) {
-        skills.current().remove(id);
+        skills.of(scope.namespace()).remove(id);
     }
 }

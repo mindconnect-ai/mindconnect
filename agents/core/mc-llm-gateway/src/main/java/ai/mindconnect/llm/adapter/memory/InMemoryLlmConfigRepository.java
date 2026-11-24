@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.memory;
 
-import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.NamespaceMap;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -15,37 +15,39 @@ import java.util.concurrent.ConcurrentHashMap;
 /** In-memory {@link LlmConfigRepository} — process-lifetime storage, no persistence. */
 public class InMemoryLlmConfigRepository implements LlmConfigRepository {
 
-    private final PerNamespace<Map<LlmConfigId, LlmConfig>> store;
+    private final ScopeSupplier scope;
+    private final NamespaceMap<Map<LlmConfigId, LlmConfig>> store;
 
     public InMemoryLlmConfigRepository(ScopeSupplier scope) {
-        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
+        this.scope = scope;
+        this.store = new NamespaceMap<>(ConcurrentHashMap::new);
     }
 
     @Override
     public void save(LlmConfig config) {
-        store.current().compute(config.id(), (id, current) -> config.withVersion(Versions.next(
+        store.of(scope.namespace()).compute(config.id(), (id, current) -> config.withVersion(Versions.next(
                 current == null ? null : current.version(), config.version(), "LlmConfig", id.value())));
     }
 
     @Override
     public Optional<LlmConfig> findById(LlmConfigId id) {
-        return Optional.ofNullable(store.current().get(id));
+        return Optional.ofNullable(store.of(scope.namespace()).get(id));
     }
 
     @Override
     public Optional<LlmConfig> findByName(String name) {
-        return store.current().values().stream()
+        return store.of(scope.namespace()).values().stream()
                 .filter(c -> c.name().equals(name))
                 .findFirst();
     }
 
     @Override
     public List<LlmConfig> findAll() {
-        return store.current().values().stream().toList();
+        return store.of(scope.namespace()).values().stream().toList();
     }
 
     @Override
     public void deleteById(LlmConfigId id) {
-        store.current().remove(id);
+        store.of(scope.namespace()).remove(id);
     }
 }

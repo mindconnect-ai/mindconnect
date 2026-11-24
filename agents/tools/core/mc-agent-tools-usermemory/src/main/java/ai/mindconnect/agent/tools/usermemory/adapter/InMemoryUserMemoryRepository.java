@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.tools.usermemory.adapter;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.NamespaceMap;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
@@ -17,37 +17,40 @@ public class InMemoryUserMemoryRepository implements UserMemoryRepository {
 
     private record Key(AgentId agentId, String name) { }
 
-    private final PerNamespace<Map<UserId, Map<Key, MemoryEntry>>> store;
+    private final ScopeSupplier scope;
+    private final NamespaceMap<Map<UserId, Map<Key, MemoryEntry>>> store;
 
     public InMemoryUserMemoryRepository(ScopeSupplier scope) {
-        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
+        this.scope = scope;
+        this.store = new NamespaceMap<>(ConcurrentHashMap::new);
     }
 
     @Override
     public List<MemoryEntry> findByUser(UserId userId) {
-        return List.copyOf(store.current().getOrDefault(userId, Map.of()).values());
+        return List.copyOf(store.of(scope.namespace()).getOrDefault(userId, Map.of()).values());
     }
 
     @Override
     public List<MemoryEntry> findAll() {
-        return store.current().values().stream().flatMap(m -> m.values().stream()).toList();
+        return store.of(scope.namespace()).values().stream().flatMap(m -> m.values().stream()).toList();
     }
 
     @Override
     public Optional<MemoryEntry> find(UserId userId, AgentId agentId, String name) {
-        return Optional.ofNullable(store.current().getOrDefault(userId, Map.of()).get(new Key(agentId, name)));
+        return Optional.ofNullable(
+                store.of(scope.namespace()).getOrDefault(userId, Map.of()).get(new Key(agentId, name)));
     }
 
     @Override
     public MemoryEntry save(MemoryEntry entry) {
-        store.current().computeIfAbsent(entry.userId(), u -> new ConcurrentHashMap<>())
+        store.of(scope.namespace()).computeIfAbsent(entry.userId(), u -> new ConcurrentHashMap<>())
                 .put(new Key(entry.agentId(), entry.name()), entry);
         return entry;
     }
 
     @Override
     public boolean delete(UserId userId, AgentId agentId, String name) {
-        Map<Key, MemoryEntry> entries = store.current().get(userId);
+        Map<Key, MemoryEntry> entries = store.of(scope.namespace()).get(userId);
         return entries != null && entries.remove(new Key(agentId, name)) != null;
     }
 }

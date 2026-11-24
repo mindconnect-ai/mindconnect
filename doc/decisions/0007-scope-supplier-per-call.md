@@ -14,7 +14,7 @@ gateway — takes the `ScopeSupplier` (`ai.mindconnect.agent.scope`, module `mc-
 and asks it on every call: one instance serves every namespace. A file adapter
 resolves `<dataDir>/<namespace>/…` per call (`Documents`/`RecordLog` build on a
 `Supplier<FileRepo>`), a Postgres adapter matches its `namespace` column, an
-in-memory adapter keeps its entries in a `PerNamespace`. The workflow area, which
+in-memory adapter keeps its entries in a `NamespaceMap`, read by the namespace its `ScopeSupplier` names. The workflow area, which
 knows no namespace, takes a `Supplier<String>` partition. `AgentRuntimeBuilder`
 holds the scope: `ScopeSupplier.fixed` for a library, the host's `ThreadBoundScopeSupplier`
 (`mc-namespace-core`, `scope(…)`) for a server, bound per request; a queued task

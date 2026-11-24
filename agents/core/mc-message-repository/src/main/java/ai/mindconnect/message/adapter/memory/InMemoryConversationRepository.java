@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.memory;
 
-import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.NamespaceMap;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.message.domain.ConversationId;
 
@@ -16,26 +16,28 @@ import java.util.concurrent.ConcurrentHashMap;
 /** In-memory {@link ConversationRepository} — process-lifetime storage, no persistence. */
 public class InMemoryConversationRepository implements ConversationRepository {
 
-    private final PerNamespace<Map<ConversationId, Conversation>> store;
+    private final ScopeSupplier scope;
+    private final NamespaceMap<Map<ConversationId, Conversation>> store;
 
     public InMemoryConversationRepository(ScopeSupplier scope) {
-        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
+        this.scope = scope;
+        this.store = new NamespaceMap<>(ConcurrentHashMap::new);
     }
 
     @Override
     public Conversation save(Conversation conversation) {
-        store.current().put(conversation.id(), conversation);
+        store.of(scope.namespace()).put(conversation.id(), conversation);
         return conversation;
     }
 
     @Override
     public Optional<Conversation> findById(ConversationId id) {
-        return Optional.ofNullable(store.current().get(id));
+        return Optional.ofNullable(store.of(scope.namespace()).get(id));
     }
 
     @Override
     public List<Conversation> findAll(PageRequest page) {
-        return store.current().values().stream()
+        return store.of(scope.namespace()).values().stream()
                 .skip((long) page.page() * page.size())
                 .limit(page.size())
                 .toList();
@@ -43,6 +45,6 @@ public class InMemoryConversationRepository implements ConversationRepository {
 
     @Override
     public void deleteById(ConversationId id) {
-        store.current().remove(id);
+        store.of(scope.namespace()).remove(id);
     }
 }

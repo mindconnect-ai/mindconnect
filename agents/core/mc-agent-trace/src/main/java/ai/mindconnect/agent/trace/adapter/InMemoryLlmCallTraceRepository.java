@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.trace.adapter;
 
-import ai.mindconnect.agent.scope.PerNamespace;
+import ai.mindconnect.agent.scope.NamespaceMap;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
@@ -34,7 +34,8 @@ public class InMemoryLlmCallTraceRepository implements LlmCallTraceRepository {
     /** The same cap the file adapter applies. {@code 0} or less keeps everything. */
     public static final int DEFAULT_MAX_PER_CONVERSATION = 50;
 
-    private final PerNamespace<Map<TraceId, LlmCallTrace>> store;
+    private final ScopeSupplier scope;
+    private final NamespaceMap<Map<TraceId, LlmCallTrace>> store;
     private final int maxTracesPerConversation;
 
     public InMemoryLlmCallTraceRepository(ScopeSupplier scope) {
@@ -43,12 +44,13 @@ public class InMemoryLlmCallTraceRepository implements LlmCallTraceRepository {
 
     public InMemoryLlmCallTraceRepository(int maxTracesPerConversation, ScopeSupplier scope) {
         this.maxTracesPerConversation = maxTracesPerConversation;
-        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
+        this.scope = scope;
+        this.store = new NamespaceMap<>(ConcurrentHashMap::new);
     }
 
     @Override
     public void save(LlmCallTrace trace) {
-        store.current().put(trace.id(), trace);
+        store.of(scope.namespace()).put(trace.id(), trace);
         enforceRetention(trace.context().conversationId());
     }
 
@@ -60,26 +62,26 @@ public class InMemoryLlmCallTraceRepository implements LlmCallTraceRepository {
                 .sorted(Comparator.comparing((LlmCallTrace t) -> t.startedAt() == null ? Instant.MIN : t.startedAt())
                         .thenComparing(t -> t.id().value()))
                 .limit(all.size() - maxTracesPerConversation)
-                .forEach(t -> store.current().remove(t.id()));
+                .forEach(t -> store.of(scope.namespace()).remove(t.id()));
     }
 
     @Override
     public List<LlmCallTrace> findByTurn(ChatTurnId turnId) {
-        return store.current().values().stream()
+        return store.of(scope.namespace()).values().stream()
                 .filter(t -> Objects.equals(t.context().turnId(), turnId))
                 .toList();
     }
 
     @Override
     public List<LlmCallTrace> findBySession(SessionId sessionId) {
-        return store.current().values().stream()
+        return store.of(scope.namespace()).values().stream()
                 .filter(t -> Objects.equals(t.context().sessionId(), sessionId))
                 .toList();
     }
 
     @Override
     public List<LlmCallTrace> findByConversation(ConversationId conversationId) {
-        return store.current().values().stream()
+        return store.of(scope.namespace()).values().stream()
                 .filter(t -> Objects.equals(t.context().conversationId(), conversationId))
                 .toList();
     }
@@ -92,25 +94,25 @@ public class InMemoryLlmCallTraceRepository implements LlmCallTraceRepository {
         boolean changed = true;
         while (changed) {
             changed = false;
-            for (LlmCallTrace t : store.current().values()) {
+            for (LlmCallTrace t : store.of(scope.namespace()).values()) {
                 ChatTurnId parent = t.context().parentTurnId();
                 if (parent != null && turnsInTree.contains(parent) && turnsInTree.add(t.context().turnId())) {
                     changed = true;
                 }
             }
         }
-        return store.current().values().stream()
+        return store.of(scope.namespace()).values().stream()
                 .filter(t -> turnsInTree.contains(t.context().turnId()))
                 .toList();
     }
 
     @Override
     public Optional<LlmCallTrace> findById(TraceId id) {
-        return Optional.ofNullable(store.current().get(id));
+        return Optional.ofNullable(store.of(scope.namespace()).get(id));
     }
 
     @Override
     public void deleteBySession(SessionId sessionId) {
-        store.current().values().removeIf(t -> Objects.equals(t.context().sessionId(), sessionId));
+        store.of(scope.namespace()).values().removeIf(t -> Objects.equals(t.context().sessionId(), sessionId));
     }
 }
