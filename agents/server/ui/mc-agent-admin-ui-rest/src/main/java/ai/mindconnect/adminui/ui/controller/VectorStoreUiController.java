@@ -18,7 +18,6 @@ import ai.mindconnect.ui.model.UiToast;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTrigger;
 import ai.mindconnect.vectorstore.tools.IndexDefinition;
-import ai.mindconnect.vectorstore.tools.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
@@ -39,8 +38,8 @@ import java.util.Set;
 /**
  * Admin UI for vector stores: templates (the policies — backend, embedding
  * config, ingestion workflow) and the store instances created from them.
- * Uses the same {@link VectorStores} resolution the knowledge tools use, so
- * what the UI shows is exactly what the tools do.
+ * Everything goes through the {@link ai.mindconnect.agentrest.service.VectorStoreService}
+ * the REST API uses, so what the screen shows is what the API and the tools do.
  *
  * <p>Templates and knowledge bases are shared configuration. A chat's upload
  * store is its user's alone ({@link ai.mindconnect.agentrest.auth.VectorStoreAccess}):
@@ -54,23 +53,23 @@ public class VectorStoreUiController {
 
     private static final String BASE = "/admin/vector-stores";
 
-    private final VectorStores stores;
-    /** Where the request works — every store call names the namespace. */
     private final LlmConfigRepository llmConfigs;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService;
     private final ai.mindconnect.agentrest.auth.CurrentUsers currentUsers;
     private final ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess;
-    private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
+    private final ai.mindconnect.agentrest.service.FileUsageService fileUsage;
+    private final ai.mindconnect.agentrest.service.VectorStoreContents contents;
 
-    public VectorStoreUiController(VectorStores stores, LlmConfigRepository llmConfigs,
+    public VectorStoreUiController(LlmConfigRepository llmConfigs,
                                       ai.mindconnect.filestore.FileStore fileStore,
                                       ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService,
                                       ai.mindconnect.agentrest.auth.CurrentUsers currentUsers,
                                       ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess,
-                                      ai.mindconnect.agent.sdk.AgentRuntime runtime) {
-        this.runtime = runtime;
-        this.stores = stores;
+                                      ai.mindconnect.agentrest.service.FileUsageService fileUsage,
+                                      ai.mindconnect.agentrest.service.VectorStoreContents contents) {
+        this.fileUsage = fileUsage;
+        this.contents = contents;
         this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
         this.vectorStoreService = vectorStoreService;
@@ -98,7 +97,7 @@ public class VectorStoreUiController {
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this template? Existing stores keep their copied settings.")
                         .dispatch("DELETE", "/admin/vector-stores/templates/{id}"));
-        for (VectorStoreTemplate t : stores.templates()) {
+        for (VectorStoreTemplate t : vectorStoreService.templates()) {
             templates.row(Map.of(
                     "id", t.name(),
                     "name", VectorStores.DEFAULT_TEMPLATE.equals(t.name()) ? t.name() + " (built-in)" : t.name(),
@@ -122,20 +121,17 @@ public class VectorStoreUiController {
                                 + "in the other stores and chats that list them.")
                         .dispatch("DELETE", "/admin/vector-stores/stores/{id}"));
         ai.mindconnect.agent.UserId caller = currentUsers.require();
-        // Opening the index first brings in what the namespace kept before 0.9.
-        stores.index();
-        for (VectorStoreInstance i : stores.registry().instances()) {
-            // A chat's upload store is its user's: nobody else sees it listed.
-            if (!storeAccess.reachable(i, caller)) continue;
-            String[] counts = counts(i);
+        // A chat's upload store is its user's: nobody else sees it listed.
+        for (var summary : contents.summaries(instance -> storeAccess.reachable(instance, caller))) {
+            VectorStoreInstance i = summary.instance();
             instances.row(Map.of(
                     "id", i.name(),
                     "name", i.name(),
                     "template", i.templateName(),
                     "scope", i.scope() + (i.scopeRef() == null ? "" : " (" + shortRef(i.scopeRef()) + ")"),
-                    "index", stores.indexOf(i),
-                    "entries", counts[0],
-                    "chunks", counts[1]));
+                    "index", summary.index(),
+                    "entries", summary.entries().isPresent() ? String.valueOf(summary.entries().getAsLong()) : "?",
+                    "chunks", summary.chunks().isPresent() ? String.valueOf(summary.chunks().getAsLong()) : "?"));
         }
 
         // The file store (Files API): raw uploads addressed by id, independent
@@ -157,7 +153,7 @@ public class VectorStoreUiController {
                         .dispatch("DELETE", "/admin/vector-stores/files/{id}"));
         // What the Files API gives the caller by id: their own files and those
         // stored before creators were recorded — nobody else's names and ids.
-        FileUsages usages = fileUsages(caller);
+        var usages = fileUsage.of(caller);
         for (ai.mindconnect.filestore.StoredFile f : fileStore.list()) {
             if (!f.readableBy(caller)) continue;
             files.row(Map.of(
@@ -168,7 +164,7 @@ public class VectorStoreUiController {
                     "size", readableSize(f.size()),
                     "created", f.createdAt() == null ? "" : f.createdAt().toString()
                             .replace("T", " ").substring(0, 16),
-                    "used", usages.summary(f.id().value())));
+                    "used", usedIn(usages, f.id().value())));
         }
         var upload = ai.mindconnect.ui.model.UiUpload
                 .of("vs-files-upload", "Upload to file store")
@@ -309,21 +305,15 @@ public class VectorStoreUiController {
                                 + "built-in index goes back to the server's settings. The chunks stay where they are.")
                         .dispatch("DELETE", BASE + "/indexes/{id}"));
         try {
-            List<VectorStoreTemplate> templates = stores.templates();
-            for (IndexDefinition index : stores.indexes()) {
-                String where;
-                try {
-                    where = stores.indexLocation(index.name());
-                } catch (RuntimeException e) {
-                    where = "cannot be opened: " + e.getMessage();
-                }
+            List<VectorStoreTemplate> templates = vectorStoreService.templates();
+            for (var info : vectorStoreService.indexes()) {
+                IndexDefinition index = info.definition();
                 String usedBy = templates.stream().filter(t -> index.name().equals(t.effectiveIndex()))
                         .map(VectorStoreTemplate::name).collect(java.util.stream.Collectors.joining(", "));
-                boolean builtIn = stores.isBuiltIn(index.name());
                 table.row(Map.of(
                         "id", index.name(),
-                        "name", index.name() + (builtIn ? " (built-in)" : ""),
-                        "where", where,
+                        "name", index.name() + (info.builtIn() ? " (built-in)" : ""),
+                        "where", info.location(),
                         "templates", usedBy.isEmpty() ? "—" : usedBy,
                         "description", index.description() == null ? "" : index.description()));
             }
@@ -341,13 +331,14 @@ public class VectorStoreUiController {
     /** A built-in index opens as the host defines it; saving it moves it for this namespace. */
     @GetMapping("/indexes/{name}/edit")
     public UiPage editIndex(@PathVariable String name) {
-        return indexForm(stores.indexes().stream().filter(i -> i.name().equals(name))
+        return indexForm(vectorStoreService.indexes().stream().filter(i -> i.definition().name().equals(name))
                 .findFirst().orElse(null));
     }
 
-    private UiPage indexForm(IndexDefinition index) {
-        boolean isNew = index == null;
-        boolean builtIn = !isNew && stores.isBuiltIn(index.name());
+    private UiPage indexForm(ai.mindconnect.agentrest.service.VectorStoreService.IndexInfo info) {
+        boolean isNew = info == null;
+        IndexDefinition index = isNew ? null : info.definition();
+        boolean builtIn = !isNew && info.builtIn();
         UiForm form = UiForm.of("vs-index-form", isNew ? "New Index"
                         : builtIn ? "Built-in Index: " + index.name() : "Edit Index: " + index.name())
                 .field(UiField.text("name", "Name", isNew ? null : index.name()).asEditable()
@@ -360,7 +351,7 @@ public class VectorStoreUiController {
                         // pgvector, a directory for files.
                         .onChange(UiTrigger.api("POST", BASE + "/indexes/kind-fields", "vs-index-form")))
                 .content(pgvectorGroup(!isNew && !index.pgvector(), isNew ? null : index.table(),
-                        isNew || index.url() == null ? SYSTEM_DATABASE : OWN_DATABASE, stores.systemDatabase()))
+                        isNew || index.url() == null ? SYSTEM_DATABASE : OWN_DATABASE, vectorStoreService.systemDatabase()))
                 .content(ownDatabaseGroup((!isNew && !index.pgvector()) || isNew || index.url() == null,
                         isNew ? null : index.url(), isNew ? null : index.user(), !isNew && index.password() != null))
                 .content(fileGroup(isNew || index.pgvector(), isNew ? null : index.directory()))
@@ -419,11 +410,11 @@ public class VectorStoreUiController {
         boolean pgvector = !IndexDefinition.FILE.equals(body.str("kind"));
         String database = OWN_DATABASE.equals(body.str("database")) ? OWN_DATABASE : SYSTEM_DATABASE;
         String name = body.str("name") == null ? null : body.str("name").trim();
-        boolean passwordSet = name != null && stores.indexes().stream()
-                .anyMatch(i -> i.name().equals(name) && i.password() != null);
+        boolean passwordSet = name != null && vectorStoreService.indexes().stream()
+                .anyMatch(i -> i.definition().name().equals(name) && i.definition().password() != null);
         return ai.mindconnect.ui.model.UiPatch.of()
                 .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-pgvector", pgvectorGroup(!pgvector,
-                        body.str("table"), database, stores.systemDatabase())))
+                        body.str("table"), database, vectorStoreService.systemDatabase())))
                 .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-own-db",
                         ownDatabaseGroup(!pgvector || SYSTEM_DATABASE.equals(database), body.str("url"),
                                 body.str("user"), passwordSet)))
@@ -435,8 +426,6 @@ public class VectorStoreUiController {
     public Object saveIndex(@RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         String name = body.str("name") == null ? null : body.str("name").trim();
-        IndexDefinition previous = name == null ? null : stores.indexes().stream()
-                .filter(i -> i.name().equals(name)).findFirst().orElse(null);
         String password = body.str("password");
         IndexDefinition index;
         // Hidden groups are submitted too; only the fields of the chosen kind and database count.
@@ -446,89 +435,45 @@ public class VectorStoreUiController {
             index = new IndexDefinition(name, body.str("kind"),
                     pgvector ? body.str("table") : null, ownDatabase ? body.str("url") : null,
                     ownDatabase ? body.str("user") : null,
-                    !ownDatabase ? null
-                            : password == null || password.isBlank() ? (previous == null ? null : previous.password())
-                            : password,
+                    // Left empty, the service keeps the password stored under this name.
+                    !ownDatabase || password == null || password.isBlank() ? null : password,
                     pgvector ? null : body.str("directory"), body.str("description"));
             if (ownDatabase && index.url() == null) {
                 return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error(
                         "A database of its own needs a JDBC URL — or choose the application's database.")
                         .title("Not saved"));
             }
-            stores.saveIndex(index);
+            vectorStoreService.saveIndex(index);
             // Open it now: a wrong URL or a database without pgvector shows here, not at the next upload.
-            stores.indexLocation(index.name());
+            vectorStoreService.indexLocation(index.name());
         } catch (IllegalArgumentException e) {
             return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error(e.getMessage()).title("Not saved"));
         } catch (RuntimeException e) {
             return list("indexes").toast(UiToast.error("Saved, but it cannot be opened: " + e.getMessage()));
         }
         return list("indexes").toast(UiToast.success("Index '" + index.name() + "' saved: "
-                + stores.indexLocation(index.name())));
+                + vectorStoreService.indexLocation(index.name())));
     }
 
     @DeleteMapping("/indexes/{name}")
     public UiPage deleteIndex(@PathVariable String name) {
-        if (stores.isBuiltIn(name)) {
+        if (!vectorStoreService.deleteIndex(name)) {
             return list("indexes").toast(UiToast.error("'" + name + "' is built in: it follows the server's settings."));
         }
-        stores.deleteIndex(name);
         return list("indexes");
     }
 
     // ── where a file is used ───────────────────────────────────────────────
 
-    /**
-     * Where the caller's files are used: the caller's chats that have them
-     * attached — images included, which are never indexed — and the stores the
-     * caller can reach that list them. A chat's upload store counts as its chat.
-     */
-    private record FileUsages(Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.management.api.ManagedSession>> chats,
-                              Map<String, List<VectorStoreInstance>> stores) {
-
-        String summary(String fileId) {
-            int c = chats.getOrDefault(fileId, new java.util.LinkedHashMap<>()).size();
-            int s = stores.getOrDefault(fileId, List.of()).size();
-            if (c == 0 && s == 0) return "—";
-            List<String> parts = new java.util.ArrayList<>();
-            if (c > 0) parts.add(c + (c == 1 ? " chat" : " chats"));
-            if (s > 0) parts.add(s + (s == 1 ? " store" : " stores"));
-            return String.join(" · ", parts);
-        }
-    }
-
-    private FileUsages fileUsages(ai.mindconnect.agent.UserId caller) {
-        Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.management.api.ManagedSession>> chats = new java.util.HashMap<>();
-        Map<String, ai.mindconnect.agent.management.api.ManagedSession> ownChats = new java.util.HashMap<>();
-        for (var session : runtime.service(ai.mindconnect.agent.management.api.SessionManagement.class)
-                .list(caller)) {
-            ownChats.put(session.id().value(), session);
-            for (var attached : session.attachments()) {
-                chats.computeIfAbsent(attached.id(), k -> new java.util.LinkedHashMap<>())
-                        .put(session.id().value(), session);
-            }
-        }
-        Map<String, List<VectorStoreInstance>> inStores = new java.util.HashMap<>();
-        try {
-            var registry = stores.registry();
-            for (VectorStoreInstance instance : registry.instances()) {
-                if (!storeAccess.reachable(instance, caller)) continue;
-                for (var ref : registry.members(instance.name())) {
-                    if (!ref.type().equals(ai.mindconnect.vectorstore.embedding.EntityType.FILE)) continue;
-                    var chat = instance.scope() == VectorStoreInstance.Scope.SESSION && instance.scopeRef() != null
-                            ? ownChats.get(instance.scopeRef()) : null;
-                    if (chat != null) {
-                        chats.computeIfAbsent(ref.id(), k -> new java.util.LinkedHashMap<>())
-                                .put(chat.id().value(), chat);
-                    } else {
-                        inStores.computeIfAbsent(ref.id(), k -> new java.util.ArrayList<>()).add(instance);
-                    }
-                }
-            }
-        } catch (RuntimeException e) {
-            // Vector stores unreadable: the chats still say where a file is used.
-        }
-        return new FileUsages(chats, inStores);
+    /** "2 chats · 1 store", or a dash for a file nothing lists. */
+    private static String usedIn(ai.mindconnect.agentrest.service.FileUsageService.FileUsage usages, String fileId) {
+        int c = usages.chatsOf(fileId).size();
+        int s = usages.storesOf(fileId).size();
+        if (c == 0 && s == 0) return "—";
+        List<String> parts = new java.util.ArrayList<>();
+        if (c > 0) parts.add(c + (c == 1 ? " chat" : " chats"));
+        if (s > 0) parts.add(s + (s == 1 ? " store" : " stores"));
+        return String.join(" · ", parts);
     }
 
     private static final String USAGE_DIALOG = "vs-file-usage-dialog";
@@ -545,13 +490,13 @@ public class VectorStoreUiController {
         if (file == null) {
             return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("There is no file '" + id + "'."));
         }
-        FileUsages usages = fileUsages(caller);
+        var usages = fileUsage.of(caller);
 
         UiStack body = UiStack.of("vs-file-usage").gap(16);
         body.child(UiText.of("vs-file-usage-meta", id + " · " + readableSize(file.size())
                 + (file.contentType() == null ? "" : " · " + file.contentType())).withCssClass("wf-run-meta"));
 
-        var chatsOfFile = usages.chats().getOrDefault(id, new java.util.LinkedHashMap<>()).values();
+        var chatsOfFile = usages.chatsOf(id);
         UiTable chats = UiTable.of("vs-file-chats", "Chats (" + chatsOfFile.size() + ")").stackOnMobile(true)
                 .column(UiTable.Column.text("title", "Chat"))
                 .column(UiTable.Column.text("started", "Started"))
@@ -566,7 +511,7 @@ public class VectorStoreUiController {
         }
         body.child(chatsOfFile.isEmpty() ? UiText.of("vs-file-no-chats", "Not attached to any of your chats.") : chats);
 
-        List<VectorStoreInstance> storesOfFile = usages.stores().getOrDefault(id, List.of());
+        List<VectorStoreInstance> storesOfFile = usages.storesOf(id);
         UiTable storeTable = UiTable.of("vs-file-stores", "Vector stores (" + storesOfFile.size() + ")").stackOnMobile(true)
                 .column(UiTable.Column.text("name", "Store"))
                 .column(UiTable.Column.text("template", "Template"))
@@ -599,17 +544,6 @@ public class VectorStoreUiController {
         return list("files");
     }
 
-    /** How many entries the store lists and how many chunks the index has for them — "?" when it cannot say. */
-    private String[] counts(VectorStoreInstance instance) {
-        try {
-            var entities = stores.store(instance.name()).entities();
-            return new String[]{String.valueOf(entities.size()),
-                    String.valueOf(entities.stream().mapToLong(e -> e.chunks()).sum())};
-        } catch (RuntimeException e) {
-            return new String[]{"?", "?"};
-        }
-    }
-
     private static String shortRef(String ref) {
         return ref.length() > 12 ? ref.substring(0, 12) + "…" : ref;
     }
@@ -629,9 +563,9 @@ public class VectorStoreUiController {
     @GetMapping("/templates/{name}/edit")
     public UiPage editTemplate(@PathVariable String name) {
         if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
-            return templateForm(stores.template(name).orElse(null), true);
+            return templateForm(vectorStoreService.template(name).orElse(null), true);
         }
-        return templateForm(stores.registry().template(name).orElse(null), false);
+        return templateForm(vectorStoreService.template(name).orElse(null), false);
     }
 
     private static final String BUILT_IN_NOTE = "'" + VectorStores.DEFAULT_TEMPLATE
@@ -659,8 +593,8 @@ public class VectorStoreUiController {
                                 + "changing it later never affects existing stores. Stores on the same "
                                 + "model share the vectors of the files they both list."))
                 .field(UiField.select("index", "Index", t == null ? IndexDefinition.DEFAULT : t.effectiveIndex(),
-                                stores.indexes().stream()
-                                        .map(i -> UiField.Option.of(i.name(), i.name())).toList())
+                                vectorStoreService.indexes().stream().map(i -> i.definition().name())
+                                        .map(index -> UiField.Option.of(index, index)).toList())
                         .asEditable()
                         .hint("Where the chunks of this template's stores are kept — see the Indexes tab"))
                 .field(UiField.text("ingestionWorkflow", "Ingestion Workflow",
@@ -698,7 +632,7 @@ public class VectorStoreUiController {
                 .withIndex(body.str("index"))
                 .withVersion(VersionedForms.version(body));
         try {
-            stores.registry().saveTemplate(template);
+            vectorStoreService.saveTemplate(template);
         } catch (StaleVersionException e) {
             if (e.expectedVersion() == 0) {
                 return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("A template named '"
@@ -709,7 +643,7 @@ public class VectorStoreUiController {
                 return VersionedForms.changedMeanwhile("Template '" + templateName + "'");
             }
             // Nothing stored under this name: the edit renamed the template — a new one.
-            stores.registry().saveTemplate(template.withVersion(0L));
+            vectorStoreService.saveTemplate(template.withVersion(0L));
         }
         return list("templates").toast(UiToast.success("Template '" + templateName + "' saved."));
     }
@@ -730,7 +664,7 @@ public class VectorStoreUiController {
         if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
             return list("templates").toast(UiToast.error(BUILT_IN_NOTE));
         }
-        stores.registry().deleteTemplate(name);
+        vectorStoreService.deleteTemplate(name);
         return list("templates");
     }
 
@@ -738,7 +672,7 @@ public class VectorStoreUiController {
 
     @GetMapping("/stores/new")
     public UiPage newStore() {
-        List<UiField.Option> templateOptions = stores.templates().stream()
+        List<UiField.Option> templateOptions = vectorStoreService.templates().stream()
                 .map(t -> UiField.Option.of(t.name(), t.name())).toList();
         UiForm form = UiForm.of("vs-store-form", "New Store")
                 .field(UiField.text("name", "Name", null).asEditable()
@@ -761,7 +695,7 @@ public class VectorStoreUiController {
             return list("stores").toast(UiToast.error(ai.mindconnect.agentrest.auth.VectorStoreAccess.RESERVED_NAME));
         }
         if (name != null && !name.isBlank()) {
-            stores.open(name.trim(), body.str("template"), VectorStoreInstance.Scope.GLOBAL, null);
+            vectorStoreService.createStore(name, body.str("template"));
         }
         return list("stores");
     }
@@ -792,8 +726,7 @@ public class VectorStoreUiController {
      */
     private UiPage storeDetail(String name, String tab, String entry, String lastQuery, UiNode searchResult,
                                String message) {
-        VectorStore store = stores.store(name);
-        VectorStoreInstance instance = store.settings();
+        VectorStoreInstance instance = vectorStoreService.settings(name);
 
         UiStack page = UiStack.of("vs-detail").gap(16);
         // The same header bar as every other detail screen: icon, the store's
@@ -805,10 +738,10 @@ public class VectorStoreUiController {
         page.child(UiText.of("vs-detail-meta", "template " + instance.templateName()
                 + " · embedding " + instance.embeddingConfig()
                 + " · scope " + instance.scope()).withCssClass("wf-run-meta"));
-        String indexName = stores.indexOf(instance);
+        String indexName = vectorStoreService.indexOf(instance);
         String location;
         try {
-            location = stores.indexLocation(indexName);
+            location = vectorStoreService.indexLocation(indexName);
         } catch (RuntimeException e) {
             location = "unknown (" + e.getMessage() + ")";
         }
@@ -876,30 +809,21 @@ public class VectorStoreUiController {
                         // Ids may contain slashes (paths of documents from before 0.9) — they
                         // travel URL-encoded in the query, never in the path.
                         .dispatch("DELETE", BASE + "/stores/" + enc + "/files?file={id}"));
-        List<Map<String, Object>> rows = new java.util.ArrayList<>();
+        ai.mindconnect.common.Page<ai.mindconnect.agentrest.service.VectorStoreContents.NamedEntry> found;
         try {
-            String needle = q == null || q.isBlank() ? null : q.toLowerCase(java.util.Locale.ROOT);
-            for (var entity : stores.store(name).entities()) {
-                String label = entryName(entity.ref());
-                if (needle != null && !(label + " " + entity.ref().id() + " " + entity.ref().type().value())
-                        .toLowerCase(java.util.Locale.ROOT).contains(needle)) {
-                    continue;
-                }
-                rows.add(Map.of(
-                        "id", java.net.URLEncoder.encode(entity.ref().id(), java.nio.charset.StandardCharsets.UTF_8),
-                        "file", label,
-                        "type", entity.ref().type().value(),
-                        "chunks", String.valueOf(entity.chunks())));
-            }
+            found = contents.entries(name, q, page, PAGE_SIZE);
         } catch (RuntimeException e) {
             return UiText.of("vs-entries", "The entries cannot be listed: " + e.getMessage())
                     .withCssClass("task-card-body");
         }
-        int pages = Math.max(1, (rows.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-        int current = Math.min(Math.max(page, 1), pages);
-        int from = (current - 1) * PAGE_SIZE;
-        rows.subList(from, Math.min(from + PAGE_SIZE, rows.size())).forEach(table::row);
-        table.paginate(current, PAGE_SIZE, rows.size(), UiTrigger.api("GET",
+        for (var named : found.items()) {
+            table.row(Map.of(
+                    "id", java.net.URLEncoder.encode(named.entry().entityId(), java.nio.charset.StandardCharsets.UTF_8),
+                    "file", named.name(),
+                    "type", named.entry().entityType(),
+                    "chunks", String.valueOf(named.entry().chunks())));
+        }
+        table.paginate(found.page(), PAGE_SIZE, (int) found.total(), UiTrigger.api("GET",
                 BASE + "/stores/" + enc + "/entries/table?page={page}" + param("q", q)));
         return table;
     }
@@ -929,21 +853,15 @@ public class VectorStoreUiController {
      */
     private UiNode chunksTable(String name, String q, String entry, int page) {
         String enc = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
-        VectorStore store = stores.store(name);
-        List<ai.mindconnect.vectorstore.embedding.EntityRef> members;
+        Map<String, String> names;
         try {
-            members = store.members();
+            names = contents.entryNames(name);
         } catch (RuntimeException e) {
             return UiText.of("vs-chunks", "The chunks cannot be listed: " + e.getMessage()).withCssClass("task-card-body");
         }
         List<UiField.Option> entries = new java.util.ArrayList<>();
         entries.add(UiField.Option.of("", "All entries"));
-        Map<String, String> labels = new java.util.HashMap<>();
-        for (var ref : members) {
-            String label = entryName(ref);
-            labels.put(ref.id(), label);
-            entries.add(UiField.Option.of(ref.id(), label));
-        }
+        names.forEach((id, label) -> entries.add(UiField.Option.of(id, label)));
         String selected = entry == null || entry.isBlank() ? null : entry;
 
         UiForm searchForm = UiForm.of("vs-chunks-search", null);
@@ -958,38 +876,28 @@ public class VectorStoreUiController {
                 .column(UiTable.Column.number("ordinal", "#"))
                 .column(UiTable.Column.text("meta", "Metadata"))
                 .column(UiTable.Column.text("text", "Text"));
-        EmbeddingIndexPage result;
+        ai.mindconnect.common.Page<ai.mindconnect.agentrest.service.VectorStoreContents.Chunk> result;
         try {
-            var within = selected == null ? null : store.select(List.of(ai.mindconnect.vectorstore.tools.EntitySelector.id(selected)));
-            int current = Math.max(page, 1);
-            var chunkPage = store.chunks(within, q, (current - 1) * PAGE_SIZE, PAGE_SIZE);
-            long pages = Math.max(1, (chunkPage.total() + PAGE_SIZE - 1) / PAGE_SIZE);
-            if (current > pages) {
-                current = (int) pages;
-                chunkPage = store.chunks(within, q, (current - 1) * PAGE_SIZE, PAGE_SIZE);
-            }
-            result = new EmbeddingIndexPage(chunkPage, current);
+            result = contents.chunks(name, selected, q, page, PAGE_SIZE);
         } catch (RuntimeException e) {
             return UiText.of("vs-chunks", "The chunks cannot be listed: " + e.getMessage()).withCssClass("task-card-body");
         }
-        for (var chunk : result.chunks().chunks()) {
+        for (var chunk : result.items()) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", chunk.ref().type().value() + ":" + chunk.ref().id() + "#" + chunk.chunk().id());
-            row.put("entry", labels.getOrDefault(chunk.ref().id(), chunk.ref().id()));
-            row.put("ordinal", String.valueOf(chunk.chunk().ordinal()));
-            row.put("meta", chunk.chunk().metadata().entrySet().stream()
+            row.put("id", chunk.entityType() + ":" + chunk.entityId() + "#" + chunk.chunkId());
+            row.put("entry", chunk.entryName());
+            row.put("ordinal", String.valueOf(chunk.ordinal()));
+            row.put("meta", chunk.metadata().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(e -> e.getKey() + ": " + e.getValue())
                     .collect(java.util.stream.Collectors.joining(" · ")));
-            row.put("text", chunk.chunk().text());
+            row.put("text", chunk.text());
             table.row(row);
         }
-        table.paginate(result.page(), PAGE_SIZE, result.chunks().total(), UiTrigger.api("GET",
+        table.paginate(result.page(), PAGE_SIZE, result.total(), UiTrigger.api("GET",
                 BASE + "/stores/" + enc + "/chunks/table?page={page}" + param("q", q) + param("entry", selected)));
         return table;
     }
-
-    private record EmbeddingIndexPage(ai.mindconnect.vectorstore.embedding.EmbeddingIndex.ChunkPage chunks, int page) {}
 
     @GetMapping("/stores/{name}/chunks/table")
     public ai.mindconnect.ui.model.UiPatch chunksPage(@PathVariable String name,
@@ -1014,19 +922,6 @@ public class VectorStoreUiController {
     private static String param(String key, String value) {
         return value == null || value.isBlank() ? ""
                 : "&" + key + "=" + java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
-    }
-
-    /** A stored file by its name in the file store; anything else by its id. */
-    private String entryName(ai.mindconnect.vectorstore.embedding.EntityRef ref) {
-        if (ref.type().equals(ai.mindconnect.vectorstore.embedding.EntityType.FILE)) {
-            try {
-                return fileStore.find(ai.mindconnect.filestore.FileId.of(ref.id()))
-                        .map(f -> f.name()).orElse(ref.id() + " (file removed)");
-            } catch (RuntimeException e) {
-                return ref.id();
-            }
-        }
-        return ref.id();
     }
 
     @PostMapping("/stores/{name}/upload")
@@ -1129,7 +1024,7 @@ public class VectorStoreUiController {
      * another user's chat upload store; null when the caller may reach it.
      */
     private UiPage refuseForeignStore(String name) {
-        if (storeAccess.reachable(name, stores.registry().instance(name).orElse(null), currentUsers.require())) {
+        if (storeAccess.reachable(name, vectorStoreService.instance(name).orElse(null), currentUsers.require())) {
             return null;
         }
         return list("stores").toast(UiToast.error("There is no store '" + name + "'."));

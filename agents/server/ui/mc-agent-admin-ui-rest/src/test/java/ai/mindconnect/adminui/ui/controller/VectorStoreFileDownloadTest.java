@@ -39,7 +39,7 @@ class VectorStoreFileDownloadTest {
     @Test
     void theSignedInUserDownloadsTheirOwnFilesButNotSomebodyElses() throws Exception {
         FilesystemFileStore store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
-        VectorStoreUiController controller = new VectorStoreUiController(null, null, store, null, currentUsers(), null, null);
+        VectorStoreUiController controller = new VectorStoreUiController(null, store, null, currentUsers(), null, null, null);
         StoredFile alices = store.save("notes.txt", "text/plain", text("hello"), UserId.of("alice"));
         StoredFile legacy = store.save("old.txt", "text/plain", text("before creators"), null);
 

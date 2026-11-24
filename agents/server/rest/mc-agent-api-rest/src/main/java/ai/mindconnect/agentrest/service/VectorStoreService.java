@@ -118,7 +118,10 @@ public class VectorStoreService {
     /** Saves an index definition; a missing password keeps the one stored under that name. */
     public IndexInfo saveIndex(IndexDefinition index) {
         VectorStores vs = stores();
-        if (index.password() == null || "***".equals(index.password())) {
+        // A password belongs to a database of the index's own: without a URL there is none to keep.
+        if (index.url() == null) {
+            index = index.withPassword(null);
+        } else if (index.password() == null || "***".equals(index.password())) {
             String name = index.name();
             String kept = vs.indexes().stream().filter(i -> i.name().equals(name))
                     .map(IndexDefinition::password).filter(java.util.Objects::nonNull).findFirst().orElse(null);
@@ -139,6 +142,25 @@ public class VectorStoreService {
         return true;
     }
 
+    /**
+     * Opens the index and says where it is.
+     *
+     * @throws RuntimeException when it cannot be opened — a wrong URL, a database without pgvector
+     */
+    public String indexLocation(String name) {
+        return stores().indexLocation(name);
+    }
+
+    /** The index a store's chunks are kept in. */
+    public String indexOf(VectorStoreInstance instance) {
+        return stores().indexOf(instance);
+    }
+
+    /** Where the application's own database is; empty when it runs without one. */
+    public Optional<String> systemDatabase() {
+        return stores().systemDatabase();
+    }
+
     private String location(VectorStores vs, String name) {
         try {
             return vs.indexLocation(name);
@@ -155,6 +177,11 @@ public class VectorStoreService {
 
     public Optional<VectorStoreInstance> instance(String name) {
         return stores().registry().instance(name);
+    }
+
+    /** The settings a store works with, registered or not. */
+    public VectorStoreInstance settings(String storeName) {
+        return stores().store(storeName).settings();
     }
 
     /** Registers (and creates on first use) a GLOBAL store from a template. */
@@ -203,7 +230,7 @@ public class VectorStoreService {
                 .toList();
     }
 
-    private static Entry entry(IndexedEntity e) {
+    static Entry entry(IndexedEntity e) {
         return new Entry(e.ref().type().value(), e.ref().source(), e.ref().container(), e.ref().id(),
                 e.owner() == null ? null : e.owner().value(), e.version(), e.chunks());
     }
