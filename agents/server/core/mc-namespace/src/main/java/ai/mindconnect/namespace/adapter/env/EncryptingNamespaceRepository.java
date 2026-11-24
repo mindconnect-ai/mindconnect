@@ -59,6 +59,24 @@ public class EncryptingNamespaceRepository implements NamespaceRepository {
     }
 
     /**
+     * Stores every namespace's variables in the current encryption scheme where an
+     * earlier one wrote them, and says how many records that changed. Once
+     * at start: a record nobody saves would otherwise keep its earlier
+     * ciphertext for good. A value this key does not read stays as it is.
+     */
+    public int rewriteEarlierScheme() {
+        int rewritten = 0;
+        for (NamespaceDefinition namespace : delegate.findAll()) {
+            Map<String, String> environment = encryption.reencryptValuesOfEarlierScheme(namespace.environment());
+            if (!environment.equals(namespace.environment())) {
+                delegate.save(namespace.withEnvironment(environment));
+                rewritten++;
+            }
+        }
+        return rewritten;
+    }
+
+    /**
      * The variables encrypted for storage, plus any stored value that no longer decrypts:
      * it was left out when the record was read, so a save after renaming or inviting
      * would otherwise delete it for good.

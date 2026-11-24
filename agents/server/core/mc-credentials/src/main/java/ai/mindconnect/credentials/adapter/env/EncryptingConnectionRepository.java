@@ -10,6 +10,7 @@ import ai.mindconnect.credentials.domain.OAuth2UserCreds;
 import ai.mindconnect.credentials.domain.UserCredentials;
 import ai.mindconnect.credentials.port.out.ConnectionRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,6 +59,29 @@ public class EncryptingConnectionRepository implements ConnectionRepository {
     @Override
     public void deleteById(ConnectionId id) {
         delegate.deleteById(id);
+    }
+
+    /**
+     * Stores the credentials of every connection of {@code users} in the
+     * current encryption scheme where an earlier one wrote them, and says how
+     * many connections that changed. Once at start: a connection nobody saves
+     * would otherwise keep its earlier ciphertext for good. The port lists
+     * connections by user only, hence the users; a value this key does not
+     * read stays as it is.
+     */
+    public int rewriteEarlierScheme(Collection<UserId> users) {
+        int rewritten = 0;
+        for (UserId user : users) {
+            for (Connection connection : delegate.findByUser(user)) {
+                UserCredentials credentials = map(connection.credentials(),
+                        encryption::reencryptValuesOfEarlierScheme, encryption::reencryptEarlierScheme);
+                if (!Objects.equals(credentials, connection.credentials())) {
+                    delegate.save(connection.withCredentials(credentials, connection.updatedAt()));
+                    rewritten++;
+                }
+            }
+        }
+        return rewritten;
     }
 
     private UserCredentials encrypted(UserCredentials credentials) {

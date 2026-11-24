@@ -81,7 +81,14 @@ public class PostgresPersistenceConfig {
             log.warn("No EncryptionHelper — users' own variables are stored unencrypted");
             return rows;
         }
-        return new ai.mindconnect.user.adapter.env.EncryptingUserRepository(rows, helper);
+        var encrypting = new ai.mindconnect.user.adapter.env.EncryptingUserRepository(rows, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(), "user record(s)");
+        return encrypting;
+    }
+
+    /** Says what the start-up rewrite of earlier ciphertexts changed — nothing on every start after the first. */
+    private static void logRewritten(int records, String what) {
+        if (records > 0) log.info("{} {} rewritten from the earlier encryption scheme to AES-GCM", records, what);
     }
 
     @Bean
@@ -96,8 +103,10 @@ public class PostgresPersistenceConfig {
             org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption) {
         var rows = new ai.mindconnect.credentials.adapter.pg.PgOAuthProviderRepository(mindconnectSql).initSchema();
         var helper = encryption.getIfAvailable();
-        return helper == null ? rows
-                : new ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository(rows, helper);
+        if (helper == null) return rows;
+        var encrypting = new ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository(rows, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(), "OAuth provider(s)");
+        return encrypting;
     }
 
     /** The tools each user keeps in their own account — installation-wide. */
@@ -110,14 +119,18 @@ public class PostgresPersistenceConfig {
     @Bean
     ai.mindconnect.credentials.port.out.ConnectionRepository connectionRepository(
             Sql mindconnectSql,
-            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption) {
+            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption,
+            ai.mindconnect.user.port.out.UserRepository users) {
         var rows = new ai.mindconnect.credentials.adapter.pg.PgConnectionRepository(mindconnectSql).initSchema();
         var helper = encryption.getIfAvailable();
         if (helper == null) {
             log.warn("No EncryptionHelper — connection credentials are stored unencrypted");
             return rows;
         }
-        return new ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository(rows, helper);
+        var encrypting = new ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository(rows, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(
+                users.findAll().stream().map(ai.mindconnect.user.domain.User::id).toList()), "connection(s)");
+        return encrypting;
     }
 
     /** Installation-wide like the users they are addressed to, and not encrypted: a notice is not a secret. */

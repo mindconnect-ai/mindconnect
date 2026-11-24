@@ -84,6 +84,9 @@ import ai.mindconnect.agent.tools.usermemory.UserMemoryPlugin;
 import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.port.in.LlmChat;
@@ -233,6 +236,23 @@ public class RuntimeEngineAutoConfiguration {
     ApplicationListener<ContextRefreshedEvent> toolWarmUp(AgentRuntime runtime, ScopeSupplier scope, Environment env) {
         Namespace startup = new Namespace(env.getProperty("mindconnect.namespace", "local"));
         return event -> StartupScope.run(scope, startup, () -> runtime.service(ToolRegistryPlugin.class).warmUp());
+    }
+
+    /**
+     * Stores what an earlier encryption scheme wrote in the current one, in every namespace, once the
+     * context is up. Without an encryption key nothing is stored encrypted, and nothing is rewritten.
+     */
+    @Bean
+    ApplicationListener<ContextRefreshedEvent> storedSecretRewrite(
+            ObjectProvider<EncryptionHelper> encryption, ObjectProvider<NamespaceService> namespaces,
+            LlmConfigRepository llmConfigs, VectorStores vectorStores, ScopeSupplier scope, Environment env) {
+        Namespace startup = new Namespace(env.getProperty("mindconnect.namespace", "local"));
+        return event -> encryption.ifAvailable(key -> {
+            NamespaceService service = namespaces.getIfAvailable();
+            new StoredSecretRewrite(key, llmConfigs, vectorStores, scope).rewriteIn(service == null
+                    ? List.of(startup)
+                    : service.all().stream().map(NamespaceDefinition::id).toList());
+        });
     }
 
     /**

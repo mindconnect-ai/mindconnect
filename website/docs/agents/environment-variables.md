@@ -86,8 +86,10 @@ is encrypted with AES-GCM under that key, with a random nonce per value: the
 same secret stored twice looks different, and a stored value that was changed
 is refused rather than decrypted. A stored value reads `enc:v2:…`. Values
 written before 1.0 read `enc:…` without the `v2:` (AES in ECB mode); they are
-still read with the same key and are rewritten in the new form the next time
-their record is saved. Changing the key makes every stored secret unreadable —
+still read with the same key, and the server rewrites them in the new form
+when it starts — in every namespace; the log says how many records that were.
+An earlier version cannot read `enc:v2:` values, so take a backup before the
+first start of 1.0. Changing the key makes every stored secret unreadable —
 there is no key rotation.
 
 The lookup is pluggable: the gateways take an `EnvVarResolver`, the servers

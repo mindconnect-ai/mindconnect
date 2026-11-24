@@ -107,6 +107,20 @@ class EncryptionHelperTest {
     }
 
     @Test
+    void of_several_values_only_those_of_the_earlier_scheme_are_rewritten() throws Exception {
+        String current = ENCRYPTION.encryptTagged("a");
+        String stale = new EncryptionHelper("fedcba9876543210").encryptTagged("w");
+
+        Map<String, String> rewritten = ENCRYPTION.reencryptValuesOfEarlierScheme(
+                Map.of("CURRENT", current, "STALE", stale, "EARLIER", writtenByTheEarlierScheme("b")));
+
+        assertThat(rewritten.get("CURRENT")).isEqualTo(current);
+        assertThat(rewritten.get("STALE")).isEqualTo(stale);
+        assertThat(rewritten.get("EARLIER")).startsWith("enc:v2:");
+        assertThat(ENCRYPTION.resolve(rewritten.get("EARLIER"))).isEqualTo("b");
+    }
+
+    @Test
     void saving_values_back_keeps_an_unreadable_one_and_rewrites_the_rest() throws Exception {
         String stale = new EncryptionHelper("fedcba9876543210").encryptTagged("w");
         Map<String, String> stored = Map.of("STALE", stale, "GOOD", writtenByTheEarlierScheme("v"));

@@ -10,7 +10,11 @@ import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.port.out.UserRepository;
 import org.junit.jupiter.api.Test;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +31,29 @@ class UserEnvVarResolverTest {
 
     private final InMemoryUserRepository store = new InMemoryUserRepository();
     private final UserRepository users = new EncryptingUserRepository(store, ENCRYPTION);
+
+    /** A stored value as the scheme before AES-GCM wrote it: {@code enc:} and the Base64 of AES/ECB. */
+    private static String writtenByTheEarlierScheme(String plain) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec("0123456789abcdef".getBytes(StandardCharsets.UTF_8), "AES"));
+        return EncryptionHelper.ENC + Base64.getEncoder().encodeToString(cipher.doFinal(plain.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void at_start_a_value_of_the_earlier_scheme_is_stored_in_the_current_one_and_nothing_else_is_touched() throws Exception {
+        String stale = new EncryptionHelper("fedcba9876543210").encryptTagged("w");
+        store.save(alice(Map.of("EARLIER", writtenByTheEarlierScheme("sk-alice"), "STALE", stale)));
+        EncryptingUserRepository encrypting = new EncryptingUserRepository(store, ENCRYPTION);
+
+        assertThat(encrypting.rewriteEarlierScheme()).isEqualTo(1);
+
+        Map<String, String> stored = store.findById(ALICE).orElseThrow().environment();
+        assertThat(stored.get("EARLIER")).startsWith("enc:v2:");
+        assertThat(stored.get("STALE")).isEqualTo(stale);
+        assertThat(users.findById(ALICE)).get().extracting(User::environment).isEqualTo(Map.of("EARLIER", "sk-alice"));
+        assertThat(encrypting.rewriteEarlierScheme()).as("a second start finds nothing to do").isZero();
+        assertThat(store.findById(ALICE).orElseThrow().environment()).isEqualTo(stored);
+    }
 
     private static User alice(Map<String, String> environment) {
         return new User(ALICE, null, null, "Alice", null, NOW, NOW, null, environment);

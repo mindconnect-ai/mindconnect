@@ -164,6 +164,13 @@ public class EncryptionHelper {
         return encryptTagged(resolve(stored));
     }
 
+    /** Every value {@link #reencryptEarlierScheme rewritten} where an earlier scheme wrote it; the map's order is kept. */
+    public Map<String, String> reencryptValuesOfEarlierScheme(Map<String, String> stored) {
+        Map<String, String> rewritten = new LinkedHashMap<>();
+        stored.forEach((name, value) -> rewritten.put(name, reencryptEarlierScheme(value)));
+        return rewritten;
+    }
+
     /**
      * The ciphertext without the {@code enc:} prefix, already carrying the
      * scheme's tag: {@code ENC + encrypt(…)} is a complete stored value. A

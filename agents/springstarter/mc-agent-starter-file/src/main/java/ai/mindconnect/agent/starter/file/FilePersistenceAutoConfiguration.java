@@ -2,6 +2,7 @@ package ai.mindconnect.agent.starter.file;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
+import ai.mindconnect.user.domain.User;
 import ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository;
 import ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository;
 import ai.mindconnect.credentials.adapter.file.FileConnectionRepository;
@@ -61,7 +62,14 @@ public class FilePersistenceAutoConfiguration {
             log.warn("No EncryptionHelper — users' own variables are stored unencrypted under {}", baseDir);
             return files;
         }
-        return new EncryptingUserRepository(files, helper);
+        EncryptingUserRepository encrypting = new EncryptingUserRepository(files, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(), "user record(s)");
+        return encrypting;
+    }
+
+    /** Says what the start-up rewrite of earlier ciphertexts changed — nothing on every start after the first. */
+    private static void logRewritten(int records, String what) {
+        if (records > 0) log.info("{} {} rewritten from the earlier encryption scheme to AES-GCM", records, what);
     }
 
     @Bean
@@ -82,7 +90,10 @@ public class FilePersistenceAutoConfiguration {
                                                     ObjectProvider<EncryptionHelper> encryption) {
         OAuthProviderRepository files = new FileOAuthProviderRepository(Path.of(baseDir), objectMapper);
         EncryptionHelper helper = encryption.getIfAvailable();
-        return helper == null ? files : new EncryptingOAuthProviderRepository(files, helper);
+        if (helper == null) return files;
+        EncryptingOAuthProviderRepository encrypting = new EncryptingOAuthProviderRepository(files, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(), "OAuth provider(s)");
+        return encrypting;
     }
 
     /** The tools each user keeps in their own account — installation-wide, and no secrets in them. */
@@ -101,14 +112,17 @@ public class FilePersistenceAutoConfiguration {
     @ConditionalOnMissingBean(ConnectionRepository.class)
     ConnectionRepository connectionRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
                                               ObjectMapper objectMapper,
-                                              ObjectProvider<EncryptionHelper> encryption) {
+                                              ObjectProvider<EncryptionHelper> encryption,
+                                              UserRepository users) {
         ConnectionRepository files = new FileConnectionRepository(Path.of(baseDir), objectMapper);
         EncryptionHelper helper = encryption.getIfAvailable();
         if (helper == null) {
             log.warn("No EncryptionHelper — connection credentials are stored unencrypted under {}", baseDir);
             return files;
         }
-        return new EncryptingConnectionRepository(files, helper);
+        EncryptingConnectionRepository encrypting = new EncryptingConnectionRepository(files, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(users.findAll().stream().map(User::id).toList()), "connection(s)");
+        return encrypting;
     }
 
     /** Installation-wide like the users they are addressed to, and not encrypted: a notice is not a secret. */

@@ -90,14 +90,22 @@ public class NamespaceAutoConfiguration {
         return encrypting(new FileNamespaceRepository(Path.of(baseDir), objectMapper), encryption);
     }
 
-    /** A namespace's variables are secrets — {@code enc:} at rest when the application has a key, like LLM credentials. */
+    /**
+     * A namespace's variables are secrets — {@code enc:} at rest when the application has a key, like LLM credentials.
+     * What an earlier encryption scheme wrote is stored in the current one here, once at start.
+     */
     static NamespaceRepository encrypting(NamespaceRepository repository, ObjectProvider<EncryptionHelper> encryption) {
         EncryptionHelper helper = encryption.getIfAvailable();
         if (helper == null) {
             log.warn("No EncryptionHelper — a namespace's variables are stored unencrypted");
             return repository;
         }
-        return new EncryptingNamespaceRepository(repository, helper);
+        EncryptingNamespaceRepository encrypting = new EncryptingNamespaceRepository(repository, helper);
+        int rewritten = encrypting.rewriteEarlierScheme();
+        if (rewritten > 0) {
+            log.info("{} namespace record(s) rewritten from the earlier encryption scheme to AES-GCM", rewritten);
+        }
+        return encrypting;
     }
 
     /** Deleting a namespace removes {@code <mindconnect.data.base-dir>/<namespace>} — everything of it. */
