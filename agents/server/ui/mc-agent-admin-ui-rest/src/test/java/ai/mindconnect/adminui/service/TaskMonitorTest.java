@@ -3,22 +3,26 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.adminui.service.TaskMonitor.CancelResult;
 import ai.mindconnect.adminui.service.TaskMonitor.Snapshot;
 import ai.mindconnect.adminui.service.TaskMonitor.TaskView;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
-import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.management.RepositorySessionManagement;
+import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.plugin.DefaultPluginRegistry;
+import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
@@ -29,9 +33,7 @@ import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -50,7 +52,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TaskMonitorTest {
 
-    private static final AgentId AGENT_ID = AgentId.random();
+    /** The engine's turn task, as {@code RuntimeTask} reads it. */
+    private static final String TURN = "turn";
+    private static final Map<String, Object> SCOUT = Map.of("name", "Scout");
     private static final SessionId ALICE_SESSION = SessionId.random();
 
     private LocalTaskQueue queue;
@@ -63,7 +67,7 @@ class TaskMonitorTest {
         queue = new LocalTaskQueue(new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
         // A stand-in for the agent turn: blocks until released or cancelled,
         // so the task is observably RUNNING while the test looks at it.
-        queue.register(AgentTurnWorker.TYPE, ctx -> {
+        queue.register(TURN, ctx -> {
             started.countDown();
             try {
                 while (!ctx.cancelRequested() && !release.await(20, TimeUnit.MILLISECONDS)) {
@@ -75,16 +79,7 @@ class TaskMonitorTest {
             return TaskOutcome.done("ok");
         });
 
-        var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
-        definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
-                "assistants", "bot", "prompt", null, "cfg", 5, null,
-                AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
-        var sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-        sessions.create(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"), ConversationId.random(),
-                "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
-                null, null, null, null, null, null, null));
-
-        monitor = new TaskMonitor(queue, sessions, definitions);
+        monitor = new TaskMonitor(queue, runtimeWithAlicesSession(ALICE_SESSION, NamespaceProvider.fixed("test")));
     }
 
     @AfterEach
@@ -94,9 +89,25 @@ class TaskMonitorTest {
         queue.close();
     }
 
+    /** A runtime that knows sessions, with Alice's chat "Alice asks" in the namespace current when it is made. */
+    static AgentRuntime runtimeWithAlicesSession(SessionId alices, NamespaceProvider namespaces) {
+        var sessions = new InMemorySessionRepository(namespaces);
+        var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
+        SessionManagement management = new RepositorySessionManagement(sessions, messages,
+                new InMemoryAgentRepository(namespaces), SessionDirectoryPolicy.unrestricted(), List.of());
+        new RepositorySessionStore(sessions, messages).create(new Session(
+                ai.mindconnect.agent.runtime.api.domain.SessionId.of(alices.value()),
+                ai.mindconnect.agent.runtime.api.domain.UserId.of("alice"), null,
+                new AgentDefinition("Scout", "A test agent", "prompt", ModelSettings.NONE, List.of(), 5, Map.of()),
+                Map.of(ManagedSession.TITLE, "Alice asks"), Instant.now()));
+        PluginRegistry registry = new DefaultPluginRegistry();
+        registry.provide(SessionManagement.class, () -> management);
+        registry.start();
+        return new AgentRuntime(registry, () -> { });
+    }
+
     private String submitTurn() {
-        return queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE,
-                Map.of(AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0)));
+        return queue.submit(TaskSubmission.of(TURN, Map.of("sessionId", ALICE_SESSION.value(), "agent", SCOUT)));
     }
 
     @Test
@@ -152,36 +163,40 @@ class TaskMonitorTest {
     }
 
     @Test
-    void aTaskOfADeletedNamespaceShowsWithoutOpeningThatNamespacesStoresAgain(@TempDir Path data) throws Exception {
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
-                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    void aTaskOfADeletedNamespaceShowsWithoutOpeningThatNamespacesStoresAgain() throws Exception {
         var scope = ThreadBoundScopeSupplier.strict();
-        var sessions = new FileAgentSessionRepository(data, mapper, scope);
-        var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
-        definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
-                "assistants", "bot", "prompt", null, "cfg", 5, null,
-                AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
+        // The sessions' store follows the bound namespace and keeps which ones it was asked in.
+        List<String> asked = new CopyOnWriteArrayList<>();
+        NamespaceProvider following = new NamespaceProvider() {
+            @Override
+            public String current() {
+                String namespace = scope.get().namespace().value();
+                asked.add(namespace);
+                return namespace;
+            }
+
+            @Override
+            public <T> T callIn(String namespace, java.util.function.Supplier<T> body) {
+                return scope.runIn(Scope.of(new Namespace(namespace)), body);
+            }
+        };
         var namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
         Namespace acme = namespaces.create("acme", null, UserId.of("alice")).id();
-        scope.runIn(Scope.of(acme), () -> sessions.create(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"),
-                ConversationId.random(), "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
-                null, null, null, null, null, null, null)));
+        AgentRuntime runtime = scope.runIn(Scope.of(acme), () -> runtimeWithAlicesSession(ALICE_SESSION, following));
+        asked.clear();
         release.countDown();                                     // the stand-in worker finishes at once
-        String live = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
-                ScopeTaskAdvisor.NAMESPACE, "acme")));
-        String orphan = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                AgentTurnWorker.SESSION_ID, SessionId.random().value(), AgentTurnWorker.DEPTH, 0,
-                ScopeTaskAdvisor.NAMESPACE, "gone")));
+        String live = queue.submit(TaskSubmission.of(TURN, Map.of(
+                "sessionId", ALICE_SESSION.value(), "agent", SCOUT, "namespace", "acme")));
+        String orphan = queue.submit(TaskSubmission.of(TURN, Map.of(
+                "sessionId", SessionId.random().value(), "namespace", "gone")));
         queue.await(live, Duration.ofSeconds(5));
         queue.await(orphan, Duration.ofSeconds(5));
 
-        TaskMonitor board = new TaskMonitor(queue, sessions, definitions, scope, namespaces);
+        TaskMonitor board = new TaskMonitor(queue, runtime, scope, namespaces);
         try {
             Snapshot snapshot = board.snapshot();
 
-            assertThat(data.resolve("gone")).as("no directory for a namespace that is not there").doesNotExist();
+            assertThat(asked).as("no store is asked in a namespace that is not there").doesNotContain("gone");
             TaskView orphanView = snapshot.recent().stream().filter(v -> v.id().equals(orphan)).findFirst().orElseThrow();
             assertThat(orphanView.label()).isEqualTo("Agent turn");
             assertThat(orphanView.owner()).isNull();
@@ -195,12 +210,10 @@ class TaskMonitorTest {
 
     @Test
     void theBoardOfANamespaceShowsItsOwnTasksAndTheUnstampedOnes() throws Exception {
-        String acme = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
-                ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "acme")));
-        String other = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                AgentTurnWorker.SESSION_ID, SessionId.random().value(), AgentTurnWorker.DEPTH, 0,
-                ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "other")));
+        String acme = queue.submit(TaskSubmission.of(TURN, Map.of(
+                "sessionId", ALICE_SESSION.value(), "namespace", "acme")));
+        String other = queue.submit(TaskSubmission.of(TURN, Map.of(
+                "sessionId", SessionId.random().value(), "namespace", "other")));
         String unstamped = submitTurn();
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
         ai.mindconnect.agent.Namespace ns = new ai.mindconnect.agent.Namespace("acme");

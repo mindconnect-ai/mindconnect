@@ -80,6 +80,12 @@ final class TurnTaskMapper {
         return TaskSubmission.of(TYPE, payload).withId(turn.id().value());
     }
 
+    /** The name of the agent the task's turn runs; {@code null} for a payload without one. */
+    static String agentName(TaskRecord task) {
+        return task.payload().get(AGENT) instanceof Map<?, ?> agent && agent.get("name") instanceof String name
+                ? name : null;
+    }
+
     @SuppressWarnings("unchecked")
     static TurnMessage userMessage(TaskRecord task) {
         return MESSAGES.fromJson((Map<String, Object>) task.payload().get(USER_MESSAGE));

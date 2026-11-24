@@ -1,14 +1,7 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.chat.stream.UserChannels;
 import ai.mindconnect.agent.chat.stream.UserEvent;
-import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
@@ -42,7 +35,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class UserStreamTest {
 
-    private static final AgentId AGENT_ID = AgentId.random();
     private static final SessionId ALICE_SESSION = SessionId.random();
 
     private LocalTaskQueue queue;
@@ -74,7 +66,7 @@ class UserStreamTest {
     @BeforeEach
     void setUp() {
         queue = new LocalTaskQueue(new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
-        queue.register(AgentTurnWorker.TYPE, ctx -> {
+        queue.register("turn", ctx -> {
             started.countDown();
             try {
                 while (!ctx.cancelRequested() && !release.await(20, TimeUnit.MILLISECONDS)) {
@@ -85,15 +77,8 @@ class UserStreamTest {
             }
             return TaskOutcome.done("ok");
         });
-        var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
-        definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
-                "assistants", "bot", "prompt", null, "cfg", 5, null,
-                AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
-        var sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-        sessions.create(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"), ConversationId.random(),
-                "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
-                null, null, null, null, null, null, null));
-        monitor = new TaskMonitor(queue, sessions, definitions);
+        monitor = new TaskMonitor(queue, TaskMonitorTest.runtimeWithAlicesSession(ALICE_SESSION,
+                ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider.fixed("test")));
         userChannels = new UserChannels();
         stream = new UserStream(Optional.of(monitor), userChannels, new ObjectMapper());
     }
@@ -124,8 +109,8 @@ class UserStreamTest {
         var emitter = new CapturingEmitter();
         stream.attach(emitter, "alice");
 
-        String id = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE,
-                Map.of(AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0)));
+        String id = queue.submit(TaskSubmission.of("turn",
+                Map.of("sessionId", ALICE_SESSION.value(), "agent", Map.of("name", "Scout"))));
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(emitter.patchArrived.await(5, TimeUnit.SECONDS)).isTrue();
 
@@ -144,9 +129,9 @@ class UserStreamTest {
             var emitter = new CapturingEmitter();
             namespaced.attach(emitter, "alice", ai.mindconnect.agent.Namespace.DEFAULT);
 
-            String acme = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                    AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
-                    ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "acme")));
+            String acme = queue.submit(TaskSubmission.of("turn", Map.of(
+                    "sessionId", ALICE_SESSION.value(), "agent", Map.of("name", "Scout"),
+                    "namespace", "acme")));
             assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(emitter.patchArrived.await(5, TimeUnit.SECONDS)).isTrue();
             String frame = emitter.frames.stream().filter(f -> f.contains("event:patch")).reduce((a, b) -> b).orElseThrow();
@@ -155,9 +140,9 @@ class UserStreamTest {
             // she was removed from acme: the remembered choice no longer counts, the board is the default namespace's
             remembered.set(Optional.empty());
             emitter.frames.clear();
-            String other = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                    AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
-                    ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "other")));
+            String other = queue.submit(TaskSubmission.of("turn", Map.of(
+                    "sessionId", ALICE_SESSION.value(), "agent", Map.of("name", "Scout"),
+                    "namespace", "other")));
             waitForFrames(emitter, 1);
             String next = emitter.frames.stream().filter(f -> f.contains("event:patch")).reduce((a, b) -> b).orElseThrow();
             assertThat(next).doesNotContain("task-" + acme).doesNotContain("task-" + other);
