@@ -86,6 +86,8 @@ and the rule it violates.
   Found 2026-11-24 in feature/agent-runtime-refactor by the maintainer and the agent. Size: large. Rule: –.
 - [ ] **agents/server/core/mc-agent-chat-stream** `UserChannels` keeps a user's stream in an ephemeral `Channel` (ring buffer): after a restart or a buffer overrun the few lifecycle events it carries are gone, and a client reloads from `GET /api/sessions`. A `PersistentChannel` (with `JdbcChannelStore` where Postgres runs) is the fitting channel for them; a session's stream stays ephemeral.
   Found 2026-11-24 in feature/agent-runtime-refactor by the maintainer and the agent. Size: one wave. Rule: –.
+- [ ] **agents/core/mc-agent-runtime-api, agents/engine/mc-agent-runtime-infrastructure** `SessionService.lifecycle(UserId, …)` and `lifecycleOfAll(…)` have no caller in the server: the chat's session list still reads `UserChannels`, fed by `UserEventFeed`, and the task monitor reads the task queue. `UserEventFeed` cannot move to a subscription as it is — a contributed listener hears every namespace, a subscription only the one it was made in — so the runtime's lifecycle channel and the server's user stream do the same job twice. Decide which one a list of sessions reads, and have the other go or build on it.
+  Found 2026-11-24 in feature/agent-runtime-refactor by the maintainer and the agent. Size: one wave. Rule: reuse.
 
 ## Closed
 
