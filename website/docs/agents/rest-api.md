@@ -70,7 +70,8 @@ stored:
 ```
 
 `definition` is what the runtime runs; its `metadata` holds what a capability
-reads under its own key: `subAgents`, `responseReviewers`, `skills` (absent:
+reads under its own key: `subAgents`, `callableByAgents` (`false`: no other
+agent may call it; absent: yes), `responseReviewers`, `skills` (absent:
 every skill, an empty list: none), `memory`. A seed file or a registry entry
 written before 1.0 — fields flat, `systemPrompt`, `llmConfigName`,
 `memoryConfig` — is still read, and stored in the shape above. `POST` and `PUT`

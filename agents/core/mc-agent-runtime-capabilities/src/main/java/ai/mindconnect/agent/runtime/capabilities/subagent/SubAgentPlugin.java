@@ -37,6 +37,19 @@ public final class SubAgentPlugin implements Plugin {
      */
     public static final String SUB_AGENTS = "subAgents";
 
+    /**
+     * The key in an agent's metadata saying whether other agents may call
+     * it. {@code false} is for agents the host calls on its own, like a title
+     * generator: no roster offers them and a call to them is refused. Absent
+     * means yes.
+     */
+    public static final String CALLABLE = "callableByAgents";
+
+    /** Whether other agents may call this one. */
+    public static boolean callable(AgentDefinition agent) {
+        return !Boolean.FALSE.equals(agent.metadata().get(CALLABLE));
+    }
+
     /** The agents an agent may hand a task to; none when it names none. */
     public static List<String> subAgentsOf(AgentDefinition agent) {
         return agent.metadata().get(SUB_AGENTS) instanceof List<?> names

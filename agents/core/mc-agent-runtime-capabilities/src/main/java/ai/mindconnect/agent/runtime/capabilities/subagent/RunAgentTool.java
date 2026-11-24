@@ -98,7 +98,7 @@ final class RunAgentTool implements Tool {
             throw new IllegalArgumentException("a task needs the agent's \"name\" and a \"message\"");
         }
         AgentDefinition agent = SubAgentPlugin.subAgentsOf(caller).contains(name)
-                ? agents.resolve(name, session).orElse(null) : null;
+                ? agents.resolve(name, session).filter(SubAgentPlugin::callable).orElse(null) : null;
         if (agent == null) {
             throw new IllegalArgumentException("there is no agent named " + name + " you can call. Available to you: "
                     + String.join(", ", SubAgentPlugin.subAgentsOf(caller)));

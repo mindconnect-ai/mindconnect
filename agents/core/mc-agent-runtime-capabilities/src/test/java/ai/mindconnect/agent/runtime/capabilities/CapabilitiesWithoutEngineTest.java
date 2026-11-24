@@ -164,6 +164,24 @@ class CapabilitiesWithoutEngineTest {
                 "Error: there is no agent named lead you can call. Available to you: researcher"));
     }
 
+    @Test
+    void an_agent_marked_not_callable_is_neither_listed_nor_called_whatever_the_roster_says() {
+        AgentDefinition titles = new AgentDefinition("titles", "Names chats.", "You name.", ModelSettings.NONE,
+                List.of(), 5, Map.of(SubAgentPlugin.CALLABLE, false));
+        AgentDefinition lead = new AgentDefinition("lead", "Leads.", "You lead.", ModelSettings.NONE, List.of(), 10,
+                Map.of(SubAgentPlugin.SUB_AGENTS, List.of("researcher", "titles")));
+        registry.contribute(AgentResolver.class, AgentResolver.of(List.of(titles)));
+        ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
+
+        assertThat(tools.resolve("list_agents", lead, SESSION).orElseThrow()
+                .execute(new ToolCall("c1", "list_agents", Map.of(), TurnId.of("t1"), SESSION.id()), SESSION))
+                .isEqualTo(ToolOutput.ok("- researcher: Looks things up."));
+        assertThat(tools.resolve("run_agent", lead, SESSION).orElseThrow().execute(
+                new ToolCall("c2", "run_agent", Map.of("name", "titles", "message", "Name this."),
+                        TurnId.of("t1"), SESSION.id()), SESSION))
+                .asString().contains("there is no agent named titles you can call");
+    }
+
     private List<String> offeredNames() {
         ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
         return registry.run(RuntimeHook.TOOL_OFFER, CONTEXT, context -> tools.tools(context.agent(), context.session()).stream()

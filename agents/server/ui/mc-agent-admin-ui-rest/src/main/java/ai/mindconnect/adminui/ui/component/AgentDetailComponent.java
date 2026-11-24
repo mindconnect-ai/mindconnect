@@ -116,6 +116,8 @@ public final class AgentDetailComponent implements UiComponent {
                 // the header above the tabs already shows the symbol itself.
                 .field(UiField.text("icon", "Icon", AgentSetting.icon(agent)))
                 .field(UiField.text("callableAgents", "Callable Agents", callableAgentsSummary()))
+                .field(UiField.text(SubAgentPlugin.CALLABLE, "Callable by other agents",
+                        SubAgentPlugin.callable(definition) ? "yes" : "no"))
                 .field(UiField.text("skills", "Skills", skillsSummary()))
                 .field(UiField.text("llmConfigName", "LLM Config", definition.modelSettings().model()))
                 .field(UiField.text("status", "Status",

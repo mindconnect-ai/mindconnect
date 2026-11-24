@@ -106,7 +106,7 @@ public final class AgentFormComponent implements UiComponent {
         List<String> roster = isNew ? List.of() : AgentSetting.names(definition, SubAgentPlugin.SUB_AGENTS);
         List<UiField.Option> reviewerOptions = candidates(
                 other -> AgentSetting.REVIEWER_GROUP.equals(AgentSetting.group(other)), reviewers);
-        List<UiField.Option> rosterOptions = candidates(other -> true, roster);
+        List<UiField.Option> rosterOptions = candidates(other -> SubAgentPlugin.callable(other.definition()), roster);
 
         // Same bar as the list and the detail page. A form's title is a plain
         // escaped string, so the icon has to come from a header-only UiList
@@ -186,6 +186,12 @@ public final class AgentFormComponent implements UiComponent {
                         .asEditable()
                         .hint("The agents this one may hand work to. Naming any gives it run_agent, "
                                 + "run_agents and list_agents; naming none leaves it without"))
+                .field(UiField.bool(SubAgentPlugin.CALLABLE, "Callable by other agents",
+                        isNew || SubAgentPlugin.callable(definition))
+                        .asEditable()
+                        .hint("Off for agents the host calls on its own, like a title generator "
+                                + "or a summarizer: they are not offered in any roster and "
+                                + "run_agent refuses them"))
                 // Checkboxes whose ticked rows move up and down: the reviewers
                 // run in the order they stand in.
                 .field(UiField.multiselect("responseReviewers", "Response Reviewers",

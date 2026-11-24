@@ -39,6 +39,7 @@ final class ListAgentsTool implements Tool {
         return ToolOutput.ok(SubAgentPlugin.subAgentsOf(caller).stream()
                 .map(name -> agents.resolve(name, session))
                 .flatMap(java.util.Optional::stream)
+                .filter(SubAgentPlugin::callable)
                 .map(agent -> "- " + agent.name() + ": " + agent.description())
                 .collect(Collectors.joining("\n")));
     }

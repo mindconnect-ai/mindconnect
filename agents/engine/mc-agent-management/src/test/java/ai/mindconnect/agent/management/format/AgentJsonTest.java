@@ -99,6 +99,14 @@ class AgentJsonTest {
     }
 
     @Test
+    void anEarlierAgentOtherAgentsMayNotCallStaysSo() {
+        ManagedAgent read = files.read("{\"name\": \"titles\", \"callableByAgents\": false}");
+
+        assertThat(read.definition().metadata()).containsEntry("callableByAgents", false);
+        assertThat(files.read(files.write(read)).definition().metadata()).containsEntry("callableByAgents", false);
+    }
+
+    @Test
     void anEarlierAgentThatSaysLittleGetsTheDefaults() {
         ManagedAgent read = files.read("{\"name\": \"plain\"}");
 

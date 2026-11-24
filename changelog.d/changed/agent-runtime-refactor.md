@@ -80,3 +80,6 @@
   for the user it belongs to.
 - Stopping a turn while a tool runs answers the open call with "Cancelled by
   user before the tool finished"; the chat takes the next message as before.
+- "Callable by other agents" is back on the agent form: an agent switched off
+  there is offered in no roster and `run_agent` refuses it. Seed files that
+  say `callableByAgents: false` keep saying so.

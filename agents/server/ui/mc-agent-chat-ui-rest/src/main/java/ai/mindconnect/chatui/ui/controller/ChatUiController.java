@@ -1095,6 +1095,7 @@ public class ChatUiController {
     private List<ManagedAgent> delegatableAgents(ManagedAgent effective) {
         return agents.list().stream()
                 .filter(a -> a.status() != ManagedAgent.Status.DEPRECATED)
+                .filter(a -> SubAgentPlugin.callable(a.definition()))
                 .filter(a -> !a.id().equals(effective.id()))
                 .toList();
     }

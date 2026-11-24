@@ -235,6 +235,12 @@ public class AgentUiController {
         AgentDefinition stored = agent.definition();
         Map<String, Object> metadata = new HashMap<>(stored.metadata());
         metadata.put(SubAgentPlugin.SUB_AGENTS, body.strList("callableAgents"));
+        // Kept only when off: absent means callable, and most agents are.
+        if (body.bool(SubAgentPlugin.CALLABLE, SubAgentPlugin.callable(stored))) {
+            metadata.remove(SubAgentPlugin.CALLABLE);
+        } else {
+            metadata.put(SubAgentPlugin.CALLABLE, false);
+        }
         metadata.put(ResponseReviewPlugin.REVIEWERS, body.strList("responseReviewers"));
         // Every skill is no entry at all, none is an empty list, and the ones ticked are the list.
         switch (AgentFormComponent.skillsMode(body.str(AgentFormComponent.SKILLS_MODE))) {

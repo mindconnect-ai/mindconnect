@@ -99,6 +99,17 @@ class AgentUiControllerTest {
     }
 
     @Test
+    void theFormSwitchesOffThatOtherAgentsMayCallTheAgent_andOnAgain() {
+        controller.update(scout.id().value(), Map.of("name", "Scout", "callableByAgents", false), user("alice"));
+        assertThat(agents.find(scout.id()).orElseThrow().definition().metadata())
+                .containsEntry("callableByAgents", false);
+
+        controller.update(scout.id().value(), Map.of("name", "Scout", "callableByAgents", true), user("alice"));
+        assertThat(agents.find(scout.id()).orElseThrow().definition().metadata())
+                .doesNotContainKey("callableByAgents");
+    }
+
+    @Test
     void someoneElsesSessionIsNotDeleted() {
         ResponseEntity<?> response = controller.deleteSession(scout.id().value(), ALICES.value(), user("bob"));
 

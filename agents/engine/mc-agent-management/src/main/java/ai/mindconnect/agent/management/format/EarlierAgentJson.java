@@ -52,6 +52,9 @@ final class EarlierAgentJson {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put(ManagedAgent.AGENT_ID, id);
         metadata.put(SubAgentPlugin.SUB_AGENTS, names(agent.get("callableAgents")));
+        if (!agent.path(SubAgentPlugin.CALLABLE).asBoolean(true)) {
+            metadata.put(SubAgentPlugin.CALLABLE, false);
+        }
         List<String> reviewers = names(agent.get("responseReviewers"));
         if (!reviewers.isEmpty()) {
             metadata.put(ResponseReviewPlugin.REVIEWERS, reviewers);
