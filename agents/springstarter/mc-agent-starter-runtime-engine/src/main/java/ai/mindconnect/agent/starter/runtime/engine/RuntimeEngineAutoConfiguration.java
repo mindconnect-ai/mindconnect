@@ -32,7 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
+import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
 import ai.mindconnect.agent.management.ManagementPlugin;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -70,7 +70,6 @@ import ai.mindconnect.agent.runtime.infrastructure.StorePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.UserSkillDirectory;
 import ai.mindconnect.agent.runtime.infrastructure.TokenizerPlugin;
 import ai.mindconnect.agent.runtime.infrastructure.ToolRegistryPlugin;
-import ai.mindconnect.agent.runtime.infrastructure.UserStreamPlugin;
 import ai.mindconnect.agent.runtime.infrastructure.pg.PostgresStorePlugin;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
@@ -195,7 +194,6 @@ public class RuntimeEngineAutoConfiguration {
                         UserSkillDirectory.of(env.getProperty("mindconnect.agent.skills.user-dir", ""))))
                 .plugin(new ProjectAgentPlugin())
                 .plugin(new ManagementPlugin())
-                .plugin(new UserStreamPlugin())
                 .plugin(new AttachmentPlugin())
                 .plugin(new ToolResultPlugin())
                 .plugin(new TodoPlugin())
@@ -372,7 +370,7 @@ public class RuntimeEngineAutoConfiguration {
     @Bean WorkingDirBrowser workingDirBrowser(AgentRuntime r) { return r.service(WorkingDirBrowser.class); }
     @Bean WorkingDirPolicy workingDirPolicy(AgentRuntime r) { return r.service(WorkingDirPolicy.class); }
     @Bean UserHome userHome(AgentRuntime r) { return r.service(UserHome.class); }
-    @Bean UserChannels userChannels(AgentRuntime r) { return r.service(UserChannels.class); }
+    @Bean UserSessionFeed userSessionFeed(AgentRuntime r) { return r.service(UserSessionFeed.class); }
     @Bean TodoListService todoListService(AgentRuntime r) { return r.service(TodoListService.class); }
     @Bean UserMemoryService userMemoryService(AgentRuntime r) { return r.service(UserMemoryService.class); }
     @Bean SkillRepository skillRepository(AgentRuntime r) { return r.service(SkillRepository.class); }

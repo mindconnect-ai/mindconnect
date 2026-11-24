@@ -5,7 +5,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
-import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
+import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageStore;
@@ -43,7 +43,24 @@ class AgentApiControllerOwnershipTest {
     private static final String AGENT = "a1";
 
     private final ai.mindconnect.agentrest.SessionFixture sessions = new ai.mindconnect.agentrest.SessionFixture();
-    private final UserChannels userChannels = new UserChannels();
+    /** Nothing happens in these tests: who may attach is all that is looked at. */
+    private final UserSessionFeed userSessions = new UserSessionFeed() {
+        @Override
+        public ai.mindconnect.agent.runtime.api.port.in.Subscription follow(
+                UserId user, long afterSeq, java.util.function.Consumer<Entry> listener) {
+            return () -> { };
+        }
+
+        @Override
+        public long latestSeq() {
+            return 0;
+        }
+
+        @Override
+        public long earliestKeptSeq() {
+            return 0;
+        }
+    };
 
     /** No turn runs in these tests: what reaches the services behind the controller is all that is looked at. */
     private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns =
@@ -69,7 +86,7 @@ class AgentApiControllerOwnershipTest {
                 new ai.mindconnect.message.adapter.memory.InMemoryMessageRepository(
                         ScopeSupplier.fixed(new Namespace("test"))),
                 sessionTurns, frameStream, sessions.runtime(), compaction, opener,
-                new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
+                new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userSessions,
                 new SessionAccess(sessions.runtime()), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }

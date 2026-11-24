@@ -5,3 +5,8 @@
   `submit` everything from the turn's start; one that comes much later is told what is still kept and,
   in any case, that the turn is over. The events of finished turns are no longer kept for the life of
   the process.
+- **Agents — the user stream reads the engine's events.** `GET /api/users/{id}/stream` tells of a user's
+  sessions from the engine's own lifecycle channel instead of a second one fed beside it; the frames
+  and `afterSeq` are as before. `session_titled` is sent again when a session gets its title.
+  `approval_answered` is no longer listed: nothing sent it. `UserStreamPlugin` is gone — an embedding
+  that installed it drops the line.

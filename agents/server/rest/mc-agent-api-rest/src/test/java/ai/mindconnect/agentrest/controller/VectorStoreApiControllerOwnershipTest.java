@@ -3,7 +3,6 @@ package ai.mindconnect.agentrest.controller;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
-import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.auth.VectorStoreAccess;
 import ai.mindconnect.agentrest.service.VectorStoreService;

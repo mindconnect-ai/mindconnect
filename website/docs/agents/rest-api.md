@@ -275,7 +275,6 @@ replay and the stream continues live. Every frame is one JSON object with a
 | `turn_started` | `turnId` |
 | `turn_finished` | `turnId`, `outcome` — `completed`, `failed` or `cancelled` |
 | `approval_requested` | `callId`, `toolName` — a tool waits for a human; `sessionId` is the **root** session whose chat shows the card, even when a sub-agent asked |
-| `approval_answered` | `callId`, `approved` — the question was answered, from whichever client |
 
 The tokens of a turn are not here. A client that sees `turn_started` for a
 session it is showing attaches to that session's stream for the rest; one

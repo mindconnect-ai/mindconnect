@@ -12,6 +12,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
@@ -32,8 +33,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Hands the events of sessions and turns to whoever listens, through
- * channels: one for the lifecycle of a namespace's sessions — few events,
- * what a list of sessions follows — and one for the stream of each tree of
+ * channels: one for the lifecycle of all sessions — few events, what a list
+ * of sessions follows — and one for the stream of each tree of
  * sessions, a session with every session under it. The turn workers publish
  * here; the session service and the turn service subscribe here.
  *
@@ -51,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * <p>Events live in this object: a listener in another process hears
  * nothing.
  */
-public final class SessionEventHub implements SessionEventPublisher {
+public final class SessionEventHub implements SessionEventPublisher, UserSessionFeed {
 
     private static final Logger log = LoggerFactory.getLogger(SessionEventHub.class);
     private static final Duration IDLE = Duration.ofMinutes(10);
@@ -64,8 +65,8 @@ public final class SessionEventHub implements SessionEventPublisher {
      * in, the sessions above that one, and the turn it belongs to with the
      * turns that one runs under.
      */
-    private record Happened(Session session, List<SessionId> sessionsAbove, List<TurnId> turns, SessionEvent event)
-            implements Carried { }
+    private record Happened(String namespace, Session session, List<SessionId> sessionsAbove, List<TurnId> turns,
+                            SessionEvent event) implements Carried { }
 
     /** A turn is over, as it ended: what whoever follows that turn is told last. */
     private record Ended(Turn turn) implements Carried { }
@@ -93,16 +94,40 @@ public final class SessionEventHub implements SessionEventPublisher {
 
     /** Hears the lifecycle of the sessions of this namespace that {@code wants} picks, from now on. */
     Subscription lifecycle(Predicate<Session> wants, SessionLifecycleListener listener) {
+        // Heard from the subscriber's namespace only: the same session id elsewhere is another session.
+        String namespace = scope.namespace().value();
         Channel<Happened> channel = lifecycleChannel();
-        return channel.subscribe(channel.lastSeq(), happened -> wants.test(happened.session()),
-                asSubscriber(happened -> listener.onEvent((SessionEvent.Lifecycle) happened.event())))::close;
+        return channel.subscribe(channel.lastSeq(),
+                happened -> happened.namespace().equals(namespace) && wants.test(happened.session()),
+                asSubscriber(event -> listener.onEvent((SessionEvent.Lifecycle) event.value().event())))::close;
     }
 
     /** Hears the lifecycle of one session, and with {@code childSessions} of every session under it. */
     Subscription lifecycle(SessionId sessionId, boolean childSessions, SessionLifecycleListener listener) {
+        String namespace = scope.namespace().value();
         Channel<Happened> channel = lifecycleChannel();
-        return channel.subscribe(channel.lastSeq(), happened -> isUnder(happened, sessionId, childSessions),
-                asSubscriber(happened -> listener.onEvent((SessionEvent.Lifecycle) happened.event())))::close;
+        return channel.subscribe(channel.lastSeq(),
+                happened -> happened.namespace().equals(namespace) && isUnder(happened, sessionId, childSessions),
+                asSubscriber(event -> listener.onEvent((SessionEvent.Lifecycle) event.value().event())))::close;
+    }
+
+    @Override
+    public Subscription follow(UserId user, long afterSeq, Consumer<Entry> listener) {
+        return lifecycleChannel().subscribe(afterSeq,
+                happened -> user.equals(happened.session().userId()),
+                asSubscriber(event -> listener.accept(new Entry(event.seq(), event.value().namespace(),
+                        event.value().session(), event.value().turns().size() > 1,
+                        (SessionEvent.Lifecycle) event.value().event()))))::close;
+    }
+
+    @Override
+    public long latestSeq() {
+        return lifecycleChannel().lastSeq();
+    }
+
+    @Override
+    public long earliestKeptSeq() {
+        return lifecycleChannel().earliestBufferedSeq();
     }
 
     /** Hears one session as it happens, and with {@code childSessions} every session under it, from now on. */
@@ -110,7 +135,8 @@ public final class SessionEventHub implements SessionEventPublisher {
         Channel<Carried> channel = streamChannel(rootOf(sessionId));
         return channel.subscribe(channel.lastSeq(),
                 carried -> carried instanceof Happened happened && isUnder(happened, sessionId, childSessions),
-                asSubscriber(carried -> listener.onEvent((SessionEvent.Stream) ((Happened) carried).event())))::close;
+                asSubscriber(event -> listener.onEvent(
+                        (SessionEvent.Stream) ((Happened) event.value()).event())))::close;
     }
 
     /**
@@ -132,8 +158,8 @@ public final class SessionEventHub implements SessionEventPublisher {
                     case Ended ended -> ended.turn().id().equals(turnId);
                     case CaughtUp caughtUp -> caughtUp.listener() == self;
                 },
-                asSubscriber(carried -> {
-                    switch (carried) {
+                asSubscriber(event -> {
+                    switch (event.value()) {
                         case Happened happened -> {
                             if (!over.get()) {
                                 listener.onEvent(((SessionEvent.TurnReported) happened.event()).event());
@@ -167,7 +193,8 @@ public final class SessionEventHub implements SessionEventPublisher {
      */
     void publish(Session session, List<TurnId> turns, SessionEvent event) {
         contributed.get().forEach(listener -> tell(() -> listener.onEvent(event)));
-        Happened happened = new Happened(session, ancestorsOf(session), List.copyOf(turns), event);
+        Happened happened = new Happened(scope.namespace().value(), session, ancestorsOf(session),
+                List.copyOf(turns), event);
         // Each family to its own channel: a fragment never reaches whoever follows a list of sessions.
         switch (event) {
             case SessionEvent.Lifecycle lifecycle -> lifecycleChannel().publish(happened);
@@ -186,9 +213,9 @@ public final class SessionEventHub implements SessionEventPublisher {
     }
 
     /** Runs what a listener is told as whoever subscribed, on the listener's own thread. */
-    private <E> Consumer<Channel.Event<E>> asSubscriber(Consumer<E> told) {
+    private <E> Consumer<Channel.Event<E>> asSubscriber(Consumer<Channel.Event<E>> told) {
         Scope subscriber = scope.get();
-        return event -> scope.runIn(subscriber, () -> tell(() -> told.accept(event.value())));
+        return event -> scope.runIn(subscriber, () -> tell(() -> told.accept(event)));
     }
 
     private static void tell(Runnable listener) {
@@ -199,12 +226,12 @@ public final class SessionEventHub implements SessionEventPublisher {
         }
     }
 
-    // Keyed by the namespace: the same session id elsewhere is another session.
-
+    /** One for all namespaces: a user's sessions are followed wherever they are, and the events are few. */
     private Channel<Happened> lifecycleChannel() {
-        return channels.channel("lifecycle/" + scope.namespace().value());
+        return channels.channel("lifecycle");
     }
 
+    /** Keyed by the namespace: the same session id elsewhere is another session. */
     private Channel<Carried> streamChannel(SessionId root) {
         return channels.channel("stream/" + scope.namespace().value() + "/" + root.value());
     }

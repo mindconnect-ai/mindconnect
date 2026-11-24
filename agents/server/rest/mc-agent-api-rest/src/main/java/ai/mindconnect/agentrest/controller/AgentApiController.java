@@ -36,7 +36,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
+import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
@@ -85,7 +85,7 @@ public class AgentApiController {
     private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
     private final ai.mindconnect.agentrest.service.ChatOpening chatOpener;
     private final ai.mindconnect.filestore.FileStore fileStore;
-    private final UserChannels userChannels;
+    private final UserSessionFeed userSessions;
     private final SessionAccess sessionAccess;
     private final ObjectMapper compactMapper;
     private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
@@ -98,7 +98,7 @@ public class AgentApiController {
                             ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
                             ai.mindconnect.agentrest.service.ChatOpening chatOpener,
                             ai.mindconnect.filestore.FileStore fileStore,
-                            UserChannels userChannels,
+                            UserSessionFeed userSessions,
                             SessionAccess sessionAccess,
                             ObjectMapper objectMapper,
                             @org.springframework.lang.Nullable
@@ -116,7 +116,7 @@ public class AgentApiController {
         this.runtime = runtime;
         this.chatOpener = chatOpener;
         this.fileStore = fileStore;
-        this.userChannels = userChannels;
+        this.userSessions = userSessions;
         this.sessionAccess = sessionAccess;
         this.compactMapper = objectMapper.copy().disable(
                 com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
@@ -516,13 +516,13 @@ public class AgentApiController {
         SseEmitter emitter = new SseEmitter(120_000L);
 
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        ai.mindconnect.channel.Subscription subscription = userChannels.subscribe(user, afterSeq, event -> {
+        var subscription = userSessions.follow(user, afterSeq, entry -> {
             try {
                 attachedSent.await();
-                emitter.send(SseEmitter.event().data(
-                        compactMapper.writeValueAsString(
-                                UserEventFrame.of(event.seq(), event.value())),
-                        MediaType.APPLICATION_JSON));
+                for (UserEventFrame frame : UserEventFrame.of(entry)) {
+                    emitter.send(SseEmitter.event().data(
+                            compactMapper.writeValueAsString(frame), MediaType.APPLICATION_JSON));
+                }
             } catch (Exception e) {
                 emitter.completeWithError(e);
             }
@@ -530,7 +530,7 @@ public class AgentApiController {
         try {
             emitter.send(SseEmitter.event().data(
                     compactMapper.writeValueAsString(UserEventFrame.Attached.of(
-                            userChannels.earliestBufferedSeq(user), userChannels.lastSeq(user))),
+                            userSessions.earliestKeptSeq(), userSessions.latestSeq())),
                     MediaType.APPLICATION_JSON));
         } catch (Exception e) {
             subscription.close();

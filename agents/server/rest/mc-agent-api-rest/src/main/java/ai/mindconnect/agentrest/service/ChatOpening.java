@@ -7,8 +7,9 @@ import org.springframework.stereotype.Service;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
-import ai.mindconnect.agent.runtime.infrastructure.UserEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
+import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
@@ -23,11 +24,9 @@ import ai.mindconnect.agent.sdk.AgentRuntime;
 public class ChatOpening {
 
     private final AgentRuntime runtime;
-    private final UserChannels users;
 
-    public ChatOpening(AgentRuntime runtime, UserChannels users) {
+    public ChatOpening(AgentRuntime runtime) {
         this.runtime = runtime;
-        this.users = users;
     }
 
     /**
@@ -42,7 +41,9 @@ public class ChatOpening {
                 new SessionAgent.Ref(agent), type,
                 new SessionDirectories(workingDirectory,
                         additionalDirectories == null ? List.of() : additionalDirectories));
-        users.publish(user, new UserEvent.SessionStarted(session.id(), agent, session.type()));
+        // What the user's other pages hear of it: their session lists grow by one.
+        runtime.service(SessionEventPublisher.class).publish(new SessionEvent.Notice(session.id(), null,
+                UserEventFrame.SESSION_STARTED, java.util.Map.of("agentId", agent.value(), "type", session.type())));
         return session;
     }
 }

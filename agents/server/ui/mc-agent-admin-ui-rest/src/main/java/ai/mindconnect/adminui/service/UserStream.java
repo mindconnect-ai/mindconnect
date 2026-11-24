@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
+import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.channel.Subscription;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>the {@link TaskMonitor}'s board, as {@code patch} frames that keep
  *       the header badge and the task dialog current, rendered for the user
  *       on this connection (whether a Cancel appears depends on who looks);</li>
- *   <li>the user's {@link UserChannels} stream, as {@code user} frames — a
+ *   <li>the user's {@link UserSessionFeed}, as {@code user} frames — a
  *       session opened or titled, a turn started or finished, a tool waiting
  *       for an answer — so a tab learns what happens in the sessions it is
  *       not looking at.</li>
@@ -60,7 +60,7 @@ public class UserStream {
     /** SSE comment keeping idle connections alive through proxies. */
     private static final long HEARTBEAT_SECONDS = 20;
 
-    private record Attached(Subscription tasks, Subscription events) {
+    private record Attached(Subscription tasks, ai.mindconnect.agent.runtime.api.port.in.Subscription events) {
         void close() {
             if (tasks != null) tasks.close();
             events.close();
@@ -69,7 +69,7 @@ public class UserStream {
 
     /** Absent when the host runs no task queue; the stream then carries user events only. */
     private final TaskMonitor taskMonitor;
-    private final UserChannels userChannels;
+    private final UserSessionFeed userSessions;
     private final ObjectMapper objectMapper;
     private final Map<SseEmitter, Attached> attached = new ConcurrentHashMap<>();
     /** The namespace a user chose last — asked on every board frame, so a switch shows without a reload. */
@@ -80,21 +80,21 @@ public class UserStream {
         return t;
     });
 
-    public UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper) {
-        this(taskMonitor, userChannels, objectMapper, user -> Optional.empty());
+    public UserStream(Optional<TaskMonitor> taskMonitor, UserSessionFeed userSessions, ObjectMapper objectMapper) {
+        this(taskMonitor, userSessions, objectMapper, user -> Optional.empty());
     }
 
     @org.springframework.beans.factory.annotation.Autowired
-    public UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
+    public UserStream(Optional<TaskMonitor> taskMonitor, UserSessionFeed userSessions, ObjectMapper objectMapper,
                       org.springframework.beans.factory.ObjectProvider<ai.mindconnect.user.service.UserService> users,
                       org.springframework.beans.factory.ObjectProvider<ai.mindconnect.namespace.service.NamespaceService> namespaces) {
-        this(taskMonitor, userChannels, objectMapper, activeNamespaceOf(users.getIfAvailable(), namespaces.getIfAvailable()));
+        this(taskMonitor, userSessions, objectMapper, activeNamespaceOf(users.getIfAvailable(), namespaces.getIfAvailable()));
     }
 
-    UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
+    UserStream(Optional<TaskMonitor> taskMonitor, UserSessionFeed userSessions, ObjectMapper objectMapper,
                java.util.function.Function<UserId, Optional<ai.mindconnect.agent.scope.Namespace>> activeNamespace) {
         this.taskMonitor = taskMonitor.orElse(null);
-        this.userChannels = userChannels;
+        this.userSessions = userSessions;
         this.objectMapper = objectMapper;
         this.activeNamespace = activeNamespace;
         pulse.scheduleWithFixedDelay(this::heartbeat, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
@@ -151,11 +151,11 @@ public class UserStream {
             }
         });
         UserId user = UserId.of(userId);
-        Subscription events = userChannels.subscribe(user, userChannels.lastSeq(user), event -> {
+        var events = userSessions.follow(user, userSessions.latestSeq(), entry -> {
             try {
-                emitter.send(SseEmitter.event()
-                        .name("user")
-                        .data(json(UserEventFrame.of(event.seq(), event.value()))));
+                for (UserEventFrame frame : UserEventFrame.of(entry)) {
+                    emitter.send(SseEmitter.event().name("user").data(json(frame)));
+                }
             } catch (Exception e) {
                 detach(emitter);
             }

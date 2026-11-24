@@ -59,6 +59,7 @@ public final class EnginePlugin implements Plugin {
                 registry.get(SessionStore.class), registry.get(ScopeSupplier.class),
                 () -> registry.all(SessionEventListener.class)));
         registry.provide(SessionEventPublisher.class, () -> registry.get(SessionEventHub.class));
+        registry.provide(UserSessionFeed.class, () -> registry.get(SessionEventHub.class));
         registry.provide(SessionService.class, () -> new DefaultSessionService(
                 registry.get(SessionStore.class), registry.get(SessionEventHub.class)));
         registry.provide(QueuedBackgroundWork.class,

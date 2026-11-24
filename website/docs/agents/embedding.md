@@ -70,7 +70,6 @@ sibling) and in `mc-agent-management`:
 | `DirectoryPlugin` | each user's home, the directories a session may work in, and what the model is told about them |
 | `SkillSourcePlugin` | [skills](./skills.md) from the store, the user's directory and the project |
 | `TokenizerPlugin` | token counts from a tokenizer instead of an estimate |
-| `UserStreamPlugin` | what a user's open pages hear of the runtime's turns |
 | `AttachmentPlugin`, `ToolResultPlugin`, `TodoPlugin`, `UserMemoryPlugin` | files attached to a session, cutting long tool results and reading them again, the todo list, what agents remember about a user |
 
 The stores work in the namespace of the call: they are handed a
