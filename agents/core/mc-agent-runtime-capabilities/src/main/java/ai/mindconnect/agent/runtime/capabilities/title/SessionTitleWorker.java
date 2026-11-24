@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.capabilities.title;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -10,6 +11,7 @@ import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.LlmAnswer;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
+import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
@@ -36,12 +38,14 @@ final class SessionTitleWorker implements BackgroundWorker {
     private final Supplier<SessionStore> sessions;
     private final Supplier<ModelGateway> model;
     private final Supplier<SessionEventPublisher> events;
+    private final Supplier<Optional<BackgroundModel>> background;
 
     SessionTitleWorker(Supplier<SessionStore> sessions, Supplier<ModelGateway> model,
-                       Supplier<SessionEventPublisher> events) {
+                       Supplier<SessionEventPublisher> events, Supplier<Optional<BackgroundModel>> background) {
         this.sessions = sessions;
         this.model = model;
         this.events = events;
+        this.background = background;
     }
 
     @Override
@@ -66,7 +70,9 @@ final class SessionTitleWorker implements BackgroundWorker {
                 .map(message -> message.type().name().toLowerCase(Locale.ROOT) + ": " + message.text())
                 .collect(Collectors.joining("\n\n", "The conversation starts like this:\n\n", ""));
         LlmAnswer answer = model.get().ask(new ModelRequest(TurnId.of(NAME + "-" + sessionId.value()),
-                session.agent() == null ? ModelSettings.NONE : session.agent().modelSettings(), INSTRUCTIONS,
+                background.get().map(BackgroundModel::settings).orElseGet(() ->
+                        session.agent() == null ? ModelSettings.NONE : session.agent().modelSettings()),
+                INSTRUCTIONS,
                 List.of(TurnMessage.user(List.of(new ContentPart.Text(exchange)))), List.of()), event -> { });
         String found = answer.messages().stream().map(TurnMessage::text).findFirst().orElse("").strip();
         String title = found.length() <= LONGEST_TITLE ? found : found.substring(0, LONGEST_TITLE).strip() + "…";

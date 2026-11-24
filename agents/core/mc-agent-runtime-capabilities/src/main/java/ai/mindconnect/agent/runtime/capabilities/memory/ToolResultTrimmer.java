@@ -57,7 +57,9 @@ final class ToolResultTrimmer {
         for (int k = 0; k < untouched.size() - keepRecent && total > budget; k++) {
             TurnMessage message = trimmed.get(untouched.get(k));
             int tokens = counter.count(message.text());
-            String note = "[Tool result removed to save context: " + tokens + " tokens]";
+            // With its id: the result is still in the session, and whoever may read it again asks by that.
+            String note = "[Tool result removed to save context: " + tokens + " tokens"
+                    + (message.id() == null ? "" : ", id=" + message.id()) + "]";
             int saved = tokens - counter.count(note);
             if (saved <= 0) {
                 continue;

@@ -6,11 +6,8 @@ import ai.mindconnect.adminui.ui.page.SkillListPage;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.domain.SkillId;
-import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
-import ai.mindconnect.agent.skill.domain.FileSkills;
-import ai.mindconnect.agent.skill.domain.SkillSource;
+import ai.mindconnect.agent.runtime.infrastructure.UserSkillDirectory;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
-import org.springframework.beans.factory.annotation.Value;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.ui.model.UiPage;
@@ -50,45 +47,22 @@ import java.util.Optional;
 public class SkillUiController {
 
     private final ObjectProvider<SkillRepository> repositoryProvider;
-    /** {@code null} when the user's own skill files are switched off. */
-    private final String userDirTemplate;
+    private final UserSkillDirectory userSkills;
 
     /**
      * The store is optional, as the MCP gateway is on the tools screen: a
      * host that wires none still gets the screen, reading whatever files
      * there are and saying plainly that it cannot store one.
-     *
-     * @param userDir where a user's own {@code SKILL.md} files live: a path that may carry
-     *                {@code {user}}; blank is {@code ~/.mindconnect/skills}, {@code off} none
      */
-    public SkillUiController(ObjectProvider<SkillRepository> repository,
-                             @Value("${mindconnect.agent.skills.user-dir:}") String userDir) {
+    public SkillUiController(ObjectProvider<SkillRepository> repository, UserSkillDirectory userSkills) {
         this.repositoryProvider = repository;
-        String home = System.getProperty("user.home");
-        String template = userDir == null || userDir.isBlank()
-                ? (home == null || home.isBlank() ? null : home + "/.mindconnect/skills") : userDir.strip();
-        this.userDirTemplate = "off".equalsIgnoreCase(template) ? null : template;
+        this.userSkills = userSkills;
     }
 
     /** The store, or one that holds nothing when this host wires none. */
     private SkillRepository repository() {
         SkillRepository stored = repositoryProvider.getIfAvailable();
         return stored == null ? SkillRepository.empty() : stored;
-    }
-
-    /** The {@code SKILL.md} files in this user's own skills directory, as they are. */
-    private List<Skill> userSkills(UserId user) {
-        if (userDirTemplate == null) return List.of();
-        try {
-            if (!userDirTemplate.contains(WorkingDirPolicy.USER_PLACEHOLDER)) {
-                return FileSkills.list(WorkingDirPolicy.expand(userDirTemplate), SkillSource.USER);
-            }
-            if (user == null) return List.of();
-            return FileSkills.list(WorkingDirPolicy.expand(userDirTemplate.replace(
-                    WorkingDirPolicy.USER_PLACEHOLDER, WorkingDirPolicy.pathSafe(user.value()))), SkillSource.USER);
-        } catch (java.nio.file.InvalidPathException e) {
-            return List.of();
-        }
     }
 
     /** Whether this installation can store a skill at all. */
@@ -217,7 +191,8 @@ public class SkillUiController {
      */
     private List<Skill> visible(OidcUser user) {
         List<Skill> skills = new java.util.ArrayList<>(repository().findAll());
-        skills.addAll(userSkills(userIdOf(user)));
+        UserId owner = userIdOf(user);
+        skills.addAll(userSkills.skills(owner == null ? null : owner.value()));
         return List.copyOf(skills);
     }
 

@@ -1,10 +1,13 @@
 package ai.mindconnect.agent.runtime.infrastructure;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
+import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionRule;
@@ -16,6 +19,7 @@ import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolRegistryRef;
 import ai.mindconnect.agent.tool.ToolRepository;
+import ai.mindconnect.agent.tool.UserToolRoster;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
@@ -96,10 +100,29 @@ public final class ToolRegistryPlugin implements Plugin {
             registry.get(ToolRegistryRef.class).set(layered);
             return layered;
         });
-        registry.contribute(ToolResolver.class, new RegistryToolResolver(registry.supplier(ToolRegistry.class)));
+        // Whoever keeps tools in their own account: a service of the runtime or of the host, or nobody.
+        RegistryToolResolver resolver = new RegistryToolResolver(registry.supplier(ToolRegistry.class),
+                () -> registry.get(ToolEnvironment.class).get(UserToolRoster.class).orElseGet(UserToolRoster::none));
+        registry.contribute(ToolResolver.class, resolver);
+        // An offer starts from what the agent names; what its user brought along is added here.
+        registry.after(RuntimeHook.TOOL_OFFER, (context, tools) -> {
+            List<ToolDefinition> offered = new ArrayList<>(tools);
+            resolver.added(context.agent(), context.session()).stream()
+                    .filter(added -> offered.stream().noneMatch(tool -> tool.name().equals(added.name())))
+                    .forEach(offered::add);
+            return offered;
+        });
         // A tool is switched on by the agent naming it; the registry already leaves out what is disabled.
-        registry.contribute(PermissionRuleSource.class,
-                session -> List.of(new PermissionRule(PermissionRule.ANY, PermissionEffect.ALLOW)));
+        // A tool the session's user wants to be asked about asks, whatever the agent's entry says.
+        registry.contribute(PermissionRuleSource.class, session -> {
+            List<PermissionRule> rules = new ArrayList<>();
+            if (session.agent() != null) {
+                resolver.asking(session.agent(), session)
+                        .forEach(tool -> rules.add(new PermissionRule(tool, PermissionEffect.ASK)));
+            }
+            rules.add(new PermissionRule(PermissionRule.ANY, PermissionEffect.ALLOW));
+            return rules;
+        });
     }
 
     /** Binds the tools to their providers; call it once the host and its services are up. */

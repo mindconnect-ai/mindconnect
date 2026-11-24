@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.hook.AgentContext;
@@ -74,7 +75,8 @@ public final class MemoryPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
-        ConversationSummarizer summarizer = new ConversationSummarizer(registry.supplier(ModelGateway.class));
+        ConversationSummarizer summarizer = new ConversationSummarizer(registry.supplier(ModelGateway.class),
+                () -> registry.find(BackgroundModel.class));
         Supplier<SessionStore> sessions = registry.supplier(SessionStore.class);
         registry.provide(MemoryCompaction.class, () -> sessionId -> compact(sessions.get(), sessionId, summarizer));
         registry.provide(MemoryInspection.class, () -> sessionId -> inspect(registry, sessionId));

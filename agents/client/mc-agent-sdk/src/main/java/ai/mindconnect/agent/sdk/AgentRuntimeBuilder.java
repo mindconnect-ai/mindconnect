@@ -212,7 +212,7 @@ public final class AgentRuntimeBuilder {
                 new SkillPlugin(),
                 new ToolSearchPlugin(new InMemoryToolActivation(namespaces)),
                 // Everything: an embedding keeps nothing of one session alone in its metadata.
-                new SubAgentPlugin(key -> true),
+                new SubAgentPlugin(key -> true, SubAgentPlugin.DEFAULT_MAX_DEPTH),
                 new PermissionPlugin(unruledTools,
                         approvals != null ? approvals : new InMemoryApprovalMemory(namespaces)),
                 new MemoryPlugin(new InMemorySummaryStore(namespaces)),

@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
+import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
@@ -25,15 +26,17 @@ final class ConversationSummarizer {
             Keep names, numbers and file paths exactly. Answer with the summary only.""";
 
     private final Supplier<ModelGateway> model;
+    private final Supplier<Optional<BackgroundModel>> background;
 
-    ConversationSummarizer(Supplier<ModelGateway> model) {
+    ConversationSummarizer(Supplier<ModelGateway> model, Supplier<Optional<BackgroundModel>> background) {
         this.model = model;
+        this.background = background;
     }
 
     /**
      * @param turnId   the turn this is done for: a cancel of the turn ends
      *                 the summarising too
-     * @param settings the model that summarises — the agent's own
+     * @param settings the model that summarises where the assembly names none for such tasks — the agent's own
      * @param earlier  the summary so far, which the new one has to contain
      */
     String summarize(TurnId turnId, ModelSettings settings, Optional<ConversationSummary> earlier,
@@ -44,7 +47,8 @@ final class ConversationSummarizer {
                         .filter(message -> !message.text().isBlank())
                         .map(message -> message.type().name().toLowerCase() + ": " + message.text())
                         .collect(Collectors.joining("\n\n"));
-        return model.get().ask(new ModelRequest(turnId, settings, INSTRUCTIONS,
+        return model.get().ask(new ModelRequest(turnId,
+                        background.get().map(BackgroundModel::settings).orElse(settings), INSTRUCTIONS,
                         List.of(TurnMessage.user(List.of(new ContentPart.Text(conversation)))), List.of()),
                         event -> { })
                 .messages().stream().map(TurnMessage::text).collect(Collectors.joining("\n")).strip();

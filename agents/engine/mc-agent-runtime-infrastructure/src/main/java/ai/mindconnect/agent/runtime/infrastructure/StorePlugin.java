@@ -5,7 +5,7 @@ import java.util.function.Supplier;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
-import ai.mindconnect.agent.runtime.capabilities.skill.SkillResolver;
+import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRepository;
@@ -112,7 +112,11 @@ public abstract class StorePlugin implements Plugin {
         if (keepsToolSettings()) {
             registry.provide(ToolRepository.class, () -> stores.get().toolSettings());
         }
-        // The stored skills are the skills an agent may load.
-        registry.contribute(SkillResolver.class, new RepositorySkillResolver(registry.supplier(SkillRepository.class)));
+        // What is kept for one session goes with it.
+        registry.contribute(SessionCleanup.class, session -> {
+            ai.mindconnect.agent.SessionId id = ai.mindconnect.agent.SessionId.of(session.id().value());
+            registry.get(TodoListRepository.class).deleteBySession(id);
+            registry.get(LlmCallTraceRepository.class).deleteBySession(id);
+        });
     }
 }

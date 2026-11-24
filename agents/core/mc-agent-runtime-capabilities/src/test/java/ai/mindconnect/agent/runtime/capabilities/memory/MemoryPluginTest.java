@@ -23,6 +23,7 @@ import ai.mindconnect.agent.loop.domain.Usage;
 import ai.mindconnect.agent.loop.port.out.TurnEventListener;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
+import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
@@ -167,6 +168,18 @@ class MemoryPluginTest {
     }
 
     @Test
+    void a_summary_is_made_by_the_model_the_assembly_names_for_such_tasks() {
+        sent(Map.of("strategy", "compact"), 0.9);
+        assertThat(summaryRequests.get(0).settings()).as("without one: the agent's own").isEqualTo(ModelSettings.NONE);
+
+        install_memory();
+        registry.provide(BackgroundModel.class, () -> BackgroundModel.named("small"));
+        summaryRequests.clear();
+        sent(Map.of("strategy", "compact"), 0.9);
+        assertThat(summaryRequests.get(0).settings().model()).isEqualTo("small");
+    }
+
+    @Test
     void compact_summarises_what_it_leaves_out_and_does_so_once() {
         ModelRequest first = sent(Map.of("strategy", "compact"), 0.9);
         ModelRequest second = sent(Map.of("strategy", "compact"), 0.9);
@@ -222,7 +235,8 @@ class MemoryPluginTest {
 
         ModelRequest overBudget = sent(Map.of("strategy", "window", "keepRecentToolResults", 0), 0.9, withResult);
 
-        assertThat(overBudget.messages().get(1).text()).startsWith("[Tool result removed");
+        assertThat(overBudget.messages().get(1).text()).startsWith("[Tool result removed")
+                .as("the note names the result, for whoever reads it again").contains("id=m2");
         assertThat(remembered).containsOnlyKeys("m2");
 
         // The store hands the message back with the note; shown is the note, however much room there is.

@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.capabilities.title;
 
 import java.util.Map;
 
+import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWork;
@@ -31,7 +32,7 @@ public final class SessionTitlePlugin implements Plugin {
     public void install(PluginRegistry registry) {
         registry.contribute(BackgroundWorker.class, new SessionTitleWorker(
                 registry.supplier(SessionStore.class), registry.supplier(ModelGateway.class),
-                registry.supplier(SessionEventPublisher.class)));
+                registry.supplier(SessionEventPublisher.class), () -> registry.find(BackgroundModel.class)));
 
         registry.listen(RuntimeHook.TURN_END, (context, turn) -> {
             // A child session is a sub-agent's workspace; nobody lists it.

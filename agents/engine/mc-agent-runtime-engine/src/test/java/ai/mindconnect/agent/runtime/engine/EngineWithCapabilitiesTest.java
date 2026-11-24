@@ -148,7 +148,7 @@ class EngineWithCapabilitiesTest {
         registry.contribute(ToolResolver.class, ToolResolver.of(List.of(tool("bash"), tool("read_pdf"))));
         registry.install(new SkillPlugin());
         registry.install(new ToolSearchPlugin(new InMemoryToolActivation(NamespaceProvider.fixed("test"))));
-        registry.install(new SubAgentPlugin(key -> true));
+        registry.install(new SubAgentPlugin(key -> true, SubAgentPlugin.DEFAULT_MAX_DEPTH));
         registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(NamespaceProvider.fixed("test"))));
         registry.install(new TracePlugin(traces::add));
         registry.install(new InputGuardPlugin());
@@ -358,6 +358,29 @@ class EngineWithCapabilitiesTest {
     }
 
     @Test
+    void a_sub_agent_as_deep_as_sub_agents_may_go_calls_nobody() {
+        ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
+        // The chat, and below it sub-agents' sessions one under the other.
+        java.util.List<Session> chain = new java.util.ArrayList<>(List.of(session));
+        for (int depth = 1; depth <= SubAgentPlugin.DEFAULT_MAX_DEPTH; depth++) {
+            chain.add(sessions.open(new SessionSpec(UserId.of("ada"), chain.get(depth - 1).id(), LEAD, Map.of())));
+        }
+        Session deepest = chain.get(SubAgentPlugin.DEFAULT_MAX_DEPTH);
+        Session above = chain.get(SubAgentPlugin.DEFAULT_MAX_DEPTH - 1);
+        Map<String, Object> task = Map.of("name", "researcher", "message", "Find the capital of France.");
+
+        assertThat(tools.resolve("run_agent", LEAD, deepest).orElseThrow().execute(
+                new ToolCall("c1", "run_agent", task, TurnId.of("t1"), deepest.id()), deepest))
+                .isEqualTo(ToolOutput.failed("Error: Sub-agent depth limit (5) exceeded"));
+        assertThat(tools.resolve("run_agents", LEAD, deepest).orElseThrow().execute(
+                new ToolCall("c2", "run_agents", Map.of("tasks", List.of(task)), TurnId.of("t1"), deepest.id()),
+                deepest)).isEqualTo(ToolOutput.failed("Error: Sub-agent depth limit (5) exceeded"));
+        assertThat(tools.resolve("run_agent", LEAD, above).orElseThrow().execute(
+                new ToolCall("c3", "run_agent", task, TurnId.of("t1"), above.id()), above))
+                .isInstanceOf(ToolOutput.Delegated.class);
+    }
+
+    @Test
     void several_sub_agents_run_side_by_side_and_their_answers_are_the_tools_result_together()
             throws InterruptedException {
         model.script.add(call("c1", "run_agents", Map.of("tasks", List.of(
@@ -420,9 +443,29 @@ class EngineWithCapabilitiesTest {
                 .isEqualTo(new SessionEvent.Notice(session.id(), null, "session.title",
                         Map.of("title", "A greeting")));
         assertThat(sessions.find(session.id()).orElseThrow().metadata()).containsEntry("title", "A greeting");
+        // Asked of the session agent's own model: the assembly names none for such tasks.
+        assertThat(model.requests.get(model.requests.size() - 1).settings()).isEqualTo(LEAD.modelSettings());
         assertThat(heard).filteredOn(event -> !(event instanceof SessionEvent.TurnReported))
                 .first().isInstanceOf(SessionEvent.TurnStarted.class);
         assertThat(heard).anyMatch(SessionEvent.TurnFinished.class::isInstance);
+    }
+
+    @Test
+    void a_title_is_found_by_the_model_the_assembly_names_for_such_tasks() throws InterruptedException {
+        registry.provide(ai.mindconnect.agent.runtime.api.domain.BackgroundModel.class,
+                () -> ai.mindconnect.agent.runtime.api.domain.BackgroundModel.named("small"));
+        model.script.add(TurnMessage.assistant("Hello."));
+        model.script.add(TurnMessage.assistant("A greeting"));
+
+        awaitRest(turns.submit(TurnRequest.text(session.id(), "Hi")));
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (!sessions.find(session.id()).orElseThrow().metadata().containsKey("title")
+                && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+
+        assertThat(sessions.find(session.id()).orElseThrow().metadata()).containsEntry("title", "A greeting");
+        assertThat(model.requests.get(model.requests.size() - 1).settings().model()).isEqualTo("small");
     }
 
     @Test

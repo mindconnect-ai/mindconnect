@@ -42,6 +42,7 @@ import ai.mindconnect.agent.management.directory.DirectoryPlugin;
 import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.management.directory.WorkingDirBrowser;
 import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
+import ai.mindconnect.agent.runtime.api.domain.BackgroundModel;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
@@ -54,6 +55,7 @@ import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.permission.SessionApprovalMemory;
 import ai.mindconnect.agent.runtime.capabilities.prompt.PromptPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.runtime.capabilities.toolresult.ToolResultPlugin;
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.SessionToolActivation;
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolActivation;
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolSearchPlugin;
@@ -61,7 +63,10 @@ import ai.mindconnect.agent.runtime.infrastructure.FilePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.FileStorePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.InMemoryStorePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.LlmPlugin;
+import ai.mindconnect.agent.runtime.infrastructure.SkillSourcePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.StorePlugin;
+import ai.mindconnect.agent.runtime.infrastructure.UserSkillDirectory;
+import ai.mindconnect.agent.runtime.infrastructure.TokenizerPlugin;
 import ai.mindconnect.agent.runtime.infrastructure.ToolRegistryPlugin;
 import ai.mindconnect.agent.runtime.infrastructure.UserStreamPlugin;
 import ai.mindconnect.agent.runtime.infrastructure.pg.PostgresStorePlugin;
@@ -166,6 +171,10 @@ public class RuntimeEngineAutoConfiguration {
                 .plugin(provides("scope", registry -> {
                     registry.provide(ScopeSupplier.class, () -> scope);
                     registry.provide(ToolActivation.class, () -> activation);
+                    // The model of what the runtime does on its own account: a title, a summary.
+                    Optional.ofNullable(blankToNull(env.getProperty("mindconnect.agent.stateless.llm-config-name")))
+                            .ifPresent(name -> registry.provide(BackgroundModel.class,
+                                    () -> BackgroundModel.named(name)));
                 }))
                 // Before the stores: a Postgres installation keeps uploads in the database unless
                 // another file store is named, and the store plugin's answer is the later one.
@@ -179,9 +188,12 @@ public class RuntimeEngineAutoConfiguration {
                         blankToNull(env.getProperty("mindconnect.tools.working-dir-root")),
                         env.getProperty("mindconnect.working-dirs.choice", Boolean.class, true),
                         env.getProperty("mindconnect.agent.instructions.user-dir", "")))
+                .plugin(new SkillSourcePlugin(
+                        UserSkillDirectory.of(env.getProperty("mindconnect.agent.skills.user-dir", ""))))
                 .plugin(new ManagementPlugin())
                 .plugin(new UserStreamPlugin())
                 .plugin(new AttachmentPlugin())
+                .plugin(new ToolResultPlugin(ToolResultPlugin.DEFAULT_MAX_RESULT_CHARS))
                 .plugin(new TodoPlugin())
                 .plugin(new UserMemoryPlugin())
                 // In place of the builder's own: what a session keeps, it keeps in the session.
@@ -189,7 +201,10 @@ public class RuntimeEngineAutoConfiguration {
                 // A sub-agent works where its caller works; what is kept of the caller's session alone —
                 // its conversation, its title, its attachments — stays the caller's.
                 .plugin(new SubAgentPlugin(Set.of(ManagedSession.WORKING_DIRECTORY,
-                        ManagedSession.ADDITIONAL_DIRECTORIES)::contains))
+                        ManagedSession.ADDITIONAL_DIRECTORIES)::contains,
+                        env.getProperty("mindconnect.agent.sub-agents.max-depth", Integer.class,
+                                SubAgentPlugin.DEFAULT_MAX_DEPTH)))
+                .plugin(new TokenizerPlugin())
                 .plugin(new PermissionPlugin(PermissionEffect.DENY, new SessionApprovalMemory(sessions)))
                 .plugin(new MemoryPlugin(new SessionSummaryStore(sessions)))
                 .plugin(new PromptPlugin(Clock.systemUTC(), user -> userZones.zoneOf(
@@ -336,6 +351,7 @@ public class RuntimeEngineAutoConfiguration {
     @Bean TodoListService todoListService(AgentRuntime r) { return r.service(TodoListService.class); }
     @Bean UserMemoryService userMemoryService(AgentRuntime r) { return r.service(UserMemoryService.class); }
     @Bean SkillRepository skillRepository(AgentRuntime r) { return r.service(SkillRepository.class); }
+    @Bean UserSkillDirectory userSkillDirectory(AgentRuntime r) { return r.service(UserSkillDirectory.class); }
     @Bean LlmCallTraceRepository llmCallTraceRepository(AgentRuntime r) { return r.service(LlmCallTraceRepository.class); }
     @Bean ToolRegistry toolRegistry(AgentRuntime r) { return r.service(ToolRegistry.class); }
     @Bean LlmConfigRepository llmConfigRepository(AgentRuntime r) { return r.service(LlmConfigRepository.class); }

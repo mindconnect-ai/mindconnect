@@ -27,7 +27,8 @@ class SkillUiControllerTest {
     private static SkillUiController controller(SkillRepository repository) {
         var beans = new StaticListableBeanFactory();
         beans.addBean("skillRepository", repository);
-        return new SkillUiController(beans.getBeanProvider(SkillRepository.class), "off");
+        return new SkillUiController(beans.getBeanProvider(SkillRepository.class),
+                ai.mindconnect.agent.runtime.infrastructure.UserSkillDirectory.of("off"));
     }
 
     private static Skill stored(String name, boolean enabled) {

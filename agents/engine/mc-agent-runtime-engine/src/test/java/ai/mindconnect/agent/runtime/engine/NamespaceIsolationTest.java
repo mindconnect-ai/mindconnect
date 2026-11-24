@@ -91,7 +91,7 @@ class NamespaceIsolationTest {
         registry.install(new InMemorySessionStorePlugin());
         registry.install(new PebblePromptPlugin());
         registry.install(new RuntimePlugin(queue, new InMemorySharedStateStore()));
-        registry.install(new SubAgentPlugin(key -> true));
+        registry.install(new SubAgentPlugin(key -> true, SubAgentPlugin.DEFAULT_MAX_DEPTH));
         registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(namespaces)));
         registry.start();
         turns = registry.get(TurnService.class);

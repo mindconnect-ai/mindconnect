@@ -51,7 +51,11 @@ public final class SubAgentPlugin implements Plugin {
      */
     public static final String OPENED_BY_CALL = "parentToolCallId";
 
+    /** How deep sub-agents may call sub-agents where nothing else is said. */
+    public static final int DEFAULT_MAX_DEPTH = 5;
+
     private final Predicate<String> inherited;
+    private final int maxDepth;
 
     /**
      * The tools an agent gets by naming sub-agents, for a catalog to list:
@@ -66,9 +70,13 @@ public final class SubAgentPlugin implements Plugin {
      *                  sub-agent's session takes over, by key: where it
      *                  works, yes; what a store or a user interface keeps
      *                  of that one session, no
+     * @param maxDepth  how many sessions deep a sub-agent may be: 1 lets an
+     *                  agent call sub-agents that call nobody. A chain that
+     *                  never ends costs without limit, so there is one.
      */
-    public SubAgentPlugin(Predicate<String> inherited) {
+    public SubAgentPlugin(Predicate<String> inherited, int maxDepth) {
         this.inherited = inherited;
+        this.maxDepth = maxDepth;
     }
 
     @Override
@@ -97,7 +105,7 @@ public final class SubAgentPlugin implements Plugin {
                     return Optional.empty();
                 }
                 RunAgentTool single = new RunAgentTool(caller, agents, registry.supplier(SessionService.class),
-                        inherited);
+                        inherited, maxDepth);
                 return switch (toolName) {
                     case RunAgentTool.NAME -> Optional.of(single);
                     case RunAgentsTool.NAME -> Optional.of(new RunAgentsTool(single));
