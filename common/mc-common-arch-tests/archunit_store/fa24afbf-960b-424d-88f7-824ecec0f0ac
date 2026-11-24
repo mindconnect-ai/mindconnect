@@ -1,0 +1,2 @@
+package ai.mindconnect.webscraper depends on ai.mindconnect.webscraper.jsoup, which leads back to it
+package ai.mindconnect.webscraper.jsoup depends on ai.mindconnect.webscraper, which leads back to it

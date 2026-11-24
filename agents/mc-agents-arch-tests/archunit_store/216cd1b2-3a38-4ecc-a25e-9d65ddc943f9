@@ -1,0 +1,14 @@
+ai.mindconnect.adminui.ui.controller.AgentUiController has more than 30 methods
+ai.mindconnect.adminui.ui.controller.LlmConfigUiController has more than 30 methods
+ai.mindconnect.adminui.ui.controller.VectorStoreUiController has more than 30 methods
+ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration has more than 30 methods
+ai.mindconnect.agentrest.controller.AgentApiController has more than 30 methods
+ai.mindconnect.calendar.caldav.ICalendar has more than 30 methods
+ai.mindconnect.chatui.ui.component.TaskCardComponent has more than 30 methods
+ai.mindconnect.chatui.ui.controller.ChatUiController has more than 30 methods
+ai.mindconnect.chatui.ui.page.ChatPage has more than 30 methods
+ai.mindconnect.cli.CliRunner has more than 30 methods
+ai.mindconnect.mail.imap.Mailbox has more than 30 methods
+ai.mindconnect.namespace.service.NamespaceService has more than 30 methods
+ai.mindconnect.vectorstore.pgvector.PgEmbeddingIndex has more than 30 methods
+ai.mindconnect.vectorstore.tools.DefaultVectorStores has more than 30 methods

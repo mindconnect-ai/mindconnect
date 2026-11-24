@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="mindconnect review"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        What a reviewer wants pointed out and ArchUnit cannot see, because it
+        lives inside a method body. Run on demand with -Ppmd; it reports and
+        never fails a build. Copied code is found by CPD, which the same
+        profile runs. LawOfDemeter stays out: it misfires on streams, builders
+        and records.
+    </description>
+
+    <!-- Reports a method from a cognitive complexity of 15 (the PMD default). -->
+    <rule ref="category/java/design.xml/CognitiveComplexity"/>
+
+    <!-- Method length in statements, not lines: reports a method from 60 (the
+         PMD default). The class level is out of reach on purpose: class size
+         is the ArchUnit rule D3. -->
+    <rule ref="category/java/design.xml/NcssCount">
+        <properties>
+            <property name="classReportLevel" value="100000"/>
+        </properties>
+    </rule>
+
+</ruleset>

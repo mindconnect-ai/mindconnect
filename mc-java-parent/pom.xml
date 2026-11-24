@@ -172,6 +172,45 @@
         SNAPSHOTs are not published (Central hosts releases only).
     -->
     <profiles>
+        <!--
+            PMD and CPD as a review aid, on demand:
+              mvn -Ppmd -f agents/pom.xml verify -DskipTests
+            Findings are printed as warnings and written to each module's
+            target/pmd.xml and target/cpd.xml; they never fail the build. The
+            rule set is found through the .mvn directory at the repository
+            root, which after-branch-creation.sh creates.
+        -->
+        <profile>
+            <id>pmd</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-pmd-plugin</artifactId>
+                        <version>3.28.0</version>
+                        <configuration>
+                            <rulesets>
+                                <ruleset>${maven.multiModuleProjectDirectory}/mc-java-parent/pmd-ruleset.xml</ruleset>
+                            </rulesets>
+                            <targetJdk>${java.version}</targetJdk>
+                            <failOnViolation>false</failOnViolation>
+                            <printFailingErrors>true</printFailingErrors>
+                            <linkXRef>false</linkXRef>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>pmd-review</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                    <goal>cpd-check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>release</id>
             <build>
