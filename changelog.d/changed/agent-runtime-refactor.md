@@ -121,4 +121,6 @@
 - A session of the REST API carries `turnId` and `turnStatus` of the turn
   underway, so a client that opens while a turn runs sees the session busy.
 - Deleting a session leaves its own directory on disk, as before the runtime
-  was rebuilt: what an agent wrote there is not removed with the chat.
+  was rebuilt: what an agent wrote there is not removed with the chat. A
+  server that wants the directories gone sets
+  `mindconnect.sessions.delete-directory: true`.

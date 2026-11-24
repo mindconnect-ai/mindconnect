@@ -58,7 +58,7 @@ public final class DirectoryPlugin implements Plugin {
         registry.provide(SessionDirectoryPolicy.class, () -> new RootedSessionDirectoryPolicy(
                 registry.get(WorkingDirPolicy.class), registry.get(UserHome.class)));
         // A deleted session leaves its directory: files are not this plugin's to remove.
-        // A host that wants them gone contributes a SessionDirectoryCleanup.
+        // A host that wants them gone contributes a SessionDirectoryCleanup (the starter: a property).
         new DirectoryPromptPlugin(InstructionFileReader.of(instructionsUserDir == null ? "" : instructionsUserDir))
                 .install(registry);
     }

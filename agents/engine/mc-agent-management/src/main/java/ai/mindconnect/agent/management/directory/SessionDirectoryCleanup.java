@@ -19,7 +19,8 @@ import ai.mindconnect.agent.management.api.SessionCleanup;
  *
  * <p>Not installed by any plugin: deleting a chat must not take files
  * with it unless the host decided so. A server that wants it contributes
- * one as a {@link SessionCleanup}.
+ * one as a {@link SessionCleanup}; the Spring starter does on
+ * {@code mindconnect.sessions.delete-directory=true}.
  */
 public final class SessionDirectoryCleanup implements SessionCleanup {
 

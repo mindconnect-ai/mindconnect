@@ -38,7 +38,10 @@ import ai.mindconnect.agent.management.ManagementPlugin;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.management.directory.DirectoryPlugin;
+import ai.mindconnect.agent.management.directory.SessionDirectoryCleanup;
+import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.management.directory.WorkingDirBrowser;
 import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
@@ -211,6 +214,12 @@ public class RuntimeEngineAutoConfiguration {
                 .plugin(new MemoryPlugin(new SessionSummaryStore(sessions)))
                 .plugin(new PromptPlugin(Clock.systemUTC(), user -> userZones.zoneOf(
                         user == null ? null : ai.mindconnect.agent.UserId.of(user.value()))));
+        // Off unless the installation says so: deleting a chat must not take files with it.
+        if (env.getProperty("mindconnect.sessions.delete-directory", Boolean.class, false)) {
+            builder.plugin(provides("session-directory-cleanup", registry -> registry.contribute(
+                    SessionCleanup.class,
+                    session -> new SessionDirectoryCleanup(registry.get(UserHome.class)).deleted(session))));
+        }
         more.orderedStream().forEach(builder::plugin);
 
         // Start-up work — schema, the first look at the stores — runs in the default namespace;

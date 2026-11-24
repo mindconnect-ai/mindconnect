@@ -23,6 +23,7 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -106,6 +107,45 @@ class RuntimeEngineAutoConfigurationTest {
                     assertThat(dataDirectory.resolve("test/sessions/" + session.id().value() + "/runtime-session.json"))
                             .exists();
                 });
+    }
+
+    @Test
+    void a_deleted_session_keeps_its_directory_unless_the_installation_says_otherwise() {
+        assertThat(directoryAfterDelete()).exists();
+        assertThat(directoryAfterDelete("mindconnect.sessions.delete-directory=true")).doesNotExist();
+    }
+
+    /** Opens a session, puts a file into its own directory, deletes the session; the directory. */
+    private Path directoryAfterDelete(String... properties) {
+        Path[] directory = new Path[1];
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(RuntimeEngineAutoConfiguration.class))
+                .withPropertyValues("mindconnect.data.base-dir=" + dataDirectory)
+                .withPropertyValues(properties)
+                .withBean(ScopeSupplier.class, () -> SCOPE)
+                .withBean(ObjectMapper.class, () -> new ObjectMapper().registerModule(new JavaTimeModule()))
+                .withBean(Plugin.class, () -> new Plugin() {
+                    @Override
+                    public String name() {
+                        return "test-model";
+                    }
+
+                    @Override
+                    public void install(PluginRegistry registry) {
+                        registry.provide(LlmChat.class, () -> (request, handler, cancellation, listener) -> { });
+                    }
+                })
+                .run(context -> {
+                    Session session = context.getBean(SessionService.class)
+                            .open(new SessionSpec(UserId.of("ada"), null, HELPER, Map.of()));
+                    directory[0] = context.getBean(AgentRuntime.class).service(UserHome.class)
+                            .sessionDirOf("ada", session.id().value()).orElseThrow();
+                    java.nio.file.Files.createDirectories(directory[0]);
+                    java.nio.file.Files.writeString(directory[0].resolve("notes.md"), "kept");
+
+                    context.getBean(SessionManagement.class).delete(session.id());
+                });
+        return directory[0];
     }
 
     private static Turn awaitEnd(TurnService turns, TurnId turnId) throws InterruptedException {

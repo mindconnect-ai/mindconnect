@@ -83,9 +83,10 @@ additional directory. On a server a working directory must lie under
 sets that root to `/` and works where it was launched.
 
 Deleting a session leaves its directory on disk: what an agent wrote there
-is not removed with the chat. A host that wants the directories gone — a
-server where they would pile up — contributes a `SessionDirectoryCleanup` as
-a `SessionCleanup` when it assembles the runtime.
+is not removed with the chat. A server where the directories would pile up
+sets `mindconnect.sessions.delete-directory: true`: a session's own directory
+then goes with it — never one the user chose. A host that assembles the
+runtime itself contributes a `SessionDirectoryCleanup` as a `SessionCleanup`.
 
 A session with no directory at all — one written before 0.5.2, a runtime
 without a users' home — falls back to the tool's own `baseDir` override,
