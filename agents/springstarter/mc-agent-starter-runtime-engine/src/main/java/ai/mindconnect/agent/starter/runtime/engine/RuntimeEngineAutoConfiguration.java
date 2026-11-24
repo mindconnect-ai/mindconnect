@@ -167,12 +167,14 @@ public class RuntimeEngineAutoConfiguration {
                     registry.provide(ScopeSupplier.class, () -> scope);
                     registry.provide(ToolActivation.class, () -> activation);
                 }))
+                // Before the stores: a Postgres installation keeps uploads in the database unless
+                // another file store is named, and the store plugin's answer is the later one.
+                .plugin(new FilePlugin(env.getProperty("mindconnect.file-store.backend", "filesystem"), dataDir))
                 .plugin(stores)
                 .plugin(new LlmPlugin(blankToNull(env.getProperty("mindconnect.encryption.secret-key")),
                         envVarResolver.getIfAvailable(EnvVarResolver::system), json))
                 .plugin(new ToolRegistryPlugin(toolSettings(env, dataDir, persistence),
                         blankToNull(env.getProperty("mindconnect.tools.disabled")), type -> hostBean(context, type)))
-                .plugin(new FilePlugin(env.getProperty("mindconnect.file-store.backend", "filesystem"), dataDir))
                 .plugin(new DirectoryPlugin(dataDir, blankToNull(env.getProperty("mindconnect.users.home")),
                         blankToNull(env.getProperty("mindconnect.tools.working-dir-root")),
                         env.getProperty("mindconnect.working-dirs.choice", Boolean.class, true),
