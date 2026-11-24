@@ -10,7 +10,7 @@ import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.format.AgentJson;
-import ai.mindconnect.agent.chat.stream.StreamEvent;
+import ai.mindconnect.cli.agentclient.StreamEvent;
 import ai.mindconnect.message.domain.Message;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;

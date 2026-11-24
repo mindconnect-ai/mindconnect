@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.chat.stream;
+package ai.mindconnect.agentrest.dto;
 
 import ai.mindconnect.agent.SessionId;
 import java.time.Instant;

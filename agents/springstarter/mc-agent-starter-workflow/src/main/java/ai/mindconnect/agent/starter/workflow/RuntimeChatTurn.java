@@ -4,10 +4,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
-import ai.mindconnect.agent.chat.stream.ToolApproval;
-import ai.mindconnect.agent.chat.stream.TurnResult;
-import ai.mindconnect.agent.chat.stream.TurnStatus;
 import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
@@ -17,7 +13,7 @@ import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.agent.tools.workflow.WorkflowAgentCalls;
 
 /**
  * A turn of the runtime as an agent-call step waits for it: its first
@@ -25,24 +21,21 @@ import ai.mindconnect.message.domain.ChatTurnId;
  * step is told about a stop as well as about an end, because nobody answers
  * an approval inside a workflow and the turn would otherwise wait for good.
  */
-final class RuntimeChatTurn implements ChatTurnHandle {
+final class RuntimeChatTurn implements WorkflowAgentCalls.PendingAnswer {
 
     private final AgentRuntime runtime;
-    private final SessionId sessionId;
     private final TurnId turnId;
-    private final CompletableFuture<TurnResult> outcome = new CompletableFuture<>();
+    private final CompletableFuture<WorkflowAgentCalls.Outcome> outcome = new CompletableFuture<>();
 
     /** Submits the message as a turn of the session and follows it. */
     RuntimeChatTurn(AgentRuntime runtime, SessionId session, String message) {
         this.runtime = runtime;
-        this.sessionId = session;
         // Followed before the turn starts: that it asks is told by its session, and only once.
         CompletableFuture<TurnId> started = new CompletableFuture<>();
         Subscription asking = runtime.sessions().lifecycle(session, false, event -> {
             if (event instanceof SessionEvent.TurnInterrupted interrupted
                     && interrupted.turnId().equals(started.join())) {
-                outcome.complete(TurnResult.incomplete(ChatTurnId.of(interrupted.turnId().value()),
-                        approvals(interrupted.interruptions())));
+                outcome.complete(new WorkflowAgentCalls.Outcome(null, toolsWaiting(interrupted.interruptions())));
             }
         });
         this.turnId = runtime.turns().submit(TurnRequest.text(session, message));
@@ -67,53 +60,28 @@ final class RuntimeChatTurn implements ChatTurnHandle {
 
     private void ended(Turn turn) {
         if (turn.status() == ai.mindconnect.agent.runtime.api.domain.TurnStatus.COMPLETED && turn.outcome() != null) {
-            outcome.complete(TurnResult.completed(ChatTurnId.of(turn.id().value()),
-                    turn.outcome().text() == null ? "" : turn.outcome().text()));
+            outcome.complete(new WorkflowAgentCalls.Outcome(
+                    turn.outcome().text() == null ? "" : turn.outcome().text(), List.of()));
         } else {
             outcome.completeExceptionally(new IllegalStateException(turn.error() != null ? turn.error()
                     : "the turn ended " + turn.status().name().toLowerCase(java.util.Locale.ROOT)));
         }
     }
 
-    private List<ToolApproval> approvals(List<Interruption> interruptions) {
+    private static List<String> toolsWaiting(List<Interruption> interruptions) {
         return interruptions.stream()
                 .filter(open -> open.call() != null)
-                .map(open -> new ToolApproval(open.id(), open.call().callId(), open.call().toolName(), "{}",
-                        open.call().sessionId(), sessionId, null, null))
+                .map(open -> open.call().toolName())
                 .toList();
     }
 
     @Override
-    public ChatTurnId id() {
-        return ChatTurnId.of(turnId.value());
-    }
-
-    @Override
-    public SessionId sessionId() {
-        return sessionId;
-    }
-
-    @Override
-    public TurnStatus status() {
-        if (!outcome.isDone()) {
-            return TurnStatus.RUNNING;
-        }
-        return outcome.isCompletedExceptionally() ? TurnStatus.FAILED : outcome.join().status();
-    }
-
-    @Override
-    public CompletableFuture<String> result() {
-        return outcome.thenApply(TurnResult::text);
-    }
-
-    @Override
-    public CompletableFuture<TurnResult> outcome() {
+    public CompletableFuture<WorkflowAgentCalls.Outcome> outcome() {
         return outcome;
     }
 
     @Override
-    public boolean cancel() {
+    public void cancel() {
         runtime.turns().cancel(turnId);
-        return true;
     }
 }

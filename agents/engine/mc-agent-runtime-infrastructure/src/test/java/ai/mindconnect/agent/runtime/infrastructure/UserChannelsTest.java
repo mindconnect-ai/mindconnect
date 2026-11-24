@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.chat.stream;
+package ai.mindconnect.agent.runtime.infrastructure;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
@@ -41,7 +41,7 @@ class UserChannelsTest {
 
     @Test
     void afterSeqReplaysTheBufferedTailThenContinuesLive() {
-        channels.publish(ALICE, new UserEvent.SessionStarted(session, AgentId.random()));
+        channels.publish(ALICE, new UserEvent.SessionStarted(session, AgentId.random(), null));
         channels.publish(ALICE, new UserEvent.TurnStarted(session, turn));
         long cursor = channels.lastSeq(ALICE) - 1;   // "I saw the session start"
 

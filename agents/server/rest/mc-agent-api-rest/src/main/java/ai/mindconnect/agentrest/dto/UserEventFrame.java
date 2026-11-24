@@ -1,6 +1,6 @@
 package ai.mindconnect.agentrest.dto;
 
-import ai.mindconnect.agent.chat.stream.UserEvent;
+import ai.mindconnect.agent.runtime.infrastructure.UserEvent;
 
 import ai.mindconnect.agent.EntityId;
 

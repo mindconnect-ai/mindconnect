@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.chat.stream;
+package ai.mindconnect.agent.runtime.infrastructure;
 
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.channel.Channel;
@@ -10,14 +10,13 @@ import java.util.function.Consumer;
 
 /**
  * One ring-buffered channel per user, carrying the coarse {@link UserEvent}s
- * of every session that user owns. The counterpart of {@link SessionChannels}
- * one level up: a session's stream is what a client attaches to while it
- * looks at that session; the user's stream is what it keeps attached the
- * whole time, so it hears about the sessions it is not looking at.
+ * of every session that user owns. A session's stream is what a client
+ * attaches to while it looks at that session; the user's stream is what it
+ * keeps attached the whole time, so it hears about the sessions it is not
+ * looking at.
  *
- * <p>Same delivery model as the session channels — a monotonic {@code seq}
- * per user as the reconnect cursor, replay from the buffer, then live — and
- * the same rule: the channel is delivery, never storage. A missed event
+ * <p>A monotonic {@code seq} per user is the reconnect cursor: replay from
+ * the buffer, then live. The channel is delivery, never storage. A missed event
  * costs a badge update, not data; the persisted sessions and approvals are
  * the truth a client reloads from. Channels nobody listens to are evicted
  * after idling {@link #IDLE_EVICTION}.
@@ -30,15 +29,7 @@ public final class UserChannels {
 
     private static final Duration IDLE_EVICTION = Duration.ofMinutes(10);
 
-    private final ChannelRegistry registry;
-
-    public UserChannels() {
-        this(new ChannelRegistry().withIdleEviction(IDLE_EVICTION));
-    }
-
-    public UserChannels(ChannelRegistry registry) {
-        this.registry = registry;
-    }
+    private final ChannelRegistry registry = new ChannelRegistry().withIdleEviction(IDLE_EVICTION);
 
     /** Announces {@code event} to every client attached to {@code userId}'s stream. */
     public void publish(UserId userId, UserEvent event) {

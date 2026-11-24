@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.chat.stream;
+package ai.mindconnect.agent.runtime.infrastructure;
 
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.agent.AgentId;
@@ -8,8 +8,8 @@ import ai.mindconnect.agent.SessionId;
  * What a user's clients learn about their sessions without being attached
  * to any one of them: a session was opened or got its title, a turn began
  * or ended, a tool waits for an answer. Coarse on purpose — the tokens and
- * tool calls of a turn stay on the session's own stream
- * ({@link SessionChannels}); this is the feed a session list, a header badge
+ * tool calls of a turn stay on the session's own stream; this is the feed
+ * a session list, a header badge
  * or a notification reads, and what lets a second client find out that
  * something happened in a session it is not looking at.
  *
@@ -42,11 +42,6 @@ public sealed interface UserEvent
             if (sessionType == null || sessionType.isBlank()) {
                 sessionType = CHAT;
             }
-        }
-
-        /** A chat session opened. */
-        public SessionStarted(SessionId sessionId, AgentId agentDefinitionId) {
-            this(sessionId, agentDefinitionId, null);
         }
     }
 

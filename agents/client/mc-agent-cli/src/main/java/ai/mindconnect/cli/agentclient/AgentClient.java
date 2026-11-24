@@ -1,6 +1,6 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.chat.stream.StreamEvent;
+import ai.mindconnect.cli.agentclient.StreamEvent;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;

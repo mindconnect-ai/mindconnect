@@ -1,6 +1,6 @@
 package ai.mindconnect.agentrest.dto;
 
-import ai.mindconnect.agent.chat.stream.ToolApproval;
+import ai.mindconnect.agentrest.dto.ToolApproval;
 
 import java.util.List;
 

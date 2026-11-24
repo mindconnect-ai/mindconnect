@@ -1,6 +1,6 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.chat.stream.StreamEvent;
+import ai.mindconnect.cli.agentclient.StreamEvent;
 import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;

@@ -6,8 +6,8 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.chat.stream.UserChannels;
-import ai.mindconnect.agent.chat.stream.UserEvent;
+import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
+import ai.mindconnect.agent.runtime.infrastructure.UserEvent;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;

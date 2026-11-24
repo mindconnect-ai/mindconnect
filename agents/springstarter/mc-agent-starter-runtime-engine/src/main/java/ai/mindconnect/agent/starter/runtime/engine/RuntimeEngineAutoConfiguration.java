@@ -32,8 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.agent.chat.stream.SessionChannels;
-import ai.mindconnect.agent.chat.stream.UserChannels;
+import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
 import ai.mindconnect.agent.management.ManagementPlugin;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -374,7 +373,6 @@ public class RuntimeEngineAutoConfiguration {
     @Bean WorkingDirPolicy workingDirPolicy(AgentRuntime r) { return r.service(WorkingDirPolicy.class); }
     @Bean UserHome userHome(AgentRuntime r) { return r.service(UserHome.class); }
     @Bean UserChannels userChannels(AgentRuntime r) { return r.service(UserChannels.class); }
-    @Bean SessionChannels sessionChannels(AgentRuntime r) { return r.service(SessionChannels.class); }
     @Bean TodoListService todoListService(AgentRuntime r) { return r.service(TodoListService.class); }
     @Bean UserMemoryService userMemoryService(AgentRuntime r) { return r.service(UserMemoryService.class); }
     @Bean SkillRepository skillRepository(AgentRuntime r) { return r.service(SkillRepository.class); }

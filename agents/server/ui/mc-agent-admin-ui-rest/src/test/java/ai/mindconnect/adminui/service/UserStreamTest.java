@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.chat.stream.UserChannels;
-import ai.mindconnect.agent.chat.stream.UserEvent;
+import ai.mindconnect.agent.runtime.infrastructure.UserChannels;
+import ai.mindconnect.agent.runtime.infrastructure.UserEvent;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;

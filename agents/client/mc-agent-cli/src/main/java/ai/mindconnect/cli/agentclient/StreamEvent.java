@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.chat.stream;
+package ai.mindconnect.cli.agentclient;
 
 import ai.mindconnect.agent.SessionId;
 

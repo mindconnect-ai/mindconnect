@@ -102,11 +102,6 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-chat-stream</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-repo</artifactId>
             <version>${project.version}</version>
         </dependency>

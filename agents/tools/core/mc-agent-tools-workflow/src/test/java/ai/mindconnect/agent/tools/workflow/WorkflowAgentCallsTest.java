@@ -3,11 +3,6 @@ package ai.mindconnect.agent.tools.workflow;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.agent.chat.stream.ToolApproval;
-import ai.mindconnect.agent.chat.stream.TurnResult;
-import ai.mindconnect.agent.chat.stream.TurnStatus;
-import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import org.junit.jupiter.api.Test;
 
@@ -26,20 +21,16 @@ class WorkflowAgentCallsTest {
     static final AgentId WRITER = AgentId.random();
 
     /** A turn that has answered — or will, or never does. */
-    static final class Turn implements ChatTurnHandle {
-        final CompletableFuture<TurnResult> outcome;
+    static final class Turn implements WorkflowAgentCalls.PendingAnswer {
+        final CompletableFuture<WorkflowAgentCalls.Outcome> outcome;
         boolean cancelled;
 
-        Turn(CompletableFuture<TurnResult> outcome) {
+        Turn(CompletableFuture<WorkflowAgentCalls.Outcome> outcome) {
             this.outcome = outcome;
         }
 
-        @Override public ChatTurnId id() { return ChatTurnId.random(); }
-        @Override public SessionId sessionId() { return SessionId.random(); }
-        @Override public TurnStatus status() { return TurnStatus.COMPLETED; }
-        @Override public CompletableFuture<String> result() { return outcome.thenApply(TurnResult::text); }
-        @Override public CompletableFuture<TurnResult> outcome() { return outcome; }
-        @Override public boolean cancel() { cancelled = true; return true; }
+        @Override public CompletableFuture<WorkflowAgentCalls.Outcome> outcome() { return outcome; }
+        @Override public void cancel() { cancelled = true; }
     }
 
     final List<UserId> openedFor = new ArrayList<>();
@@ -53,7 +44,7 @@ class WorkflowAgentCallsTest {
     }
 
     static Turn answered(String text) {
-        return new Turn(CompletableFuture.completedFuture(TurnResult.completed(ChatTurnId.random(), text)));
+        return new Turn(CompletableFuture.completedFuture(new WorkflowAgentCalls.Outcome(text, List.of())));
     }
 
     @Test
@@ -72,10 +63,8 @@ class WorkflowAgentCallsTest {
 
     @Test
     void a_turn_that_stops_for_an_approval_fails_the_step_instead_of_blocking_it() {
-        var approval = new ToolApproval("r", "c", "mail_send", "{}", SessionId.random(), SessionId.random(),
-                null, java.time.Instant.now());
         Turn turn = new Turn(CompletableFuture.completedFuture(
-                TurnResult.incomplete(ChatTurnId.random(), List.of(approval))));
+                new WorkflowAgentCalls.Outcome(null, List.of("mail_send"))));
         assertThatThrownBy(() -> calls(turn, Duration.ofSeconds(5)).call("writer", "Send it."))
                 .hasMessageContaining("approval of mail_send");
         assertThat(turn.cancelled).isTrue();

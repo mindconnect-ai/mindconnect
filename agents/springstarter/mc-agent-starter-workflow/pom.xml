@@ -53,11 +53,6 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-chat-stream</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-infrastructure</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

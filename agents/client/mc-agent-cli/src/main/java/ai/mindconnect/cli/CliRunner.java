@@ -7,7 +7,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.cli.agentclient.MemoryView;
-import ai.mindconnect.agent.chat.stream.StreamEvent;
+import ai.mindconnect.cli.agentclient.StreamEvent;
 import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalAgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;

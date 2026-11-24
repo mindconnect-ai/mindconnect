@@ -34,9 +34,6 @@ ai.mindconnect.adminui.ui.page.LlmConfigFormPage has 2 constructors
 ai.mindconnect.adminui.ui.page.NamespacesPage has 2 constructors
 ai.mindconnect.adminui.ui.page.SkillListPage has 2 constructors
 ai.mindconnect.adminui.ui.page.ToolListPage has 2 constructors
-ai.mindconnect.agent.chat.stream.SessionChannels has 2 constructors
-ai.mindconnect.agent.chat.stream.UserChannels has 2 constructors
-ai.mindconnect.agent.chat.stream.UserEvent$SessionStarted has 2 constructors
 ai.mindconnect.agent.protocol.client.ToolLoop has 2 constructors
 ai.mindconnect.agent.protocol.openai.OpenAiResponsesBackend has 2 constructors
 ai.mindconnect.agent.protocol.runtime.RuntimeBackendException has 2 constructors
