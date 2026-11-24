@@ -1,14 +1,15 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.runtime.api.domain.UserId;
 
-import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.SessionId;
 
-import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.management.api.AgentId;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectories;
+import ai.mindconnect.agent.management.format.AgentJson;
 import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.message.domain.Message;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -51,59 +52,43 @@ public class RemoteAgentClient implements AgentClient {
     // the read/list/chat/memory surface of AgentClient.
 
     @Override
-    public Optional<AgentDefinition> findAgent(AgentId agentId) {
+    public Optional<ManagedAgent> findAgent(AgentId agentId) {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/agents/" + agentId.value())
                 .get().build();
         try (Response resp = http.newCall(req).execute()) {
             if (resp.code() == 404) return Optional.empty();
             assertOk(resp);
-            return Optional.of(agentOf(mapper.readTree(resp.body().string())));
+            return Optional.of(new AgentJson(mapper).read(resp.body().string()));
         } catch (Exception e) {
             throw new RuntimeException("Remote call failed: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public List<AgentDefinition> listAgents() {
+    public List<ManagedAgent> listAgents() {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/agents")
                 .get().build();
-        List<AgentDefinition> agents = new java.util.ArrayList<>();
-        execute(req, JsonNode.class).forEach(agent -> agents.add(agentOf(agent)));
+        AgentJson files = new AgentJson(mapper);
+        List<ManagedAgent> agents = new java.util.ArrayList<>();
+        execute(req, JsonNode.class).forEach(agent -> agents.add(files.read(agent.toString())));
         return agents;
     }
 
-    /**
-     * The agent as this client's screens read it, from what the server answers
-     * with: the managed agent. Only what a screen here shows is carried over.
-     */
-    private static AgentDefinition agentOf(JsonNode agent) {
-        JsonNode definition = agent.path("definition");
-        List<ai.mindconnect.agent.tool.AgentTool> tools = new java.util.ArrayList<>();
-        definition.path("tools").forEach(tool -> tools.add(ai.mindconnect.agent.tool.AgentTool.of(
-                tool.path("name").asText(), text(tool.path("metadata"), "description"))));
-        return new AgentDefinition(AgentId.of(agent.path("id").asText()),
-                definition.path("name").asText(), text(definition, "description"),
-                text(agent, "group"), text(agent, "icon"), text(definition, "instructions"),
-                text(agent, "welcomeMessage"), text(definition.path("modelSettings"), "model"),
-                definition.path("maxRounds").asInt(10), null,
-                ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus.valueOf(agent.path("status").asText("ACTIVE")),
-                tools, List.of(), List.of(), null, null, null, null, agent.path("version").asLong(0));
-    }
-
-    /** The session as this client reads it, from what the server answers with. */
-    private static AgentSession sessionOf(JsonNode session) {
+    /** The session as the server answers with it. */
+    private static ManagedSession sessionOf(JsonNode session) {
         List<String> additional = new java.util.ArrayList<>();
         session.path("additionalDirs").forEach(dir -> additional.add(dir.asText()));
-        return new AgentSession(SessionId.of(session.path("id").asText()),
-                text(session, "agentId") == null ? null : AgentId.of(text(session, "agentId")),
+        String agentId = text(session, "agentId");
+        return new ManagedSession(SessionId.of(session.path("id").asText()),
                 text(session, "userId") == null ? null : UserId.of(text(session, "userId")),
-                ai.mindconnect.message.domain.ConversationId.random(), text(session, "title"),
-                ai.mindconnect.agent.runtime.domain.SessionStatus.ACTIVE,
+                text(session, "parentId") == null ? null : SessionId.of(text(session, "parentId")),
+                null, text(session, "title"), text(session, "type"),
+                text(session, "status") == null ? null : ManagedSession.Status.valueOf(text(session, "status")),
+                new SessionDirectories(text(session, "workingDir"), additional),
                 text(session, "createdAt") == null ? null : java.time.Instant.parse(text(session, "createdAt")),
-                null, null, null, null, null, null, null, null)
-                .withWorkingDir(text(session, "workingDir")).withAdditionalDirs(additional);
+                agentId == null ? Map.of() : Map.of(ManagedSession.AGENT_ID, agentId));
     }
 
     private static String text(JsonNode node, String field) {
@@ -117,14 +102,14 @@ public class RemoteAgentClient implements AgentClient {
      * {@code userId} — the owner in local mode — is not sent.
      */
     @Override
-    public AgentSession startSession(AgentId agentDefinitionId, UserId userId) {
-        return startSession(agentDefinitionId, userId, null);
+    public ManagedSession startSession(AgentId agentId, UserId userId) {
+        return startSession(agentId, userId, null);
     }
 
     @Override
-    public AgentSession startSession(AgentId agentDefinitionId, UserId userId, String workingDir) {
+    public ManagedSession startSession(AgentId agentId, UserId userId, String workingDir) {
         Map<String, Object> fields = new java.util.LinkedHashMap<>();
-        fields.put("agentId", agentDefinitionId.value());
+        fields.put("agentId", agentId.value());
         if (workingDir != null) fields.put("workingDir", workingDir);
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions")
@@ -133,12 +118,12 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir) {
+    public ManagedSession changeWorkingDir(SessionId sessionId, String workingDir) {
         return changeWorkingDir(sessionId, workingDir, null);
     }
 
     @Override
-    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
+    public ManagedSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
         Map<String, Object> fields = new java.util.LinkedHashMap<>();
         fields.put("workingDir", workingDir);
         if (additionalDirs != null) fields.put("additionalDirs", additionalDirs);
@@ -150,10 +135,10 @@ public class RemoteAgentClient implements AgentClient {
 
     /** The authenticated user's sessions; {@code userId} is not sent, as for {@link #startSession}. */
     @Override
-    public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
-        String url = baseUrl + "/api/sessions?agentId=" + agentDefinitionId.value();
+    public List<ManagedSession> listSessions(AgentId agentId, UserId userId) {
+        String url = baseUrl + "/api/sessions?agentId=" + agentId.value();
         Request req = new Request.Builder().url(url).get().build();
-        List<AgentSession> sessions = new java.util.ArrayList<>();
+        List<ManagedSession> sessions = new java.util.ArrayList<>();
         execute(req, JsonNode.class).forEach(session -> sessions.add(sessionOf(session)));
         return sessions;
     }
@@ -273,9 +258,9 @@ public class RemoteAgentClient implements AgentClient {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");
                 int depth = node.path("depth").asInt(0);
-                SessionId subSessionId = node.path("subSessionId").isMissingNode()
+                ai.mindconnect.agent.SessionId subSessionId = node.path("subSessionId").isMissingNode()
                         || node.path("subSessionId").isNull()
-                        ? null : SessionId.of(node.path("subSessionId").asText());
+                        ? null : ai.mindconnect.agent.SessionId.of(node.path("subSessionId").asText());
                 String input = node.path("text").isMissingNode() || node.path("text").isNull()
                         ? null : node.path("text").asText();
                 yield new StreamEvent.SubAgentStarted(taskId, agentName, depth, subSessionId, input);
@@ -283,7 +268,8 @@ public class RemoteAgentClient implements AgentClient {
             case "sub_agent_done" -> {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");
-                SessionId subSessionId = SessionId.of(node.path("subSessionId").asText());
+                ai.mindconnect.agent.SessionId subSessionId =
+                        ai.mindconnect.agent.SessionId.of(node.path("subSessionId").asText());
                 String finalText = node.path("finalText").isMissingNode()
                         || node.path("finalText").isNull()
                         ? null : node.path("finalText").asText();
@@ -310,7 +296,7 @@ public class RemoteAgentClient implements AgentClient {
                         node.path("text").asText(null),
                         node.path("toolName").asText(""),
                         Map.of(),
-                        origin == null || origin.isBlank() ? null : SessionId.of(origin),
+                        origin == null || origin.isBlank() ? null : ai.mindconnect.agent.SessionId.of(origin),
                         node.path("error").asText(null));
             }
             default -> null;
@@ -340,11 +326,11 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public WorkingMemory getWorkingMemory(SessionId sessionId) {
+    public MemoryView getWorkingMemory(SessionId sessionId) {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions/" + sessionId.value() + "/memory")
                 .get().build();
-        return execute(req, WorkingMemory.class);
+        return execute(req, MemoryView.class);
     }
 
     @Override

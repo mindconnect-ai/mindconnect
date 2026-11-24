@@ -1,31 +1,23 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.AgentRegistryService;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import org.springframework.stereotype.Component;
 
+/** The clients of local mode: on the runtime the application built. */
 @Component
 public class LocalClientFactory {
 
-    private final AgentRegistryService registryService;
-    private final AgentSessionService sessionService;
-    private final AgentChatService chatService;
+    private final AgentRuntime runtime;
     private final LlmConfigRepository llmConfigRepository;
 
-    public LocalClientFactory(AgentRegistryService registryService,
-                               AgentSessionService sessionService,
-                               AgentChatService chatService,
-                               LlmConfigRepository llmConfigRepository) {
-        this.registryService = registryService;
-        this.sessionService = sessionService;
-        this.chatService = chatService;
+    public LocalClientFactory(AgentRuntime runtime, LlmConfigRepository llmConfigRepository) {
+        this.runtime = runtime;
         this.llmConfigRepository = llmConfigRepository;
     }
 
     public AgentClient createAgentClient() {
-        return new LocalAgentClient(registryService, sessionService, chatService);
+        return new LocalAgentClient(runtime);
     }
 
     public LlmConfigRepository getLlmConfigRepository() {

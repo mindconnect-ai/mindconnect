@@ -1,12 +1,12 @@
 package ai.mindconnect.cli;
 
-import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.UserId;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.cli.agentclient.MemoryView;
 import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalAgentClient;
@@ -84,12 +84,12 @@ public class CliRunner implements CommandLineRunner {
         Resume resume = resolveResume(stateStore.load(), userId, client);
 
         while (true) {
-            AgentDefinition selectedAgent = resume.agent != null
+            ManagedAgent selectedAgent = resume.agent != null
                     ? resume.agent
                     : selectAgent(scanner, client);
             if (selectedAgent == null) break;
 
-            AgentSession session;
+            ManagedSession session;
             if (resume.session != null) {
                 session = resume.session;
                 System.out.println("[Resumed session " + sessionLabel(session) + "]");
@@ -133,7 +133,7 @@ public class CliRunner implements CommandLineRunner {
                 }
 
                 if (input.equals("/sessions")) {
-                    AgentSession picked = pickSession(scanner, selectedAgent, userId, client);
+                    ManagedSession picked = pickSession(scanner, selectedAgent, userId, client);
                     if (picked != null) {
                         session = picked;
                         stateStore.save(CliState.activeSession(selectedAgent.id().value(), session.id().value()));
@@ -191,9 +191,9 @@ public class CliRunner implements CommandLineRunner {
                         continue;
                     }
                     try {
-                        java.util.List<String> dirs = new java.util.ArrayList<>(session.additionalDirs());
-                        dirs.add(DirectoryArgument.resolve(dir, session.workingDir()));
-                        session = client.changeWorkingDir(session.id(), session.workingDir(), dirs);
+                        java.util.List<String> dirs = new java.util.ArrayList<>(session.directories().additional());
+                        dirs.add(DirectoryArgument.resolve(dir, session.directories().working()));
+                        session = client.changeWorkingDir(session.id(), session.directories().working(), dirs);
                         printDirectories(session);
                     } catch (Exception e) {
                         System.out.println("[/add-dir failed: " + rootMessage(e) + "]");
@@ -210,9 +210,9 @@ public class CliRunner implements CommandLineRunner {
                     String dir = input.length() > 3 ? input.substring(3).trim() : "";
                     try {
                         session = client.changeWorkingDir(session.id(),
-                                dir.isEmpty() ? null : DirectoryArgument.resolve(dir, session.workingDir()));
-                        System.out.println(session.hasWorkingDir()
-                                ? "[Working directory: " + session.workingDir() + "]"
+                                dir.isEmpty() ? null : DirectoryArgument.resolve(dir, session.directories().working()));
+                        System.out.println((session.directories().working() != null)
+                                ? "[Working directory: " + session.directories().working() + "]"
                                 : "[Working directory cleared — the tools use the runtime's default.]");
                     } catch (Exception e) {
                         System.out.println("[/cd failed: " + rootMessage(e) + "]");
@@ -263,16 +263,16 @@ public class CliRunner implements CommandLineRunner {
         }
     }
 
-    private AgentSession pickOrStartSession(Scanner scanner, AgentDefinition agent,
+    private ManagedSession pickOrStartSession(Scanner scanner, ManagedAgent agent,
                                              UserId userId, AgentClient client) {
-        List<AgentSession> sessions = client.listSessions(agent.id(), userId);
+        List<ManagedSession> sessions = client.listSessions(agent.id(), userId);
         if (sessions.isEmpty()) {
             return client.startSession(agent.id(), userId, launchDir(client));
         }
 
         while (true) {
-            List<AgentSession> current = client.listSessions(agent.id(), userId);
-            System.out.println("\nSessions for " + agent.name() + ":");
+            List<ManagedSession> current = client.listSessions(agent.id(), userId);
+            System.out.println("\nSessions for " + agent.definition().name() + ":");
             System.out.println("  0) [New session]");
             for (int i = 0; i < current.size(); i++) {
                 System.out.println("  " + (i + 1) + ") " + sessionLabel(current.get(i)));
@@ -286,7 +286,7 @@ public class CliRunner implements CommandLineRunner {
                 try {
                     int idx = Integer.parseInt(input.substring("/delete ".length()).trim());
                     if (idx >= 1 && idx <= current.size()) {
-                        AgentSession toDelete = current.get(idx - 1);
+                        ManagedSession toDelete = current.get(idx - 1);
                         client.deleteSession(toDelete.id());
                         System.out.println("✓ Session " + idx + " deleted.");
                     } else {
@@ -311,15 +311,15 @@ public class CliRunner implements CommandLineRunner {
         }
     }
 
-    private AgentSession pickSession(Scanner scanner, AgentDefinition agent,
+    private ManagedSession pickSession(Scanner scanner, ManagedAgent agent,
                                       UserId userId, AgentClient client) {
-        List<AgentSession> sessions = client.listSessions(agent.id(), userId);
+        List<ManagedSession> sessions = client.listSessions(agent.id(), userId);
         if (sessions.isEmpty()) {
             System.out.println("[No sessions found.]");
             return null;
         }
 
-        System.out.println("\nSessions for " + agent.name() + ":");
+        System.out.println("\nSessions for " + agent.definition().name() + ":");
         for (int i = 0; i < sessions.size(); i++) {
             System.out.println("  " + (i + 1) + ") " + sessionLabel(sessions.get(i)));
         }
@@ -338,8 +338,8 @@ public class CliRunner implements CommandLineRunner {
         return null;
     }
 
-    private String sessionLabel(AgentSession session) {
-        String date = DATE_FMT.format(session.startedAt());
+    private String sessionLabel(ManagedSession session) {
+        String date = DATE_FMT.format(session.createdAt());
         String title = session.title() != null ? session.title() : "(untitled)";
         return title + "  [" + date + "]  " + session.id().value().substring(0, 8) + "…";
     }
@@ -360,25 +360,25 @@ public class CliRunner implements CommandLineRunner {
     }
 
     /** The session's directories, as the header and {@code /dirs} show them. */
-    private static void printDirectories(AgentSession session) {
-        if (session.hasWorkingDir()) {
-            System.out.println("[Working directory: " + session.workingDir() + " — change with /cd <dir>]");
-        } else if (!session.additionalDirs().isEmpty()) {
+    private static void printDirectories(ManagedSession session) {
+        if ((session.directories().working() != null)) {
+            System.out.println("[Working directory: " + session.directories().working() + " — change with /cd <dir>]");
+        } else if (!session.directories().additional().isEmpty()) {
             System.out.println("[No working directory — the tools use the runtime's default; set one with /cd <dir>]");
         }
-        if (!session.additionalDirs().isEmpty()) {
-            System.out.println("[Also reachable by absolute path: " + String.join(", ", session.additionalDirs())
+        if (!session.directories().additional().isEmpty()) {
+            System.out.println("[Also reachable by absolute path: " + String.join(", ", session.directories().additional())
                     + " — extend with /add-dir <dir>]");
         }
     }
 
-    private void printSessionHeader(AgentDefinition agent, AgentSession session) {
+    private void printSessionHeader(ManagedAgent agent, ManagedSession session) {
         System.out.println("\n[Session: " + sessionLabel(session) + "]");
         printDirectories(session);
         System.out.println("Type /back, /sessions, /tools, /tool-calls, /messages, /history, /memory, /compress, /quit or /help.");
     }
 
-    private void printHistory(AgentSession session, AgentClient client) {
+    private void printHistory(ManagedSession session, AgentClient client) {
         renderHistory(session, client, client.loadHistory(session.id()), null);
     }
 
@@ -390,7 +390,7 @@ public class CliRunner implements CommandLineRunner {
      *   <li>integer N      → only the last N CHAT pairs (each pair = user + agent)</li>
      * </ul>
      */
-    private void printHistoryWithArg(AgentSession session, AgentClient client, String arg) {
+    private void printHistoryWithArg(ManagedSession session, AgentClient client, String arg) {
         List<Message> all;
         try { all = client.loadHistory(session.id()); }
         catch (Exception e) {
@@ -422,11 +422,11 @@ public class CliRunner implements CommandLineRunner {
      * (user + agent) are shown. The full message list is still passed in so that
      * tool-call counts attached to a kept agent message are computed correctly.
      */
-    private void renderHistory(AgentSession session, AgentClient client,
+    private void renderHistory(ManagedSession session, AgentClient client,
                                 List<Message> history, Integer pairLimit) {
         if (history.isEmpty()) {
-            String welcome = client.findAgent(session.agentDefinitionId())
-                    .map(AgentDefinition::welcomeMessage).orElse(null);
+            String welcome = session.agentId().flatMap(client::findAgent)
+                    .map(ManagedAgent::welcomeMessage).orElse(null);
             if (welcome != null && !welcome.isBlank()) {
                 System.out.println("\nAgent:\n" + welcome);
             } else {
@@ -492,12 +492,12 @@ public class CliRunner implements CommandLineRunner {
         System.out.println("── End of history ───────────────────────");
     }
 
-    private AgentDefinition selectAgent(Scanner scanner, AgentClient client) {
-        List<AgentDefinition> agents = client.listAgents();
+    private ManagedAgent selectAgent(Scanner scanner, AgentClient client) {
+        List<ManagedAgent> agents = client.listAgents();
         System.out.println("\nAvailable agents:");
         for (int i = 0; i < agents.size(); i++) {
-            System.out.println("  " + (i + 1) + ") " + agents.get(i).name()
-                    + " — " + agents.get(i).description());
+            System.out.println("  " + (i + 1) + ") " + agents.get(i).definition().name()
+                    + " — " + agents.get(i).definition().description());
         }
         System.out.print("\nSelect agent (number) or /quit: ");
         String input = scanner.nextLine().trim();
@@ -516,7 +516,7 @@ public class CliRunner implements CommandLineRunner {
         return selectAgent(scanner, client);
     }
 
-    private void streamAgentResponse(AgentSession session, String userMessage, AgentClient client) {
+    private void streamAgentResponse(ManagedSession session, String userMessage, AgentClient client) {
         System.out.println("\nAgent: \033[90m(press q + enter to cancel)\033[0m");
         boolean[] inStatus = {false};       // true while a status line is being shown
         boolean[] textActive = {false};     // true while we are currently printing tokens on a line
@@ -752,9 +752,9 @@ public class CliRunner implements CommandLineRunner {
      * Prints a compact one-line context bar after each agent response, e.g.:
      *   ctx  [████████░░░░░░░░░░░░]  3,241 / 8,192  39.6%  — use /compress if > 80%
      */
-    private void printContextBar(AgentSession session, AgentClient client) {
+    private void printContextBar(ManagedSession session, AgentClient client) {
         try {
-            WorkingMemory stats = client.getWorkingMemory(session.id());
+            MemoryView stats = client.getWorkingMemory(session.id());
             if (stats.contextWindowTokens() == null) return;
             int used = stats.totalTokens();
             int max  = stats.contextWindowTokens();
@@ -864,7 +864,7 @@ public class CliRunner implements CommandLineRunner {
      * server's current history is loaded once via {@code client.loadHistory}.
      */
     private int[] parseDeleteMessageRange(String arg,
-                                           AgentSession session,
+                                           ManagedSession session,
                                            ai.mindconnect.cli.agentclient.AgentClient client) {
         if (arg == null || arg.isBlank()) return null;
         String s = arg.trim();
@@ -969,7 +969,7 @@ public class CliRunner implements CommandLineRunner {
      *   <li>integer        → the last N tool calls</li>
      * </ul>
      */
-    private void printToolCallHistory(AgentSession session, AgentClient client, String arg) {
+    private void printToolCallHistory(ManagedSession session, AgentClient client, String arg) {
         List<ai.mindconnect.message.domain.Message> history;
         try {
             history = client.loadHistory(session.id());
@@ -1103,7 +1103,7 @@ public class CliRunner implements CommandLineRunner {
      *   <li>integer        → the last N messages</li>
      * </ul>
      */
-    private void printMessageList(AgentSession session, AgentClient client, String arg) {
+    private void printMessageList(ManagedSession session, AgentClient client, String arg) {
         List<ai.mindconnect.message.domain.Message> history;
         try {
             history = client.loadHistory(session.id());
@@ -1237,22 +1237,22 @@ public class CliRunner implements CommandLineRunner {
         return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
-    private void printTools(AgentDefinition agent, AgentClient client) {
-        AgentDefinition fresh = client.findAgent(agent.id()).orElse(agent);
-        if (fresh.tools() == null || fresh.tools().isEmpty()) {
+    private void printTools(ManagedAgent agent, AgentClient client) {
+        ManagedAgent fresh = client.findAgent(agent.id()).orElse(agent);
+        if (fresh.definition().tools().isEmpty()) {
             System.out.println("[No tools configured for this agent.]");
             return;
         }
-        System.out.println("\nTools for " + fresh.name() + ":");
-        fresh.tools().stream()
-                .filter(t -> t.enabled())
-                .forEach(t -> System.out.println("  • " + t.name() + " — " + t.description()));
+        System.out.println("\nTools for " + fresh.definition().name() + ":");
+        // A tool the agent names is one it may use; the description is the one the agent gives it.
+        fresh.definition().tools().forEach(t -> System.out.println("  • " + t.name()
+                + (t.metadata().get("description") instanceof String description ? " — " + description : "")));
     }
 
-    private void printMemory(AgentSession session, AgentDefinition agent, AgentClient client) {
-        WorkingMemory stats = client.getWorkingMemory(session.id());
+    private void printMemory(ManagedSession session, ManagedAgent agent, AgentClient client) {
+        MemoryView stats = client.getWorkingMemory(session.id());
 
-        System.out.println("\n══ MEMORY / FULL CONTEXT  [counter: " + stats.tokenCounterName() + "] ══════════════════");
+        System.out.println("\n══ MEMORY / FULL CONTEXT ══════════════════");
 
         // System prompt
         System.out.println("\n── [SYSTEM PROMPT]  ~" + stats.systemPromptTokens() + "t ────────────────────────────────");
@@ -1261,11 +1261,9 @@ public class CliRunner implements CommandLineRunner {
         if (stats.messages().isEmpty()) {
             System.out.println("\n── [NO MESSAGES IN WINDOW] ──────────────────────────────────────");
         } else {
-            for (WorkingMemory.WorkingMemoryMessage m : stats.messages()) {
-                java.time.Instant sentAt = java.time.Instant.ofEpochMilli(m.sentAtMs());
+            for (MemoryView.Entry m : stats.messages()) {
                 String compressedTag = m.compressed() ? "  \033[33m[compressed]\033[0m" : "";
                 System.out.println("\n── [" + m.type() + " / " + m.role() + "]  seq=" + m.sequenceNum()
-                        + "  " + DATE_FMT.format(sentAt)
                         + "  ~" + m.tokens() + "t" + compressedTag + " ──");
                 if (m.compressed() && m.compressedContent() != null) {
                     System.out.println("\033[33m" + m.compressedContent() + "\033[0m");
@@ -1289,7 +1287,7 @@ public class CliRunner implements CommandLineRunner {
         }
     }
 
-    private void compressMemory(AgentSession session, AgentClient client) {
+    private void compressMemory(ManagedSession session, AgentClient client) {
         System.out.println("\n⏳ Compressing memory…");
         try {
             int compressed = client.compressMemory(session.id());
@@ -1310,7 +1308,7 @@ public class CliRunner implements CommandLineRunner {
         return "█".repeat(filled) + "░".repeat(width - filled);
     }
 
-    private void printMessage(AgentSession session, int sequenceNum, AgentClient client) {
+    private void printMessage(ManagedSession session, int sequenceNum, AgentClient client) {
         List<Message> history = client.loadHistory(session.id());
         Message msg = history.stream()
                 .filter(m -> m.sequenceNum() == sequenceNum)
@@ -1423,7 +1421,7 @@ public class CliRunner implements CommandLineRunner {
      * If only {@link #agent} is set the user lands in the session picker for that agent.
      * Both null = normal start at the agent list.
      */
-    private record Resume(AgentDefinition agent, AgentSession session) {
+    private record Resume(ManagedAgent agent, ManagedSession session) {
         static Resume none() { return new Resume(null, null); }
     }
 
@@ -1431,18 +1429,18 @@ public class CliRunner implements CommandLineRunner {
         if (state == null || state.view() == CliState.View.AGENT_LIST || state.lastAgentId() == null) {
             return Resume.none();
         }
-        Optional<AgentDefinition> agentOpt = client.findAgent(AgentId.of(state.lastAgentId()));
+        Optional<ManagedAgent> agentOpt = client.findAgent(AgentId.of(state.lastAgentId()));
         if (agentOpt.isEmpty()) {
             // Stale agent — reset and fall back to the main menu.
             stateStore.save(CliState.agentList());
             return Resume.none();
         }
-        AgentDefinition agent = agentOpt.get();
+        ManagedAgent agent = agentOpt.get();
         if (state.view() == CliState.View.SESSION_LIST || state.lastSessionId() == null) {
             return new Resume(agent, null);
         }
         String wantedId = state.lastSessionId();
-        AgentSession session = client.listSessions(agent.id(), userId).stream()
+        ManagedSession session = client.listSessions(agent.id(), userId).stream()
                 .filter(s -> s.id().value().equals(wantedId))
                 .findFirst()
                 .orElse(null);

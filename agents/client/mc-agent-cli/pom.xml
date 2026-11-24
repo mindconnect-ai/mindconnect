@@ -19,11 +19,12 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime</artifactId>
+            <artifactId>mc-agent-starter-runtime-engine</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-starter-runtime</artifactId>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
