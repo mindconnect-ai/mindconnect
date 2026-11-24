@@ -40,7 +40,8 @@ import org.junit.jupiter.api.BeforeEach;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillResolver;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillSummary;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -69,9 +70,9 @@ class CapabilitiesWithoutEngineTest {
                 new SkillDefinition("citations", "How to cite sources.", "Cite like this.", List.of())));
         registry.contribute(ToolResolver.class, ToolResolver.of(List.of(tool("web_search"), tool("bash"), tool("read_pdf"))));
         registry.install(new SkillPlugin());
-        registry.install(new ToolSearchPlugin(new InMemoryToolActivation(NamespaceProvider.fixed("test"))));
+        registry.install(new ToolSearchPlugin(new InMemoryToolActivation(ScopeSupplier.fixed(new Namespace("test")))));
         registry.install(new SubAgentPlugin(key -> true, SubAgentPlugin.DEFAULT_MAX_DEPTH));
-        registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(NamespaceProvider.fixed("test"))));
+        registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(ScopeSupplier.fixed(new Namespace("test")))));
         registry.contribute(PermissionRuleSource.class, session -> List.of(
                 new PermissionRule("bash", PermissionEffect.ASK)));
         registry.start();

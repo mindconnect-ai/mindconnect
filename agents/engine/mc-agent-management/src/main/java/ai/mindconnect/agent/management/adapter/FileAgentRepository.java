@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.filerepo.DocumentExistsException;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
@@ -26,11 +26,11 @@ public final class FileAgentRepository implements AgentRepository {
 
     private final Documents<AgentId, ManagedAgent> agents;
 
-    public FileAgentRepository(Path base, ObjectMapper json, NamespaceProvider namespaces) {
+    public FileAgentRepository(Path base, ObjectMapper json, ScopeSupplier scope) {
         this.agents = Documents.of(ManagedAgent.class)
                 .path((AgentId id) -> AGENTS + "/" + id.value() + ".json")
                 // The partition of the namespace the current call works in.
-                .build(() -> FileRepo.open(base, namespaces.current()), json);
+                .build(() -> FileRepo.open(base, scope.namespace().value()), json);
     }
 
     @Override

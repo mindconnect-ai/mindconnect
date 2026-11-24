@@ -14,7 +14,6 @@ import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
@@ -57,7 +56,7 @@ class AgentUiControllerTest {
 
     @BeforeEach
     void setUp() {
-        NamespaceProvider namespace = NamespaceProvider.fixed("test");
+        ScopeSupplier namespace = ScopeSupplier.fixed(new Namespace("test"));
         var agentRepository = new InMemoryAgentRepository(namespace);
         var sessionRepository = new InMemorySessionRepository(namespace);
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));

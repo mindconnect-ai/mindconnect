@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.engine.adapter.memory;
 
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
@@ -20,9 +20,9 @@ public final class InMemorySessionStorePlugin implements Plugin {
     public void install(PluginRegistry registry) {
         registry.provide(SessionStore.class,
                 () -> {
-                    NamespaceProvider namespaces = registry.get(NamespaceProvider.class);
+                    ScopeSupplier namespaces = registry.get(ScopeSupplier.class);
                     return new RepositorySessionStore(new InMemorySessionRepository(namespaces),
-                            new InMemoryMessageRepository(RepositorySessionStore.scopeOf(namespaces)));
+                            new InMemoryMessageRepository(namespaces));
                 });
     }
 }

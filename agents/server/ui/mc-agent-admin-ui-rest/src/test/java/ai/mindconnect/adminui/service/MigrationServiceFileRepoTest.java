@@ -48,7 +48,7 @@ class MigrationServiceFileRepoTest {
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, json, ScopeSupplier.fixed(new Namespace("test"))), ENCRYPTION);
         service = new MigrationService(repo,
-                new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider.fixed("test"))), new InMemorySkillRepository(ScopeSupplier.local()), new InMemoryWorkflowDataRepository(),
+                new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.ScopeSupplier.fixed(new ai.mindconnect.agent.Namespace("test")))), new InMemorySkillRepository(ScopeSupplier.local()), new InMemoryWorkflowDataRepository(),
                 json, encryption);
     }
 

@@ -6,21 +6,21 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 
 /** Activations that live as long as the process: enough for a library user and for tests. */
 public final class InMemoryToolActivation implements ToolActivation {
 
     private final Map<String, Set<String>> activated = new ConcurrentHashMap<>();
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    public InMemoryToolActivation(NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
+    public InMemoryToolActivation(ScopeSupplier scope) {
+        this.scope = scope;
     }
 
     /** A session id means something only within its namespace. */
     private String key(SessionId sessionId) {
-        return namespaces.current() + "/" + sessionId.value();
+        return scope.namespace().value() + "/" + sessionId.value();
     }
 
     @Override

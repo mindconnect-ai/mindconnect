@@ -16,7 +16,6 @@ import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
@@ -79,7 +78,7 @@ class TaskMonitorTest {
             return TaskOutcome.done("ok");
         });
 
-        monitor = new TaskMonitor(queue, runtimeWithAlicesSession(ALICE_SESSION, NamespaceProvider.fixed("test")));
+        monitor = new TaskMonitor(queue, runtimeWithAlicesSession(ALICE_SESSION, ScopeSupplier.fixed(new Namespace("test"))));
     }
 
     @AfterEach
@@ -90,7 +89,7 @@ class TaskMonitorTest {
     }
 
     /** A runtime that knows sessions, with Alice's chat "Alice asks" in the namespace current when it is made. */
-    static AgentRuntime runtimeWithAlicesSession(SessionId alices, NamespaceProvider namespaces) {
+    static AgentRuntime runtimeWithAlicesSession(SessionId alices, ScopeSupplier namespaces) {
         var sessions = new InMemorySessionRepository(namespaces);
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
@@ -167,17 +166,17 @@ class TaskMonitorTest {
         var scope = ThreadBoundScopeSupplier.strict();
         // The sessions' store follows the bound namespace and keeps which ones it was asked in.
         List<String> asked = new CopyOnWriteArrayList<>();
-        NamespaceProvider following = new NamespaceProvider() {
+        ScopeSupplier following = new ScopeSupplier() {
             @Override
-            public String current() {
-                String namespace = scope.get().namespace().value();
-                asked.add(namespace);
-                return namespace;
+            public Scope get() {
+                Scope current = scope.get();
+                asked.add(current.namespace().value());
+                return current;
             }
 
             @Override
-            public <T> T callIn(String namespace, java.util.function.Supplier<T> body) {
-                return scope.runIn(Scope.of(new Namespace(namespace)), body);
+            public <T> T callIn(Scope in, java.util.concurrent.Callable<T> body) throws Exception {
+                return scope.callIn(in, body);
             }
         };
         var namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);

@@ -5,21 +5,21 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 
 /** Summaries that live as long as the process; a session summarised before a restart is summarised again. */
 public final class InMemorySummaryStore implements SummaryStore {
 
     private final Map<String, ConversationSummary> summaries = new ConcurrentHashMap<>();
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    public InMemorySummaryStore(NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
+    public InMemorySummaryStore(ScopeSupplier scope) {
+        this.scope = scope;
     }
 
     /** A session id means something only within its namespace. */
     private String key(SessionId sessionId) {
-        return namespaces.current() + "/" + sessionId.value();
+        return scope.namespace().value() + "/" + sessionId.value();
     }
 
     @Override

@@ -173,7 +173,7 @@ class NamespaceSeedingTest {
     }
 
     private static AgentManagement agentStore() {
-        return new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider.fixed("test")));
+        return new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.ScopeSupplier.fixed(new ai.mindconnect.agent.Namespace("test"))));
     }
 
     private List<String> ledger(Namespace namespace) {

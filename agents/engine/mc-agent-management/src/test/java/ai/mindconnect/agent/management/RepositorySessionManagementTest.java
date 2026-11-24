@@ -30,7 +30,6 @@ import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
@@ -45,11 +44,11 @@ class RepositorySessionManagementTest {
     private static final AgentDefinition HELPER = new AgentDefinition("helper", "Helps.", "You help.",
             ModelSettings.NONE, List.of(), 5, Map.of());
 
-    private final SessionRepository sessions = new InMemorySessionRepository(NamespaceProvider.fixed("test"));
+    private final SessionRepository sessions = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
     private final MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
     /** What the runtime does: the sessions and messages the management API is to find. */
     private final SessionStore runtime = new RepositorySessionStore(sessions, messages);
-    private final AgentRepository agents = new InMemoryAgentRepository(NamespaceProvider.fixed("test"));
+    private final AgentRepository agents = new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test")));
     /** The sessions a cleanup was told are gone. */
     private final List<ManagedSession> cleanedUp = new java.util.ArrayList<>();
     private final SessionManagement management = new RepositorySessionManagement(sessions, messages, agents,

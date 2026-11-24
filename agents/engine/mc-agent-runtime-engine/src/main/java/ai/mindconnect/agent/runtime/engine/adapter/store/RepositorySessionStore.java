@@ -12,7 +12,6 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.common.PageRequest;
@@ -54,15 +53,6 @@ public final class RepositorySessionStore implements SessionStore {
     public RepositorySessionStore(SessionRepository sessions, MessageRepository messages) {
         this.sessions = sessions;
         this.messages = messages;
-    }
-
-    /**
-     * The scope supplier a message repository is built with, answering from
-     * the runtime's namespace provider: the two then keep a session and its
-     * messages apart by the same namespace.
-     */
-    public static ScopeSupplier scopeOf(NamespaceProvider namespaces) {
-        return () -> Scope.of(new Namespace(namespaces.current()));
     }
 
     /**

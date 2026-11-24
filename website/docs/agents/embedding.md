@@ -39,7 +39,7 @@ else is asked of the runtime — `runtime.sessions()`, `runtime.turns()`, and
 | `inputGuard(…)`, `outputGuard(…)` | what is checked before a message reaches the model and before an answer leaves |
 | `permission(tool, effect)`, `unruledTools(effect)` | whether a tool call runs, asks first or is refused (`ALLOW`, `ASK`, `DENY`); tools no rule names are allowed by default |
 | `approvalMemory(…)` | where "allow for this session" is remembered; in memory by default |
-| `namespaces(…)`, `users(…)` | for a host that serves several namespaces and knows its users: the namespace of the call and who acts in it |
+| `scope(…)` | for a host that serves several namespaces and knows its users: a `ScopeSupplier` saying the namespace of the call, who acts in it, and whatever else the host carries along (`Scope` attributes). A turn and everything it starts run in the scope the turn was submitted in |
 | `taskQueue(…)` | the queue turns and tool calls run on, for a host that brings its own — one on a database, one it also watches; in memory by default, closed with the runtime |
 | `sessionStore(plugin)` | where sessions are kept; in memory by default |
 | `plugin(…)` | anything else, see below |

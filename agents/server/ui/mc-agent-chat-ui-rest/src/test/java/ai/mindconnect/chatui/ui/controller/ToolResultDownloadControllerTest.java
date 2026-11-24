@@ -13,7 +13,6 @@ import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
@@ -52,10 +51,10 @@ class ToolResultDownloadControllerTest {
 
     @BeforeEach
     void setUp() {
-        var stored = new InMemorySessionRepository(NamespaceProvider.fixed("test"));
+        var stored = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionManagement management = new RepositorySessionManagement(stored, messages,
-                new InMemoryAgentRepository(NamespaceProvider.fixed("test")), SessionDirectoryPolicy.unrestricted(),
+                new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
                 List.of());
         var store = new RepositorySessionStore(stored, messages);
         store.create(new Session(ALICES, UserId.of("alice"), null,

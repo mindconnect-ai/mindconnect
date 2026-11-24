@@ -8,8 +8,8 @@ import java.util.function.Consumer;
 
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
-import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.capabilities.guard.InputGuard;
 import ai.mindconnect.agent.runtime.capabilities.guard.InputGuardPlugin;
@@ -70,9 +70,8 @@ public final class AgentRuntimeBuilder {
     private Plugin model;
     private Plugin sessionStore = new InMemorySessionStorePlugin();
     private PermissionEffect unruledTools = PermissionEffect.ALLOW;
-    private NamespaceProvider namespaces = NamespaceProvider.fixed("default");
+    private ScopeSupplier scope = ScopeSupplier.fixed(new Namespace("default"));
     private ApprovalMemory approvals;
-    private UserProvider users;
     private TaskQueue taskQueue;
 
     AgentRuntimeBuilder() {
@@ -128,22 +127,14 @@ public final class AgentRuntimeBuilder {
     }
 
     /**
-     * Who says which namespace the running code works in. One fixed
-     * namespace unless said otherwise: a program that embeds the runtime
-     * for itself has no tenants.
+     * Who says which namespace the running code works in, and for a host
+     * that knows its users, who acts: a turn runs in the namespace and as
+     * the user of the call that submitted it. One fixed namespace and
+     * nobody acting unless said otherwise: a program that embeds the
+     * runtime for itself has no tenants.
      */
-    public AgentRuntimeBuilder namespaces(NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
-        return this;
-    }
-
-    /**
-     * Who acts in a call, for a host that knows its users: a turn runs as
-     * the user who was acting when it was submitted. Without it nobody is
-     * known.
-     */
-    public AgentRuntimeBuilder users(UserProvider users) {
-        this.users = users;
+    public AgentRuntimeBuilder scope(ScopeSupplier scope) {
+        this.scope = scope;
         return this;
     }
 
@@ -185,15 +176,11 @@ public final class AgentRuntimeBuilder {
     public AgentRuntime build() {
         TaskQueue queue = taskQueue != null ? taskQueue : new LocalTaskQueue(new InMemoryTaskStore());
         PluginRegistry registry = new DefaultPluginRegistry();
-        NamespaceProvider namespaces = this.namespaces;
-        UserProvider users = this.users;
+        ScopeSupplier scope = this.scope;
         List<Plugin> plugins = new ArrayList<>(List.of(
                 provides("host", into -> {
-                    into.provide(NamespaceProvider.class, () -> namespaces);
+                    into.provide(ScopeSupplier.class, () -> scope);
                     into.provide(TaskQueue.class, () -> queue);
-                    if (users != null) {
-                        into.provide(UserProvider.class, () -> users);
-                    }
                 }),
                 sessionStore));
         if (model != null) {
@@ -210,12 +197,12 @@ public final class AgentRuntimeBuilder {
                 // The JVM's zone for everyone: an embedding without users of its own.
                 new PromptPlugin(java.time.Clock.systemUTC(), user -> java.time.ZoneId.systemDefault()),
                 new SkillPlugin(),
-                new ToolSearchPlugin(new InMemoryToolActivation(namespaces)),
+                new ToolSearchPlugin(new InMemoryToolActivation(scope)),
                 // Everything: an embedding keeps nothing of one session alone in its metadata.
                 new SubAgentPlugin(key -> true, SubAgentPlugin.DEFAULT_MAX_DEPTH),
                 new PermissionPlugin(unruledTools,
-                        approvals != null ? approvals : new InMemoryApprovalMemory(namespaces)),
-                new MemoryPlugin(new InMemorySummaryStore(namespaces)),
+                        approvals != null ? approvals : new InMemoryApprovalMemory(scope)),
+                new MemoryPlugin(new InMemorySummaryStore(scope)),
                 new TracePlugin(new LoggingTraceSink()),
                 new InputGuardPlugin(),
                 new OutputGuardPlugin(),

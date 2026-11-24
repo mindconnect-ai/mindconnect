@@ -18,7 +18,7 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionLifecycleListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionStreamListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 
@@ -47,7 +47,7 @@ public final class SessionEventHub implements SessionEventPublisher {
     private record Listening<L>(String namespace, Predicate<Session> wants, L listener) { }
 
     private final SessionStore sessions;
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
     private final Supplier<List<SessionEventListener>> contributed;
     private final List<Listening<SessionLifecycleListener>> lifecycle = new CopyOnWriteArrayList<>();
     private final List<Listening<SessionStreamListener>> stream = new CopyOnWriteArrayList<>();
@@ -58,10 +58,10 @@ public final class SessionEventHub implements SessionEventPublisher {
      * @param sessions    where a session's parent is looked up
      * @param contributed the listeners plugins contributed, which hear every session
      */
-    public SessionEventHub(SessionStore sessions, NamespaceProvider namespaces,
+    public SessionEventHub(SessionStore sessions, ScopeSupplier scope,
                            Supplier<List<SessionEventListener>> contributed) {
         this.sessions = sessions;
-        this.namespaces = namespaces;
+        this.scope = scope;
         this.contributed = contributed;
     }
 
@@ -81,7 +81,7 @@ public final class SessionEventHub implements SessionEventPublisher {
 
     private <L> Subscription listen(List<Listening<L>> listeners, Predicate<Session> wants, L listener) {
         // Heard from the subscriber's namespace only: the same session id elsewhere is another session.
-        Listening<L> listening = new Listening<>(namespaces.current(), wants, listener);
+        Listening<L> listening = new Listening<>(scope.namespace().value(), wants, listener);
         listeners.add(listening);
         return () -> listeners.remove(listening);
     }
@@ -92,7 +92,7 @@ public final class SessionEventHub implements SessionEventPublisher {
     }
 
     void publish(Session session, SessionEvent event) {
-        String namespace = namespaces.current();
+        String namespace = scope.namespace().value();
         contributed.get().forEach(listener -> tell(() -> listener.onEvent(event), event));
         // Each family to its own listeners: a fragment never reaches whoever follows a list of sessions.
         switch (event) {
@@ -119,7 +119,7 @@ public final class SessionEventHub implements SessionEventPublisher {
     }
 
     private List<SessionId> ancestorsOf(Session session) {
-        return ancestors.computeIfAbsent(namespaces.current() + "/" + session.id().value(), id -> {
+        return ancestors.computeIfAbsent(scope.namespace().value() + "/" + session.id().value(), id -> {
             List<SessionId> above = new ArrayList<>();
             SessionId parentId = session.parentId();
             while (parentId != null) {

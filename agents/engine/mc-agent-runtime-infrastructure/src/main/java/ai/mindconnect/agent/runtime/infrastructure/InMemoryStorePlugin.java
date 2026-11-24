@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
@@ -55,10 +54,10 @@ public final class InMemoryStorePlugin extends StorePlugin {
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }
             @Override public ConversationRepository conversations() { return messages.conversationRepository(); }
             @Override public MessageRepository messages() { return messages.messageRepository(); }
-            @Override public SessionRepository sessions(NamespaceProvider namespaces) {
+            @Override public SessionRepository sessions(ScopeSupplier namespaces) {
                 return new InMemorySessionRepository(namespaces);
             }
-            @Override public AgentRepository agents(NamespaceProvider namespaces) {
+            @Override public AgentRepository agents(ScopeSupplier namespaces) {
                 return new InMemoryAgentRepository(namespaces);
             }
             @Override public SkillRepository skills() { return new InMemorySkillRepository(scope); }

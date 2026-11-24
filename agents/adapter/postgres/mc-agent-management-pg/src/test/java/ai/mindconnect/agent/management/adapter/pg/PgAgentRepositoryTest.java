@@ -19,7 +19,8 @@ import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 
 /**
@@ -47,7 +48,7 @@ class PgAgentRepositoryTest {
 
     private AgentManagement in(String namespace) {
         return new RepositoryAgentManagement(
-                new PgAgentRepository(sql, NamespaceProvider.fixed(namespace)).initSchema());
+                new PgAgentRepository(sql, ScopeSupplier.fixed(new Namespace(namespace))).initSchema());
     }
 
     private static AgentDefinition definition(String name) {

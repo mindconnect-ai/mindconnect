@@ -168,11 +168,9 @@ public class RuntimeEngineAutoConfiguration {
         ToolActivation activation = new SessionToolActivation(sessions);
 
         var builder = AgentRuntime.builder()
-                .namespaces(new ScopeNamespaceProvider(scope))
-                .users(new ScopeUserProvider(scope))
+                .scope(scope)
                 .taskQueue(queue)
                 .plugin(provides("scope", registry -> {
-                    registry.provide(ScopeSupplier.class, () -> scope);
                     registry.provide(ToolActivation.class, () -> activation);
                     // The model of what the runtime does on its own account: a title, a summary.
                     Optional.ofNullable(blankToNull(env.getProperty("mindconnect.agent.stateless.llm-config-name")))

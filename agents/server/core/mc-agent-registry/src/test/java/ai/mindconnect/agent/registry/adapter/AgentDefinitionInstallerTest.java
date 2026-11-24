@@ -12,7 +12,8 @@ import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import java.util.Map;
@@ -49,7 +50,7 @@ class AgentDefinitionInstallerTest {
 
     @BeforeEach
     void setUp() {
-        repository = new RepositoryAgentManagement(new InMemoryAgentRepository(NamespaceProvider.fixed("test")));
+        repository = new RepositoryAgentManagement(new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))));
         installer = new AgentDefinitionInstaller(repository);
     }
 

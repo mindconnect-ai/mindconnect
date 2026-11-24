@@ -27,7 +27,6 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
@@ -41,7 +40,7 @@ import ai.mindconnect.message.port.out.MessageRepository;
 /** The same store over both kinds of repository: what goes in comes back as it was. */
 class RepositorySessionStoreTest {
 
-    private static final NamespaceProvider NAMESPACES = NamespaceProvider.fixed("test");
+    private static final ScopeSupplier NAMESPACES = ScopeSupplier.fixed(new Namespace("test"));
     private static final SessionId ID = SessionId.of("s1");
     private static final Session SESSION = new Session(ID, UserId.of("ada"), null,
             new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.ofModel("small"),
@@ -53,7 +52,7 @@ class RepositorySessionStoreTest {
     static Path directory;
 
     static Stream<SessionStore> stores() {
-        ScopeSupplier scope = RepositorySessionStore.scopeOf(NAMESPACES);
+        ScopeSupplier scope = NAMESPACES;
         ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
         return Stream.of(
                 new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES),
@@ -158,7 +157,7 @@ class RepositorySessionStoreTest {
 
     @Test
     void a_message_written_the_earlier_way_reads_with_its_media_and_the_call_its_result_answers() {
-        InMemoryMessageRepository messages = new InMemoryMessageRepository(RepositorySessionStore.scopeOf(NAMESPACES));
+        InMemoryMessageRepository messages = new InMemoryMessageRepository(NAMESPACES);
         SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages);
         store.create(SESSION);
         ai.mindconnect.message.domain.ConversationId conversation = RepositorySessionStore.conversationOf(SESSION);

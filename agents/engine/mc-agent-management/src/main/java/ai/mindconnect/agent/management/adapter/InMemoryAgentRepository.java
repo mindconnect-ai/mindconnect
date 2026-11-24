@@ -9,7 +9,7 @@ import java.util.function.UnaryOperator;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 
 /** Agents that live as long as the process: for a program that defines its agents in code, and for tests. */
 public final class InMemoryAgentRepository implements AgentRepository {
@@ -18,14 +18,14 @@ public final class InMemoryAgentRepository implements AgentRepository {
     private record Key(String namespace, AgentId id) { }
 
     private final Map<Key, ManagedAgent> agents = new ConcurrentHashMap<>();
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    public InMemoryAgentRepository(NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
+    public InMemoryAgentRepository(ScopeSupplier scope) {
+        this.scope = scope;
     }
 
     private Key key(AgentId id) {
-        return new Key(namespaces.current(), id);
+        return new Key(scope.namespace().value(), id);
     }
 
     @Override
@@ -43,7 +43,7 @@ public final class InMemoryAgentRepository implements AgentRepository {
 
     @Override
     public List<ManagedAgent> findAll() {
-        String namespace = namespaces.current();
+        String namespace = scope.namespace().value();
         return agents.entrySet().stream()
                 .filter(entry -> entry.getKey().namespace().equals(namespace))
                 .map(Map.Entry::getValue)

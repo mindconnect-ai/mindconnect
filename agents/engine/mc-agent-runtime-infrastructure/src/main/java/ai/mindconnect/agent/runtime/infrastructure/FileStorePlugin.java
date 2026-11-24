@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.management.adapter.FileAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.FileSessionRepository;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.skill.adapter.FileSkillRepository;
@@ -59,10 +58,10 @@ public final class FileStorePlugin extends StorePlugin {
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }
             @Override public ConversationRepository conversations() { return messages.conversationRepository(); }
             @Override public MessageRepository messages() { return messages.messageRepository(); }
-            @Override public SessionRepository sessions(NamespaceProvider namespaces) {
+            @Override public SessionRepository sessions(ScopeSupplier namespaces) {
                 return new FileSessionRepository(dataDir, json, namespaces);
             }
-            @Override public AgentRepository agents(NamespaceProvider namespaces) {
+            @Override public AgentRepository agents(ScopeSupplier namespaces) {
                 return new FileAgentRepository(dataDir, json, namespaces);
             }
             @Override public SkillRepository skills() { return new FileSkillRepository(dataDir, json, scope); }

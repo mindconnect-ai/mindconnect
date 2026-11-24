@@ -15,7 +15,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
@@ -52,11 +52,11 @@ final class TurnTaskMapper {
     private static final TurnMessageConverter MESSAGES = new TurnMessageConverter();
 
     private final TaskQueue queue;
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    TurnTaskMapper(TaskQueue queue, NamespaceProvider namespaces) {
+    TurnTaskMapper(TaskQueue queue, ScopeSupplier scope) {
         this.queue = queue;
-        this.namespaces = namespaces;
+        this.scope = scope;
     }
 
     // ── a turn as a task ────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ final class TurnTaskMapper {
         // A turn of another namespace does not exist for whoever asks from here, however it came by the id.
         return queue.get(turnId.value())
                 .filter(task -> TYPE.equals(task.type()))
-                .filter(task -> namespaces.current().equals(task.payload().get(CallerBoundWorker.NAMESPACE)))
+                .filter(task -> scope.namespace().value().equals(task.payload().get(CallerBoundWorker.NAMESPACE)))
                 .map(this::turn);
     }
 

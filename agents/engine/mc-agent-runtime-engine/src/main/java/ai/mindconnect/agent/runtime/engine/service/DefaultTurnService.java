@@ -20,8 +20,7 @@ import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
-import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.taskqueue.SharedStateStore;
@@ -52,8 +51,7 @@ public final class DefaultTurnService implements TurnService {
     private final SessionStore sessionStore;
     private final TaskQueue queue;
     private final TurnTaskMapper turns;
-    private final NamespaceProvider namespaces;
-    private final UserProvider users;
+    private final ScopeSupplier scope;
     private final SessionTurnOrder order;
     private final TurnEventHub events;
     private final SessionEventHub sessionEvents;
@@ -66,14 +64,12 @@ public final class DefaultTurnService implements TurnService {
      *                    publish to, which is where subscribers are heard
      */
     DefaultTurnService(TurnAcceptor acceptor, SessionStore sessionStore, TaskQueue queue,
-                       SharedStateStore sharedState, EventDelivery events, NamespaceProvider namespaces,
-                       UserProvider users) {
+                       SharedStateStore sharedState, EventDelivery events, ScopeSupplier scope) {
         this.acceptor = acceptor;
         this.sessionStore = sessionStore;
         this.queue = queue;
-        this.turns = new TurnTaskMapper(queue, namespaces);
-        this.users = users;
-        this.namespaces = namespaces;
+        this.turns = new TurnTaskMapper(queue, scope);
+        this.scope = scope;
         this.order = new SessionTurnOrder(sharedState);
         this.events = events.toTurnListeners();
         this.sessionEvents = events.toSessionListeners();
@@ -84,9 +80,9 @@ public final class DefaultTurnService implements TurnService {
         TurnAcceptor.Accepted accepted = acceptor.accept(request);
         Turn turn = accepted.turn();
         // Noted here, where the caller's namespace and user are current; the workers that run the turn bind them again.
-        Map<String, Object> caller = CallerBoundWorker.caller(namespaces, users);
+        Map<String, Object> caller = CallerBoundWorker.caller(scope);
         queue.submit(TurnTaskMapper.submission(accepted,
-                order.enqueue(namespaces.current(), turn.sessionId(), turn.id()), caller));
+                order.enqueue(scope.namespace().value(), turn.sessionId(), turn.id()), caller));
         return turn.id();
     }
 
@@ -99,7 +95,7 @@ public final class DefaultTurnService implements TurnService {
     public Optional<Turn> runningTurn(SessionId sessionId) {
         // From the end of the session's line back to the first turn that has not ended.
         Optional<Turn> running = Optional.empty();
-        Optional<TurnId> next = order.last(namespaces.current(), sessionId);
+        Optional<TurnId> next = order.last(scope.namespace().value(), sessionId);
         while (next.isPresent()) {
             Optional<Turn> turn = turns.turn(next.get()).filter(found -> !found.status().isFinal());
             if (turn.isEmpty()) {

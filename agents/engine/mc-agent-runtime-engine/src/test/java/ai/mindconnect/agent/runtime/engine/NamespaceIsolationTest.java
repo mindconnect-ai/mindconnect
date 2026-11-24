@@ -30,7 +30,9 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.capabilities.permission.InMemoryApprovalMemory;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
@@ -38,7 +40,6 @@ import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptPlugin;
-import ai.mindconnect.agent.runtime.engine.adapter.namespace.ThreadBoundNamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
@@ -66,7 +67,9 @@ class NamespaceIsolationTest {
 
     private final Deque<TurnMessage> script = new ArrayDeque<>();
     private final List<ModelRequest> requests = new CopyOnWriteArrayList<>();
-    private final NamespaceProvider namespaces = new ThreadBoundNamespaceProvider();
+    /** The organisation in the scope of each model call, in order. */
+    private final List<String> organisations = new CopyOnWriteArrayList<>();
+    private final ScopeSupplier namespaces = new ThreadBoundScope();
     private final LocalTaskQueue queue = new LocalTaskQueue(new InMemoryTaskStore());
     private final PluginRegistry registry = new DefaultPluginRegistry();
     private TurnService turns;
@@ -74,11 +77,12 @@ class NamespaceIsolationTest {
     @BeforeEach
     void assemble_a_runtime_for_several_namespaces() {
         registry.install(provides(into -> {
-            into.provide(NamespaceProvider.class, () -> namespaces);
+            into.provide(ScopeSupplier.class, () -> namespaces);
             into.provide(ModelGateway.class, () -> new ModelGateway() {
                 @Override
                 public synchronized LlmAnswer ask(ModelRequest request, TurnEventListener events) {
                     requests.add(request);
+                    organisations.add(namespaces.get().attribute("organisation").orElse("none"));
                     return LlmAnswer.of(List.of(script.pop()), new Usage(10, 1));
                 }
 
@@ -139,6 +143,21 @@ class NamespaceIsolationTest {
     }
 
     @Test
+    void a_turn_its_tool_call_and_its_sub_agent_act_in_the_whole_scope_it_was_submitted_in() throws Exception {
+        script.add(TurnMessage.toolCalls(List.of(
+                new TurnMessage.ToolCall("c1", "run_agent", Map.of("name", "researcher", "message", "Find it.")))));
+        script.add(TurnMessage.assistant("Found."));
+        script.add(TurnMessage.assistant("Answer."));
+        Scope submitted = Scope.of(new Namespace("a"), UserId.of("ada")).withAttribute("organisation", "acme");
+
+        Turn turn = namespaces.callIn(submitted, () -> awaitEnd(turns.submit(TurnRequest.text(SAME_ID, "Question"))));
+
+        assertThat(turn.status()).isEqualTo(TurnStatus.COMPLETED);
+        // The lead's call, the sub-agent's — submitted by the tool call — and the lead's answer.
+        assertThat(organisations).containsExactly("acme", "acme", "acme");
+    }
+
+    @Test
     void a_turn_does_not_exist_for_another_namespace() {
         script.add(TurnMessage.assistant("Answer for A."));
         Turn inA = in("a", () -> awaitEnd(turns.submit(TurnRequest.text(SAME_ID, "Question of A"))));
@@ -158,7 +177,47 @@ class NamespaceIsolationTest {
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private <T> T in(String namespace, Supplier<T> body) {
-        return namespaces.callIn(namespace, body);
+        try {
+            return namespaces.callIn(Scope.of(new Namespace(namespace)), body::get);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * The scope of the thread, as a server binds it: for the length of a
+     * request by whoever receives it, and by the engine's workers for the
+     * length of a task. A thread nobody bound has none and is told so.
+     */
+    private static final class ThreadBoundScope implements ScopeSupplier {
+
+        private final ThreadLocal<Scope> bound = new ThreadLocal<>();
+
+        @Override
+        public Scope get() {
+            Scope scope = bound.get();
+            if (scope == null) {
+                throw new IllegalStateException("No namespace is bound to this thread");
+            }
+            return scope;
+        }
+
+        @Override
+        public <T> T callIn(Scope scope, java.util.concurrent.Callable<T> body) throws Exception {
+            Scope before = bound.get();
+            bound.set(scope);
+            try {
+                return body.call();
+            } finally {
+                if (before == null) {
+                    bound.remove();
+                } else {
+                    bound.set(before);
+                }
+            }
+        }
     }
 
     private List<String> conversation() {

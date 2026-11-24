@@ -3,9 +3,10 @@ package ai.mindconnect.agent.runtime.engine.service;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
-import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskRecord;
@@ -24,22 +25,30 @@ final class CallerBoundWorker implements TaskWorker {
     static final String NAMESPACE = "namespace";
     /** The payload key of the user who acted when the task's turn was submitted; absent where nobody was known. */
     static final String USER = "user";
+    /**
+     * The payload key of what else the caller's scope carried — a host's own
+     * attributes, such as the organisation a user works in; absent where
+     * there were none. Text by text, so a task store keeps them as they are.
+     */
+    static final String ATTRIBUTES = "attributes";
 
     private final TaskWorker worker;
-    private final NamespaceProvider namespaces;
-    private final UserProvider users;
+    private final ScopeSupplier scope;
 
-    CallerBoundWorker(TaskWorker worker, NamespaceProvider namespaces, UserProvider users) {
+    CallerBoundWorker(TaskWorker worker, ScopeSupplier scope) {
         this.worker = worker;
-        this.namespaces = namespaces;
-        this.users = users;
+        this.scope = scope;
     }
 
     /** Who is submitting right now, as the entries a new task's payload carries. */
-    static Map<String, Object> caller(NamespaceProvider namespaces, UserProvider users) {
+    static Map<String, Object> caller(ScopeSupplier scope) {
         Map<String, Object> caller = new LinkedHashMap<>();
-        caller.put(NAMESPACE, namespaces.current());
-        users.current().ifPresent(user -> caller.put(USER, user.value()));
+        Scope current = scope.get();
+        caller.put(NAMESPACE, current.namespace().value());
+        current.userIfAny().ifPresent(user -> caller.put(USER, user.value()));
+        if (!current.attributes().isEmpty()) {
+            caller.put(ATTRIBUTES, Map.copyOf(current.attributes()));
+        }
         return caller;
     }
 
@@ -50,6 +59,9 @@ final class CallerBoundWorker implements TaskWorker {
         if (task.payload().get(USER) != null) {
             caller.put(USER, task.payload().get(USER));
         }
+        if (task.payload().get(ATTRIBUTES) != null) {
+            caller.put(ATTRIBUTES, task.payload().get(ATTRIBUTES));
+        }
         return caller;
     }
 
@@ -58,21 +70,12 @@ final class CallerBoundWorker implements TaskWorker {
         if (!(ctx.task().payload().get(NAMESPACE) instanceof String namespace)) {
             throw new IllegalStateException("Task " + ctx.task().id() + " carries no namespace");
         }
-        // The providers' bodies cannot throw a checked exception; the worker's is carried out and thrown again.
-        Object result = namespaces.callIn(namespace, () -> ctx.task().payload().get(USER) instanceof String user
-                ? users.callAs(UserId.of(user), () -> run(ctx))
-                : run(ctx));
-        if (result instanceof Exception failure) {
-            throw failure;
+        Map<String, String> attributes = new LinkedHashMap<>();
+        if (ctx.task().payload().get(ATTRIBUTES) instanceof Map<?, ?> carried) {
+            carried.forEach((key, value) -> attributes.put(String.valueOf(key), String.valueOf(value)));
         }
-        return (TaskOutcome) result;
-    }
-
-    private Object run(TaskContext ctx) {
-        try {
-            return worker.execute(ctx);
-        } catch (Exception e) {
-            return e;
-        }
+        Scope caller = new Scope(new Namespace(namespace),
+                ctx.task().payload().get(USER) instanceof String user ? UserId.of(user) : null, attributes);
+        return scope.callIn(caller, () -> worker.execute(ctx));
     }
 }

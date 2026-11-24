@@ -3,7 +3,7 @@ package ai.mindconnect.agent.management.directory;
 import java.nio.file.Path;
 
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
@@ -45,7 +45,7 @@ public final class DirectoryPlugin implements Plugin {
     public void install(PluginRegistry registry) {
         // Under the namespace the current call works in, so every namespace has its own homes.
         registry.provide(UserHome.class, () -> usersHome != null && !usersHome.isBlank() ? UserHome.of(usersHome)
-                : UserHome.underCurrent(() -> dataDir.resolve(registry.get(NamespaceProvider.class).current())
+                : UserHome.underCurrent(() -> dataDir.resolve(registry.get(ScopeSupplier.class).namespace().value())
                         .toAbsolutePath()));
         registry.provide(WorkingDirPolicy.class, () -> {
             // The home template is asked per call, not now: there is no namespace yet.

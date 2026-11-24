@@ -34,7 +34,8 @@ import ai.mindconnect.agent.runtime.api.hook.AgentContext;
 import ai.mindconnect.agent.runtime.api.hook.ModelCall;
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.TokenCounter;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
@@ -112,7 +113,7 @@ class MemoryPluginTest {
                 throw new UnsupportedOperationException();
             }
         });
-        registry.install(new MemoryPlugin(new InMemorySummaryStore(NamespaceProvider.fixed("test"))));
+        registry.install(new MemoryPlugin(new InMemorySummaryStore(ScopeSupplier.fixed(new Namespace("test")))));
         registry.start();
     }
 

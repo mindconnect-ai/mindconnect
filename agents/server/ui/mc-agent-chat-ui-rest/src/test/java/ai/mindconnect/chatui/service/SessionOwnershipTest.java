@@ -12,7 +12,6 @@ import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
@@ -38,11 +37,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SessionOwnershipTest {
 
-    private final InMemorySessionRepository stored = new InMemorySessionRepository(NamespaceProvider.fixed("test"));
+    private final InMemorySessionRepository stored = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
     private final InMemoryMessageRepository messages =
             new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
     private final SessionManagement management = new RepositorySessionManagement(stored, messages,
-            new InMemoryAgentRepository(NamespaceProvider.fixed("test")), SessionDirectoryPolicy.unrestricted(),
+            new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
             List.of());
     private final SessionOwnership ownership = new SessionOwnership(runtimeOver(management));
 

@@ -136,3 +136,9 @@
 - `Email` moved from `mc-agent-domain` (`ai.mindconnect.agent`) to
   `mc-namespace-core` (`ai.mindconnect.namespace.domain`): only the
   namespaces' member lists use it.
+- The runtime asks the `ScopeSupplier` which namespace it works in and who
+  acts, like every store does; its own `NamespaceProvider` and `UserProvider`
+  are gone. `AgentRuntime.builder()` takes one `scope(ScopeSupplier)` in
+  place of `namespaces(...)` and `users(...)`. A turn, its tool calls, its
+  sub-agents and its background work run in the whole scope the turn was
+  submitted in — namespace, user and the host's attributes.

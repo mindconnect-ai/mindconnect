@@ -7,7 +7,7 @@ import java.util.function.UnaryOperator;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
@@ -22,13 +22,13 @@ import ai.mindconnect.jdbc.Sql;
 public final class PgSessionRepository implements SessionRepository {
 
     private final DocumentTable<Session> sessions;
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    public PgSessionRepository(Sql sql, NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
+    public PgSessionRepository(Sql sql, ScopeSupplier scope) {
+        this.scope = scope;
         this.sessions = DocumentTable.of(Session.class)
                 .table("mc_session")
-                .partitionKey("namespace", "TEXT", session -> namespaces.current())
+                .partitionKey("namespace", "TEXT", session -> scope.namespace().value())
                 .id("id", "TEXT", session -> session.id().value())
                 .column("user_id", "TEXT", session -> session.userId().value())
                 .column("parent_id", "TEXT", session -> session.parentId() == null ? null : session.parentId().value())
@@ -54,29 +54,29 @@ public final class PgSessionRepository implements SessionRepository {
 
     @Override
     public Optional<Session> find(SessionId id) {
-        return sessions.findById(namespaces.current(), id.value());
+        return sessions.findById(scope.namespace().value(), id.value());
     }
 
     /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
     @Override
     public Optional<Session> update(SessionId id, UnaryOperator<Session> change) {
-        return sessions.update(namespaces.current(), id.value(), change);
+        return sessions.update(scope.namespace().value(), id.value(), change);
     }
 
     @Override
     public List<Session> findByUser(UserId user) {
         return sessions.find("WHERE namespace = ? AND user_id = ? AND parent_id IS NULL "
-                + "ORDER BY created_at DESC, id", namespaces.current(), user.value());
+                + "ORDER BY created_at DESC, id", scope.namespace().value(), user.value());
     }
 
     @Override
     public List<Session> findByParent(SessionId parent) {
         return sessions.find("WHERE namespace = ? AND parent_id = ? ORDER BY created_at, id",
-                namespaces.current(), parent.value());
+                scope.namespace().value(), parent.value());
     }
 
     @Override
     public boolean delete(SessionId id) {
-        return sessions.deleteById(namespaces.current(), id.value());
+        return sessions.deleteById(scope.namespace().value(), id.value());
     }
 }

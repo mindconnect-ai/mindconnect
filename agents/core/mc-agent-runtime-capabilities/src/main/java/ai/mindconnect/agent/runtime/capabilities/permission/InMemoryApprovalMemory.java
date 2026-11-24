@@ -4,21 +4,21 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 
 /** Approvals that live as long as the process. */
 public final class InMemoryApprovalMemory implements ApprovalMemory {
 
     private final Set<String> approved = ConcurrentHashMap.newKeySet();
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    public InMemoryApprovalMemory(NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
+    public InMemoryApprovalMemory(ScopeSupplier scope) {
+        this.scope = scope;
     }
 
     /** A session id means something only within its namespace. */
     private String key(SessionId sessionId, String toolName) {
-        return namespaces.current() + "/" + sessionId.value() + "/" + toolName;
+        return scope.namespace().value() + "/" + sessionId.value() + "/" + toolName;
     }
 
     @Override

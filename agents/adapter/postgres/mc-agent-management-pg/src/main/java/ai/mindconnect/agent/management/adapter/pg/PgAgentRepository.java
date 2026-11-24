@@ -7,7 +7,7 @@ import java.util.function.UnaryOperator;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 
@@ -20,13 +20,13 @@ import ai.mindconnect.jdbc.Sql;
 public final class PgAgentRepository implements AgentRepository {
 
     private final DocumentTable<ManagedAgent> agents;
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    public PgAgentRepository(Sql sql, NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
+    public PgAgentRepository(Sql sql, ScopeSupplier scope) {
+        this.scope = scope;
         this.agents = DocumentTable.of(ManagedAgent.class)
                 .table("mc_managed_agent")
-                .partitionKey("namespace", "TEXT", agent -> namespaces.current())
+                .partitionKey("namespace", "TEXT", agent -> scope.namespace().value())
                 .id("id", "TEXT", agent -> agent.id().value())
                 .column("name", "TEXT", agent -> agent.definition().name())
                 .index("namespace", "name")
@@ -49,22 +49,22 @@ public final class PgAgentRepository implements AgentRepository {
 
     @Override
     public Optional<ManagedAgent> find(AgentId id) {
-        return agents.findById(namespaces.current(), id.value());
+        return agents.findById(scope.namespace().value(), id.value());
     }
 
     @Override
     public List<ManagedAgent> findAll() {
-        return agents.find("WHERE namespace = ? ORDER BY name, id", namespaces.current());
+        return agents.find("WHERE namespace = ? ORDER BY name, id", scope.namespace().value());
     }
 
     /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
     @Override
     public Optional<ManagedAgent> update(AgentId id, UnaryOperator<ManagedAgent> change) {
-        return agents.update(namespaces.current(), id.value(), change);
+        return agents.update(scope.namespace().value(), id.value(), change);
     }
 
     @Override
     public boolean delete(AgentId id) {
-        return agents.deleteById(namespaces.current(), id.value());
+        return agents.deleteById(scope.namespace().value(), id.value());
     }
 }

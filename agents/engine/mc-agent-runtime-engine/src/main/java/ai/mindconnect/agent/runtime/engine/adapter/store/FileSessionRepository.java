@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.filerepo.DocumentExistsException;
 import ai.mindconnect.filerepo.Documents;
@@ -32,11 +32,11 @@ public final class FileSessionRepository implements SessionRepository {
 
     private final Documents<SessionId, Session> sessions;
 
-    public FileSessionRepository(Path base, ObjectMapper json, NamespaceProvider namespaces) {
+    public FileSessionRepository(Path base, ObjectMapper json, ScopeSupplier scope) {
         this.sessions = Documents.of(Session.class)
                 .path((SessionId id) -> SESSIONS + "/" + id.value() + "/" + FILE_NAME)
                 // The partition of the namespace the current call works in.
-                .build(() -> FileRepo.open(base, namespaces.current()), json);
+                .build(() -> FileRepo.open(base, scope.namespace().value()), json);
     }
 
     @Override

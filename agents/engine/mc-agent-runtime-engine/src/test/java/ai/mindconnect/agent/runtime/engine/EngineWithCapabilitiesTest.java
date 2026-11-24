@@ -52,7 +52,8 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptPlugin;
@@ -125,7 +126,7 @@ class EngineWithCapabilitiesTest {
 
             @Override
             public void install(PluginRegistry into) {
-                into.provide(NamespaceProvider.class, () -> NamespaceProvider.fixed("test"));
+                into.provide(ScopeSupplier.class, () -> ScopeSupplier.fixed(new Namespace("test")));
             }
         });
         registry.install(new InMemorySessionStorePlugin());
@@ -147,9 +148,9 @@ class EngineWithCapabilitiesTest {
                 new SkillDefinition("citations", "How to cite sources.", "Cite like this.", List.of())));
         registry.contribute(ToolResolver.class, ToolResolver.of(List.of(tool("bash"), tool("read_pdf"))));
         registry.install(new SkillPlugin());
-        registry.install(new ToolSearchPlugin(new InMemoryToolActivation(NamespaceProvider.fixed("test"))));
+        registry.install(new ToolSearchPlugin(new InMemoryToolActivation(ScopeSupplier.fixed(new Namespace("test")))));
         registry.install(new SubAgentPlugin(key -> true, SubAgentPlugin.DEFAULT_MAX_DEPTH));
-        registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(NamespaceProvider.fixed("test"))));
+        registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(ScopeSupplier.fixed(new Namespace("test")))));
         registry.install(new TracePlugin(traces::add));
         registry.install(new InputGuardPlugin());
         registry.install(new OutputGuardPlugin());

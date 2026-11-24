@@ -78,7 +78,7 @@ class UserStreamTest {
             return TaskOutcome.done("ok");
         });
         monitor = new TaskMonitor(queue, TaskMonitorTest.runtimeWithAlicesSession(ALICE_SESSION,
-                ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider.fixed("test")));
+                ai.mindconnect.agent.ScopeSupplier.fixed(new ai.mindconnect.agent.Namespace("test"))));
         userChannels = new UserChannels();
         stream = new UserStream(Optional.of(monitor), userChannels, new ObjectMapper());
     }

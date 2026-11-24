@@ -7,8 +7,7 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWork;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWorker;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
-import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskQueue;
@@ -28,20 +27,17 @@ final class QueuedBackgroundWork implements BackgroundWork, TaskWorker {
 
     private final TaskQueue queue;
     private final Supplier<List<BackgroundWorker>> workers;
-    private final NamespaceProvider namespaces;
-    private final UserProvider users;
+    private final ScopeSupplier scope;
 
-    QueuedBackgroundWork(TaskQueue queue, Supplier<List<BackgroundWorker>> workers, NamespaceProvider namespaces,
-                         UserProvider users) {
+    QueuedBackgroundWork(TaskQueue queue, Supplier<List<BackgroundWorker>> workers, ScopeSupplier scope) {
         this.queue = queue;
-        this.namespaces = namespaces;
-        this.users = users;
+        this.scope = scope;
         this.workers = workers;
     }
 
     @Override
     public void submit(String workerName, Map<String, Object> payload) {
-        Map<String, Object> task = new LinkedHashMap<>(CallerBoundWorker.caller(namespaces, users));
+        Map<String, Object> task = new LinkedHashMap<>(CallerBoundWorker.caller(scope));
         task.put(WORKER, workerName);
         task.put(PAYLOAD, payload);
         queue.submit(TaskSubmission.of(TYPE, task));

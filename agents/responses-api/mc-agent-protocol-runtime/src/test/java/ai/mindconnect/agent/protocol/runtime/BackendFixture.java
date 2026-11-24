@@ -21,7 +21,6 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
@@ -43,12 +42,12 @@ final class BackendFixture implements AutoCloseable {
     private final AgentRuntime runtime;
 
     BackendFixture(List<Tool> tools) {
-        NamespaceProvider namespaces = NamespaceProvider.fixed("test");
+        ScopeSupplier namespaces = ScopeSupplier.fixed(new Namespace("test"));
         SessionRepository sessions = new InMemorySessionRepository(namespaces);
         AgentRepository agents = new InMemoryAgentRepository(namespaces);
         MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         var builder = AgentRuntime.builder()
-                .namespaces(namespaces)
+                .scope(namespaces)
                 .model(new ModelGateway() {
                     @Override
                     public LlmAnswer ask(ModelRequest request, TurnEventListener events) {

@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 
 /** Sessions that live as long as the process: for a library user who keeps nothing, and for tests. */
@@ -21,14 +21,14 @@ public final class InMemorySessionRepository implements SessionRepository {
     private record Key(String namespace, SessionId sessionId) { }
 
     private final Map<Key, Session> sessions = new ConcurrentHashMap<>();
-    private final NamespaceProvider namespaces;
+    private final ScopeSupplier scope;
 
-    public InMemorySessionRepository(NamespaceProvider namespaces) {
-        this.namespaces = namespaces;
+    public InMemorySessionRepository(ScopeSupplier scope) {
+        this.scope = scope;
     }
 
     private Key key(SessionId sessionId) {
-        return new Key(namespaces.current(), sessionId);
+        return new Key(scope.namespace().value(), sessionId);
     }
 
     @Override
@@ -71,7 +71,7 @@ public final class InMemorySessionRepository implements SessionRepository {
     }
 
     private Stream<Session> inThisNamespace() {
-        String namespace = namespaces.current();
+        String namespace = scope.namespace().value();
         return sessions.entrySet().stream()
                 .filter(entry -> entry.getKey().namespace().equals(namespace))
                 .map(Map.Entry::getValue);

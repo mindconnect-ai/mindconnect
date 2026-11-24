@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.pg.PgSessionRepository;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.runtime.infrastructure.StorePlugin;
@@ -80,10 +79,10 @@ public final class PostgresStorePlugin extends StorePlugin {
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }
             @Override public ConversationRepository conversations() { return messages.conversationRepository(); }
             @Override public MessageRepository messages() { return messages.messageRepository(); }
-            @Override public SessionRepository sessions(NamespaceProvider namespaces) {
+            @Override public SessionRepository sessions(ScopeSupplier namespaces) {
                 return new PgSessionRepository(sql, namespaces).initSchema();
             }
-            @Override public AgentRepository agents(NamespaceProvider namespaces) {
+            @Override public AgentRepository agents(ScopeSupplier namespaces) {
                 return new PgAgentRepository(sql, namespaces).initSchema();
             }
             @Override public SkillRepository skills() { return new PgSkillRepository(sql, scope).initSchema(); }

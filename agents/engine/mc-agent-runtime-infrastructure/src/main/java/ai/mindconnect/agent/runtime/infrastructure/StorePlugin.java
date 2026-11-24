@@ -4,7 +4,6 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
@@ -47,9 +46,9 @@ public abstract class StorePlugin implements Plugin {
 
         MessageRepository messages();
 
-        SessionRepository sessions(NamespaceProvider namespaces);
+        SessionRepository sessions(ScopeSupplier namespaces);
 
-        AgentRepository agents(NamespaceProvider namespaces);
+        AgentRepository agents(ScopeSupplier namespaces);
 
         SkillRepository skills();
 
@@ -91,7 +90,7 @@ public abstract class StorePlugin implements Plugin {
                 return made;
             }
         };
-        Supplier<NamespaceProvider> namespaces = registry.supplier(NamespaceProvider.class);
+        Supplier<ScopeSupplier> namespaces = registry.supplier(ScopeSupplier.class);
         // The store stays plain, the key wraps it: with an encryption key, credentials are kept encrypted.
         registry.provide(LlmConfigRepository.class, () -> registry.find(EncryptionHelper.class)
                 .<LlmConfigRepository>map(key -> new EncryptingLlmConfigRepository(stores.get().llmConfigs(), key))

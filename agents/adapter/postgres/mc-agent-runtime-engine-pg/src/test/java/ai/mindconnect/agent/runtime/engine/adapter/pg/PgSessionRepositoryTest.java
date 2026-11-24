@@ -19,7 +19,8 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 
 /**
@@ -52,7 +53,7 @@ class PgSessionRepositoryTest {
     }
 
     private PgSessionRepository in(String namespace) {
-        return new PgSessionRepository(sql, NamespaceProvider.fixed(namespace)).initSchema();
+        return new PgSessionRepository(sql, ScopeSupplier.fixed(new Namespace(namespace))).initSchema();
     }
 
     @Test

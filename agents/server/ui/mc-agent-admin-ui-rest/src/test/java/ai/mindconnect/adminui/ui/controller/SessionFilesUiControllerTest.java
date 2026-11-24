@@ -12,7 +12,6 @@ import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
-import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
@@ -68,10 +67,10 @@ class SessionFilesUiControllerTest {
         Files.writeString(work.resolve("page.html"), "<script>alert(1)</script>");
         root = work.toString();
 
-        var sessions = new InMemorySessionRepository(NamespaceProvider.fixed("test"));
+        var sessions = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
-                new InMemoryAgentRepository(NamespaceProvider.fixed("test")), SessionDirectoryPolicy.unrestricted(),
+                new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
                 List.of());
         var id = ai.mindconnect.agent.SessionId.of("s1");
         new RepositorySessionStore(sessions, messages).create(new Session(id,
