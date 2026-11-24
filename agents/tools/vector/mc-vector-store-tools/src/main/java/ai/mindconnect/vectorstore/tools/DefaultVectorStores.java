@@ -254,9 +254,11 @@ public final class DefaultVectorStores implements VectorStores {
     public void saveIndex(IndexDefinition index) {
         String password = index.password();
         // Kept encrypted like an LLM config's key; a ${VAR} placeholder stays as it is.
-        if (password != null && host.encryption() != null && !password.startsWith("enc:")
+        if (password != null && host.encryption() != null
                 && !ai.mindconnect.common.env.EnvVarResolver.containsPlaceholder(password)) {
-            index = index.withPassword(host.encryption().encryptTagged(password));
+            index = index.withPassword(password.startsWith(EncryptionHelper.ENC)
+                    ? host.encryption().reencryptEarlierScheme(password)
+                    : host.encryption().encryptTagged(password));
         }
         registry().saveIndex(index);
         Map<String, Opened> byName = opened.get(scope.namespace());

@@ -16,7 +16,10 @@ import java.util.Optional;
  * decryption happens at the gateway level via {@link EncryptionHelper#resolve}.
  * <p>
  * Keys already carrying an {@code enc:} or {@code plain:} prefix are stored
- * as-is so re-saving an already-encrypted config is idempotent.
+ * as-is so re-saving an already-encrypted config is idempotent — except an
+ * {@code enc:} key an earlier encryption scheme wrote, which is stored in the
+ * current one: the form hands the ciphertext back on every save, so it would
+ * never leave the store otherwise.
  */
 public class EncryptingLlmConfigRepository implements LlmConfigRepository {
 
@@ -55,8 +58,11 @@ public class EncryptingLlmConfigRepository implements LlmConfigRepository {
 
     private String encryptKey(String apiKey) {
         if (apiKey == null) return null;
-        if (apiKey.startsWith(EncryptionHelper.ENC) || apiKey.startsWith(EncryptionHelper.PLAIN)) {
-            return apiKey; // already tagged — don't double-encrypt
+        if (apiKey.startsWith(EncryptionHelper.ENC)) {
+            return encryption.reencryptEarlierScheme(apiKey); // already encrypted — don't double-encrypt
+        }
+        if (apiKey.startsWith(EncryptionHelper.PLAIN)) {
+            return apiKey;
         }
         if (EnvVarResolver.containsPlaceholder(apiKey)) {
             // ${VAR} reference — store verbatim. It is resolved at use time

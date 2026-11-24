@@ -7,6 +7,10 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.Test;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
@@ -61,6 +65,23 @@ class EncryptingLlmConfigRepositoryTest {
         String already = EncryptionHelper.ENC + "somebase64==";
         repo(delegate).save(withKey(already));
         assertThat(delegate.saved.apiKey()).isEqualTo(already);
+    }
+
+    @Test
+    void a_key_of_the_earlier_scheme_is_stored_in_the_current_one() throws Exception {
+        Cipher ecb = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        ecb.init(Cipher.ENCRYPT_MODE, new SecretKeySpec("0123456789abcdef".getBytes(StandardCharsets.UTF_8), "AES"));
+        String earlier = EncryptionHelper.ENC
+                + Base64.getEncoder().encodeToString(ecb.doFinal("sk-plain-secret".getBytes(StandardCharsets.UTF_8)));
+        var delegate = new CapturingRepo();
+
+        repo(delegate).save(withKey(earlier));
+        String rewritten = delegate.saved.apiKey();
+        repo(delegate).save(withKey(rewritten));
+
+        assertThat(rewritten).startsWith("enc:v2:");
+        assertThat(encryption.resolve(rewritten)).isEqualTo("sk-plain-secret");
+        assertThat(delegate.saved.apiKey()).isEqualTo(rewritten);
     }
 
     @Test

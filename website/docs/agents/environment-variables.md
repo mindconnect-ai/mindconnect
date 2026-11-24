@@ -80,6 +80,16 @@ one, the namespace's when it has one, and the server's otherwise; the
 `MINDCONNECT_ENCRYPTION_SECRET_KEY` and are never shown again once saved — the
 tables list names only. Removing a variable lets the next place answer.
 
+Every stored secret — these variables, an LLM config's literal API key, a
+connection's credentials, an OAuth client secret, a vector store's password —
+is encrypted with AES-GCM under that key, with a random nonce per value: the
+same secret stored twice looks different, and a stored value that was changed
+is refused rather than decrypted. A stored value reads `enc:v2:…`. Values
+written before 1.0 read `enc:…` without the `v2:` (AES in ECB mode); they are
+still read with the same key and are rewritten in the new form the next time
+their record is saved. Changing the key makes every stored secret unreadable —
+there is no key rotation.
+
 The lookup is pluggable: the gateways take an `EnvVarResolver`, the servers
 wire the chain above (`UserEnvVarResolver`, `NamespaceEnvVarResolver`,
 `EnvVarResolver.system()`), a library gets the process environment unless it
@@ -90,7 +100,7 @@ host may define an `EnvVarResolver` bean of its own.
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `MINDCONNECT_ENCRYPTION_SECRET_KEY` | _(none)_ | **Required.** Encrypts stored LLM credentials. No default on purpose — the app **fails to start** without it. Must be **16, 24 or 32 characters** (used directly as an AES key). |
+| `MINDCONNECT_ENCRYPTION_SECRET_KEY` | _(none)_ | **Required.** Encrypts every stored secret (AES-GCM, see [above](#your-own-and-your-namespaces-variables)). No default on purpose — the app **fails to start** without it. Must be **16, 24 or 32 characters** (used directly as an AES key). |
 | `MC_PERSISTENCE` | `file` | `file` keeps everything under `mindconnect.data.base-dir`; `postgres` keeps it in the database — see [Persistence](./persistence.md#postgres). Since 0.3.0. |
 | `MC_NAMESPACE` | `local` | The namespace this process runs in: file data lives under `<base-dir>/<namespace>/`, Postgres rows carry it in their key. One process serves one namespace. |
 | `MC_NAMESPACE_ADMINS` | _(empty)_ | Who shapes the default namespace — a comma-separated list of e-mail addresses. **Naming anybody closes it:** from then on being signed in is not the same as being let in, and an account listed in no namespace is turned away at `/no-access` (403 for the API) instead of landing in the default one. Empty keeps it open to every signed-in user, who is an admin there — a single-user installation and the dev mode as they always were. |
