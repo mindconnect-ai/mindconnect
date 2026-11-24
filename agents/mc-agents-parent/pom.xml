@@ -229,11 +229,6 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-agent-runtime-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-memory-strategies</artifactId>
                 <version>${project.version}</version>
             </dependency>
