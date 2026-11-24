@@ -6,7 +6,6 @@ ai.mindconnect.adminui.ui.controller.VectorStoreUiController depends on more tha
 ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend depends on more than 25 other classes of the project
 ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend$2 depends on more than 25 other classes of the project
 ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin depends on more than 25 other classes of the project
-ai.mindconnect.agent.runtime.engine.service.DefaultTurnService depends on more than 25 other classes of the project
 ai.mindconnect.agent.runtime.engine.service.EnginePlugin depends on more than 25 other classes of the project
 ai.mindconnect.agent.runtime.engine.service.TurnWorker depends on more than 25 other classes of the project
 ai.mindconnect.agent.runtime.infrastructure.LlmPlugin depends on more than 25 other classes of the project

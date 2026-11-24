@@ -50,12 +50,12 @@ final class TurnWorker implements TaskWorker {
     private final ToolResolver tools;
     private final ModelGateway gateway;
     private final HookRunner hooks;
-    private final EventDelivery events;
+    private final SessionEventHub events;
     private final TurnTaskMapper turns;
     private final InstructionRenderer instructions;
 
     TurnWorker(SessionStore sessions, ToolResolver tools, ModelGateway gateway, HookRunner hooks,
-               EventDelivery events, TurnTaskMapper turns, InstructionRenderer instructions) {
+               SessionEventHub events, TurnTaskMapper turns, InstructionRenderer instructions) {
         this.sessions = sessions;
         this.tools = tools;
         this.gateway = gateway;
@@ -97,13 +97,10 @@ final class TurnWorker implements TaskWorker {
                 turn.agent().maxRounds());
         ctx.onCancel(() -> loop.cancel(turnId.value()));
         SessionEventTranslator sessionEvents =
-                new SessionEventTranslator(events.toSessionListeners(), sessions, session, turn);
+                new SessionEventTranslator(events, sessions, session, turn, turns.withTurnsAbove(ctx.task()));
         TurnContext context = new TurnContext(turnId.value(), turn.sessionId().value(),
                 new StoredTurnJournal(sessions, turn.sessionId(), ctx::cancelRequested),
-                event -> {
-                    publish(ctx.task(), event);
-                    sessionEvents.translate(event);
-                }, List::of, List.of(new AnswerHookAdvisor(hooks, agentContext)));
+                sessionEvents::translate, List::of, List.of(new AnswerHookAdvisor(hooks, agentContext)));
 
         // Whether the turn has begun is what the session says, not how often
         // its task was woken: a turn that waited in line was woken and has
@@ -139,7 +136,7 @@ final class TurnWorker implements TaskWorker {
     private void ended(AgentContext context, Turn turn, TurnStatus status, TurnOutcome outcome, String error) {
         Turn ended = new Turn(turn.id(), turn.parent(), turn.sessionId(), turn.agent(), status,
                 List.of(), outcome, error);
-        events.toTurnListeners().finished(ended);
+        events.ended(context.session(), ended);
         hooks.run(RuntimeHook.TURN_END, context, asked -> ended);
     }
 
@@ -185,16 +182,6 @@ final class TurnWorker implements TaskWorker {
                 decisions.resultFromAnswer(interruptionId,
                         answer.get(InterruptionAnswer.TEXT) instanceof String said ? said : "");
             }
-        }
-    }
-
-    /** Tells the turn's own listeners, and those of every turn it runs under. */
-    private void publish(TaskRecord task, TurnEvent event) {
-        events.toTurnListeners().publish(TurnId.of(task.id()), event);
-        String parentId = task.parentTaskId();
-        while (parentId != null) {
-            events.toTurnListeners().publish(TurnId.of(parentId), event);
-            parentId = turns.parentOf(parentId);
         }
     }
 

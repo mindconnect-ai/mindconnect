@@ -601,6 +601,8 @@ class EngineWithCapabilitiesTest {
             Thread.sleep(10);
             turn = turns.find(turnId).orElseThrow();
         }
+        // A listener is told on a thread of its own, a moment after the turn stands still.
+        Thread.sleep(50);
         return turn;
     }
 

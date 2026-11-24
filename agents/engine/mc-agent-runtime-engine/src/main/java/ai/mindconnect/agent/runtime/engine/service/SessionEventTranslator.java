@@ -25,14 +25,18 @@ final class SessionEventTranslator {
     private final SessionStore sessions;
     private final Session session;
     private final Turn turn;
+    /** The turn and the turns it runs under, nearest first. */
+    private final List<TurnId> turns;
     /** Whether the agent's answer in the making has been announced. */
     private boolean answering;
 
-    SessionEventTranslator(SessionEventHub hub, SessionStore sessions, Session session, Turn turn) {
+    SessionEventTranslator(SessionEventHub hub, SessionStore sessions, Session session, Turn turn,
+                           List<TurnId> turns) {
         this.hub = hub;
         this.sessions = sessions;
         this.session = session;
         this.turn = turn;
+        this.turns = List.copyOf(turns);
     }
 
     /** One event of the loop: as it is, and as the events of the session it amounts to. */
@@ -113,7 +117,7 @@ final class SessionEventTranslator {
     }
 
     private void publish(SessionEvent event) {
-        hub.publish(session, event);
+        hub.publish(session, turns, event);
     }
 
     private static TurnStatus statusOf(TurnEvent.TurnEnded ended) {

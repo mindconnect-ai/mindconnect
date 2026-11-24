@@ -241,6 +241,13 @@ class NamespaceIsolationTest {
             }
             turn = turns.find(turnId).orElseThrow();
         }
+        // A listener is told on a thread of its own, a moment after the turn stands still.
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
         return turn;
     }
 

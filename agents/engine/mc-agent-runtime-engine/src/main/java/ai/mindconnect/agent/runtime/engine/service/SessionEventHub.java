@@ -1,40 +1,52 @@
 package ai.mindconnect.agent.runtime.engine.service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.Turn;
+import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionLifecycleListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionStreamListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.channel.Channel;
+import ai.mindconnect.channel.ChannelRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Hands session events to whoever listens, each of the two families to its
- * own listeners — of one session, a session with everything under it, a
- * user's sessions or all. The session
- * service subscribes here and the turn workers publish here, which is why
- * it is an object of its own that both are given.
+ * Hands the events of sessions and turns to whoever listens, through
+ * channels: one for the lifecycle of a namespace's sessions — few events,
+ * what a list of sessions follows — and one for the stream of each tree of
+ * sessions, a session with every session under it. The turn workers publish
+ * here; the session service and the turn service subscribe here.
+ *
+ * <p>A channel numbers what it is given, keeps the newest of it and gives
+ * each listener a queue and a thread of its own, so a slow listener costs
+ * the turn nothing: it is the listener that falls behind, and one that falls
+ * too far behind loses the oldest of what waited for it. A channel nobody
+ * listens to is given up after ten idle minutes.
  *
  * <p>A plugin hears every session without subscribing: a
  * {@link SessionEventListener} it contributes is told each event, of whatever
- * user and namespace, in the namespace the event happened in.
- *
- * <p>From now on, not from the beginning: a listener hears what happens
- * after it subscribed. What a session said before is in the session.
+ * user and namespace, in the namespace the event happened in and before
+ * anybody else is.
  *
  * <p>Events live in this object: a listener in another process hears
  * nothing.
@@ -42,15 +54,29 @@ import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 public final class SessionEventHub implements SessionEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(SessionEventHub.class);
+    private static final Duration IDLE = Duration.ofMinutes(10);
 
-    /** A listener of one of the two families and which sessions it wants to hear. */
-    private record Listening<L>(String namespace, Predicate<Session> wants, L listener) { }
+    /** What travels on a stream channel. */
+    private sealed interface Carried { }
+
+    /**
+     * An event with what a listener is chosen by: the session it happened
+     * in, the sessions above that one, and the turn it belongs to with the
+     * turns that one runs under.
+     */
+    private record Happened(Session session, List<SessionId> sessionsAbove, List<TurnId> turns, SessionEvent event)
+            implements Carried { }
+
+    /** A turn is over, as it ended: what whoever follows that turn is told last. */
+    private record Ended(Turn turn) implements Carried { }
+
+    /** Sent by a listener to itself: when it arrives, everything buffered before it has been heard. */
+    private record CaughtUp(Object listener) implements Carried { }
 
     private final SessionStore sessions;
     private final ScopeSupplier scope;
     private final Supplier<List<SessionEventListener>> contributed;
-    private final List<Listening<SessionLifecycleListener>> lifecycle = new CopyOnWriteArrayList<>();
-    private final List<Listening<SessionStreamListener>> stream = new CopyOnWriteArrayList<>();
+    private final ChannelRegistry channels = new ChannelRegistry().withIdleEviction(IDLE);
     /** For each session, the sessions it is under, nearest first. A session's parent never changes. */
     private final Map<String, List<SessionId>> ancestors = new ConcurrentHashMap<>();
 
@@ -65,57 +91,133 @@ public final class SessionEventHub implements SessionEventPublisher {
         this.contributed = contributed;
     }
 
-    /** The session, and with {@code childSessions} every session under it, however deep. */
-    Predicate<Session> under(SessionId sessionId, boolean childSessions) {
-        return session -> session.id().equals(sessionId)
-                || (childSessions && ancestorsOf(session).contains(sessionId));
-    }
-
+    /** Hears the lifecycle of the sessions of this namespace that {@code wants} picks, from now on. */
     Subscription lifecycle(Predicate<Session> wants, SessionLifecycleListener listener) {
-        return listen(lifecycle, wants, listener);
+        Channel<Happened> channel = lifecycleChannel();
+        return channel.subscribe(channel.lastSeq(), happened -> wants.test(happened.session()),
+                asSubscriber(happened -> listener.onEvent((SessionEvent.Lifecycle) happened.event())))::close;
     }
 
-    Subscription stream(Predicate<Session> wants, SessionStreamListener listener) {
-        return listen(stream, wants, listener);
+    /** Hears the lifecycle of one session, and with {@code childSessions} of every session under it. */
+    Subscription lifecycle(SessionId sessionId, boolean childSessions, SessionLifecycleListener listener) {
+        Channel<Happened> channel = lifecycleChannel();
+        return channel.subscribe(channel.lastSeq(), happened -> isUnder(happened, sessionId, childSessions),
+                asSubscriber(happened -> listener.onEvent((SessionEvent.Lifecycle) happened.event())))::close;
     }
 
-    private <L> Subscription listen(List<Listening<L>> listeners, Predicate<Session> wants, L listener) {
-        // Heard from the subscriber's namespace only: the same session id elsewhere is another session.
-        Listening<L> listening = new Listening<>(scope.namespace().value(), wants, listener);
-        listeners.add(listening);
-        return () -> listeners.remove(listening);
+    /** Hears one session as it happens, and with {@code childSessions} every session under it, from now on. */
+    Subscription stream(SessionId sessionId, boolean childSessions, SessionStreamListener listener) {
+        Channel<Carried> channel = streamChannel(rootOf(sessionId));
+        return channel.subscribe(channel.lastSeq(),
+                carried -> carried instanceof Happened happened && isUnder(happened, sessionId, childSessions),
+                asSubscriber(carried -> listener.onEvent((SessionEvent.Stream) ((Happened) carried).event())))::close;
+    }
+
+    /**
+     * Follows one turn: what the loop reports of it and of the turns it runs
+     * under it, then that it is over. A listener that comes late is told what
+     * the channel still keeps of the turn; one that comes after the turn has
+     * ended is told so all the same.
+     *
+     * @param turn how the turn stands when asked — the listener asks once it has caught up
+     */
+    Subscription follow(TurnId turnId, SessionId sessionId, Supplier<Optional<Turn>> turn, TurnListener listener) {
+        Channel<Carried> channel = streamChannel(rootOf(sessionId));
+        AtomicBoolean over = new AtomicBoolean();
+        Object self = new Object();
+        Subscription following = channel.subscribe(0,
+                carried -> switch (carried) {
+                    case Happened happened -> happened.turns().contains(turnId)
+                            && happened.event() instanceof SessionEvent.TurnReported;
+                    case Ended ended -> ended.turn().id().equals(turnId);
+                    case CaughtUp caughtUp -> caughtUp.listener() == self;
+                },
+                asSubscriber(carried -> {
+                    switch (carried) {
+                        case Happened happened -> {
+                            if (!over.get()) {
+                                listener.onEvent(((SessionEvent.TurnReported) happened.event()).event());
+                            }
+                        }
+                        case Ended ended -> {
+                            if (over.compareAndSet(false, true)) {
+                                listener.onFinished(ended.turn());
+                            }
+                        }
+                        // The end of a turn that ended long ago is no longer on the channel.
+                        case CaughtUp caughtUp -> turn.get().filter(now -> now.status().isFinal()).ifPresent(now -> {
+                            if (over.compareAndSet(false, true)) {
+                                listener.onFinished(now);
+                            }
+                        });
+                    }
+                }))::close;
+        channel.publish(new CaughtUp(self));
+        return following;
     }
 
     @Override
     public void publish(SessionEvent event) {
-        sessions.find(event.sessionId()).ifPresent(session -> publish(session, event));
+        sessions.find(event.sessionId()).ifPresent(session -> publish(session, List.of(), event));
     }
 
-    void publish(Session session, SessionEvent event) {
-        String namespace = scope.namespace().value();
-        contributed.get().forEach(listener -> tell(() -> listener.onEvent(event), event));
-        // Each family to its own listeners: a fragment never reaches whoever follows a list of sessions.
+    /**
+     * @param turns the turn the event belongs to and the turns that one runs
+     *              under, nearest first; empty for an event of no turn
+     */
+    void publish(Session session, List<TurnId> turns, SessionEvent event) {
+        contributed.get().forEach(listener -> tell(() -> listener.onEvent(event)));
+        Happened happened = new Happened(session, ancestorsOf(session), List.copyOf(turns), event);
+        // Each family to its own channel: a fragment never reaches whoever follows a list of sessions.
         switch (event) {
-            case SessionEvent.Lifecycle happened -> wanting(lifecycle, namespace, session)
-                    .forEach(listener -> tell(() -> listener.onEvent(happened), event));
-            case SessionEvent.Stream written -> wanting(stream, namespace, session)
-                    .forEach(listener -> tell(() -> listener.onEvent(written), event));
+            case SessionEvent.Lifecycle lifecycle -> lifecycleChannel().publish(happened);
+            case SessionEvent.Stream stream -> streamChannel(rootOf(session)).publish(happened);
         }
     }
 
-    private static <L> List<L> wanting(List<Listening<L>> listeners, String namespace, Session session) {
-        return listeners.stream()
-                .filter(listening -> listening.namespace().equals(namespace) && listening.wants().test(session))
-                .map(Listening::listener)
-                .toList();
+    /** The turn is over: whoever follows it is told, once and last. */
+    void ended(Session session, Turn turn) {
+        streamChannel(rootOf(session)).publish(new Ended(turn));
     }
 
-    private static void tell(Runnable listener, SessionEvent event) {
+    private static boolean isUnder(Happened happened, SessionId sessionId, boolean childSessions) {
+        return happened.session().id().equals(sessionId)
+                || (childSessions && happened.sessionsAbove().contains(sessionId));
+    }
+
+    /** Runs what a listener is told as whoever subscribed, on the listener's own thread. */
+    private <E> Consumer<Channel.Event<E>> asSubscriber(Consumer<E> told) {
+        Scope subscriber = scope.get();
+        return event -> scope.runIn(subscriber, () -> tell(() -> told.accept(event.value())));
+    }
+
+    private static void tell(Runnable listener) {
         try {
             listener.run();
         } catch (RuntimeException e) {
-            log.warn("Session event listener failed on {}: {}", event.getClass().getSimpleName(), e.toString());
+            log.warn("A session event listener failed: {}", e.toString());
         }
+    }
+
+    // Keyed by the namespace: the same session id elsewhere is another session.
+
+    private Channel<Happened> lifecycleChannel() {
+        return channels.channel("lifecycle/" + scope.namespace().value());
+    }
+
+    private Channel<Carried> streamChannel(SessionId root) {
+        return channels.channel("stream/" + scope.namespace().value() + "/" + root.value());
+    }
+
+    /** The session at the top of the tree this one is in. */
+    private SessionId rootOf(Session session) {
+        List<SessionId> above = ancestorsOf(session);
+        return above.isEmpty() ? session.id() : above.get(above.size() - 1);
+    }
+
+    /** As {@link #rootOf(Session)}; the session itself, for one nobody knows. */
+    private SessionId rootOf(SessionId sessionId) {
+        return sessions.find(sessionId).map(this::rootOf).orElse(sessionId);
     }
 
     private List<SessionId> ancestorsOf(Session session) {

@@ -67,8 +67,14 @@ public interface TurnService {
 
     /**
      * Follows the turn until the subscription is closed or the turn is over.
-     * A listener that comes late is first told what it missed — the end
-     * included — so subscribing right after {@link #submit} loses nothing.
+     * A listener that comes late is first told what the runtime still keeps
+     * of the turn, so subscribing right after {@link #submit} loses nothing;
+     * one that comes long after may hear only the rest. That the turn is
+     * over it is told in any case, and last. What the turn said is in the
+     * session whenever it is asked for.
+     *
+     * <p>The listener is told on a thread of its own, in the order things
+     * happened: a listener that is slow holds up nobody but itself.
      */
     Subscription subscribe(TurnId turnId, TurnListener listener);
 

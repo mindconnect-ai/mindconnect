@@ -71,7 +71,7 @@ public final class EnginePlugin implements Plugin {
             SessionStore sessions = registry.get(SessionStore.class);
             HookRunner hooks = registry::run;
             ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));
-            EventDelivery events = new EventDelivery(new TurnEventHub(), registry.get(SessionEventHub.class));
+            SessionEventHub events = registry.get(SessionEventHub.class);
             TurnAcceptor acceptor = new TurnAcceptor(sessions,
                     () -> registry.all(ModelSettingsResolver.class), hooks);
             ScopeSupplier scope = registry.get(ScopeSupplier.class);

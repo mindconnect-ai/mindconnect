@@ -65,7 +65,7 @@ public final class DefaultSessionService implements SessionService {
 
     @Override
     public Subscription lifecycle(SessionId sessionId, boolean childSessions, SessionLifecycleListener listener) {
-        return events.lifecycle(events.under(sessionId, childSessions), listener);
+        return events.lifecycle(sessionId, childSessions, listener);
     }
 
     @Override
@@ -80,7 +80,7 @@ public final class DefaultSessionService implements SessionService {
 
     @Override
     public Subscription stream(SessionId sessionId, boolean childSessions, SessionStreamListener listener) {
-        return events.stream(events.under(sessionId, childSessions), listener);
+        return events.stream(sessionId, childSessions, listener);
     }
 
     private Session existing(SessionId sessionId) {

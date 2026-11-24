@@ -117,6 +117,22 @@ final class TurnTaskMapper {
         return queue.get(taskId).map(TaskRecord::parentTaskId).orElse(null);
     }
 
+    /**
+     * The turn of this task and whatever it runs under, nearest first: the
+     * turn that called it and the turns above that one — which is whom a
+     * turn's events are also for.
+     */
+    List<TurnId> withTurnsAbove(TaskRecord task) {
+        List<TurnId> turns = new ArrayList<>();
+        turns.add(TurnId.of(task.id()));
+        String parentId = task.parentTaskId();
+        while (parentId != null) {
+            turns.add(TurnId.of(parentId));
+            parentId = parentOf(parentId);
+        }
+        return turns;
+    }
+
     // ── a task as a turn ────────────────────────────────────────────────────
 
     /** The turn as its task stands right now; empty when no turn task has this id. */

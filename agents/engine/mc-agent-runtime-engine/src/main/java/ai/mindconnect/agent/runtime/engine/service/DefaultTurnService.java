@@ -53,8 +53,7 @@ public final class DefaultTurnService implements TurnService {
     private final TurnTaskMapper turns;
     private final ScopeSupplier scope;
     private final SessionTurnOrder order;
-    private final TurnEventHub events;
-    private final SessionEventHub sessionEvents;
+    private final SessionEventHub events;
 
     /**
      * @param sharedState where the order of a session's turns is kept — the
@@ -64,15 +63,14 @@ public final class DefaultTurnService implements TurnService {
      *                    publish to, which is where subscribers are heard
      */
     DefaultTurnService(TurnAcceptor acceptor, SessionStore sessionStore, TaskQueue queue,
-                       SharedStateStore sharedState, EventDelivery events, ScopeSupplier scope) {
+                       SharedStateStore sharedState, SessionEventHub events, ScopeSupplier scope) {
         this.acceptor = acceptor;
         this.sessionStore = sessionStore;
         this.queue = queue;
         this.turns = new TurnTaskMapper(queue, scope);
         this.scope = scope;
         this.order = new SessionTurnOrder(sharedState);
-        this.events = events.toTurnListeners();
-        this.sessionEvents = events.toSessionListeners();
+        this.events = events;
     }
 
     @Override
@@ -135,7 +133,10 @@ public final class DefaultTurnService implements TurnService {
 
     @Override
     public Subscription subscribe(TurnId turnId, TurnListener listener) {
-        return events.subscribe(turnId, listener);
+        // A turn nobody knows from here says nothing, and nothing is there to wait for.
+        return turns.turn(turnId)
+                .map(turn -> events.follow(turnId, turn.sessionId(), () -> turns.turn(turnId), listener))
+                .orElse(() -> { });
     }
 
     @Override
@@ -146,9 +147,11 @@ public final class DefaultTurnService implements TurnService {
         // left to do it.
         for (Turn turn : parked) {
             closeOpenCalls(turn);
-            sessionStore.find(turn.sessionId()).ifPresent(session -> sessionEvents.publish(session,
-                    new SessionEvent.TurnFinished(turn.sessionId(), turn.id(), TurnStatus.CANCELLED)));
-            turns.turn(turn.id()).ifPresent(events::finished);
+            sessionStore.find(turn.sessionId()).ifPresent(session -> {
+                queue.get(turn.id().value()).ifPresent(task -> events.publish(session, turns.withTurnsAbove(task),
+                        new SessionEvent.TurnFinished(turn.sessionId(), turn.id(), TurnStatus.CANCELLED)));
+                turns.turn(turn.id()).ifPresent(ended -> events.ended(session, ended));
+            });
         }
     }
 
