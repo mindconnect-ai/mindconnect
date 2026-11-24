@@ -25,7 +25,7 @@ import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
-import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationId;

@@ -17,7 +17,7 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
-import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
+import ai.mindconnect.agent.runtime.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 
 /**

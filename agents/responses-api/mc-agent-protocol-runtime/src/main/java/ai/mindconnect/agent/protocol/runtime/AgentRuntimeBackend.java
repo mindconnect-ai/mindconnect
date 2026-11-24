@@ -45,7 +45,7 @@ import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
-import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.filestore.FileStore;

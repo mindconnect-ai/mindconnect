@@ -29,7 +29,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-engine</artifactId>
+            <artifactId>mc-agent-runtime-adapters</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

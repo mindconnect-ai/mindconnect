@@ -56,8 +56,8 @@ import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
-import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptPlugin;
-import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
+import ai.mindconnect.agent.runtime.prompt.PebblePromptPlugin;
+import ai.mindconnect.agent.runtime.engine.service.EnginePlugin;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -142,7 +142,7 @@ class EngineWithCapabilitiesTest {
                 into.provide(ModelGateway.class, () -> model);
             }
         });
-        registry.install(new RuntimePlugin(queue, new InMemorySharedStateStore()));
+        registry.install(new EnginePlugin(queue, new InMemorySharedStateStore()));
         registry.contribute(AgentResolver.class, AgentResolver.of(List.of(LEAD, RESEARCHER)));
         registry.contribute(SkillResolver.class, skills(
                 new SkillDefinition("citations", "How to cite sources.", "Cite like this.", List.of())));

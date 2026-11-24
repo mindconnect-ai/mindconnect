@@ -11,7 +11,7 @@ import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 /**
  * An {@link AgentDefinition} as a JSON object and back: how a turn's task
  * and a stored session keep the agent they were given. Plain maps and
- * lists, like {@link TurnMessageConverter}.
+ * lists, like {@link ai.mindconnect.agent.loop.domain.TurnMessageConverter}.
  */
 public final class AgentDefinitionConverter {
 

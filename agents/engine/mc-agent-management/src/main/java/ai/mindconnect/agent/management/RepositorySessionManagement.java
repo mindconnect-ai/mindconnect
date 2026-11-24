@@ -27,8 +27,8 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
-import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
+import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.port.out.MessageRepository;
 

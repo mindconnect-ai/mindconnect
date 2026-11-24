@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.llm;
+package ai.mindconnect.agent.runtime.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

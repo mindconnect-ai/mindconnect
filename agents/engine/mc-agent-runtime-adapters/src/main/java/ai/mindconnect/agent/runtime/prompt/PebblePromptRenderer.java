@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.prompt;
+package ai.mindconnect.agent.runtime.prompt;
 
 import java.io.StringWriter;
 import java.util.Map;

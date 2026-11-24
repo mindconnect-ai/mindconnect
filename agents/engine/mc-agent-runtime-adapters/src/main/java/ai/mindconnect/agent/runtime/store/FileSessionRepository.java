@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.store;
+package ai.mindconnect.agent.runtime.store;
 
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -12,7 +12,7 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.filerepo.DocumentExistsException;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;

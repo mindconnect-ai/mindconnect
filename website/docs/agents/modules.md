@@ -75,7 +75,7 @@ See [vector store & file store](./vector-store.md).
 |--------|---------|
 | `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres. |
 | `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres. |
-| `postgres/mc-agent-runtime-engine-pg`, `postgres/mc-agent-management-pg` | The engine's session repository and the agent repository on Postgres — a JSONB document per session and per agent. |
+| `postgres/mc-agent-runtime-engine-pg`, `postgres/mc-agent-management-pg` | The session repository and the agent repository on Postgres — a JSONB document per session and per agent. |
 | `postgres/mc-agent-skill-pg`, `postgres/mc-agent-trace-pg`, `postgres/mc-agent-tools-todo-pg`, `postgres/mc-agent-tools-usermemory-pg` | Skills, LLM call traces, todo lists and the users' memory on Postgres. |
 | `postgres/mc-agent-runtime-infrastructure-pg` | `PostgresStorePlugin`: every store of an installation from one database, as a plugin for the runtime's builder. |
 | `postgres/mc-file-store-pg` | `FileStore` on Postgres — uploads as `bytea` rows; also the `postgres` backend of the SPI. |
@@ -100,8 +100,9 @@ An app has both persistence starters on the classpath; the property picks.
 
 | Module | Purpose |
 |--------|---------|
-| `engine/mc-agent-runtime-engine` | Runs turns: the runtime API's services on the task queue, with the agent loop turning inside each turn task. A turn is a task, each tool call a child task. The module that carries the task queue and the LLM gateway. |
-| `engine/mc-agent-management` | The management API on stores — sessions on the engine's session repository, agents on a repository of their own — as `ManagementPlugin`; `DirectoryPlugin` for where sessions work; `AgentJson` for an agent as a file. |
+| `engine/mc-agent-runtime-engine` | Runs turns: the runtime API's services on the task queue, with the agent loop turning inside each turn task. A turn is a task, each tool call a child task. Installed as `EnginePlugin`; its one foreign dependency is the task queue. |
+| `engine/mc-agent-runtime-adapters` | What the runtime API's ports are answered with by default, each a plugin: sessions in a session repository and the message repository (`RepositorySessionStore`), a model through the LLM gateway (`LlmGatewayModelPlugin`), prompts rendered with Pebble (`PebblePromptPlugin`). No engine. |
+| `engine/mc-agent-management` | The management API on stores — sessions on the session repository of `mc-agent-runtime-adapters`, agents on a repository of their own — as `ManagementPlugin`; `DirectoryPlugin` for where sessions work; `AgentJson` for an agent as a file. |
 | `engine/mc-agent-runtime-infrastructure` | What a runtime that serves an installation is assembled from, as plugins: the stores on files or in memory, the LLM gateway, the tool registry, the file and vector stores, the skill sources, the tokenizer, the users' channels. |
 | `client/mc-agent-sdk` | The runtime for a Java program: one dependency and one builder, `AgentRuntime.builder()`, that put the engine and the default capabilities together — see [Embedding](./embedding.md). |
 | `client/mc-agent-cli-local` | A coding harness on the command line that runs wholly on this machine, on the SDK alone: no server and no Spring. |

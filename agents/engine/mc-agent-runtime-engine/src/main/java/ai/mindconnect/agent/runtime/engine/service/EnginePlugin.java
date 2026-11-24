@@ -27,7 +27,7 @@ import ai.mindconnect.taskqueue.TaskQueue;
  * services, agents, tools and model settings as contributions — and this is
  * the one place of the engine that looks anything up there.
  */
-public final class RuntimePlugin implements Plugin {
+public final class EnginePlugin implements Plugin {
 
     private final TaskQueue queue;
     private final SharedStateStore sharedState;
@@ -38,7 +38,7 @@ public final class RuntimePlugin implements Plugin {
      * @param sharedState the queue's shared state: the order of a session's
      *                    turns has to hold for every process on the queue
      */
-    public RuntimePlugin(TaskQueue queue, SharedStateStore sharedState) {
+    public EnginePlugin(TaskQueue queue, SharedStateStore sharedState) {
         this.queue = queue;
         this.sharedState = sharedState;
     }

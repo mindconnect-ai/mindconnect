@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.prompt;
+package ai.mindconnect.agent.runtime.prompt;
 
 import ai.mindconnect.agent.runtime.api.port.out.PromptRenderer;
 import ai.mindconnect.plugin.Plugin;

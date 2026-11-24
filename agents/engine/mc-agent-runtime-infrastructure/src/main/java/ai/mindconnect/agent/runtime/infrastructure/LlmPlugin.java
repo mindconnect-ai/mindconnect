@@ -8,8 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
-import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
-import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmChatModelGateway;
+import ai.mindconnect.agent.runtime.llm.LlmCallTraceListener;
+import ai.mindconnect.agent.runtime.llm.LlmChatModelGateway;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;

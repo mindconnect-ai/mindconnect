@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.llm;
+package ai.mindconnect.agent.runtime.llm;
 
 import java.util.Optional;
 import java.util.function.Function;

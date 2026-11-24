@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.llm;
+package ai.mindconnect.agent.runtime.llm;
 
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.llm.domain.LlmConfig;

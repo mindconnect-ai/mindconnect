@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.store;
+package ai.mindconnect.agent.runtime.store;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +13,7 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;

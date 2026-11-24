@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.store;
+package ai.mindconnect.agent.runtime.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

@@ -37,11 +37,11 @@ import ai.mindconnect.agent.runtime.capabilities.toolsearch.InMemoryToolActivati
 import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolSearchPlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.LoggingTraceSink;
 import ai.mindconnect.agent.runtime.capabilities.trace.TracePlugin;
-import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
-import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmGatewayModelPlugin;
+import ai.mindconnect.agent.runtime.llm.LlmCallTraceListener;
+import ai.mindconnect.agent.runtime.llm.LlmGatewayModelPlugin;
 import ai.mindconnect.agent.sdk.inmemory.InMemorySessionStorePlugin;
-import ai.mindconnect.agent.runtime.engine.adapter.prompt.PebblePromptPlugin;
-import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
+import ai.mindconnect.agent.runtime.prompt.PebblePromptPlugin;
+import ai.mindconnect.agent.runtime.engine.service.EnginePlugin;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
@@ -187,7 +187,7 @@ public final class AgentRuntimeBuilder {
             plugins.add(model);
         }
         plugins.addAll(List.of(
-                new RuntimePlugin(queue, new InMemorySharedStateStore()),
+                new EnginePlugin(queue, new InMemorySharedStateStore()),
                 new InMemorySourcePlugin(
                         new InMemoryAgentResolver(agents),
                         new InMemorySkillResolver(skills),

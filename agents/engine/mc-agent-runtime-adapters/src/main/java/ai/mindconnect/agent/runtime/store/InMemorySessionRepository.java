@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.engine.adapter.store;
+package ai.mindconnect.agent.runtime.store;
 
 import java.util.Comparator;
 import java.util.List;
@@ -12,7 +12,7 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionRepository;
 
 /** Sessions that live as long as the process: for a library user who keeps nothing, and for tests. */
 public final class InMemorySessionRepository implements SessionRepository {

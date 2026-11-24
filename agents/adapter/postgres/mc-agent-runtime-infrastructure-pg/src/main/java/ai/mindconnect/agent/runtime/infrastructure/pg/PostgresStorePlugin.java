@@ -6,7 +6,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.pg.PgSessionRepository;
-import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.agent.runtime.infrastructure.StorePlugin;
 import ai.mindconnect.agent.skill.adapter.pg.PgSkillRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;

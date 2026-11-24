@@ -1,12 +1,10 @@
-package ai.mindconnect.agent.runtime.engine.service;
+package ai.mindconnect.agent.loop.domain;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.ContentPart.MediaSource;
-import ai.mindconnect.agent.loop.domain.TurnMessage;
 
 /**
  * A {@link TurnMessage} as a JSON object and back — the one line a message

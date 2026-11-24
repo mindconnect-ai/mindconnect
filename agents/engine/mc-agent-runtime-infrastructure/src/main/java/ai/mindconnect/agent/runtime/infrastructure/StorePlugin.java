@@ -5,7 +5,7 @@ import java.util.function.Supplier;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.management.api.SessionCleanup;
-import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRepository;
 import ai.mindconnect.agent.tools.todo.TodoListRepository;
