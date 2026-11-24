@@ -142,3 +142,6 @@
   place of `namespaces(...)` and `users(...)`. A turn, its tool calls, its
   sub-agents and its background work run in the whole scope the turn was
   submitted in — namespace, user and the host's attributes.
+- Overwriting a registry entry replaces that entry only. What it requires is
+  installed when missing and left as it is when already here; before, the
+  LLM config an agent requires was overwritten along with the agent.

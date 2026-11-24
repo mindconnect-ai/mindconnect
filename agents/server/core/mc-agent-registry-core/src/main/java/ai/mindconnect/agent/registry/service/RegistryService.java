@@ -136,9 +136,9 @@ public class RegistryService {
         RegistryIndex index = client.fetchIndex(source);
         List<RegistryEntry> members = new ArrayList<>();
         List<String> unresolved = new ArrayList<>();
-        walk(source, index, entry, Set.of(), new LinkedHashSet<>(), 0, new Visitor() {
+        walk(source, index, entry, Set.of(), new LinkedHashSet<>(), 0, false, new Visitor() {
             @Override
-            public void entity(RegistryEntry member) {
+            public void entity(RegistryEntry member, boolean required) {
                 members.add(member);
             }
 
@@ -277,6 +277,11 @@ public class RegistryService {
      * then the entry itself; a package instead walks its members, each with
      * their own requires.
      *
+     * <p>{@link ImportMode#OVERWRITE} replaces what was asked for — the entry,
+     * or a package's members — and nothing else: what is merely required is
+     * installed when it is missing and left alone when it is here. An LLM
+     * config several agents share is not reset because one of them was.
+     *
      * <p>Never throws for a member that fails — the report carries a
      * {@code FAILED} line and the walk goes on, because the members are
      * independent entities in independent stores and stopping at the first
@@ -309,10 +314,10 @@ public class RegistryService {
         leftOut.remove(entryId);
 
         List<ImportedItem> items = new ArrayList<>();
-        walk(source, index, entry, leftOut, new LinkedHashSet<>(), 0, new Visitor() {
+        walk(source, index, entry, leftOut, new LinkedHashSet<>(), 0, false, new Visitor() {
             @Override
-            public void entity(RegistryEntry member) {
-                items.add(installOne(source, member, effectiveMode));
+            public void entity(RegistryEntry member, boolean required) {
+                items.add(installOne(source, member, required ? ImportMode.SKIP_EXISTING : effectiveMode));
             }
 
             @Override
@@ -355,8 +360,8 @@ public class RegistryService {
         Set<String> visited = new LinkedHashSet<>();
         Visitor visitor = new Visitor() {
             @Override
-            public void entity(RegistryEntry member) {
-                items.add(installOne(source, member, effectiveMode));
+            public void entity(RegistryEntry member, boolean required) {
+                items.add(installOne(source, member, required ? ImportMode.SKIP_EXISTING : effectiveMode));
             }
 
             @Override
@@ -376,7 +381,7 @@ public class RegistryService {
                         "not in this registry's index — the list it was chosen from is out of date"));
                 continue;
             }
-            walk(source, index, entry.get(), Set.of(), visited, 0, visitor);
+            walk(source, index, entry.get(), Set.of(), visited, 0, false, visitor);
         }
         ImportReport report = new ImportReport(sourceId.value(), null, items);
         log.info("Imported {} entries from {}: {}",
@@ -417,9 +422,9 @@ public class RegistryService {
         List<RegistryEntry> toRemove = new ArrayList<>();
         List<ImportedItem> keptLines = new ArrayList<>();
         List<ImportedItem> problems = new ArrayList<>();
-        walk(source, index, entry, leftOut, new LinkedHashSet<>(), 0, new Visitor() {
+        walk(source, index, entry, leftOut, new LinkedHashSet<>(), 0, false, new Visitor() {
             @Override
-            public void entity(RegistryEntry member) {
+            public void entity(RegistryEntry member, boolean required) {
                 toRemove.add(member);
             }
 
@@ -464,7 +469,8 @@ public class RegistryService {
 
     /** What the walk finds: an entity, one left out, or a line for the report. */
     private interface Visitor {
-        void entity(RegistryEntry entry);
+        /** @param required whether the walk came to it only because another entry requires it */
+        void entity(RegistryEntry entry, boolean required);
 
         void excluded(RegistryEntry entry);
 
@@ -475,9 +481,12 @@ public class RegistryService {
      * One node of the walk: dependencies, then this entry. {@code visited}
      * holds the entry ids already handled, so a diamond (two agents requiring
      * the same LLM alias) installs it once and a cycle terminates.
+     * {@code asRequirement} is passed down from the first requirement on: what a
+     * requirement requires is a requirement too.
      */
     private void walk(RegistrySource source, RegistryIndex index, RegistryEntry entry,
-                      Set<String> excluded, Set<String> visited, int depth, Visitor visitor) {
+                      Set<String> excluded, Set<String> visited, int depth, boolean asRequirement,
+                      Visitor visitor) {
         if (!visited.add(entry.id())) {
             return;
         }
@@ -497,18 +506,19 @@ public class RegistryService {
                         "required by '" + entry.id() + "' but not in this registry's index"));
                 continue;
             }
-            walk(source, index, dependency.get(), excluded, visited, depth + 1, visitor);
+            walk(source, index, dependency.get(), excluded, visited, depth + 1, true, visitor);
         }
         if (entry.type() == RegistryItemType.PACKAGE) {
-            walkPackage(source, index, entry, excluded, visited, depth, visitor);
+            walkPackage(source, index, entry, excluded, visited, depth, asRequirement, visitor);
             return;
         }
-        visitor.entity(entry);
+        visitor.entity(entry, asRequirement);
     }
 
     /** A package: read its manifest, then walk every member as an entry of its own. */
     private void walkPackage(RegistrySource source, RegistryIndex index, RegistryEntry entry,
-                             Set<String> excluded, Set<String> visited, int depth, Visitor visitor) {
+                             Set<String> excluded, Set<String> visited, int depth, boolean asRequirement,
+                             Visitor visitor) {
         RegistryPackage manifest;
         try {
             manifest = client.fetchPackage(source, entry.path());
@@ -527,7 +537,7 @@ public class RegistryService {
             return;
         }
         for (RegistryEntry member : members) {
-            walk(source, index, member, excluded, visited, depth + 1, visitor);
+            walk(source, index, member, excluded, visited, depth + 1, asRequirement, visitor);
         }
     }
 

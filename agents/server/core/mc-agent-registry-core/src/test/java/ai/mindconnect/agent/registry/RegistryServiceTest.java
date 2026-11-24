@@ -171,6 +171,33 @@ class RegistryServiceTest {
     }
 
     @Test
+    void overwrite_replaces_the_entry_asked_for_and_leaves_what_it_requires() {
+        entry("default-llm", RegistryItemType.LLM_CONFIG);
+        entry("researcher", RegistryItemType.AGENT, "default-llm");
+        agents.present.add("researcher");
+        configs.present.add("default-llm");
+
+        ImportReport overwritten = service.importEntry(SOURCE.id(), "researcher", ImportMode.OVERWRITE);
+
+        assertThat(overwritten.count(ImportStatus.UPDATED)).isEqualTo(1);
+        assertThat(overwritten.count(ImportStatus.SKIPPED)).isEqualTo(1);
+        assertThat(agents.installed).containsExactly("researcher");
+        assertThat(configs.installed).isEmpty();
+    }
+
+    @Test
+    void overwrite_still_installs_a_requirement_that_is_missing() {
+        entry("default-llm", RegistryItemType.LLM_CONFIG);
+        entry("researcher", RegistryItemType.AGENT, "default-llm");
+        agents.present.add("researcher");
+
+        ImportReport overwritten = service.importEntry(SOURCE.id(), "researcher", ImportMode.OVERWRITE);
+
+        assertThat(configs.installed).containsExactly("default-llm");
+        assertThat(overwritten.count(ImportStatus.UPDATED)).isEqualTo(1);
+    }
+
+    @Test
     void an_unknown_entry_or_source_is_an_error_rather_than_an_empty_report() {
         assertThatThrownBy(() -> importEntry("nope"))
                 .isInstanceOf(RegistryException.class)
