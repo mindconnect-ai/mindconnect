@@ -142,6 +142,10 @@ with its status. Over REST a session carries that as `turnId` and
 subscribes to the turn (`runtime.turns().subscribe(turnId, …)`): its events
 from the first, also for a listener that comes late.
 
+Events are told inside the process that runs the turn. With a task queue
+shared by several nodes, a listener on another node hears nothing;
+`runningTurn` is right on every node.
+
 ## Writing a plugin
 
 A plugin provides services, contributes to the lists the runtime collects, and

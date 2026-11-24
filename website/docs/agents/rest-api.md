@@ -284,6 +284,14 @@ stream's: remember `seq`, check `firstBufferedSeq` for a gap (the truth to
 reload from is `GET /api/sessions` and `GET /api/sessions/{id}/approvals`),
 and reattach with the last seen `seq` when the connection drops.
 
+:::caution One node
+Streams are told live by the server process that runs the turn. Behind a load
+balancer over several nodes, a client attached to another node hears neither
+the session's stream nor the user stream: run one node, or pin a client to
+its node. `turnId` and `turnStatus` of a session are read from the turn and
+are right on every node.
+:::
+
 ## Approvals
 
 A tool marked "needs approval" parks its call and the turn waits for a human.
