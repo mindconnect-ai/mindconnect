@@ -78,3 +78,5 @@
 - The admin UI answers an agent name another agent already has with a message
   and keeps the form, and deletes a session from an agent's Sessions tab only
   for the user it belongs to.
+- Stopping a turn while a tool runs answers the open call with "Cancelled by
+  user before the tool finished"; the chat takes the next message as before.

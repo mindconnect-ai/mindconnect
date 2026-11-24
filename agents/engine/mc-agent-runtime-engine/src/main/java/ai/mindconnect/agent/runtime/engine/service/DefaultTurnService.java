@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import ai.mindconnect.agent.loop.domain.ToolCalls;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
@@ -148,9 +149,26 @@ public final class DefaultTurnService implements TurnService {
         // A running turn reports its own end. A parked one has no worker
         // left to do it.
         for (Turn turn : parked) {
+            closeOpenCalls(turn);
             sessionStore.find(turn.sessionId()).ifPresent(session -> sessionEvents.publish(session,
                     new SessionEvent.TurnFinished(turn.sessionId(), turn.id(), TurnStatus.CANCELLED)));
             turns.turn(turn.id()).ifPresent(events::finished);
+        }
+    }
+
+    /**
+     * Answers the calls a cancelled turn was waiting for. A call without a
+     * result is a history no provider accepts: the session's next turn would
+     * fail on it.
+     */
+    private void closeOpenCalls(Turn turn) {
+        List<TurnMessage> results = ToolCalls.of(ToolCalls.episode(sessionStore.messages(turn.sessionId())))
+                .open().stream()
+                .map(call -> TurnMessage.toolResult(call.callId(), call.name(),
+                        "Cancelled by user before the tool finished", true).inTurn(turn.id().value()))
+                .toList();
+        if (!results.isEmpty()) {
+            sessionStore.append(turn.sessionId(), results);
         }
     }
 

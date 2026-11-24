@@ -237,6 +237,20 @@ class EngineWithCapabilitiesTest {
     }
 
     @Test
+    void a_cancelled_turn_leaves_no_call_unanswered_and_the_session_takes_the_next_turn() throws InterruptedException {
+        model.script.add(call("c1", "bash", Map.of()));
+        model.script.add(TurnMessage.assistant("Five."));
+
+        TurnId cancelled = turns.submit(TurnRequest.text(session.id(), "Run it"));
+        awaitRest(cancelled);
+        turns.cancel(cancelled);
+
+        assertThat(toolResults(cancelled)).singleElement().asString().contains("Cancelled by user");
+        TurnId next = turns.submit(TurnRequest.text(session.id(), "2 + 3?"));
+        assertThat(awaitRest(next).status()).isEqualTo(TurnStatus.COMPLETED);
+    }
+
+    @Test
     void a_rejected_approval_is_an_error_the_model_reads() throws InterruptedException {
         model.script.add(call("c1", "bash", Map.of()));
         model.script.add(TurnMessage.assistant("Then not."));
