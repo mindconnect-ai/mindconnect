@@ -297,6 +297,20 @@ class NamespaceSeedingTest {
     }
 
     @Test
+    void a_namespace_bound_while_it_did_not_exist_is_seeded_once_it_is_created() {
+        namespaces = new NamespaceService(new InMemoryNamespaceRepository(), LOCAL);
+        restart();
+        // A request that outlived a delete: the namespace is bound, and is not there.
+        use(ERNI);
+        assertThat(agentStores).doesNotContainKey(ERNI);
+
+        namespaces.create("erni", "ERNI", UserId.of("plain-user"));
+        use(ERNI);
+
+        assertThat(agentNames(ERNI)).contains("host-helper");
+    }
+
+    @Test
     void a_namespace_that_does_not_exist_is_not_seeded() {
         namespaces = new NamespaceService(new InMemoryNamespaceRepository(), LOCAL);
         restart();

@@ -21,6 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 /**
  * Gives every namespace the bundled content it should have — the first time
@@ -56,6 +58,12 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
     private final ObjectProvider<ScopeSupplier> scope;
     private final ObjectProvider<NamespaceService> namespaces;
     private final NamespaceFirstUse firstUse = new NamespaceFirstUse("Seeding", this::seed);
+    /**
+     * Namespaces bound while they did not exist: a request that outlives a
+     * delete binds the namespace once more. That is no first use — the
+     * namespace created under the name next would otherwise count as seeded.
+     */
+    private final Set<Namespace> missing = ConcurrentHashMap.newKeySet();
     /** What the seeder did on this thread — for {@link #extensionsChanged()} to report. */
     private final ThreadLocal<NamespaceSeeder.Report> ranHere = new ThreadLocal<>();
 
@@ -92,6 +100,9 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
     public void ensure(Namespace namespace) {
         try {
             firstUse.ensure(namespace);
+            if (missing.remove(namespace)) {
+                firstUse.forget(namespace);
+            }
         } finally {
             ranHere.remove();
         }
@@ -134,6 +145,7 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
         NamespaceService service = namespaces.getIfAvailable();
         if (service != null && service.find(namespace).isEmpty()) {
             log.debug("Namespace '{}' does not exist (any more) — nothing to seed", namespace.value());
+            missing.add(namespace);
             return;
         }
         ranHere.set(scope.getIfAvailable() instanceof ThreadBoundScopeSupplier bound
