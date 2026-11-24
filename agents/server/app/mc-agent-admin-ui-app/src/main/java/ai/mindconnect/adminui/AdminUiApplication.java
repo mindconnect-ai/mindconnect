@@ -19,7 +19,8 @@ import org.springframework.context.annotation.Import;
     "ai.mindconnect.agentrest"
 })
 @Import({
-    InfrastructureConfig.class
+    InfrastructureConfig.class,
+    ai.mindconnect.agent.responses.config.ResponsesApiConfiguration.class
 })
 @Slf4j
 public class AdminUiApplication {

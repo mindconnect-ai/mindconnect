@@ -22,16 +22,22 @@
              here is translation between the two. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-protocol-mc-runtime</artifactId>
+            <artifactId>mc-agent-protocol-runtime</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <!-- Declared rather than inherited: this module names these types
-             directly (repositories, session service, conversation manager)
-             and must not depend on the backend continuing to expose them. -->
+             directly (the agent and session management) and must not depend
+             on the backend continuing to expose them. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-core</artifactId>
+            <artifactId>mc-agent-management-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-sdk</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
