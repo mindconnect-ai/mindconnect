@@ -41,6 +41,7 @@ ai.mindconnect.agent.chat.stream.UserChannels has 2 constructors
 ai.mindconnect.agent.chat.stream.UserEvent$SessionStarted has 2 constructors
 ai.mindconnect.agent.protocol.client.ToolLoop has 2 constructors
 ai.mindconnect.agent.protocol.openai.OpenAiResponsesBackend has 2 constructors
+ai.mindconnect.agent.protocol.runtime.RuntimeBackendException has 2 constructors
 ai.mindconnect.agent.registry.adapter.github.GitHubRegistryClient has 3 constructors
 ai.mindconnect.agent.registry.adapter.pg.PgRegistrySourceRepository has 2 constructors
 ai.mindconnect.agent.registry.admin.ui.RegistryBrowseView has 2 constructors

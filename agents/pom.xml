@@ -39,6 +39,7 @@
 
         <module>responses-api/mc-agent-protocol</module>
         <module>responses-api/mc-agent-protocol-openai</module>
+        <module>responses-api/mc-agent-protocol-runtime</module>
         <module>core/mc-llm-gateway-core</module>
         <module>core/mc-llm-gateway</module>
         <module>adapter/postgres/mc-llm-gateway-pg</module>
@@ -87,6 +88,7 @@
         <module>adapter/postgres/mc-agent-management-pg</module>
         <module>client/mc-agent-sdk</module>
         <module>client/mc-agent-cli-local</module>
+        <module>client/mc-agent-cli</module>
 
         <module>tools/core/mc-agent-tools</module>
         <module>tools/core/mc-agent-tools-code</module>
@@ -118,6 +120,7 @@
         <module>server/ui/mc-mcp-gateway-admin-ui-rest</module>
         <module>server/rest/mc-agent-api-rest</module>
         <module>server/core/mc-agent-security</module>
+        <module>server/rest/mc-agent-api-responses-rest</module>
         <module>server/app/mc-agent-api-app</module>
         <module>server/ui/mc-agent-chat-ui-rest</module>
         <module>server/ui/mc-agent-registry-admin-ui-rest</module>
