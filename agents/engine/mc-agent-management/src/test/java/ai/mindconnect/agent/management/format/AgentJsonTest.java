@@ -42,6 +42,18 @@ class AgentJsonTest {
     }
 
     @Test
+    void anIdIsItsPlainValue_andTheWrappedOneOfAnOlderStoreIsStillRead() {
+        ManagedAgent owl = ManagedAgent.of(new AgentDefinition("owl", "", "", ModelSettings.NONE, List.of(), 5,
+                Map.of()));
+        String written = files.write(new ManagedAgent(AgentId.of("a1"), owl.definition(), null, null, null,
+                ManagedAgent.Status.ACTIVE, null, null, 1));
+
+        assertThat(written).contains("\"id\" : \"a1\"");
+        assertThat(files.read(written.replace("\"id\" : \"a1\"", "\"id\" : {\"value\" : \"a1\"}")).id())
+                .isEqualTo(AgentId.of("a1"));
+    }
+
+    @Test
     void anAgentOfTheEarlierFormIsReadIntoTheSameShape() {
         ManagedAgent read = files.read("""
                 {"id": "a1", "name": "owl", "description": "Knows owls.", "group": "birds", "icon": "feather",

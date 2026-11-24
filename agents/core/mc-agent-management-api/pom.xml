@@ -24,6 +24,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+        <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-api</artifactId>
             <version>${project.version}</version>

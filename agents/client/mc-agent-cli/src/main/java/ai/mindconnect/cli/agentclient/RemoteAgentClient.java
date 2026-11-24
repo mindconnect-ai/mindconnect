@@ -58,7 +58,7 @@ public class RemoteAgentClient implements AgentClient {
         try (Response resp = http.newCall(req).execute()) {
             if (resp.code() == 404) return Optional.empty();
             assertOk(resp);
-            return Optional.of(mapper.readValue(resp.body().string(), AgentDefinition.class));
+            return Optional.of(agentOf(mapper.readTree(resp.body().string())));
         } catch (Exception e) {
             throw new RuntimeException("Remote call failed: " + e.getMessage(), e);
         }
@@ -69,8 +69,45 @@ public class RemoteAgentClient implements AgentClient {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/agents")
                 .get().build();
-        return execute(req, new TypeReference<>() {
-        });
+        List<AgentDefinition> agents = new java.util.ArrayList<>();
+        execute(req, JsonNode.class).forEach(agent -> agents.add(agentOf(agent)));
+        return agents;
+    }
+
+    /**
+     * The agent as this client's screens read it, from what the server answers
+     * with: the managed agent. Only what a screen here shows is carried over.
+     */
+    private static AgentDefinition agentOf(JsonNode agent) {
+        JsonNode definition = agent.path("definition");
+        List<ai.mindconnect.agent.tool.AgentTool> tools = new java.util.ArrayList<>();
+        definition.path("tools").forEach(tool -> tools.add(ai.mindconnect.agent.tool.AgentTool.of(
+                tool.path("name").asText(), text(tool.path("metadata"), "description"))));
+        return new AgentDefinition(AgentId.of(agent.path("id").asText()),
+                definition.path("name").asText(), text(definition, "description"),
+                text(agent, "group"), text(agent, "icon"), text(definition, "instructions"),
+                text(agent, "welcomeMessage"), text(definition.path("modelSettings"), "model"),
+                definition.path("maxRounds").asInt(10), null,
+                ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus.valueOf(agent.path("status").asText("ACTIVE")),
+                tools, List.of(), List.of(), null, null, null, null, agent.path("version").asLong(0));
+    }
+
+    /** The session as this client reads it, from what the server answers with. */
+    private static AgentSession sessionOf(JsonNode session) {
+        List<String> additional = new java.util.ArrayList<>();
+        session.path("additionalDirs").forEach(dir -> additional.add(dir.asText()));
+        return new AgentSession(SessionId.of(session.path("id").asText()),
+                text(session, "agentId") == null ? null : AgentId.of(text(session, "agentId")),
+                text(session, "userId") == null ? null : UserId.of(text(session, "userId")),
+                ai.mindconnect.message.domain.ConversationId.random(), text(session, "title"),
+                ai.mindconnect.agent.runtime.domain.SessionStatus.ACTIVE,
+                text(session, "createdAt") == null ? null : java.time.Instant.parse(text(session, "createdAt")),
+                null, null, null, null, null, null, null, null)
+                .withWorkingDir(text(session, "workingDir")).withAdditionalDirs(additional);
+    }
+
+    private static String text(JsonNode node, String field) {
+        return node.hasNonNull(field) ? node.get(field).asText() : null;
     }
 
     // --- RunSessionUseCase ---
@@ -92,7 +129,7 @@ public class RemoteAgentClient implements AgentClient {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions")
                 .post(RequestBody.create(toJson(fields), JSON)).build();
-        return execute(req, AgentSession.class);
+        return sessionOf(execute(req, JsonNode.class));
     }
 
     @Override
@@ -108,7 +145,7 @@ public class RemoteAgentClient implements AgentClient {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions/" + sessionId.value() + "/working-dir")
                 .put(RequestBody.create(toJson(fields), JSON)).build();
-        return execute(req, AgentSession.class);
+        return sessionOf(execute(req, JsonNode.class));
     }
 
     /** The authenticated user's sessions; {@code userId} is not sent, as for {@link #startSession}. */
@@ -116,8 +153,9 @@ public class RemoteAgentClient implements AgentClient {
     public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
         String url = baseUrl + "/api/sessions?agentId=" + agentDefinitionId.value();
         Request req = new Request.Builder().url(url).get().build();
-        return execute(req, new TypeReference<>() {
-        });
+        List<AgentSession> sessions = new java.util.ArrayList<>();
+        execute(req, JsonNode.class).forEach(session -> sessions.add(sessionOf(session)));
+        return sessions;
     }
 
     @Override

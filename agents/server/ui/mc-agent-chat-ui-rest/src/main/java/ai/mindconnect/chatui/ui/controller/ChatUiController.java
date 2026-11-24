@@ -686,14 +686,9 @@ public class ChatUiController {
 
     private ManagedSession openDefaultChat(String userId) {
         return agents.findByName(DEFAULT_CHAT_AGENT)
-                .map(agent -> opened(chatOpener.open(ChatAgent.id(agent), UserId.of(userId), null, null, List.of()).id()))
+                .map(agent -> chatOpener.open(ChatAgent.id(agent), UserId.of(userId), null, null, List.of()))
                 .orElseGet(() -> sessionManagement.open(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId),
                         null, new SessionAgent.Own(fallbackChatAgent(), null), null, SessionDirectories.NONE));
-    }
-
-    /** The chat the opener just opened, as the session management knows it. */
-    private ManagedSession opened(SessionId sessionId) {
-        return sessionManagement.find(runtimeId(sessionId)).orElseThrow();
     }
 
     /**
@@ -892,7 +887,7 @@ public class ChatUiController {
         String userId = user.getPreferredUsername();
         return agents.find(ai.mindconnect.agent.management.api.AgentId.of(agentId.value()))
                 .map(agent -> {
-                    var session = opened(chatOpener.open(agentId, UserId.of(userId), type, null, List.of()).id());
+                    var session = chatOpener.open(agentId, UserId.of(userId), type, null, List.of());
                     return ResponseEntity.ok(shell(session, historyOf(UserId.of(userId), session), history));
                 })
                 .orElse(ResponseEntity.notFound().build());

@@ -4,8 +4,6 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;

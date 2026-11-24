@@ -120,7 +120,6 @@ ai.mindconnect.agent.tools.virtualenv.VirtualEnvWorkspaceProvider has 2 construc
 ai.mindconnect.agent.trace.adapter.FileLlmCallTraceRepository has 2 constructors
 ai.mindconnect.agent.trace.adapter.InMemoryLlmCallTraceRepository has 2 constructors
 ai.mindconnect.agent.trace.adapter.pg.PgLlmCallTraceRepository has 3 constructors
-ai.mindconnect.agentrest.controller.AgentApiController$UpdateAgentRequest has 2 constructors
 ai.mindconnect.agentrest.controller.MemoryApiController has 2 constructors
 ai.mindconnect.agentrest.dto.StartSessionRequest has 3 constructors
 ai.mindconnect.agentrest.service.TranscriptionChannels has 2 constructors

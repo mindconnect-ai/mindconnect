@@ -6,7 +6,6 @@ import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.tools.usermemory.adapter.InMemoryUserMemoryRepository;
 import ai.mindconnect.agent.management.RepositoryAgentManagement;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;

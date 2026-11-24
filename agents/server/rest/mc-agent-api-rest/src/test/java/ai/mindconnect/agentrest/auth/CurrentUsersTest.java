@@ -4,8 +4,6 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;

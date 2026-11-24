@@ -9,7 +9,6 @@ import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionManagement;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.chat.stream.UserChannels;
@@ -31,11 +30,9 @@ public final class ChatOpener {
     private final AgentSessionRepository chatSessions;
     private final ConversationManager conversations;
     private final UserChannels users;
-    private final EarlierAgentConverter converter;
 
     ChatOpener(SessionManagement sessions, AgentSessionRepository chatSessions, ConversationManager conversations,
-               UserChannels users, EarlierAgentConverter converter) {
-        this.converter = converter;
+               UserChannels users) {
         this.sessions = sessions;
         this.chatSessions = chatSessions;
         this.conversations = conversations;
@@ -49,34 +46,15 @@ public final class ChatOpener {
      * @param workingDirectory {@code null} for the directory the installation gives the chat
      * @throws IllegalArgumentException for an agent that does not exist or a directory the user may not have
      */
-    public AgentSession open(AgentId agent, UserId user, String type, String workingDirectory,
-                             List<String> additionalDirectories) {
-        AgentSession chat = opened(sessions.open(ai.mindconnect.agent.runtime.api.domain.UserId.of(user.value()), null,
+    public ManagedSession open(AgentId agent, UserId user, String type, String workingDirectory,
+                               List<String> additionalDirectories) {
+        ManagedSession session = sessions.open(ai.mindconnect.agent.runtime.api.domain.UserId.of(user.value()), null,
                 new SessionAgent.Ref(ai.mindconnect.agent.management.api.AgentId.of(agent.value())), type,
                 new SessionDirectories(workingDirectory,
-                        additionalDirectories == null ? List.of() : additionalDirectories)));
+                        additionalDirectories == null ? List.of() : additionalDirectories));
+        AgentSession chat = opened(session);
         users.publish(user, new UserEvent.SessionStarted(chat.id(), chat.agentDefinitionId(), chat.type()));
-        return chat;
-    }
-
-    /** Opens a chat on a definition of its own, which no stored agent stands behind. */
-    public AgentSession open(AgentDefinition definition, UserId user) {
-        AgentSession chat = opened(sessions.open(ai.mindconnect.agent.runtime.api.domain.UserId.of(user.value()), null,
-                new SessionAgent.Own(converter.runs(definition), null), null, SessionDirectories.NONE));
-        users.publish(user, new UserEvent.SessionStarted(chat.id(), chat.agentDefinitionId(), chat.type()));
-        return chat;
-    }
-
-    /**
-     * Opens a chat on a stored agent under another chat, in that chat's
-     * directories — a sub-agent tried out from the chat that may call it.
-     * It is the chat's business and no news for the user's list.
-     */
-    public AgentSession openUnder(AgentSession parent, AgentId agent) {
-        return opened(sessions.open(ai.mindconnect.agent.runtime.api.domain.UserId.of(parent.userId().value()),
-                ai.mindconnect.agent.runtime.api.domain.SessionId.of(parent.id().value()),
-                new SessionAgent.Ref(ai.mindconnect.agent.management.api.AgentId.of(agent.value())), null,
-                new SessionDirectories(parent.workingDir(), parent.additionalDirs())));
+        return session;
     }
 
     /** The session as the earlier side reads it, with the conversation record that side asks for. */

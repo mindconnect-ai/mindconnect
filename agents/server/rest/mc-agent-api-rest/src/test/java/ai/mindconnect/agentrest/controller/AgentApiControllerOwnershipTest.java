@@ -1,19 +1,10 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryConversationSummaryRepository;
 import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.AgentRegistryService;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.chat.stream.UserChannels;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
@@ -49,62 +40,42 @@ class AgentApiControllerOwnershipTest {
     Path dir;
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-    private final InMemoryAgentDefinitionRepository definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
+    private static final String AGENT = "a1";
+
+    private final ai.mindconnect.agentrest.SessionFixture sessions = new ai.mindconnect.agentrest.SessionFixture();
     private final UserChannels userChannels = new UserChannels();
 
-    private AgentSessionService sessionService;
     /** No turn runs in these tests: what reaches the services behind the controller is all that is looked at. */
     private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns =
             org.mockito.Mockito.mock(ai.mindconnect.agentrest.service.SessionTurns.class);
     private final ai.mindconnect.agentrest.service.TurnFrameStream frameStream =
             org.mockito.Mockito.mock(ai.mindconnect.agentrest.service.TurnFrameStream.class);
-    private final AgentChatService earlierChat = org.mockito.Mockito.mock(AgentChatService.class);
-    private final ai.mindconnect.agent.management.api.SessionManagement management =
-            org.mockito.Mockito.mock(ai.mindconnect.agent.management.api.SessionManagement.class);
+    private final ai.mindconnect.agent.management.api.SessionManagement management = sessions.management();
     private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction =
             org.mockito.Mockito.mock(ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction.class);
-    private AgentDefinition agent;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        sessionService = new AgentSessionService(definitions, sessions,
-                new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
-                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
-                new InMemoryToolApprovalRepository(), userChannels);
-        agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
-        // A chat opened through the chat service is a session of the repository these tests read.
-        // A session deleted through the management is gone from the repository these tests read.
-        org.mockito.Mockito.doAnswer(call -> {
-            sessions.deleteById(SessionId.of(
-                    call.<ai.mindconnect.agent.runtime.api.domain.SessionId>getArgument(0).value()));
-            return null;
-        }).when(management).delete(org.mockito.ArgumentMatchers.any());
-        // The sessions the earlier session service opened are the ones access is asked about.
-        org.mockito.Mockito.when(management.find(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->
-                sessions.findById(SessionId.of(
-                                call.<ai.mindconnect.agent.runtime.api.domain.SessionId>getArgument(0).value()))
-                        .map(found -> new ai.mindconnect.agent.management.api.ManagedSession(
-                                call.getArgument(0),
-                                ai.mindconnect.agent.runtime.api.domain.UserId.of(found.userId().value()), null, null,
-                                null, null, null, ai.mindconnect.agent.management.api.SessionDirectories.NONE, null,
-                                java.util.Map.of())));
-        ai.mindconnect.plugin.PluginRegistry registry = new ai.mindconnect.plugin.DefaultPluginRegistry();
-        registry.provide(ai.mindconnect.agent.management.api.SessionManagement.class, () -> management);
-        registry.start();
-        ai.mindconnect.agent.sdk.AgentRuntime managed = new ai.mindconnect.agent.sdk.AgentRuntime(registry, () -> { });
         ai.mindconnect.agent.starter.runtime.bridge.ChatOpener opener =
                 org.mockito.Mockito.mock(ai.mindconnect.agent.starter.runtime.bridge.ChatOpener.class);
         org.mockito.Mockito.when(opener.open(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any()))
-                .thenAnswer(call -> sessionService.openChat(call.getArgument(0), call.<UserId>getArgument(1),
-                        call.<String>getArgument(3), call.<List<String>>getArgument(4)));
-        AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
-                sessionService, sessionTurns, frameStream, earlierChat, managed, compaction, opener, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
-                new SessionAccess(managed), new ObjectMapper(), null);
+                .thenAnswer(call -> sessions.openOn(call.<ai.mindconnect.agent.AgentId>getArgument(0).value(),
+                        call.<UserId>getArgument(1).value()));
+        AgentApiController controller = new AgentApiController(
+                ai.mindconnect.agent.management.directory.WorkingDirPolicy.unrestricted(),
+                new ai.mindconnect.message.adapter.memory.InMemoryMessageRepository(
+                        ScopeSupplier.fixed(new Namespace("test"))),
+                sessionTurns, frameStream, sessions.runtime(), compaction, opener,
+                new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
+                new SessionAccess(sessions.runtime()), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
+    }
+
+    private List<ai.mindconnect.agent.management.api.ManagedSession> sessionsOf(String user) {
+        return management.list(ai.mindconnect.agent.runtime.api.domain.UserId.of(user));
     }
 
     @Test
@@ -112,22 +83,22 @@ class AgentApiControllerOwnershipTest {
         callers.actAs("alice");
 
         mvc.perform(post("/api/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"agentId\":\"" + agent.id().value() + "\",\"userId\":\"mallory\"}"))
+                        .content("{\"agentId\":\"" + AGENT + "\",\"userId\":\"mallory\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("alice"));
 
-        assertThat(sessionService.listSessions(agent.id(), UserId.of("alice"))).hasSize(1);
-        assertThat(sessionService.listSessions(agent.id(), UserId.of("mallory"))).isEmpty();
+        assertThat(sessionsOf("alice")).hasSize(1);
+        assertThat(sessionsOf("mallory")).isEmpty();
     }
 
     @Test
     void theSessionListHoldsOnlyTheCallersSessions() throws Exception {
-        String alices = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
-        sessionService.openChat(agent.id(), UserId.of("bob"));
+        String alices = sessions.openOn(AGENT, "alice").id().value();
+        sessions.openOn(AGENT, "bob");
         callers.actAs("alice");
 
         // A userId parameter from an older client changes nothing.
-        mvc.perform(get("/api/sessions").param("agentId", agent.id().value()).param("userId", "bob"))
+        mvc.perform(get("/api/sessions").param("agentId", AGENT).param("userId", "bob"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(alices));
@@ -135,19 +106,19 @@ class AgentApiControllerOwnershipTest {
 
     @Test
     void someoneElsesSessionIsNotFoundOnEveryEndpoint() throws Exception {
-        String bobs = sessionService.openChat(agent.id(), UserId.of("bob")).id().value();
+        String bobs = sessions.openOn(AGENT, "bob").id().value();
         callers.actAs("alice");
 
         for (MockHttpServletRequestBuilder request : sessionEndpoints(bobs)) {
             mvc.perform(request).andExpect(status().isNotFound());
         }
 
-        org.mockito.Mockito.verifyNoInteractions(sessionTurns, frameStream, earlierChat, compaction);
+        org.mockito.Mockito.verifyNoInteractions(sessionTurns, frameStream, compaction);
         // Asked whose session it is, and nothing else.
         org.mockito.Mockito.verify(management, org.mockito.Mockito.atLeastOnce())
                 .find(org.mockito.ArgumentMatchers.any());
         org.mockito.Mockito.verifyNoMoreInteractions(management);
-        assertThat(sessions.findById(SessionId.of(bobs))).as("the session was not deleted").isPresent();
+        assertThat(sessionsOf("bob")).as("the session was not deleted").hasSize(1);
     }
 
     @Test
@@ -161,7 +132,7 @@ class AgentApiControllerOwnershipTest {
 
     @Test
     void theOwnerReachesTheirSession() throws Exception {
-        String alices = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
+        String alices = sessions.openOn(AGENT, "alice").id().value();
         callers.actAs("alice");
 
         mvc.perform(get("/api/sessions/{id}/history", alices))
@@ -173,9 +144,9 @@ class AgentApiControllerOwnershipTest {
                 .andExpect(jsonPath("$.compressedMessages").value(0));
         mvc.perform(delete("/api/sessions/{id}", alices)).andExpect(status().isNoContent());
 
-        org.mockito.Mockito.verify(earlierChat).openApprovals(ai.mindconnect.agent.SessionId.of(alices));
+        org.mockito.Mockito.verify(sessionTurns).open(ai.mindconnect.agent.runtime.api.domain.SessionId.of(alices));
         org.mockito.Mockito.verify(compaction).compact(ai.mindconnect.agent.runtime.api.domain.SessionId.of(alices));
-        assertThat(sessions.findById(SessionId.of(alices))).isEmpty();
+        assertThat(sessionsOf("alice")).isEmpty();
     }
 
     @Test

@@ -2,12 +2,24 @@ package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agentrest.dto.WorkingMemoryResponse;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentPatch;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.AgentSpec;
-import ai.mindconnect.agent.runtime.service.AgentRegistryService;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectories;
+import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
+import ai.mindconnect.agent.management.tool.AgentToolBinding;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.Interruption;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
+import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agentrest.dto.SessionResponse;
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.agent.chat.stream.ToolApproval;
 import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.auth.SessionAccess;
@@ -41,8 +53,8 @@ import java.util.Optional;
 /**
  * External REST API for agents and their chat sessions: agent CRUD, session
  * lifecycle, chat streaming, history and working memory. Delegates to the
- * same use-case services the admin UI runs on ({@link AgentRegistryService},
- * {@link AgentSessionService}, the bridge's chat service).
+ * same services the admin UI runs on: the runtime's agent and session
+ * management.
  *
  * <p>Sessions belong to the authenticated caller ({@link CurrentUser}): one is
  * opened for the caller and listed for the caller, and every
@@ -57,13 +69,16 @@ public class AgentApiController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentApiController.class);
 
+    private static final int DEFAULT_MAX_ROUNDS = 10;
+    private static final PageRequest EVERYTHING = new PageRequest(0, Integer.MAX_VALUE);
+
     /** How long a finished turn's stream waits for its Done frame before it closes anyway. */
 
-    private final AgentRegistryService registryService;
-    private final AgentSessionService sessionService;
+    private final WorkingDirPolicy workingDirPolicy;
+    /** The messages as they are stored: the history endpoint answers with them as they are. */
+    private final MessageRepository messages;
     private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns;
     private final ai.mindconnect.agentrest.service.TurnFrameStream frameStream;
-    private final ai.mindconnect.agent.runtime.service.AgentChatService earlierChat;
     private final ai.mindconnect.agent.management.api.SessionManagement management;
     private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction;
     /** Asked for what only some assemblies have: a service is looked up when it is needed. */
@@ -75,11 +90,10 @@ public class AgentApiController {
     private final ObjectMapper compactMapper;
     private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
 
-    public AgentApiController(AgentRegistryService registryService,
-                            AgentSessionService sessionService,
+    public AgentApiController(WorkingDirPolicy workingDirPolicy,
+                            MessageRepository messages,
                             ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
                             ai.mindconnect.agentrest.service.TurnFrameStream frameStream,
-                            ai.mindconnect.agent.runtime.service.AgentChatService earlierChat,
                             ai.mindconnect.agent.sdk.AgentRuntime runtime,
                             ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
                             ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
@@ -89,15 +103,14 @@ public class AgentApiController {
                             ObjectMapper objectMapper,
                             @org.springframework.lang.Nullable
                             ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser) {
-        // A host that defines no browser gets one over the session service's
+        // A host that defines no browser gets one over the directory
         // policy — the same tree, without a bean to declare.
         this.dirBrowser = dirBrowser != null ? dirBrowser
-                : new ai.mindconnect.agent.management.directory.WorkingDirBrowser(sessionService.workingDirPolicy());
-        this.registryService = registryService;
-        this.sessionService = sessionService;
+                : new ai.mindconnect.agent.management.directory.WorkingDirBrowser(workingDirPolicy);
+        this.workingDirPolicy = workingDirPolicy;
+        this.messages = messages;
         this.sessionTurns = sessionTurns;
         this.frameStream = frameStream;
-        this.earlierChat = earlierChat;
         this.management = runtime.service(ai.mindconnect.agent.management.api.SessionManagement.class);
         this.compaction = compaction;
         this.runtime = runtime;
@@ -120,14 +133,20 @@ public class AgentApiController {
     @Operation(tags = "Agents", summary = "Create an agent",
             description = "Creates an agent; it starts with no tools.")
     @PostMapping("/agents")
-    public AgentDefinition createAgent(@RequestBody CreateAgentRequest req) {
+    public ManagedAgent createAgent(@RequestBody CreateAgentRequest req) {
         log.info("POST /api/agents name={}", req.name());
-        AgentSpec spec = new AgentSpec(req.name(), req.description(),
-                req.systemPrompt(), req.welcomeMessage(), req.llmConfigName());
-        AgentDefinition agent = registryService.create(spec);
-        log.info("Created agent: {} ({})", agent.name(), agent.id());
+        ManagedAgent agent = agents().create(ManagedAgent.of(new AgentDefinition(req.name(),
+                        req.description() == null ? "" : req.description(),
+                        req.systemPrompt() == null ? "" : req.systemPrompt(),
+                        req.llmConfigName() == null ? ModelSettings.NONE : ModelSettings.ofModel(req.llmConfigName()),
+                        List.of(), DEFAULT_MAX_ROUNDS, Map.of()))
+                .shownAs(null, null, req.welcomeMessage()));
+        log.info("Created agent: {} ({})", agent.definition().name(), agent.id());
         return agent;
     }
+
+    /** How an agent's skills are picked: {@code ALL}, {@code NONE} or {@code SPECIFIC} with the names. */
+    public record SkillsSetting(String mode, List<String> names) { }
 
     /**
      * Partial update: absent (null) fields keep their current value. {@code version},
@@ -137,89 +156,122 @@ public class AgentApiController {
     public record UpdateAgentRequest(String name, String description, String systemPrompt,
                                      String welcomeMessage, String llmConfigName,
                                      Integer maxIterations, List<String> responseReviewers,
-                                     List<String> callableAgents, Boolean callableByAgents,
-                                     AgentDefinition.SkillsConfig skills, Long version) {
-
-        /** Without a version: the update is applied to the agent as stored. */
-        public UpdateAgentRequest(String name, String description, String systemPrompt,
-                                  String welcomeMessage, String llmConfigName,
-                                  Integer maxIterations, List<String> responseReviewers,
-                                  List<String> callableAgents, Boolean callableByAgents) {
-            this(name, description, systemPrompt, welcomeMessage, llmConfigName, maxIterations,
-                    responseReviewers, callableAgents, callableByAgents, null, null);
-        }
-    }
+                                     List<String> callableAgents, SkillsSetting skills, Long version) { }
 
     @Operation(tags = "Agents", summary = "Update an agent",
             description = "Partial update — absent (null) fields keep their current value. "
-                    + "Covers the same fields as the admin UI's edit form, through the same "
-                    + "AgentRegistryService path. Send the agent's `version` as you read it to "
-                    + "have the update refused with 409 when the agent was saved since; without "
-                    + "it the update is applied to the agent as stored.")
+                    + "Covers the same fields as the admin UI's edit form. Send the agent's "
+                    + "`version` as you read it to have the update refused with 409 when the "
+                    + "agent was saved since; without it the update is applied to the agent as stored.")
     @PutMapping("/agents/{agentId}")
-    public AgentDefinition updateAgent(@PathVariable String agentId,
-                                       @RequestBody UpdateAgentRequest req) {
+    public ManagedAgent updateAgent(@PathVariable String agentId,
+                                    @RequestBody UpdateAgentRequest req) {
         log.info("PUT /api/agents/{}", agentId);
-        AgentPatch patch = AgentPatch.of()
-                .withName(req.name())
-                .withDescription(req.description())
-                .withSystemPrompt(req.systemPrompt())
-                .withWelcomeMessage(req.welcomeMessage())
-                .withLlmConfigName(req.llmConfigName())
-                .withMaxIterations(req.maxIterations())
-                .withResponseReviewers(req.responseReviewers())
-                .withCallableAgents(req.callableAgents())
-                .withCallableByAgents(req.callableByAgents())
-                .withSkills(req.skills());
-        return registryService.update(AgentId.of(agentId), patch, req.version());
+        return changeAgent(agentId, req.version(), stored -> {
+            AgentDefinition definition = stored.definition();
+            Map<String, Object> metadata = new java.util.HashMap<>(definition.metadata());
+            if (req.responseReviewers() != null) {
+                metadata.put(ResponseReviewPlugin.REVIEWERS, List.copyOf(req.responseReviewers()));
+            }
+            if (req.callableAgents() != null) {
+                metadata.put(SubAgentPlugin.SUB_AGENTS, List.copyOf(req.callableAgents()));
+            }
+            if (req.skills() != null) {
+                // Every skill is no entry at all, none is an empty list, and the ones named are the list.
+                switch (req.skills().mode() == null ? "ALL" : req.skills().mode().toUpperCase(java.util.Locale.ROOT)) {
+                    case "NONE" -> metadata.put(SkillPlugin.SKILLS, List.of());
+                    case "SPECIFIC" -> metadata.put(SkillPlugin.SKILLS,
+                            req.skills().names() == null ? List.of() : List.copyOf(req.skills().names()));
+                    case "ALL" -> metadata.remove(SkillPlugin.SKILLS);
+                    default -> throw new IllegalArgumentException("There is no skills mode " + req.skills().mode());
+                }
+            }
+            return stored.withDefinition(new AgentDefinition(
+                            req.name() != null ? req.name() : definition.name(),
+                            req.description() != null ? req.description() : definition.description(),
+                            req.systemPrompt() != null ? req.systemPrompt() : definition.instructions(),
+                            req.llmConfigName() != null ? ModelSettings.ofModel(req.llmConfigName())
+                                    : definition.modelSettings(),
+                            definition.tools(),
+                            req.maxIterations() != null ? req.maxIterations() : definition.maxRounds(),
+                            metadata))
+                    .shownAs(stored.group(), stored.icon(),
+                            req.welcomeMessage() != null ? req.welcomeMessage() : stored.welcomeMessage());
+        });
     }
 
     @Operation(tags = "Agents", summary = "Delete an agent")
     @DeleteMapping("/agents/{agentId}")
     public ResponseEntity<Void> deleteAgent(@PathVariable String agentId) {
         log.info("DELETE /api/agents/{}", agentId);
-        AgentId id = AgentId.of(agentId);
-        if (registryService.find(id).isEmpty()) return ResponseEntity.notFound().build();
-        registryService.delete(id);
+        ai.mindconnect.agent.management.api.AgentId id = ai.mindconnect.agent.management.api.AgentId.of(agentId);
+        if (agents().find(id).isEmpty()) return ResponseEntity.notFound().build();
+        agents().delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @Operation(tags = "Agents", summary = "Duplicate an agent",
-            description = "Creates \"{name}-copy\" with a fresh id and no tools "
-                    + "(tools carry per-agent ids).")
+            description = "Creates \"{name}-copy\" with a fresh id and the same tools.")
     @PostMapping("/agents/{agentId}/copy")
-    public ResponseEntity<AgentDefinition> copyAgent(@PathVariable String agentId) {
+    public ResponseEntity<ManagedAgent> copyAgent(@PathVariable String agentId) {
         log.info("POST /api/agents/{}/copy", agentId);
-        AgentId id = AgentId.of(agentId);
-        if (registryService.find(id).isEmpty()) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(registryService.copy(id));
+        ai.mindconnect.agent.management.api.AgentId id = ai.mindconnect.agent.management.api.AgentId.of(agentId);
+        if (agents().find(id).isEmpty()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(agents().copy(id));
     }
 
     @Operation(tags = "Agents", summary = "Replace an agent's tools",
             description = "Sets the complete tool list — tools not in the request are removed.")
     @PutMapping("/agents/{agentId}/tools")
-    public AgentDefinition updateTools(@PathVariable String agentId,
-                                        @RequestBody UpdateToolsRequest req) {
+    public ManagedAgent updateTools(@PathVariable String agentId,
+                                    @RequestBody UpdateToolsRequest req) {
         log.info("PUT /api/agents/{}/tools count={}", agentId, req.tools().size());
-        // The tools come in the shape an agent is read in.
-        AgentPatch patch = AgentPatch.of().withTools(req.tools().stream().map(t -> t.toTool()).toList());
-        return registryService.update(AgentId.of(agentId), patch);
+        // A tool sent switched off is one the agent does not have.
+        List<ToolBinding> tools = req.tools().stream().map(tool -> tool.toTool())
+                .filter(ai.mindconnect.agent.tool.AgentTool::enabled).map(AgentToolBinding::of).toList();
+        return changeAgent(agentId, null, stored -> {
+            AgentDefinition definition = stored.definition();
+            return stored.withDefinition(new AgentDefinition(definition.name(), definition.description(),
+                    definition.instructions(), definition.modelSettings(), tools, definition.maxRounds(),
+                    definition.metadata()));
+        });
     }
 
     @Operation(tags = "Agents", summary = "List agents")
     @GetMapping("/agents")
-    public List<AgentDefinition> listAgents() {
+    public List<ManagedAgent> listAgents() {
         log.info("GET /api/agents");
-        return registryService.list();
+        return agents().list();
     }
 
     @Operation(tags = "Agents", summary = "Get an agent")
     @GetMapping("/agents/{agentId}")
-    public ResponseEntity<AgentDefinition> findAgent(@PathVariable String agentId) {
+    public ResponseEntity<ManagedAgent> findAgent(@PathVariable String agentId) {
         log.info("GET /api/agents/{}", agentId);
-        return registryService.find(AgentId.of(agentId))
+        return agents().find(ai.mindconnect.agent.management.api.AgentId.of(agentId))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private AgentManagement agents() {
+        return runtime.service(AgentManagement.class);
+    }
+
+    /** @param version the agent's version as the caller read it; {@code null} applies to the agent as stored */
+    private ManagedAgent changeAgent(String agentId, Long version,
+                                     java.util.function.UnaryOperator<ManagedAgent> change) {
+        ai.mindconnect.agent.management.api.AgentId id = ai.mindconnect.agent.management.api.AgentId.of(agentId);
+        long expected = version != null ? version : agents().find(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "No such agent")).version();
+        return agents().update(id, expected, change);
+    }
+
+    /** An agent saved since the caller read it: 409, so the caller reads again instead of overwriting. */
+    @ExceptionHandler(java.util.ConcurrentModificationException.class)
+    public ResponseEntity<Map<String, String>> conflict(java.util.ConcurrentModificationException e) {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT)
+                .body(Map.of("error", e.getMessage() == null ? "conflict" : e.getMessage()));
     }
 
     // ── Sessions ────────────────────────────────────────────────────────────
@@ -229,13 +281,13 @@ public class AgentApiController {
                     + "the returned id addresses chat, history, memory and file endpoints. Body "
                     + "{agentId} — a userId still sent by an older client is ignored.")
     @PostMapping("/sessions")
-    public AgentSession startSession(@RequestBody StartSessionRequest req, @CurrentUser UserId caller) {
+    public SessionResponse startSession(@RequestBody StartSessionRequest req, @CurrentUser UserId caller) {
         log.info("POST /api/sessions agentId={} user={} workingDir={}",
                 req.agentId(), caller, req.workingDir());
-        AgentSession session = chatOpener.open(
+        ManagedSession opened = chatOpener.open(
                 AgentId.of(req.agentId()), caller, null, req.workingDir(), req.additionalDirs());
-        log.info("Session started: {}", session.id());
-        return session;
+        log.info("Session started: {}", opened.id().value());
+        return SessionResponse.of(opened);
     }
 
     @Operation(tags = "Sessions", summary = "List the directories the caller may work in",
@@ -257,7 +309,7 @@ public class AgentApiController {
                     + "directory does not exist or lies outside `mindconnect.tools.working-dir-root`; "
                     + "404 when the session is not the caller's.")
     @PutMapping("/sessions/{sessionId}/working-dir")
-    public AgentSession changeWorkingDir(@PathVariable String sessionId,
+    public SessionResponse changeWorkingDir(@PathVariable String sessionId,
                                          @RequestBody Map<String, Object> body,
                                          @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
@@ -268,14 +320,22 @@ public class AgentApiController {
             additionalDirs = raw.stream().filter(java.util.Objects::nonNull).map(Object::toString).toList();
         }
         log.info("PUT /api/sessions/{}/working-dir workingDir={} additionalDirs={}", id, workingDir, additionalDirs);
-        return sessionService.changeWorkingDir(id, workingDir, additionalDirs);
+        // Clearing counts as a choice too: it would take the chat out of its own directory.
+        workingDirPolicy.requireChoice();
+        ManagedSession current = management.find(runtimeId(id)).orElseThrow();
+        return SessionResponse.of(management.changeDirectories(current.id(), new SessionDirectories(
+                workingDir == null || workingDir.isBlank() ? null : workingDir,
+                additionalDirs == null ? current.directories().additional() : additionalDirs)));
     }
 
     @Operation(tags = "Sessions", summary = "List the caller's sessions for an agent")
     @GetMapping("/sessions")
-    public List<AgentSession> listSessions(@RequestParam String agentId, @CurrentUser UserId caller) {
+    public List<SessionResponse> listSessions(@RequestParam String agentId, @CurrentUser UserId caller) {
         log.info("GET /api/sessions agentId={} user={}", agentId, caller);
-        List<AgentSession> sessions = sessionService.listSessions(AgentId.of(agentId), caller);
+        List<SessionResponse> sessions = management
+                .list(ai.mindconnect.agent.runtime.api.domain.UserId.of(caller.value())).stream()
+                .filter(session -> session.agentId().map(id -> id.value().equals(agentId)).orElse(false))
+                .map(SessionResponse::of).toList();
         log.info("Found {} session(s)", sessions.size());
         return sessions;
     }
@@ -378,7 +438,7 @@ public class AgentApiController {
 
             @Override
             public void asked(ai.mindconnect.agent.runtime.api.domain.TurnId turnId) {
-                sendFrame(emitter, IncompleteFrame.of(turnId.value(), earlierChat.openApprovals(sessionId)));
+                sendFrame(emitter, IncompleteFrame.of(turnId.value(), openApprovals(sessionId)));
             }
 
             @Override
@@ -552,7 +612,7 @@ public class AgentApiController {
     public List<Message> loadHistory(@PathVariable String sessionId, @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("GET /api/sessions/{}/history", sessionId);
-        List<Message> history = sessionService.loadHistory(id);
+        List<Message> history = messages.findByConversation(conversationOf(id), EVERYTHING);
         log.info("Returning {} message(s) for session {}", history.size(), sessionId);
         return history;
     }
@@ -576,7 +636,11 @@ public class AgentApiController {
                                                                @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("DELETE /api/sessions/{}/messages fromSeq={} toSeq={}", sessionId, fromSeq, toSeq);
-        int deleted = sessionService.deleteMessages(id, fromSeq, toSeq);
+        if (fromSeq > toSeq) throw new IllegalArgumentException("fromSeq must be <= toSeq");
+        ConversationId conversation = conversationOf(id);
+        int deleted = (int) messages.findByConversation(conversation, EVERYTHING).stream()
+                .filter(message -> message.sequenceNum() >= fromSeq && message.sequenceNum() <= toSeq).count();
+        messages.deleteBySequenceRange(conversation, fromSeq, toSeq);
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "deletedMessages", deleted));
@@ -617,7 +681,7 @@ public class AgentApiController {
                     + "from here. Each entry's content is the call JSON the card shows.")
     @GetMapping("/sessions/{sessionId}/approvals")
     public List<ToolApproval> openApprovals(@PathVariable String sessionId, @CurrentUser UserId caller) {
-        List<ToolApproval> open = earlierChat.openApprovals(owned(sessionId, caller));
+        List<ToolApproval> open = openApprovals(owned(sessionId, caller));
         log.info("GET /api/sessions/{}/approvals → {} open", sessionId, open.size());
         return open;
     }
@@ -667,6 +731,30 @@ public class AgentApiController {
      * The session's id, once it is known to be the caller's — a 404 for the
      * request otherwise, whether the session is someone else's or missing.
      */
+    /** The conversation the session's messages are kept in. */
+    private ConversationId conversationOf(SessionId sessionId) {
+        return runtime.sessions().find(runtimeId(sessionId)).map(RepositorySessionStore::conversationOf)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "No such session"));
+    }
+
+    /** What the session's turn waits for, as the approval cards a client draws. */
+    private List<ToolApproval> openApprovals(SessionId sessionId) {
+        return sessionTurns.open(runtimeId(sessionId)).stream()
+                .filter(open -> Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null)
+                .map(open -> new ToolApproval(open.id(), open.call().callId(), open.call().toolName(),
+                        callJson(open), SessionId.of(open.call().sessionId().value()), sessionId, null, null))
+                .toList();
+    }
+
+    private String callJson(Interruption open) {
+        try {
+            return compactMapper.writeValueAsString(open.call().arguments());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return "{}";
+        }
+    }
+
     private SessionId owned(String sessionId, UserId caller) {
         SessionId id = SessionId.of(sessionId);
         sessionAccess.requireOwned(id, caller);

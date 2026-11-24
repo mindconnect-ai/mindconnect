@@ -20,3 +20,18 @@
   cancelling, reattaching to a session's stream, answering an approval with or
   without a continuation stream, and compressing a session's memory, which now
   summarises everything before the last turn for an agent that keeps a summary.
+- **api:** **`/api/agents` answers with the agent as it is stored**, no longer
+  with the flat shape of the earlier runtime: `{id, definition: {name,
+  description, instructions, modelSettings, tools, maxRounds, metadata}, group,
+  icon, welcomeMessage, status, createdAt, updatedAt, version}`. The requests
+  take the fields they took. `/api/sessions` answers with `{id, userId,
+  parentId, agentId, title, type, status, workingDir, additionalDirs,
+  createdAt}`. A client that read `systemPrompt`, `llmConfigName` or
+  `agentDefinitionId` from a response reads `definition.instructions`,
+  `definition.modelSettings.model` and `agentId` instead.
+- Agent files — seeds under `initial-data/agent-definitions`, registry entries —
+  are read in the stored shape and, as before, in the flat one written before
+  1.0. A migration compares and applies an agent field by field across its
+  definition and its settings (`instructions`, `tools`, `memory`, `subAgents`, …).
+- The task board shows the turns and tool calls of the runtime with their agent
+  and their owner, and a namespace sees its own tasks only.

@@ -17,6 +17,7 @@ import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
@@ -40,11 +41,17 @@ public final class SessionFixture {
         var sessions = new InMemorySessionRepository(NamespaceProvider.fixed("test"));
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         store = new RepositorySessionStore(sessions, messages);
-        management = new RepositorySessionManagement(sessions, messages,
+        // A spy, so a test can look at what reached the management.
+        management = org.mockito.Mockito.spy(new RepositorySessionManagement(sessions, messages,
                 new InMemoryAgentRepository(NamespaceProvider.fixed("test")), SessionDirectoryPolicy.unrestricted(),
-                List.of());
+                List.of()));
         PluginRegistry registry = new DefaultPluginRegistry();
         registry.provide(SessionManagement.class, () -> management);
+        // Enough of the runtime's own session service to find a session by its id.
+        SessionService found = org.mockito.Mockito.mock(SessionService.class);
+        org.mockito.Mockito.when(found.find(org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call -> store.find(call.getArgument(0)));
+        registry.provide(SessionService.class, () -> found);
         registry.start();
         runtime = new AgentRuntime(registry, () -> { });
     }
@@ -59,10 +66,20 @@ public final class SessionFixture {
 
     /** A session of {@code user}, working in {@code workingDir} when one is given. */
     public ManagedSession open(String user, String workingDir) {
+        return open(user, workingDir == null ? Map.of() : Map.of(ManagedSession.WORKING_DIRECTORY, workingDir));
+    }
+
+    /** A session of {@code user} on the stored agent of that id. */
+    public ManagedSession openOn(String agentId, String user) {
+        return open(user, Map.of(ManagedSession.AGENT_ID, agentId));
+    }
+
+    private ManagedSession open(String user, Map<String, Object> metadata) {
         SessionId id = SessionId.of(UUID.randomUUID().toString());
-        store.create(new Session(id, UserId.of(user), null, HELPER,
-                workingDir == null ? Map.of() : Map.of(ManagedSession.WORKING_DIRECTORY, workingDir),
+        store.create(new Session(id, UserId.of(user), null, HELPER, metadata,
                 Instant.parse("2026-11-01T00:00:00Z")));
-        return management.find(id).orElseThrow();
+        ManagedSession opened = management.find(id).orElseThrow();
+        org.mockito.Mockito.clearInvocations(management);
+        return opened;
     }
 }

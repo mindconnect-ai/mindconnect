@@ -49,6 +49,38 @@ the request. In Swagger UI, **Authorize** takes the token. See
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
 
+An agent is answered, and read from a file, in one shape — the agent as it is
+stored:
+
+```json
+{
+  "id": "…",
+  "definition": {
+    "name": "researcher",
+    "description": "Looks things up.",
+    "instructions": "You research …",
+    "modelSettings": { "model": "agent-default" },
+    "tools": [ { "name": "web_search", "deferred": false, "metadata": { "needsApproval": true } } ],
+    "maxRounds": 10,
+    "metadata": { "subAgents": ["url-reader"], "skills": ["weekly-report"], "memory": { "strategy": "compact" } }
+  },
+  "group": "assistants", "icon": "telescope", "welcomeMessage": "…",
+  "status": "ACTIVE", "createdAt": "…", "updatedAt": "…", "version": 3
+}
+```
+
+`definition` is what the runtime runs; its `metadata` holds what a capability
+reads under its own key: `subAgents`, `responseReviewers`, `skills` (absent:
+every skill, an empty list: none), `memory`. A seed file or a registry entry
+written before 1.0 — fields flat, `systemPrompt`, `llmConfigName`,
+`memoryConfig` — is still read, and stored in the shape above. `POST` and `PUT`
+take the flat fields they always took (`name`, `description`, `systemPrompt`,
+`welcomeMessage`, `llmConfigName`, and on `PUT` also `maxIterations`,
+`responseReviewers`, `callableAgents`, `skills` as `{mode, names}`, `version`).
+
+A session is answered as `{id, userId, parentId, agentId, title, type, status,
+workingDir, additionalDirs, createdAt}`.
+
 A server serves any number of namespaces. A call names the one it works in
 in the address — `/ns/{namespace}/api/…`, so an OpenAI-compatible client
 simply uses `https://host/ns/{namespace}` as its base URL — or in an
