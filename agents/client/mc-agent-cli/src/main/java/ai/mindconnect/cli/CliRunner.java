@@ -529,7 +529,10 @@ public class CliRunner implements CommandLineRunner {
         // Lives only for the duration of this turn; stops itself when streamDone is set.
         java.util.concurrent.atomic.AtomicBoolean streamDone = new java.util.concurrent.atomic.AtomicBoolean(false);
         java.util.concurrent.atomic.AtomicBoolean cancelSent = new java.util.concurrent.atomic.AtomicBoolean(false);
-        Thread cancelWatcher = startCancelWatcher(session.id(), client, streamDone, cancelSent);
+        // The approval the turn waits for, while it waits: the watcher reads its answer from the keyboard.
+        java.util.concurrent.atomic.AtomicReference<StreamEvent.ApprovalRequested> asked =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Thread cancelWatcher = startCancelWatcher(session.id(), client, streamDone, cancelSent, asked);
         try {
             client.chat(session.id(), userMessage, event -> {
                 // After the user has pressed q, drop any further events. In the
@@ -673,8 +676,16 @@ public class CliRunner implements CommandLineRunner {
                     }
                     case StreamEvent.ApprovalRequested ar -> {
                         if (inStatus[0]) { System.out.print("\r\033[K"); inStatus[0] = false; }
-                        System.out.println("\n\033[33m⚠ approval required: tool '" + ar.toolName()
-                                + "' — answer the card in the web UI to continue\033[0m");
+                        if (client.answersApprovals()) {
+                            System.out.println("\n\033[33m⚠ approval required: tool '" + ar.toolName() + "' "
+                                    + ar.arguments() + "\033[0m");
+                            System.out.print("  allow? [y] once, [a] for this session, [n] deny, then enter: ");
+                            System.out.flush();
+                            asked.set(ar);
+                        } else {
+                            System.out.println("\n\033[33m⚠ approval required: tool '" + ar.toolName()
+                                    + "' — answer the card in the web UI to continue\033[0m");
+                        }
                     }
                     case StreamEvent.SubAgentError sErr -> {
                         endTextLine(textActive, streamedLines);
@@ -705,6 +716,8 @@ public class CliRunner implements CommandLineRunner {
      * Spawns a daemon thread that polls {@code System.in.available()} and
      * watches for a {@code q} character followed by a newline. On match, it
      * fires a single {@code cancelChat} to the server and sets {@code cancelSent}.
+     * While the turn waits for an approval, {@code y}, {@code a} or {@code n}
+     * answers it instead.
      * The thread exits as soon as {@code streamDone} flips to true (or it is
      * interrupted), discarding any non-{@code q} characters it consumed.
      * <p>
@@ -714,14 +727,25 @@ public class CliRunner implements CommandLineRunner {
      */
     private Thread startCancelWatcher(SessionId sessionId, AgentClient client,
                                        java.util.concurrent.atomic.AtomicBoolean streamDone,
-                                       java.util.concurrent.atomic.AtomicBoolean cancelSent) {
+                                       java.util.concurrent.atomic.AtomicBoolean cancelSent,
+                                       java.util.concurrent.atomic.AtomicReference<StreamEvent.ApprovalRequested> asked) {
         Thread t = new Thread(() -> {
             try {
                 while (!streamDone.get() && !Thread.currentThread().isInterrupted()) {
                     if (System.in.available() > 0) {
                         int b = System.in.read();
                         if (b == -1) return;
-                        if ((b == 'q' || b == 'Q') && !cancelSent.get()) {
+                        StreamEvent.ApprovalRequested waiting = asked.get();
+                        char key = Character.toLowerCase((char) b);
+                        if (waiting != null && (key == 'y' || key == 'a' || key == 'n')) {
+                            // The answer to the approval the turn waits for; the turn goes on in this chat call.
+                            asked.set(null);
+                            try {
+                                client.answerApproval(sessionId, waiting.callId(), key != 'n', key == 'a');
+                            } catch (Exception ex) {
+                                System.out.println("\n[Error: " + ex.getMessage() + "]");
+                            }
+                        } else if ((b == 'q' || b == 'Q') && !cancelSent.get()) {
                             try {
                                 client.cancelChat(sessionId);
                                 cancelSent.set(true);

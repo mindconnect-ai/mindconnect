@@ -54,6 +54,26 @@ public interface AgentClient {
     /** @return whether there was a turn to cancel */
     boolean cancelChat(SessionId sessionId);
 
+    /**
+     * Whether a tool approval can be answered through this client while its
+     * turn waits. Where it cannot, the question is answered elsewhere — in
+     * the web UI of the server the client talks to.
+     */
+    default boolean answersApprovals() {
+        return false;
+    }
+
+    /**
+     * Answers the approval a tool call of the session's turn waits for; the
+     * turn goes on within the {@link #chat} call that reported the question.
+     *
+     * @param forSession with {@code approved}: the tool may run for the rest of the session
+     * @return whether the question was still open
+     */
+    default boolean answerApproval(SessionId sessionId, String callId, boolean approved, boolean forSession) {
+        return false;
+    }
+
     // ── Memory ──────────────────────────────────────────────────────────────
 
     MemoryView getWorkingMemory(SessionId sessionId);

@@ -13,6 +13,7 @@ import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
+import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
@@ -156,9 +157,7 @@ public class LocalAgentClient implements AgentClient {
                                 ai.mindconnect.agent.SessionId.of(open.call().sessionId().value()), null));
                     }
                 }
-                // Nobody answers an approval in this process yet: the turn is given up, so the session
-                // is free for the next message.
-                runtime.turns().cancel(started.join());
+                // The turn waits: whoever draws the question answers it through answerApproval.
             }
         });
         TurnId turnId = runtime.turns().submit(TurnRequest.text(sessionId, userMessage));
@@ -191,6 +190,24 @@ public class LocalAgentClient implements AgentClient {
             following.close();
             asking.close();
         }
+    }
+
+    @Override
+    public boolean answersApprovals() {
+        return true;
+    }
+
+    @Override
+    public boolean answerApproval(SessionId sessionId, String callId, boolean approved, boolean forSession) {
+        Optional<Turn> running = runtime.turns().runningTurn(sessionId);
+        Optional<String> asked = running.map(Turn::interruptions).orElse(List.of()).stream()
+                .filter(open -> open.call() != null && callId.equals(open.call().callId()))
+                .map(Interruption::id)
+                .findFirst();
+        asked.ifPresent(id -> runtime.turns().resume(running.orElseThrow().id(), List.of(
+                !approved ? InterruptionAnswer.reject(id, "")
+                        : forSession ? InterruptionAnswer.approveAlways(id) : InterruptionAnswer.approve(id))));
+        return asked.isPresent();
     }
 
     @Override
