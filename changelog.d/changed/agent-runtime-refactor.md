@@ -133,3 +133,6 @@
   `ai.mindconnect.agent` (`mc-agent-domain`); their own records of the same
   name are gone. A session id and an agent id are lower-case letters, digits,
   `.`, `_` and `-`, as everywhere else.
+- `Email` moved from `mc-agent-domain` (`ai.mindconnect.agent`) to
+  `mc-namespace-core` (`ai.mindconnect.namespace.domain`): only the
+  namespaces' member lists use it.

@@ -1,4 +1,4 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.namespace.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

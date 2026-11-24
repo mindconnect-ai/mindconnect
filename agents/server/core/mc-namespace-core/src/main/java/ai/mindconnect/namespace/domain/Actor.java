@@ -1,6 +1,5 @@
 package ai.mindconnect.namespace.domain;
 
-import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.UserId;
 
 import java.util.Locale;

@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.starter.namespace;
 
-import ai.mindconnect.agent.Email;
+import ai.mindconnect.namespace.domain.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
@@ -159,7 +159,7 @@ public class NamespaceAutoConfiguration {
     UserEmails userEmails(ObjectProvider<UserService> users) {
         UserService userService = users.getIfAvailable();
         if (userService == null) return UserEmails.none();
-        return id -> userService.find(id).map(User::email).flatMap(ai.mindconnect.agent.Email::parse);
+        return id -> userService.find(id).map(User::email).flatMap(ai.mindconnect.namespace.domain.Email::parse);
     }
 
     /**

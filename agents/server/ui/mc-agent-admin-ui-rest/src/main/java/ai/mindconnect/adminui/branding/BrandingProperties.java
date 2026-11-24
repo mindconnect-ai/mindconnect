@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.branding;
 
-import ai.mindconnect.agent.Email;
+import ai.mindconnect.namespace.domain.Email;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 

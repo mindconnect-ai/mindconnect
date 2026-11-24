@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.branding;
 
-import ai.mindconnect.agent.Email;
+import ai.mindconnect.namespace.domain.Email;
 
 import java.util.List;
 

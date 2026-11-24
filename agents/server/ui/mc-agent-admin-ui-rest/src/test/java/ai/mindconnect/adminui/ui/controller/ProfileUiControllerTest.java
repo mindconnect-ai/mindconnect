@@ -51,7 +51,7 @@ class ProfileUiControllerTest {
                     java.util.List.of(),
                     // As the server wires it: a namespace lists addresses, the user store has them.
                     id -> users.find(id).map(ai.mindconnect.user.domain.User::email)
-                            .flatMap(ai.mindconnect.agent.Email::parse),
+                            .flatMap(ai.mindconnect.namespace.domain.Email::parse),
                     "local");
     private final ProfileUiController controller = controller(true);
 

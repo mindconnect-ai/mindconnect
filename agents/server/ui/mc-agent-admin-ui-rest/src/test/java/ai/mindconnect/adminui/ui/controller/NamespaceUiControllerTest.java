@@ -74,7 +74,7 @@ class NamespaceUiControllerTest {
 
         assertThat(created.getStatusCode().value()).isEqualTo(303);
         assertThat(namespaces.find(ACME)).get().satisfies(ns -> {
-            assertThat(ns.createdBy()).isEqualTo(ai.mindconnect.agent.Email.of("alice@local"));
+            assertThat(ns.createdBy()).isEqualTo(ai.mindconnect.namespace.domain.Email.of("alice@local"));
             assertThat(ns.label()).isEqualTo("ACME");
         });
         assertThat(NamespaceSelection.selected(request)).contains(ACME);

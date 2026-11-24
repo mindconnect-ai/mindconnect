@@ -207,7 +207,7 @@ public class ProfileUiController {
         UserId me = userId(user);
         Namespace namespace = new Namespace(id);
         FormBody body = new FormBody(raw);
-        ai.mindconnect.agent.Email invitee;
+        ai.mindconnect.namespace.domain.Email invitee;
         NamespaceRole role;
         try {
             role = NamespaceRole.of(body.str("role"));

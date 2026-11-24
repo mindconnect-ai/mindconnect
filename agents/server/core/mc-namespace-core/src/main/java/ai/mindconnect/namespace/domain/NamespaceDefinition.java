@@ -1,6 +1,5 @@
 package ai.mindconnect.namespace.domain;
 
-import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonCreator;

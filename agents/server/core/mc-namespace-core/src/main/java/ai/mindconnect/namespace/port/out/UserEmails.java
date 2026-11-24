@@ -1,6 +1,6 @@
 package ai.mindconnect.namespace.port.out;
 
-import ai.mindconnect.agent.Email;
+import ai.mindconnect.namespace.domain.Email;
 import ai.mindconnect.agent.UserId;
 
 import java.util.Optional;

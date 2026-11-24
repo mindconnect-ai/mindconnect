@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.namespaces;
 import ai.mindconnect.adminui.branding.BrandingNamespace;
 import ai.mindconnect.adminui.branding.BrandingProperties;
 import ai.mindconnect.adminui.branding.BrandingVariant;
-import ai.mindconnect.agent.Email;
+import ai.mindconnect.namespace.domain.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;

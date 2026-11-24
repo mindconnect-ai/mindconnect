@@ -186,7 +186,7 @@ public class NamespaceUiController {
                          @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
         FormBody body = new FormBody(raw);
-        ai.mindconnect.agent.Email invitee;
+        ai.mindconnect.namespace.domain.Email invitee;
         NamespaceRole role;
         try {
             role = NamespaceRole.of(body.str("role"));

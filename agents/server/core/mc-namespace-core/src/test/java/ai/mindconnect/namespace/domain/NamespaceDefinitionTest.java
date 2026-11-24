@@ -1,6 +1,5 @@
 package ai.mindconnect.namespace.domain;
 
-import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import org.junit.jupiter.api.Test;
