@@ -125,7 +125,8 @@ final class DemoRuntime {
                 .orElseThrow(() -> new IllegalArgumentException("No agent named " + agentName));
         SessionId session = runtime.service(SessionManagement.class).open(UserId.of(user), null,
                 new SessionAgent.Ref(agent.id()), null, SessionDirectories.NONE).id();
-        Subscription heard = runtime.sessions().subscribe(session, true, events::accept);
+        Subscription heard = runtime.sessions().subscribe(
+                ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session).withChildSessions().withStream(), events::accept);
         TurnId turnId = runtime.turns().submit(TurnRequest.text(session, question));
         CompletableFuture<Turn> ended = new CompletableFuture<>();
         Subscription following = runtime.turns().subscribe(turnId, new TurnListener() {

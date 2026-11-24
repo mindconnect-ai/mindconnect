@@ -148,7 +148,8 @@ public class LocalAgentClient implements AgentClient {
         CompletableFuture<Turn> over = new CompletableFuture<>();
         CompletableFuture<TurnId> started = new CompletableFuture<>();
         // Followed before the turn starts: that it asks is told by its session, and only once.
-        var asking = runtime.sessions().subscribe(sessionId, true, event -> {
+        var asking = runtime.sessions().subscribe(
+                ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(sessionId).withChildSessions(), event -> {
             if (event instanceof SessionEvent.TurnInterrupted interrupted && !over.isDone()) {
                 for (Interruption open : interrupted.interruptions()) {
                     if (Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null) {

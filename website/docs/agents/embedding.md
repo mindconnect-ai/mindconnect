@@ -113,6 +113,33 @@ question may be answered from anywhere, much later. A question a sub-agent
 raises reaches the turn you submitted. `runtime.sessions().subscribe(…)` tells
 the moment a turn starts to wait (`SessionEvent.TurnInterrupted`).
 
+### Following sessions
+
+A subscription names which sessions it follows and how closely:
+
+```java
+// A list of sessions: which of the user's are busy, which wait for an answer.
+runtime.sessions().subscribe(SessionEventFilter.user(userId), listener);
+
+// The session on screen, as it happens — with its sub-agents' sessions.
+runtime.sessions().subscribe(
+        SessionEventFilter.session(sessionId).withChildSessions().withStream(), listener);
+
+// Every session of the namespace, for a monitor.
+runtime.sessions().subscribe(SessionEventFilter.all(), listener);
+```
+
+Without `withStream()` a listener hears turns begin, ask and end
+(`TurnStarted`, `TurnInterrupted`, `TurnFinished`) and what capabilities say
+about a session (`Notice`). With it, also every message, every tool call and
+what each turn reports as it runs, fragments of the answer included — far
+more events, so ask for it only where a session is shown.
+
+A subscription hears what happens from now on. A client that opens while a
+turn runs asks `runtime.turns().runningTurn(sessionId)`: the turn that has not
+ended, with its status. Over REST a session carries that as `turnId` and
+`turnStatus`.
+
 ## Writing a plugin
 
 A plugin provides services, contributes to the lists the runtime collects, and

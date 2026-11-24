@@ -287,7 +287,7 @@ public class AgentApiController {
         ManagedSession opened = chatOpener.open(
                 AgentId.of(req.agentId()), caller, null, req.workingDir(), req.additionalDirs());
         log.info("Session started: {}", opened.id().value());
-        return SessionResponse.of(opened);
+        return answered(opened);
     }
 
     @Operation(tags = "Sessions", summary = "List the directories the caller may work in",
@@ -323,9 +323,15 @@ public class AgentApiController {
         // Clearing counts as a choice too: it would take the chat out of its own directory.
         workingDirPolicy.requireChoice();
         ManagedSession current = management.find(runtimeId(id)).orElseThrow();
-        return SessionResponse.of(management.changeDirectories(current.id(), new SessionDirectories(
+        return answered(management.changeDirectories(current.id(), new SessionDirectories(
                 workingDir == null || workingDir.isBlank() ? null : workingDir,
                 additionalDirs == null ? current.directories().additional() : additionalDirs)));
+    }
+
+    /** The session with the turn underway in it: what a list of sessions shows as busy or waiting. */
+    private SessionResponse answered(ManagedSession session) {
+        return SessionResponse.of(session, runtime.find(ai.mindconnect.agent.runtime.api.port.in.TurnService.class)
+                .flatMap(turns -> turns.runningTurn(session.id())));
     }
 
     @Operation(tags = "Sessions", summary = "List the caller's sessions for an agent")
@@ -335,7 +341,7 @@ public class AgentApiController {
         List<SessionResponse> sessions = management
                 .list(ai.mindconnect.agent.runtime.api.domain.UserId.of(caller.value())).stream()
                 .filter(session -> session.agentId().map(id -> id.value().equals(agentId)).orElse(false))
-                .map(SessionResponse::of).toList();
+                .map(this::answered).toList();
         log.info("Found {} session(s)", sessions.size());
         return sessions;
     }

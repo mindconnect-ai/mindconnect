@@ -12,6 +12,7 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
@@ -63,13 +64,8 @@ public final class DefaultSessionService implements SessionService {
     }
 
     @Override
-    public Subscription subscribe(UserId userId, SessionEventListener listener) {
-        return events.subscribe(userId, listener);
-    }
-
-    @Override
-    public Subscription subscribe(SessionId sessionId, boolean includeChildSessions, SessionEventListener listener) {
-        return events.subscribe(sessionId, includeChildSessions, listener);
+    public Subscription subscribe(SessionEventFilter filter, SessionEventListener listener) {
+        return events.subscribe(filter, listener);
     }
 
     private Session existing(SessionId sessionId) {

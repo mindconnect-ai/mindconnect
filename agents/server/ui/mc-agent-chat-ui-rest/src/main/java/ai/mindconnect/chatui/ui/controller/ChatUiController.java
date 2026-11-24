@@ -422,7 +422,9 @@ public class ChatUiController {
         ai.mindconnect.agent.runtime.api.domain.SessionId chat = runtimeId(sessionId);
         java.util.concurrent.CompletableFuture<String> answer = new java.util.concurrent.CompletableFuture<>();
         // Followed before the turn exists: a session's events are not replayed.
-        var following = runtimeSessions.subscribe(chat, true, event -> {
+        var following = runtimeSessions.subscribe(
+                ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(chat)
+                        .withChildSessions().withStream(), event -> {
             live.onEvent(event);
             if (!event.sessionId().equals(chat)) {
                 return;

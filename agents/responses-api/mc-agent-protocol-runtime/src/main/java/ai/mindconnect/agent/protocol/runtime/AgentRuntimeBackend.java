@@ -209,7 +209,8 @@ public final class AgentRuntimeBackend {
 
             // Followed before the turn goes on: that it asks is told by its session, and only once.
             ai.mindconnect.agent.runtime.api.port.in.Subscription asking =
-                    runtime.sessions().subscribe(session.id(), true, event -> {
+                    runtime.sessions().subscribe(
+                            ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session.id()).withChildSessions(), event -> {
                         if (event instanceof SessionEvent.TurnInterrupted interrupted && !settled.isDone()) {
                             assembler.waitingForApproval(interrupted.interruptions().stream()
                                     .filter(open -> Interruption.TOOL_APPROVAL.equals(open.kind())

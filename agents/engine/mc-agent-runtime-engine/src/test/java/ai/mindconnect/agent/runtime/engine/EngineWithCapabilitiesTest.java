@@ -310,7 +310,7 @@ class EngineWithCapabilitiesTest {
         List<ai.mindconnect.agent.runtime.api.domain.SessionEvent> heard =
                 new java.util.concurrent.CopyOnWriteArrayList<>();
         registry.get(ai.mindconnect.agent.runtime.api.port.in.SessionService.class)
-                .subscribe(session.id(), false, heard::add);
+                .subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session.id()).withStream(), heard::add);
         model.script.add(call("c1", "bash", Map.of()));
 
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Run it"));
@@ -324,6 +324,25 @@ class EngineWithCapabilitiesTest {
         assertThat(heard).noneMatch(
                 ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnFinished.class::isInstance);
         turns.cancel(turnId);
+    }
+
+    @Test
+    void whoever_follows_a_users_sessions_hears_turns_begin_and_end_and_none_of_the_stream() throws InterruptedException {
+        List<SessionEvent> overview = new CopyOnWriteArrayList<>();
+        List<SessionEvent> everySession = new CopyOnWriteArrayList<>();
+        List<SessionEvent> someoneElse = new CopyOnWriteArrayList<>();
+        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.user(session.userId()), overview::add);
+        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.all(), everySession::add);
+        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.user(UserId.of("someone-else")), someoneElse::add);
+        model.script.add(TurnMessage.assistant("Hello."));
+
+        awaitRest(turns.submit(TurnRequest.text(session.id(), "Hi")));
+
+        assertThat(overview).extracting(event -> event.getClass().getSimpleName())
+                .contains("TurnStarted", "TurnFinished")
+                .doesNotContain("TurnReported", "MessageStarted", "MessageFinished");
+        assertThat(everySession).hasSameSizeAs(overview);
+        assertThat(someoneElse).isEmpty();
     }
 
     @Test
@@ -442,7 +461,7 @@ class EngineWithCapabilitiesTest {
     @Test
     void a_session_gets_a_title_in_the_background_and_its_listeners_hear_of_it() throws InterruptedException {
         List<SessionEvent> heard = new CopyOnWriteArrayList<>();
-        sessions.subscribe(session.id(), false, heard::add);
+        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session.id()).withStream(), heard::add);
         model.script.add(TurnMessage.assistant("Hello."));
         model.script.add(TurnMessage.assistant("A greeting"));
 
@@ -530,7 +549,7 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("`PASS`"));
         model.script.add(TurnMessage.assistant("Buy. This is not investment advice."));
         List<SessionEvent> heard = new CopyOnWriteArrayList<>();
-        sessions.subscribe(session.id(), false, heard::add);
+        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session.id()).withStream(), heard::add);
 
         Turn ended = awaitRest(turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), advisor).id(), "What now?")));
 

@@ -113,7 +113,8 @@ class NamespaceIsolationTest {
     @Test
     void a_turn_with_a_sub_agent_stays_in_the_namespace_it_was_submitted_in() {
         List<SessionEvent> heardInA = new CopyOnWriteArrayList<>();
-        in("a", () -> registry.get(SessionService.class).subscribe(SAME_ID, true, heardInA::add));
+        in("a", () -> registry.get(SessionService.class).subscribe(
+                ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(SAME_ID).withChildSessions().withStream(), heardInA::add));
         script.add(TurnMessage.toolCalls(List.of(
                 new TurnMessage.ToolCall("c1", "run_agent", Map.of("name", "researcher", "message", "Find it.")))));
         script.add(TurnMessage.assistant("Found."));

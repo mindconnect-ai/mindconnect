@@ -38,7 +38,7 @@ final class RuntimeChatTurn implements ChatTurnHandle {
         this.sessionId = SessionId.of(session.value());
         // Followed before the turn starts: that it asks is told by its session, and only once.
         CompletableFuture<TurnId> started = new CompletableFuture<>();
-        Subscription asking = runtime.sessions().subscribe(session, false, event -> {
+        Subscription asking = runtime.sessions().subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session), event -> {
             if (event instanceof SessionEvent.TurnInterrupted interrupted
                     && interrupted.turnId().equals(started.join())) {
                 outcome.complete(TurnResult.incomplete(ChatTurnId.of(interrupted.turnId().value()),

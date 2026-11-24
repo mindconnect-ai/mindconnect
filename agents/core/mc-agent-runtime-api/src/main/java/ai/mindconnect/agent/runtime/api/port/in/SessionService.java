@@ -52,22 +52,12 @@ public interface SessionService {
     Session forkAsChild(SessionId sessionId);
 
     /**
-     * Follows every session of this user — the ones open now and the ones
-     * opened later, sub-agent sessions included — until the subscription is
-     * closed. What a client shows in a list of a user's sessions: which of
-     * them are busy, which wait for an answer.
+     * Follows the sessions the filter names — one, a user's or all — until
+     * the subscription is closed. Each event says which session it is from.
      *
-     * <p>From now on: what happened before is in the sessions, not replayed.
+     * <p>From now on: what happened before is in the sessions, not
+     * replayed. Which of a user's sessions is busy at the moment of
+     * subscribing, {@link TurnService#runningTurn} says.
      */
-    Subscription subscribe(UserId userId, SessionEventListener listener);
-
-    /**
-     * Follows one session until the subscription is closed.
-     *
-     * @param includeChildSessions also follow every session under this one,
-     *                             however deep — the sessions of its
-     *                             sub-agents and its forks as children. Each
-     *                             event says which session it is from
-     */
-    Subscription subscribe(SessionId sessionId, boolean includeChildSessions, SessionEventListener listener);
+    Subscription subscribe(SessionEventFilter filter, SessionEventListener listener);
 }

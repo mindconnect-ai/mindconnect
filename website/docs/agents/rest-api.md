@@ -45,7 +45,7 @@ the request. In Swagger UI, **Authorize** takes the token. See
 | `POST /api/sessions` | start a session for the caller — body `{agentId, workingDir?, additionalDirs?}`; without `workingDir` the session works in its own directory under the user's home |
 | `PUT /api/sessions/{id}/working-dir` | change them — body `{workingDir, additionalDirs?}`; a null or blank `workingDir` clears it, an absent `additionalDirs` keeps the current ones, an empty list clears them |
 | `GET /api/directories?path=` | one level of the tree the caller may work in: `{root, current, parent, subdirs, truncated}` — the root without `path` |
-| `GET /api/sessions?agentId=` | the caller's sessions for one agent |
+| `GET /api/sessions?agentId=` | the caller's sessions for one agent; each with `turnId` and `turnStatus` of the turn underway (`QUEUED`, `RUNNING`, `WAITING`: busy; `INTERRUPTED`: waits for an answer), both `null` when idle |
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
 

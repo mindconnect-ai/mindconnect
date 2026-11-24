@@ -61,7 +61,8 @@ public class TurnFrameStream {
         CompletableFuture<TurnFrameTranslator> frames = new CompletableFuture<>();
         CompletableFuture<Void> over = new CompletableFuture<>();
         // Followed before the turn goes on: that it asks is told by its session, and only once.
-        Subscription asking = runtime.sessions().subscribe(sessionId, true, event -> {
+        Subscription asking = runtime.sessions().subscribe(
+                ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(sessionId).withChildSessions(), event -> {
             if (event instanceof SessionEvent.TurnInterrupted interrupted && !over.isDone()) {
                 frames.join().interrupted(interrupted.interruptions());
                 sink.asked(interrupted.turnId());

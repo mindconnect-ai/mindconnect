@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -14,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
@@ -41,8 +40,8 @@ public final class SessionEventHub implements SessionEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(SessionEventHub.class);
 
-    /** A listener and which sessions it wants to hear. */
-    private record Listening(String namespace, Predicate<Session> wants, SessionEventListener listener) { }
+    /** A listener and what it wants to hear. */
+    private record Listening(String namespace, SessionEventFilter filter, SessionEventListener listener) { }
 
     private final SessionStore sessions;
     private final NamespaceProvider namespaces;
@@ -62,20 +61,9 @@ public final class SessionEventHub implements SessionEventPublisher {
         this.contributed = contributed;
     }
 
-    /** Every session of this user, sub-agent sessions included. */
-    Subscription subscribe(UserId userId, SessionEventListener listener) {
-        return subscribe(session -> session.userId().equals(userId), listener);
-    }
-
-    /** This session, and with {@code includeChildSessions} every session under it, however deep. */
-    Subscription subscribe(SessionId sessionId, boolean includeChildSessions, SessionEventListener listener) {
-        return subscribe(session -> session.id().equals(sessionId)
-                || (includeChildSessions && ancestorsOf(session).contains(sessionId)), listener);
-    }
-
-    private Subscription subscribe(Predicate<Session> wants, SessionEventListener listener) {
+    Subscription subscribe(SessionEventFilter filter, SessionEventListener listener) {
         // Heard from the subscriber's namespace only: the same session id elsewhere is another session.
-        Listening listening = new Listening(namespaces.current(), wants, listener);
+        Listening listening = new Listening(namespaces.current(), filter, listener);
         listeners.add(listening);
         return () -> listeners.remove(listening);
     }
@@ -89,7 +77,10 @@ public final class SessionEventHub implements SessionEventPublisher {
         String namespace = namespaces.current();
         contributed.get().forEach(listener -> tell(listener, event));
         for (Listening listening : listeners) {
-            if (listening.namespace().equals(namespace) && listening.wants().test(session)) {
+            // The detail first: most events are fragments, and most listeners do not want them.
+            SessionEventFilter filter = listening.filter();
+            if (filter.tells(event) && listening.namespace().equals(namespace) && (filter.names(session)
+                    || (filter.childSessions() && ancestorsOf(session).contains(filter.sessionId())))) {
                 tell(listening.listener(), event);
             }
         }
