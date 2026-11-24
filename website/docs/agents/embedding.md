@@ -115,30 +115,32 @@ the moment a turn starts to wait (`SessionEvent.TurnInterrupted`).
 
 ### Following sessions
 
-A subscription names which sessions it follows and how closely:
+Sessions are followed on two channels, subscribed to apart:
 
 ```java
-// A list of sessions: which of the user's are busy, which wait for an answer.
-runtime.sessions().subscribe(SessionEventFilter.user(userId), listener);
+// Lifecycle — a list of sessions: which of the user's are busy, which wait for an answer.
+runtime.sessions().lifecycle(userId, event -> { … });
+runtime.sessions().lifecycle(sessionId, true, event -> { … });   // one session, with those under it
+runtime.sessions().lifecycleOfAll(event -> { … });               // every session of the namespace
 
-// The session on screen, as it happens — with its sub-agents' sessions.
-runtime.sessions().subscribe(
-        SessionEventFilter.session(sessionId).withChildSessions().withStream(), listener);
-
-// Every session of the namespace, for a monitor.
-runtime.sessions().subscribe(SessionEventFilter.all(), listener);
+// Stream — the session on screen, as it happens, with its sub-agents' sessions.
+runtime.sessions().stream(sessionId, true, event -> { … });
 ```
 
-Without `withStream()` a listener hears turns begin, ask and end
-(`TurnStarted`, `TurnInterrupted`, `TurnFinished`) and what capabilities say
-about a session (`Notice`). With it, also every message, every tool call and
-what each turn reports as it runs, fragments of the answer included — far
-more events, so ask for it only where a session is shown.
+| Channel | Events | How many |
+|---------|--------|----------|
+| lifecycle (`SessionEvent.Lifecycle`) | `TurnStarted`, `TurnInterrupted`, `TurnFinished`, and what capabilities say about a session (`Notice`) | a handful per turn |
+| stream (`SessionEvent.Stream`) | every message, every tool call, and what each turn reports as it runs (`TurnReported`), fragments of the answer included | thousands per turn |
 
-A subscription hears what happens from now on. A client that opens while a
-turn runs asks `runtime.turns().runningTurn(sessionId)`: the turn that has not
-ended, with its status. Over REST a session carries that as `turnId` and
-`turnStatus`.
+The stream is offered for one session only: nobody draws the fragments of
+every session of a user. A page that shows a session subscribes to both.
+
+Both hear what happens from now on. A client that opens while a turn runs
+asks `runtime.turns().runningTurn(sessionId)`: the turn that has not ended,
+with its status. Over REST a session carries that as `turnId` and
+`turnStatus`. Whoever submitted a turn and follows that one turn to its end
+subscribes to the turn (`runtime.turns().subscribe(turnId, …)`): its events
+from the first, also for a listener that comes late.
 
 ## Writing a plugin
 

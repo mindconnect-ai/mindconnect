@@ -52,12 +52,39 @@ public interface SessionService {
     Session forkAsChild(SessionId sessionId);
 
     /**
-     * Follows the sessions the filter names — one, a user's or all — until
-     * the subscription is closed. Each event says which session it is from.
+     * Hears the turns of one session begin, ask and end, until the
+     * subscription is closed.
      *
-     * <p>From now on: what happened before is in the sessions, not
-     * replayed. Which of a user's sessions is busy at the moment of
-     * subscribing, {@link TurnService#runningTurn} says.
+     * <p>From now on, as every subscription here: what happened before is
+     * in the session, not replayed. Whether a turn runs in it at the moment
+     * of subscribing, {@link TurnService#runningTurn} says.
+     *
+     * @param childSessions also every session under this one, however deep —
+     *                      the sessions of its sub-agents and its forks as
+     *                      children. Each event says which session it is from
      */
-    Subscription subscribe(SessionEventFilter filter, SessionEventListener listener);
+    Subscription lifecycle(SessionId sessionId, boolean childSessions, SessionLifecycleListener listener);
+
+    /**
+     * Hears the turns of every session of this user begin, ask and end —
+     * the sessions open now and the ones opened later, sub-agent sessions
+     * included. What a list of a user's sessions shows: which are busy,
+     * which wait for an answer.
+     */
+    Subscription lifecycle(UserId userId, SessionLifecycleListener listener);
+
+    /** Hears the turns of every session of the namespace begin, ask and end, whoever its user is. */
+    Subscription lifecycleOfAll(SessionLifecycleListener listener);
+
+    /**
+     * Hears one session as it happens: every message, every tool call, the
+     * fragments of an answer. Not offered for a user's sessions or all of
+     * them — that is thousands of events per turn nobody draws.
+     *
+     * <p>Whoever follows one turn it submitted, from its first event and to
+     * its end, subscribes to the turn instead ({@link TurnService#subscribe}).
+     *
+     * @param childSessions as for {@link #lifecycle(SessionId, boolean, SessionLifecycleListener)}
+     */
+    Subscription stream(SessionId sessionId, boolean childSessions, SessionStreamListener listener);
 }

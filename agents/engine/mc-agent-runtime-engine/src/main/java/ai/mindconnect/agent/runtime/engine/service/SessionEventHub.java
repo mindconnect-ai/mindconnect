@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -13,16 +14,18 @@ import org.slf4j.LoggerFactory;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
-import ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
+import ai.mindconnect.agent.runtime.api.port.in.SessionLifecycleListener;
+import ai.mindconnect.agent.runtime.api.port.in.SessionStreamListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 
 /**
- * Hands session events to whoever listens — to one session, to a session
- * with everything under it, or to all sessions of a user. The session
+ * Hands session events to whoever listens, each of the two families to its
+ * own listeners — of one session, a session with everything under it, a
+ * user's sessions or all. The session
  * service subscribes here and the turn workers publish here, which is why
  * it is an object of its own that both are given.
  *
@@ -40,13 +43,14 @@ public final class SessionEventHub implements SessionEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(SessionEventHub.class);
 
-    /** A listener and what it wants to hear. */
-    private record Listening(String namespace, SessionEventFilter filter, SessionEventListener listener) { }
+    /** A listener of one of the two families and which sessions it wants to hear. */
+    private record Listening<L>(String namespace, Predicate<Session> wants, L listener) { }
 
     private final SessionStore sessions;
     private final NamespaceProvider namespaces;
     private final Supplier<List<SessionEventListener>> contributed;
-    private final List<Listening> listeners = new CopyOnWriteArrayList<>();
+    private final List<Listening<SessionLifecycleListener>> lifecycle = new CopyOnWriteArrayList<>();
+    private final List<Listening<SessionStreamListener>> stream = new CopyOnWriteArrayList<>();
     /** For each session, the sessions it is under, nearest first. A session's parent never changes. */
     private final Map<String, List<SessionId>> ancestors = new ConcurrentHashMap<>();
 
@@ -61,9 +65,23 @@ public final class SessionEventHub implements SessionEventPublisher {
         this.contributed = contributed;
     }
 
-    Subscription subscribe(SessionEventFilter filter, SessionEventListener listener) {
+    /** The session, and with {@code childSessions} every session under it, however deep. */
+    Predicate<Session> under(SessionId sessionId, boolean childSessions) {
+        return session -> session.id().equals(sessionId)
+                || (childSessions && ancestorsOf(session).contains(sessionId));
+    }
+
+    Subscription lifecycle(Predicate<Session> wants, SessionLifecycleListener listener) {
+        return listen(lifecycle, wants, listener);
+    }
+
+    Subscription stream(Predicate<Session> wants, SessionStreamListener listener) {
+        return listen(stream, wants, listener);
+    }
+
+    private <L> Subscription listen(List<Listening<L>> listeners, Predicate<Session> wants, L listener) {
         // Heard from the subscriber's namespace only: the same session id elsewhere is another session.
-        Listening listening = new Listening(namespaces.current(), filter, listener);
+        Listening<L> listening = new Listening<>(namespaces.current(), wants, listener);
         listeners.add(listening);
         return () -> listeners.remove(listening);
     }
@@ -75,20 +93,26 @@ public final class SessionEventHub implements SessionEventPublisher {
 
     void publish(Session session, SessionEvent event) {
         String namespace = namespaces.current();
-        contributed.get().forEach(listener -> tell(listener, event));
-        for (Listening listening : listeners) {
-            // The detail first: most events are fragments, and most listeners do not want them.
-            SessionEventFilter filter = listening.filter();
-            if (filter.tells(event) && listening.namespace().equals(namespace) && (filter.names(session)
-                    || (filter.childSessions() && ancestorsOf(session).contains(filter.sessionId())))) {
-                tell(listening.listener(), event);
-            }
+        contributed.get().forEach(listener -> tell(() -> listener.onEvent(event), event));
+        // Each family to its own listeners: a fragment never reaches whoever follows a list of sessions.
+        switch (event) {
+            case SessionEvent.Lifecycle happened -> wanting(lifecycle, namespace, session)
+                    .forEach(listener -> tell(() -> listener.onEvent(happened), event));
+            case SessionEvent.Stream written -> wanting(stream, namespace, session)
+                    .forEach(listener -> tell(() -> listener.onEvent(written), event));
         }
     }
 
-    private static void tell(SessionEventListener listener, SessionEvent event) {
+    private static <L> List<L> wanting(List<Listening<L>> listeners, String namespace, Session session) {
+        return listeners.stream()
+                .filter(listening -> listening.namespace().equals(namespace) && listening.wants().test(session))
+                .map(Listening::listener)
+                .toList();
+    }
+
+    private static void tell(Runnable listener, SessionEvent event) {
         try {
-            listener.onEvent(event);
+            listener.run();
         } catch (RuntimeException e) {
             log.warn("Session event listener failed on {}: {}", event.getClass().getSimpleName(), e.toString());
         }

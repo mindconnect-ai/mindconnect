@@ -12,8 +12,8 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
-import ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter;
-import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
+import ai.mindconnect.agent.runtime.api.port.in.SessionLifecycleListener;
+import ai.mindconnect.agent.runtime.api.port.in.SessionStreamListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
@@ -64,8 +64,23 @@ public final class DefaultSessionService implements SessionService {
     }
 
     @Override
-    public Subscription subscribe(SessionEventFilter filter, SessionEventListener listener) {
-        return events.subscribe(filter, listener);
+    public Subscription lifecycle(SessionId sessionId, boolean childSessions, SessionLifecycleListener listener) {
+        return events.lifecycle(events.under(sessionId, childSessions), listener);
+    }
+
+    @Override
+    public Subscription lifecycle(UserId userId, SessionLifecycleListener listener) {
+        return events.lifecycle(session -> userId.equals(session.userId()), listener);
+    }
+
+    @Override
+    public Subscription lifecycleOfAll(SessionLifecycleListener listener) {
+        return events.lifecycle(session -> true, listener);
+    }
+
+    @Override
+    public Subscription stream(SessionId sessionId, boolean childSessions, SessionStreamListener listener) {
+        return events.stream(events.under(sessionId, childSessions), listener);
     }
 
     private Session existing(SessionId sessionId) {

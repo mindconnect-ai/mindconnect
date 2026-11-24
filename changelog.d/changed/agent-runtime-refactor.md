@@ -112,12 +112,13 @@
   "no agent". Picking the agent again in the dialog makes the chat follow it.
 - The working-memory view and `/memory` show a user message with the note
   about attached or removed files the model reads ahead of it.
-- A subscription to session events says which sessions it follows and how
-  closely: `SessionService.subscribe(SessionEventFilter, listener)` with
-  `SessionEventFilter.session(id)`, `.user(id)` or `.all()`. A listener hears
-  turns begin, ask and end; messages, tool calls and the fragments of an
-  answer only with `.withStream()`. The two earlier `subscribe` methods are
-  gone.
+- Session events come on two channels, subscribed to apart. Lifecycle —
+  turns begin, ask and end — with `SessionService.lifecycle(sessionId,
+  childSessions, listener)`, `lifecycle(userId, listener)` and
+  `lifecycleOfAll(listener)`; the stream — messages, tool calls, the fragments
+  of an answer — with `stream(sessionId, childSessions, listener)`, for one
+  session only. `SessionEvent` has the two families `Lifecycle` and `Stream`.
+  The two earlier `subscribe` methods are gone.
 - A session of the REST API carries `turnId` and `turnStatus` of the turn
   underway, so a client that opens while a turn runs sees the session busy.
 - Deleting a session leaves its own directory on disk, as before the runtime

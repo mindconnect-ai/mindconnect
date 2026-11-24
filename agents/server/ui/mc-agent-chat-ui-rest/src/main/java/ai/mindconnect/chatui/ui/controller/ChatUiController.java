@@ -422,9 +422,8 @@ public class ChatUiController {
         ai.mindconnect.agent.runtime.api.domain.SessionId chat = runtimeId(sessionId);
         java.util.concurrent.CompletableFuture<String> answer = new java.util.concurrent.CompletableFuture<>();
         // Followed before the turn exists: a session's events are not replayed.
-        var following = runtimeSessions.subscribe(
-                ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(chat)
-                        .withChildSessions().withStream(), event -> {
+        // Both of the session's channels: the page draws what is written, and has to hear a turn die.
+        java.util.function.Consumer<SessionEvent> heard = event -> {
             live.onEvent(event);
             if (!event.sessionId().equals(chat)) {
                 return;
@@ -442,12 +441,18 @@ public class ChatUiController {
                     default -> { }
                 }
             }
-        });
-        answer.whenComplete((text, failure) -> following.close());
+        };
+        var lifecycle = runtimeSessions.lifecycle(chat, true, heard::accept);
+        var stream = runtimeSessions.stream(chat, true, heard::accept);
+        Runnable unfollow = () -> {
+            lifecycle.close();
+            stream.close();
+        };
+        answer.whenComplete((text, failure) -> unfollow.run());
         try {
             sessionTurns.submit(chat, input);
         } catch (RuntimeException e) {
-            following.close();
+            unfollow.run();
             throw e;
         }
         return answer;

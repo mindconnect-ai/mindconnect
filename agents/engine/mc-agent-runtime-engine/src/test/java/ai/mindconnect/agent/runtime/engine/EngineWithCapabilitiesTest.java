@@ -309,8 +309,8 @@ class EngineWithCapabilitiesTest {
     void whoever_follows_a_session_hears_what_its_turns_report() throws InterruptedException {
         List<ai.mindconnect.agent.runtime.api.domain.SessionEvent> heard =
                 new java.util.concurrent.CopyOnWriteArrayList<>();
-        registry.get(ai.mindconnect.agent.runtime.api.port.in.SessionService.class)
-                .subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session.id()).withStream(), heard::add);
+        registry.get(ai.mindconnect.agent.runtime.api.port.in.SessionService.class).lifecycle(session.id(), false, heard::add);
+        registry.get(ai.mindconnect.agent.runtime.api.port.in.SessionService.class).stream(session.id(), false, heard::add);
         model.script.add(call("c1", "bash", Map.of()));
 
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Run it"));
@@ -331,9 +331,9 @@ class EngineWithCapabilitiesTest {
         List<SessionEvent> overview = new CopyOnWriteArrayList<>();
         List<SessionEvent> everySession = new CopyOnWriteArrayList<>();
         List<SessionEvent> someoneElse = new CopyOnWriteArrayList<>();
-        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.user(session.userId()), overview::add);
-        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.all(), everySession::add);
-        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.user(UserId.of("someone-else")), someoneElse::add);
+        sessions.lifecycle(session.userId(), overview::add);
+        sessions.lifecycleOfAll(everySession::add);
+        sessions.lifecycle(UserId.of("someone-else"), someoneElse::add);
         model.script.add(TurnMessage.assistant("Hello."));
 
         awaitRest(turns.submit(TurnRequest.text(session.id(), "Hi")));
@@ -461,7 +461,8 @@ class EngineWithCapabilitiesTest {
     @Test
     void a_session_gets_a_title_in_the_background_and_its_listeners_hear_of_it() throws InterruptedException {
         List<SessionEvent> heard = new CopyOnWriteArrayList<>();
-        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session.id()).withStream(), heard::add);
+        sessions.lifecycle(session.id(), false, heard::add);
+        sessions.stream(session.id(), false, heard::add);
         model.script.add(TurnMessage.assistant("Hello."));
         model.script.add(TurnMessage.assistant("A greeting"));
 
@@ -549,7 +550,8 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("`PASS`"));
         model.script.add(TurnMessage.assistant("Buy. This is not investment advice."));
         List<SessionEvent> heard = new CopyOnWriteArrayList<>();
-        sessions.subscribe(ai.mindconnect.agent.runtime.api.port.in.SessionEventFilter.session(session.id()).withStream(), heard::add);
+        sessions.lifecycle(session.id(), false, heard::add);
+        sessions.stream(session.id(), false, heard::add);
 
         Turn ended = awaitRest(turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), advisor).id(), "What now?")));
 
