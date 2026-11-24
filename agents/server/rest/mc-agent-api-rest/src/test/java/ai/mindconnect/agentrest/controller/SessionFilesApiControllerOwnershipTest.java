@@ -40,14 +40,14 @@ class SessionFilesApiControllerOwnershipTest {
     Path dir;
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
+    private final ai.mindconnect.agentrest.SessionFixture sessions = new ai.mindconnect.agentrest.SessionFixture();
     private FileStore store;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
-        var controller = new SessionFilesApiController(store, null, new SessionAccess(sessions));
+        var controller = new SessionFilesApiController(store, null, new SessionAccess(sessions.runtime()));
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }
 
@@ -85,8 +85,6 @@ class SessionFilesApiControllerOwnershipTest {
     }
 
     private String session(String owner) {
-        AgentSession session = sessions.create(AgentSession.start(AgentId.of("default-chat"), UserId.of(owner),
-                ConversationId.random()));
-        return session.id().value();
+        return sessions.open(owner, null).id().value();
     }
 }

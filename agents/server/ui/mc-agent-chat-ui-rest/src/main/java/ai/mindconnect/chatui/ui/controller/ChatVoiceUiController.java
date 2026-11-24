@@ -4,7 +4,6 @@ import ai.mindconnect.chatui.ui.component.ChatFormComponent;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 import ai.mindconnect.llm.port.in.LlmTranscription;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.slf4j.Logger;
@@ -50,14 +49,14 @@ public class ChatVoiceUiController {
     private static final Logger log = LoggerFactory.getLogger(ChatVoiceUiController.class);
 
     private final ObjectProvider<LlmTranscription> transcription;
-    private final AgentSessionRepository sessions;
+    private final ai.mindconnect.chatui.service.SessionOwnership ownership;
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
 
     public ChatVoiceUiController(ObjectProvider<LlmTranscription> transcription,
-                                 AgentSessionRepository sessions,
+                                 ai.mindconnect.chatui.service.SessionOwnership ownership,
                                  ai.mindconnect.chatui.service.ActiveStreams activeStreams) {
         this.transcription = transcription;
-        this.sessions = sessions;
+        this.ownership = ownership;
         this.activeStreams = activeStreams;
     }
 
@@ -120,9 +119,7 @@ public class ChatVoiceUiController {
 
     /** The session belongs to whoever is asking — the chat's own rule. */
     private boolean ownsSession(SessionId sessionId, OidcUser user) {
-        return sessions.findById(sessionId)
-                .filter(session -> ai.mindconnect.chatui.service.SessionOwnership.owns(session, user))
-                .isPresent();
+        return ownership.owned(sessionId, user).isPresent();
     }
 
     /**

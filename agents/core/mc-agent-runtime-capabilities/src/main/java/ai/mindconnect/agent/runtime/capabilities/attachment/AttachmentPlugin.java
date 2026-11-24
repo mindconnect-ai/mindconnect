@@ -47,6 +47,9 @@ public final class AttachmentPlugin implements Plugin {
      */
     public static final String ATTACHMENTS = "attachedFiles";
 
+    /** The name of the tool that shows the model an attached file again. */
+    public static final String VIEW_TOOL = "view_attachment";
+
     /** The key in a user message's metadata: the names of the files it announced as attached. */
     public static final String ANNOUNCED = "attachments";
 

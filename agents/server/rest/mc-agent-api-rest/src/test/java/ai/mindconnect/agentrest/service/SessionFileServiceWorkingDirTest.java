@@ -4,9 +4,9 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.AttachedFile;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionAttachment;
+import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.filestore.FileId;
@@ -47,14 +47,14 @@ class SessionFileServiceWorkingDirTest {
     @TempDir
     Path temp;
 
-    private InMemoryAgentSessionRepository sessions;
+    private ai.mindconnect.agentrest.SessionFixture sessions;
     private UserHome home;
     private StubFileStore files;
     private SessionFileService service;
 
     @BeforeEach
     void setUp() {
-        sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
+        sessions = new ai.mindconnect.agentrest.SessionFixture();
         home = UserHome.of(temp.resolve("home").resolve("{user}").toString());
         files = new StubFileStore();
         VectorStores stores = VectorStores.fromEnvironment(new ToolEnvironment() {
@@ -74,102 +74,78 @@ class SessionFileServiceWorkingDirTest {
         // Direct ingestion — no workflow engine; an empty file needs no embeddings either.
         stores.registry().saveTemplate(new VectorStoreTemplate(SessionFileService.CHAT_UPLOADS_TEMPLATE,
                 "embeddings", null, Map.of()));
-        service = new SessionFileService(files, provider(stores), provider(null), sessions,
-                provider(managementOver(sessions)),
+        service = new SessionFileService(files, provider(stores), provider(null), sessions.runtime(),
                 provider(null), temp.resolve("tools").toString(), provider(home),
                 provider(null));
     }
 
     @Test
     void aChatWorkingInAProjectReachesItsUploads() throws Exception {
-        UserId alice = UserId.of("alice");
         Path project = Files.createDirectories(temp.resolve("project")).toRealPath();
-        AgentSession session = sessions.create(AgentSession.start(AgentId.random(), alice, ConversationId.random())
-                .withWorkingDir(project.toString()));
+        ManagedSession session = sessions.open("alice", project.toString());
 
-        var result = service.attach(session.id(), files.save("report.md", "text/markdown",
+        var result = service.attach(id(session), files.save("report.md", "text/markdown",
                 new ByteArrayInputStream(new byte[0])));
 
         assertThat(result.success()).as(result.message()).isTrue();
-        Path own = home.sessionDirOf(alice.value(), session.id().value()).orElseThrow();
-        AgentSession after = sessions.findById(session.id()).orElseThrow();
-        assertThat(after.attachedFile("report.md")).get().extracting(AttachedFile::path)
-                .isEqualTo(own.resolve("uploads").resolve("report.md").toString());
-        assertThat(after.workingDir()).isEqualTo(project.toString());
-        assertThat(after.additionalDirs()).as("the uploads' directory is reachable")
+        Path own = home.sessionDirOf("alice", session.id().value()).orElseThrow();
+        ManagedSession after = sessions.management().find(session.id()).orElseThrow();
+        assertThat(pathOf(after, "report.md")).isEqualTo(own.resolve("uploads").resolve("report.md").toString());
+        assertThat(after.directories().working()).isEqualTo(project.toString());
+        assertThat(after.directories().additional()).as("the uploads' directory is reachable")
                 .containsExactly(own.toString());
 
-        service.attach(session.id(), files.save("second.md", "text/markdown",
+        service.attach(id(session), files.save("second.md", "text/markdown",
                 new ByteArrayInputStream(new byte[0])));
-        assertThat(sessions.findById(session.id()).orElseThrow().additionalDirs())
+        assertThat(sessions.management().find(session.id()).orElseThrow().directories().additional())
                 .as("added once").containsExactly(own.toString());
     }
 
     @Test
     void aChatInItsOwnDirectory_orAboveIt_getsNothingAdded() throws Exception {
-        UserId bob = UserId.of("bob");
-        AgentSession inOwn = AgentSession.start(AgentId.random(), bob, ConversationId.random());
-        inOwn = sessions.create(inOwn.withWorkingDir(home.sessionDirOf(bob.value(), inOwn.id().value()).orElseThrow().toString()));
-        AgentSession inHome = sessions.create(AgentSession.start(AgentId.random(), bob, ConversationId.random())
-                .withWorkingDir(home.homeOf(bob.value()).orElseThrow().toString()));
+        ManagedSession inOwn = sessions.open("bob", null);
+        inOwn = sessions.management().changeDirectories(inOwn.id(), new SessionDirectories(
+                home.sessionDirOf("bob", inOwn.id().value()).orElseThrow().toString(), List.of()));
+        ManagedSession inHome = sessions.open("bob", home.homeOf("bob").orElseThrow().toString());
 
-        for (AgentSession session : List.of(inOwn, inHome)) {
-            var result = service.attach(session.id(), files.save("notes.md", "text/markdown",
+        for (ManagedSession session : List.of(inOwn, inHome)) {
+            var result = service.attach(id(session), files.save("notes.md", "text/markdown",
                     new ByteArrayInputStream(new byte[0])));
 
             assertThat(result.success()).as(result.message()).isTrue();
-            AgentSession after = sessions.findById(session.id()).orElseThrow();
-            assertThat(after.attachedFile("notes.md")).get().extracting(AttachedFile::path).isNotNull();
-            assertThat(after.additionalDirs()).isEmpty();
+            ManagedSession after = sessions.management().find(session.id()).orElseThrow();
+            assertThat(pathOf(after, "notes.md")).isNotNull();
+            assertThat(after.directories().additional()).isEmpty();
         }
     }
 
     @Test
     void anImageIsCopiedIntoTheUploadsDirectoryToo() throws Exception {
-        UserId carol = UserId.of("carol");
-        AgentSession session = sessions.create(AgentSession.start(AgentId.random(), carol, ConversationId.random()));
+        ManagedSession session = sessions.open("carol", null);
         byte[] pixels = {(byte) 0x89, 'P', 'N', 'G'};
 
-        var result = service.attach(session.id(), files.save("shot.png", "image/png",
+        var result = service.attach(id(session), files.save("shot.png", "image/png",
                 new ByteArrayInputStream(pixels)));
 
         assertThat(result.success()).as(result.message()).isTrue();
-        Path copy = home.sessionDirOf(carol.value(), session.id().value()).orElseThrow().resolve("uploads").resolve("shot.png");
+        Path copy = home.sessionDirOf("carol", session.id().value()).orElseThrow().resolve("uploads").resolve("shot.png");
         assertThat(copy).as("the file tools list it like any other upload").exists()
                 .hasBinaryContent(pixels);
-        assertThat(sessions.findById(session.id()).orElseThrow().attachedFile("shot.png"))
-                .get().extracting(AttachedFile::path).isEqualTo(copy.toString());
+        assertThat(pathOf(sessions.management().find(session.id()).orElseThrow(), "shot.png"))
+                .isEqualTo(copy.toString());
 
-        service.deleteAttachment(session.id(), "shot.png");
+        service.deleteAttachment(id(session), "shot.png");
         assertThat(copy).as("detaching takes the copy with it").doesNotExist();
-        assertThat(sessions.findById(session.id()).orElseThrow().attachedFile("shot.png")).isEmpty();
+        assertThat(sessions.management().find(session.id()).orElseThrow().attachments()).isEmpty();
     }
 
-    /**
-     * The session management as the application wires it: on the record the
-     * session repository reads, so what is attached there shows here.
-     */
-    private static ai.mindconnect.agent.management.api.SessionManagement managementOver(
-            InMemoryAgentSessionRepository sessions) {
-        var management = mock(ai.mindconnect.agent.management.api.SessionManagement.class);
-        org.mockito.Mockito.when(management.attach(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any())).thenAnswer(call -> {
-            ai.mindconnect.agent.management.api.SessionAttachment file = call.getArgument(1);
-            ai.mindconnect.agent.runtime.api.domain.SessionId id = call.getArgument(0);
-            sessions.update(ai.mindconnect.agent.SessionId.of(id.value()), session -> session.withAttachedFiles(
-                            List.of(new AttachedFile(file.id(), file.name(), file.mediaType(), file.sizeBytes(),
-                                    file.path()))))
-                    .orElseThrow(() -> new IllegalArgumentException("There is no session " + id.value()));
-            return null;
-        });
-        org.mockito.Mockito.when(management.detach(org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString())).thenAnswer(call -> {
-            ai.mindconnect.agent.runtime.api.domain.SessionId id = call.getArgument(0);
-            sessions.update(ai.mindconnect.agent.SessionId.of(id.value()),
-                    session -> session.withoutAttachedFile(call.getArgument(1)));
-            return null;
-        });
-        return management;
+    private static ai.mindconnect.agent.SessionId id(ManagedSession session) {
+        return ai.mindconnect.agent.SessionId.of(session.id().value());
+    }
+
+    private static String pathOf(ManagedSession session, String fileName) {
+        return session.attachments().stream().filter(file -> file.name().equals(fileName))
+                .map(SessionAttachment::path).findFirst().orElseThrow();
     }
 
     // ── Stubs ──────────────────────────────────────────────────────────────

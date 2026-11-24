@@ -5,7 +5,6 @@ import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import org.junit.jupiter.api.Test;
 
 import java.time.format.DateTimeFormatter;
@@ -50,9 +49,9 @@ class MessageComponentMediaTest {
     @Test
     void anAttachmentShownAgainIsOneMutedLineWithoutThumbnailOrActions() throws Exception {
         ManagedMessage m = userMessage(2, java.util.Map.of(
-                        ViewAttachmentTool.INSERTED_BY,
-                        ViewAttachmentTool.NAME,
-                        ViewAttachmentTool.ATTACHMENT, "photo.png"),
+                        "insertedBy",
+                        ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin.VIEW_TOOL,
+                        "attachment", "photo.png"),
                 new ContentPart.Text("[photo.png — image shown again at the assistant's request]"),
                 new ContentPart.Image(new FileId("f-1"), ContentPart.Image.Detail.AUTO, "photo.png"));
 

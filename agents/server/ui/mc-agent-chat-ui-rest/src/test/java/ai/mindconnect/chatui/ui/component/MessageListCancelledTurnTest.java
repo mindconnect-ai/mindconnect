@@ -1,8 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
@@ -21,8 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MessageListCancelledTurnTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final AgentDefinition AGENT = new AgentDefinition(AgentId.random(), "coder", null, null, null, null, null,
-            "cfg", 5, null, null, List.of(), List.of(), List.of(), null, null, null);
+    private static final ai.mindconnect.agent.management.api.ManagedAgent AGENT =
+            ai.mindconnect.chatui.ChatFixture.agent("coder", "", "", "cfg");
 
     @Test
     void theToolCardOfACancelledTurnIsDrawnAboveTheNextQuestionAsFailed() throws Exception {

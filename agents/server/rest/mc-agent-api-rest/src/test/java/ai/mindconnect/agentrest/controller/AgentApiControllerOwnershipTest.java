@@ -81,6 +81,15 @@ class AgentApiControllerOwnershipTest {
                     call.<ai.mindconnect.agent.runtime.api.domain.SessionId>getArgument(0).value()));
             return null;
         }).when(management).delete(org.mockito.ArgumentMatchers.any());
+        // The sessions the earlier session service opened are the ones access is asked about.
+        org.mockito.Mockito.when(management.find(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->
+                sessions.findById(SessionId.of(
+                                call.<ai.mindconnect.agent.runtime.api.domain.SessionId>getArgument(0).value()))
+                        .map(found -> new ai.mindconnect.agent.management.api.ManagedSession(
+                                call.getArgument(0),
+                                ai.mindconnect.agent.runtime.api.domain.UserId.of(found.userId().value()), null, null,
+                                null, null, null, ai.mindconnect.agent.management.api.SessionDirectories.NONE, null,
+                                java.util.Map.of())));
         ai.mindconnect.plugin.PluginRegistry registry = new ai.mindconnect.plugin.DefaultPluginRegistry();
         registry.provide(ai.mindconnect.agent.management.api.SessionManagement.class, () -> management);
         registry.start();
@@ -94,7 +103,7 @@ class AgentApiControllerOwnershipTest {
                         call.<String>getArgument(3), call.<List<String>>getArgument(4)));
         AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
                 sessionService, sessionTurns, frameStream, earlierChat, managed, compaction, opener, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
-                new SessionAccess(sessions), new ObjectMapper(), null);
+                new SessionAccess(managed), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }
 
@@ -133,7 +142,11 @@ class AgentApiControllerOwnershipTest {
             mvc.perform(request).andExpect(status().isNotFound());
         }
 
-        org.mockito.Mockito.verifyNoInteractions(sessionTurns, frameStream, earlierChat, management, compaction);
+        org.mockito.Mockito.verifyNoInteractions(sessionTurns, frameStream, earlierChat, compaction);
+        // Asked whose session it is, and nothing else.
+        org.mockito.Mockito.verify(management, org.mockito.Mockito.atLeastOnce())
+                .find(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoMoreInteractions(management);
         assertThat(sessions.findById(SessionId.of(bobs))).as("the session was not deleted").isPresent();
     }
 

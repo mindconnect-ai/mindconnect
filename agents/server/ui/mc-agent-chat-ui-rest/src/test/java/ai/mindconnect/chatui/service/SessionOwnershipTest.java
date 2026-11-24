@@ -1,12 +1,23 @@
 package ai.mindconnect.chatui.service;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.management.RepositorySessionManagement;
+import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
+import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.plugin.DefaultPluginRegistry;
+import ai.mindconnect.plugin.PluginRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
@@ -16,6 +27,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,32 +38,55 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SessionOwnershipTest {
 
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-    private final SessionOwnership ownership = new SessionOwnership(sessions);
+    private final InMemorySessionRepository stored = new InMemorySessionRepository(NamespaceProvider.fixed("test"));
+    private final InMemoryMessageRepository messages =
+            new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
+    private final SessionManagement management = new RepositorySessionManagement(stored, messages,
+            new InMemoryAgentRepository(NamespaceProvider.fixed("test")), SessionDirectoryPolicy.unrestricted(),
+            List.of());
+    private final SessionOwnership ownership = new SessionOwnership(runtimeOver(management));
 
-    private final AgentSession alices = sessions.create(
-            AgentSession.start(AgentId.of("default-chat"), UserId.of("alice"), ConversationId.random()));
+    private final ManagedSession alices = opened("alice");
+
+    private ManagedSession opened(String user) {
+        var id = ai.mindconnect.agent.runtime.api.domain.SessionId.of(java.util.UUID.randomUUID().toString());
+        new RepositorySessionStore(stored, messages).create(new Session(id,
+                ai.mindconnect.agent.runtime.api.domain.UserId.of(user), null,
+                new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5, Map.of()),
+                Map.of(), Instant.parse("2026-11-01T00:00:00Z")));
+        return management.find(id).orElseThrow();
+    }
+
+    private static AgentRuntime runtimeOver(SessionManagement management) {
+        PluginRegistry registry = new DefaultPluginRegistry();
+        registry.provide(SessionManagement.class, () -> management);
+        registry.start();
+        return new AgentRuntime(registry, () -> { });
+    }
+
+    private static SessionId id(ManagedSession session) {
+        return SessionOwnership.idOf(session);
+    }
 
     @Test
     void theOwnerReachesTheSessionAndNobodyElseDoes() {
-        assertThat(ownership.owned(alices.id(), user("alice"))).contains(alices);
-        assertThat(ownership.owned(alices.id(), user("bob"))).isEmpty();
+        assertThat(ownership.owned(id(alices), user("alice"))).contains(alices);
+        assertThat(ownership.owned(id(alices), user("bob"))).isEmpty();
         assertThat(ownership.owned(SessionId.random(), user("alice"))).isEmpty();
     }
 
     @Test
     void withoutAPrincipalTheRequestRunsAsTheDevUser() {
-        var devs = sessions.create(AgentSession.start(AgentId.of("default-chat"),
-                UserId.of(SessionOwnership.ANONYMOUS_USER), ConversationId.random()));
+        var devs = opened(SessionOwnership.ANONYMOUS_USER);
         assertThat(SessionOwnership.userIdOf(null)).isEqualTo(SessionOwnership.ANONYMOUS_USER);
-        assertThat(ownership.owned(devs.id(), null)).contains(devs);
-        assertThat(ownership.owned(alices.id(), null)).isEmpty();
+        assertThat(ownership.owned(id(devs), null)).contains(devs);
+        assertThat(ownership.owned(id(alices), null)).isEmpty();
     }
 
     @Test
     void aChannelIsOwnedExactlyWhenItsSessionIs() {
-        String channel = SessionOwnership.channelOf(alices.id());
-        assertThat(SessionOwnership.sessionIdOf(channel)).contains(alices.id());
+        String channel = SessionOwnership.channelOf(id(alices));
+        assertThat(SessionOwnership.sessionIdOf(channel)).contains(id(alices));
         assertThat(ownership.ownedByChannel(channel, user("alice"))).contains(alices);
         assertThat(ownership.ownedByChannel(channel, user("bob"))).isEmpty();
 

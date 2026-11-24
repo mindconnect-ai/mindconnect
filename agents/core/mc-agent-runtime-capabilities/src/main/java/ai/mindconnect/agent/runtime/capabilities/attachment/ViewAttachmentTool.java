@@ -17,7 +17,7 @@ import ai.mindconnect.agent.runtime.api.port.out.Tool;
  */
 final class ViewAttachmentTool implements Tool {
 
-    static final String NAME = "view_attachment";
+    static final String NAME = AttachmentPlugin.VIEW_TOOL;
     static final ToolDefinition DEFINITION = new ToolDefinition(NAME, """
             Show an image or PDF attached to this chat again.
             An attached image or PDF is shown to you with the message it came with, once. \

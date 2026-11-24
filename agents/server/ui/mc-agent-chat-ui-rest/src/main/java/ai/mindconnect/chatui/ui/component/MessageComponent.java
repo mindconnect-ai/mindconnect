@@ -1,9 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedMessage;
-import ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
+import ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
@@ -27,13 +26,18 @@ import ai.mindconnect.agent.SessionId;
  */
 public final class MessageComponent {
 
+    /** On a message the earlier runtime inserted for the user: the tool that did. */
+    private static final String INSERTED_BY = "insertedBy";
+    /** On such a message: the name of the file it shows again. */
+    private static final String ATTACHMENT = "attachment";
+
     private final SessionId sessionId;
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final ManagedMessage message;
     private final boolean fromUser;
     private final DateTimeFormatter timeFormat;
 
-    public MessageComponent(SessionId sessionId, AgentDefinition agent, ManagedMessage message,
+    public MessageComponent(SessionId sessionId, ManagedAgent agent, ManagedMessage message,
                             boolean fromUser, DateTimeFormatter timeFormat) {
         this.sessionId = sessionId;
         this.agent = agent;
@@ -66,8 +70,8 @@ public final class MessageComponent {
      * pictures the stored message renders with later.
      */
     public static String userBubble(SessionId sessionId, ai.mindconnect.agent.loop.domain.TurnMessage message) {
-        List<String> attached = names(message, AttachmentNotice.ATTACHMENTS);
-        List<String> removed = names(message, AttachmentNotice.DETACHED);
+        List<String> attached = names(message, AttachmentPlugin.ANNOUNCED);
+        List<String> removed = names(message, AttachmentPlugin.DETACHED);
         StringBuilder out = new StringBuilder();
         if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(MarkdownText.safe(String.join(", ", attached))).append("*\n\n");
         if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(MarkdownText.safe(String.join(", ", removed))).append(" removed*\n\n");
@@ -125,10 +129,10 @@ public final class MessageComponent {
     }
 
     private UiList.Item chatItem(ManagedMessage m, boolean isUser) {
-        if (ViewAttachmentTool.NAME.equals(m.message().metadata().get(ViewAttachmentTool.INSERTED_BY))) {
+        if (AttachmentPlugin.VIEW_TOOL.equals(m.message().metadata().get(INSERTED_BY))) {
             return reshownItem(m);
         }
-        String speaker = isUser ? "You" : agent.name();
+        String speaker = isUser ? "You" : agent.definition().name();
         String time    = timeFormat.format(m.sentAt());
         String label   = speaker + "  [" + time + "]" + messageTokenSuffix(m);
         String css     = isUser ? "user-message" : "bot-message";
@@ -166,7 +170,7 @@ public final class MessageComponent {
      * naming the file, no thumbnail, no actions.
      */
     private UiList.Item reshownItem(ManagedMessage m) {
-        Object name = m.message().metadata().get(ViewAttachmentTool.ATTACHMENT);
+        Object name = m.message().metadata().get(ATTACHMENT);
         String line = icon("repeat") + " *" + markdownSafe(MarkdownText.safe(name == null ? "attachment" : name.toString()))
                 + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
         return UiList.Item.of(m.id(), "")

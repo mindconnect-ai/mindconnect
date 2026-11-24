@@ -1,6 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiAction;
@@ -41,14 +41,14 @@ public final class ChatSettingsComponent implements UiComponent {
 
     private final SessionId sessionId;
     private final List<LlmConfig> llmConfigs;
-    private final List<AgentDefinition> agents;
+    private final List<ManagedAgent> agents;
     private final String currentLlmConfigName;
     private final AgentId currentAgentId;
     /** What this chat runs on today — the agent's prompt, or its own override. */
     private final String currentSystemPrompt;
 
     public ChatSettingsComponent(SessionId sessionId, List<LlmConfig> llmConfigs,
-                                 List<AgentDefinition> agents,
+                                 List<ManagedAgent> agents,
                                  String currentLlmConfigName, AgentId currentAgentId,
                                  String currentSystemPrompt) {
         this.sessionId = sessionId;
@@ -81,10 +81,10 @@ public final class ChatSettingsComponent implements UiComponent {
      * @param current   the chat's own values today
      * @param submitted what the fields held when the pick changed
      */
-    public static Values valuesFor(AgentDefinition picked, AgentId currentAgentId, Values current, Values submitted) {
+    public static Values valuesFor(ManagedAgent picked, AgentId currentAgentId, Values current, Values submitted) {
         if (picked == null) return submitted;
-        if (picked.id().equals(currentAgentId)) return current;
-        return new Values(picked.llmConfigName(), picked.systemPrompt());
+        if (ChatAgent.id(picked).equals(currentAgentId)) return current;
+        return new Values(ChatAgent.model(picked), picked.definition().instructions());
     }
 
     @Override
@@ -128,16 +128,16 @@ public final class ChatSettingsComponent implements UiComponent {
     }
 
     /** An agent reads as what it is for, not just what it is called. */
-    private static String label(AgentDefinition agent) {
-        String description = agent.description();
+    private static String label(ManagedAgent agent) {
+        String description = agent.definition().description();
         if (description == null || description.isBlank()) {
-            return agent.name();
+            return agent.definition().name();
         }
         String trimmed = description.strip();
         if (trimmed.length() > 70) {
             trimmed = trimmed.substring(0, 69).strip() + "…";
         }
-        return agent.name() + " — " + trimmed;
+        return agent.definition().name() + " — " + trimmed;
     }
 
     private UiField modelField() {

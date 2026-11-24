@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.ToolState;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 import ai.mindconnect.ui.model.UiAction;
@@ -42,7 +42,7 @@ public final class ChatSubAgentsComponent {
      * @param agents   the agents this chat could be given, in registry order
      * @param selected the ones on its roster, by name
      */
-    public static UiNode node(SessionId sessionId, List<AgentDefinition> agents, Set<String> selected) {
+    public static UiNode node(SessionId sessionId, List<ManagedAgent> agents, Set<String> selected) {
         var body = UiStack.of(BODY_ID).gap(12);
 
         if (agents.isEmpty()) {
@@ -55,10 +55,10 @@ public final class ChatSubAgentsComponent {
         long on = agents.stream().filter(a -> isOn(selected, a)).count();
         var list = UiList.of("chat-subagents-list",
                 "Sub-agents · " + on + " of " + agents.size() + " on").icon("bot");
-        for (AgentDefinition agent : agents) {
-            String slug = ChatToolsPickerComponent.slug(agent.name());
-            var item = UiList.Item.of("chat-subagent-" + slug, agent.name())
-                    .icon(agent.iconOrDefault())
+        for (ManagedAgent agent : agents) {
+            String slug = ChatToolsPickerComponent.slug(agent.definition().name());
+            var item = UiList.Item.of("chat-subagent-" + slug, agent.definition().name())
+                    .icon(ChatAgent.icon(agent))
                     .description(describe(agent))
                     .action(test(sessionId, agent));
             ChatToolsPickerComponent.segments(item, "subagent-" + slug,
@@ -66,7 +66,7 @@ public final class ChatSubAgentsComponent {
                     List.of(ToolState.OFF, ToolState.ON),
                     s -> s == ToolState.ON ? "On" : "Off",
                     s -> trigger(on(ChatUiController.class)
-                            .setSubAgent(sessionId.value(), agent.name(), s == ToolState.ON, null)));
+                            .setSubAgent(sessionId.value(), agent.definition().name(), s == ToolState.ON, null)));
             list.item(item);
         }
         body.child(list);
@@ -79,17 +79,17 @@ public final class ChatSubAgentsComponent {
     }
 
     /** A roster names agents as typed; the lookup ignores case, so does this. */
-    private static boolean isOn(Set<String> selected, AgentDefinition agent) {
-        return selected.stream().anyMatch(agent.name()::equalsIgnoreCase);
+    private static boolean isOn(Set<String> selected, ManagedAgent agent) {
+        return selected.stream().anyMatch(agent.definition().name()::equalsIgnoreCase);
     }
 
     /** What the agent is for, or its rubric when nobody wrote it down. */
-    private static String describe(AgentDefinition agent) {
-        String description = agent.description();
+    private static String describe(ManagedAgent agent) {
+        String description = agent.definition().description();
         if (description != null && !description.isBlank()) {
             return description;
         }
-        return ChatToolsPickerComponent.displayGroup(agent.groupOrDefault());
+        return ChatToolsPickerComponent.displayGroup(ChatAgent.group(agent));
     }
 
     /**
@@ -97,10 +97,10 @@ public final class ChatSubAgentsComponent {
      * what it answers. It does not go through this chat and does not need
      * delegation to be on — it is the agent on its own.
      */
-    private static UiAction test(SessionId sessionId, AgentDefinition agent) {
-        return UiAction.secondary("test-" + ChatToolsPickerComponent.slug(agent.name()), "Test")
+    private static UiAction test(SessionId sessionId, ManagedAgent agent) {
+        return UiAction.secondary("test-" + ChatToolsPickerComponent.slug(agent.definition().name()), "Test")
                 .icon("flash")
                 .onClick(trigger(on(ChatUiController.class)
-                        .subAgentTestDialog(sessionId.value(), agent.name(), null)));
+                        .subAgentTestDialog(sessionId.value(), agent.definition().name(), null)));
     }
 }

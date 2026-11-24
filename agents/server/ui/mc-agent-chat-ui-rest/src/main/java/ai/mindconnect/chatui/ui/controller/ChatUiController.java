@@ -3,7 +3,14 @@ package ai.mindconnect.chatui.ui.controller;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.SessionAgent;
+import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.starter.runtime.bridge.AgentDefinitionMapper;
+import ai.mindconnect.chatui.service.SessionOwnership;
+import ai.mindconnect.chatui.ui.component.ChatAgent;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.chatui.ui.page.ChatPage;
 import ai.mindconnect.agent.loop.domain.TurnEvent;
@@ -12,19 +19,13 @@ import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.ui.model.UiAction;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -53,14 +54,13 @@ public class ChatUiController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatUiController.class);
 
-    private final AgentSessionService sessionService;
+    /** Whether this installation lets a user choose a chat's directories. */
+    private final ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy;
     /** The chat on the runtime on the plugin kernel, behind the calls this page has always made. */
     private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns;
     private final ai.mindconnect.agent.runtime.api.port.in.SessionService runtimeSessions;
-    private final ai.mindconnect.agent.runtime.service.AgentChatService earlierChat;
     private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
-    private final AgentDefinitionRepository agentRepository;
-    private final AgentSessionRepository sessionRepository;
+    private final AgentManagement agents;
     /** What is done with sessions beside running turns in them: where the list of chats comes from. */
     private final SessionManagement sessionManagement;
     /** Asked for what the chat shows of the runtime beyond sessions and turns: how full the context is. */
@@ -73,58 +73,46 @@ public class ChatUiController {
     private final ai.mindconnect.chatui.service.SessionStreams sessionStreams;
 
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
-    private final ToolApprovalRepository approvalStore;
     /** What the embedding app adds to the chat — none in a standalone chat app. */
     private final ai.mindconnect.chatui.ui.ChatHostLinks hostLinks;
     private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository;
     private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
-    /** The agent a chat runs on, as the session management keeps it. */
-    private final ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents;
     /** The server's tree a user may pick a working directory from. */
     private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
 
-    public ChatUiController(AgentSessionService sessionService,
+    public ChatUiController(ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy,
                              ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
                              ai.mindconnect.agent.sdk.AgentRuntime runtime,
-                             ai.mindconnect.agent.runtime.service.AgentChatService earlierChat,
                              ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
-                             AgentDefinitionRepository agentRepository,
-                             AgentSessionRepository sessionRepository,
                              SessionManagement sessionManagement,
-                             ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents,
                              TodoListService todoListService,
                              ObjectMapper objectMapper,
                              LlmCallTraceRepository traceRepository,
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                              ai.mindconnect.chatui.service.SessionStreams sessionStreams,
                              ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
-                             ToolApprovalRepository approvalStore,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.chatui.ui.ChatHostLinks> hostLinks,
                              ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
                              ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.management.directory.WorkingDirBrowser> dirBrowser) {
         this.dirBrowser = dirBrowser.getIfAvailable(() ->
-                new ai.mindconnect.agent.management.directory.WorkingDirBrowser(sessionService.workingDirPolicy()));
-        this.sessionService = sessionService;
+                new ai.mindconnect.agent.management.directory.WorkingDirBrowser(workingDirPolicy));
+        this.workingDirPolicy = workingDirPolicy;
         this.sessionFiles = sessionFiles;
         this.sessionTurns = sessionTurns;
         this.runtime = runtime;
         this.runtimeSessions = runtime.sessions();
-        this.earlierChat = earlierChat;
         this.chatOpener = chatOpener;
-        this.agentRepository = agentRepository;
-        this.sessionRepository = sessionRepository;
+        this.agents = runtime.service(AgentManagement.class);
         this.sessionManagement = sessionManagement;
         this.todoListService = todoListService;
         this.objectMapper = objectMapper;
         this.traceRepository = traceRepository;
         this.activeStreams = activeStreams;
         this.sessionStreams = sessionStreams;
-        this.approvalStore = approvalStore;
         this.hostLinks = hostLinks.getIfAvailable(() -> ai.mindconnect.chatui.ui.ChatHostLinks.NONE);
         this.llmConfigRepository = llmConfigRepository;
         this.toolRegistry = toolRegistry;
-        this.chatAgents = chatAgents;
     }
 
     /**
@@ -143,7 +131,7 @@ public class ChatUiController {
         // Headers for the sidebar; only the chat being shown is loaded whole.
         var sessions = chats(userId(user));
         var latest = ChatLanding.pick(sessions, lastShownChat(), this::written)
-                .flatMap(sessionRepository::findById);
+                .flatMap(id -> sessionManagement.find(runtimeId(id)));
         if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
             // tabs opening at once would each leave an empty chat behind. The
@@ -182,7 +170,7 @@ public class ChatUiController {
     public ResponseEntity<UiPage> createSession(@AuthenticationPrincipal OidcUser user) {
         String userId = userId(user);
         var session = openDefaultChat(userId);
-        log.info("New chat {}", session.id());
+        log.info("New chat {}", SessionOwnership.idOf(session));
         return ResponseEntity.ok(
                 shell(session, chats(userId)));
     }
@@ -195,12 +183,12 @@ public class ChatUiController {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
-        var effective = chatAgents.effective(session);
+        var effective = effective(session);
         AgentId agentId = boundAgentId(session);
 
         var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
                 sessionId, llmConfigRepository.findAll(), selectableAgents(agentId),
-                effective.llmConfigName(), agentId, effective.systemPrompt()).render();
+                ChatAgent.model(effective), agentId, effective.definition().instructions()).render();
 
         return ResponseEntity.ok(openDialog(
                 ai.mindconnect.chatui.ui.component.ChatSettingsComponent.TITLE, form));
@@ -223,19 +211,19 @@ public class ChatUiController {
         var session = sessionOpt.get();
         var body = new FormBody(raw == null ? Map.of() : raw);
         String agentId = body.str("agentId");
-        AgentDefinition picked = agentId == null || agentId.isBlank() ? null
-                : agentRepository.findById(AgentId.of(agentId)).orElse(null);
-        var effective = chatAgents.effective(session);
+        ManagedAgent picked = agentId == null || agentId.isBlank() ? null
+                : agents.find(ai.mindconnect.agent.management.api.AgentId.of(agentId)).orElse(null);
+        var effective = effective(session);
         AgentId bound = boundAgentId(session);
         var values = ai.mindconnect.chatui.ui.component.ChatSettingsComponent.valuesFor(picked, bound,
                 new ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values(
-                        effective.llmConfigName(), effective.systemPrompt()),
+                        ChatAgent.model(effective), effective.definition().instructions()),
                 new ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values(
-                        orKeep(body.str("llmConfigName"), effective.llmConfigName()),
-                        orKeep(body.str("systemPrompt"), effective.systemPrompt())));
+                        orKeep(body.str("llmConfigName"), ChatAgent.model(effective)),
+                        orKeep(body.str("systemPrompt"), effective.definition().instructions())));
         var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
                 sessionId, llmConfigRepository.findAll(), selectableAgents(bound),
-                values.llmConfigName(), picked == null ? null : picked.id(), values.systemPrompt());
+                values.llmConfigName(), ChatAgent.id(picked), values.systemPrompt());
         return ResponseEntity.ok(UiPatch.of().patch(UiPatch.Operation.replace(form.id(), form.render())));
     }
 
@@ -261,28 +249,40 @@ public class ChatUiController {
         var body = new FormBody(raw);
         String agentId = body.str("agentId");
 
-        var effective = chatAgents.effective(session);
+        var effective = effective(session);
         var def = agentId == null || agentId.isBlank() ? null
-                : agentRepository.findById(AgentId.of(agentId))
+                : agents.find(ai.mindconnect.agent.management.api.AgentId.of(agentId))
                         .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
         // Another agent takes the chat over as it is, which is what the picker promises. The agent the
         // chat already refers to stays referred to while the form says what the agent says; a model or
         // a prompt that differs makes the chat's definition its own, as does a chat without an agent.
-        boolean another = def != null && !def.id().equals(boundAgentId(session));
-        boolean untouched = def != null && differing(body.str("systemPrompt"), def.systemPrompt()) == null
-                && differing(body.str("llmConfigName"), def.llmConfigName()) == null;
+        boolean another = def != null && !ChatAgent.id(def).equals(boundAgentId(session));
+        boolean untouched = def != null && differing(body.str("systemPrompt"), def.definition().instructions()) == null
+                && differing(body.str("llmConfigName"), ChatAgent.model(def)) == null;
         if (another || untouched) {
-            sessionManagement.useAgent(runtimeId(sessionId),
-                    ai.mindconnect.agent.management.api.AgentId.of(def.id().value()));
+            sessionManagement.useAgent(runtimeId(sessionId), def.id());
         } else {
-            chatAgents.own(session, effective.withBasicFields(effective.name(), effective.description(),
-                    orKeep(body.str("systemPrompt"), effective.systemPrompt()), effective.welcomeMessage(),
-                    orKeep(body.str("llmConfigName"), effective.llmConfigName())));
+            own(session, effective, ChatAgent.withPromptAndModel(effective.definition(),
+                    orKeep(body.str("systemPrompt"), effective.definition().instructions()),
+                    orKeep(body.str("llmConfigName"), ChatAgent.model(effective))));
         }
-        var saved = sessionRepository.findById(sessionId).orElseThrow();
+        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
         String userId = userId(user);
         return ResponseEntity.ok(
                 shell(saved, chats(userId)));
+    }
+
+    /** The agent the chat's next turn runs on. */
+    private ManagedAgent effective(ManagedSession chat) {
+        return ChatAgent.effective(sessionManagement, agents, chat);
+    }
+
+    /** The chat runs on this definition from now on, and on no stored agent's. */
+    private void own(ManagedSession chat, ManagedAgent effective,
+                     ai.mindconnect.agent.runtime.api.domain.AgentDefinition changed) {
+        // Written without the copy of what the earlier runtime wrote: it describes the definition before.
+        sessionManagement.changeAgent(chat.id(), effective.id() == null ? changed
+                : AgentDefinitionMapper.written(effective.withDefinition(changed)).definition());
     }
 
     /** The submitted value, or what the chat already had when nothing was submitted. */
@@ -303,19 +303,19 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
         return ResponseEntity.ok(openDialog("Working directory",
-                session.hasWorkingDir() ? session.workingDir() : "The server's default directory",
-                pickerForm(session, session.workingDir())));
+                (session.directories().working() != null) ? session.directories().working() : "The server's default directory",
+                pickerForm(session, session.directories().working())));
     }
 
     /** The chooser's form at {@code path}, or at the root when there is none or it cannot be listed. */
-    private ai.mindconnect.ui.model.UiForm pickerForm(ai.mindconnect.agent.runtime.domain.AgentSession session, String path) {
+    private ai.mindconnect.ui.model.UiForm pickerForm(ManagedSession session, String path) {
         ai.mindconnect.agent.management.directory.WorkingDirBrowser.Listing listing;
         try {
-            listing = dirBrowser.list(session.userId(), path);
+            listing = dirBrowser.list(session.userId().value(), path);
         } catch (RuntimeException e) {
-            listing = dirBrowser.list(session.userId(), null);
+            listing = dirBrowser.list(session.userId().value(), null);
         }
-        return ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.form(session.id(), session, listing);
+        return ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.form(SessionOwnership.idOf(session), session, listing);
     }
 
     /** One step down or up in the chooser — the form alone is redrawn, at {@code path}. */
@@ -325,7 +325,7 @@ public class ChatUiController {
                                               @AuthenticationPrincipal OidcUser user) {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var listing = dirBrowser.list(sessionOpt.get().userId(), path);
+        var listing = dirBrowser.list(sessionOpt.get().userId().value(), path);
         return ResponseEntity.ok(redrawnPicker(sessionOpt.get(), listing));
     }
 
@@ -349,13 +349,13 @@ public class ChatUiController {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         sessionManagement.changeDirectories(runtimeId(sessionId),
-                new SessionDirectories(pathOf(raw), sessionOpt.get().additionalDirs()));
-        var saved = sessionRepository.findById(sessionId).orElseThrow();
+                new SessionDirectories(pathOf(raw), sessionOpt.get().directories().additional()));
+        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
         return ResponseEntity.ok(UiPatch.of()
                 .patch(UiPatch.Operation.remove("chat-dialog"))
                 .patch(composerRefresh(saved))
-                .toast(ai.mindconnect.ui.model.UiToast.success(saved.hasWorkingDir()
-                        ? "Working directory: " + saved.workingDir()
+                .toast(ai.mindconnect.ui.model.UiToast.success((saved.directories().working() != null)
+                        ? "Working directory: " + saved.directories().working()
                         : "Working in the server's default directory.").title("Working directory")));
     }
 
@@ -369,8 +369,8 @@ public class ChatUiController {
         var session = sessionOpt.get();
         String name = raw == null ? null
                 : new FormBody(raw).str(ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.NEW_FOLDER_FIELD);
-        var created = dirBrowser.create(session.userId(), pathOf(raw), name);
-        return ResponseEntity.ok(redrawnPicker(session, dirBrowser.list(session.userId(), created.toString()))
+        var created = dirBrowser.create(session.userId().value(), pathOf(raw), name);
+        return ResponseEntity.ok(redrawnPicker(session, dirBrowser.list(session.userId().value(), created.toString()))
                 .toast(ai.mindconnect.ui.model.UiToast.success("Created " + created).title("New folder")));
     }
 
@@ -384,11 +384,11 @@ public class ChatUiController {
         String path = pathOf(raw);
         if (path == null) throw new IllegalArgumentException("Type or pick a directory to add first");
         var session = sessionOpt.get();
-        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.workingDir(),
-                java.util.stream.Stream.concat(session.additionalDirs().stream(), java.util.stream.Stream.of(path))
+        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.directories().working(),
+                java.util.stream.Stream.concat(session.directories().additional().stream(), java.util.stream.Stream.of(path))
                         .toList()));
-        var saved = sessionRepository.findById(sessionId).orElseThrow();
-        return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId(), path))
+        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
+        return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId().value(), path))
                 .toast(ai.mindconnect.ui.model.UiToast.success("Added " + path).title("Additional directories")));
     }
 
@@ -400,10 +400,10 @@ public class ChatUiController {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
-        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.workingDir(),
-                session.additionalDirs().stream().filter(d -> !d.equals(path)).toList()));
-        var saved = sessionRepository.findById(sessionId).orElseThrow();
-        return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId(), saved.workingDir()))
+        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.directories().working(),
+                session.directories().additional().stream().filter(d -> !d.equals(path)).toList()));
+        var saved = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
+        return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId().value(), saved.directories().working()))
                 .toast(ai.mindconnect.ui.model.UiToast.success("Removed " + path).title("Additional directories")));
     }
 
@@ -460,11 +460,11 @@ public class ChatUiController {
     }
 
     /** The chooser's form redrawn in place. */
-    private UiPatch redrawnPicker(ai.mindconnect.agent.runtime.domain.AgentSession session,
+    private UiPatch redrawnPicker(ManagedSession session,
                                   ai.mindconnect.agent.management.directory.WorkingDirBrowser.Listing listing) {
         return UiPatch.of().patch(UiPatch.Operation.replace(
                 ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.ID,
-                ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.form(session.id(), session, listing)));
+                ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.form(SessionOwnership.idOf(session), session, listing)));
     }
 
     /** The chooser's path field, trimmed; {@code null} when empty. */
@@ -484,18 +484,18 @@ public class ChatUiController {
      * must not swap the Stop button for a Send button, which is what a
      * hard-coded idle form used to do.
      */
-    private UiPatch.Operation composerRefresh(ai.mindconnect.agent.runtime.domain.AgentSession session) {
-        var agent = chatAgents.effective(session);
+    private UiPatch.Operation composerRefresh(ManagedSession session) {
+        var agent = effective(session);
         boolean streaming = activeStreams.findHandle(
-                ai.mindconnect.chatui.service.SessionOwnership.channelOf(session.id())).isPresent();
+                ai.mindconnect.chatui.service.SessionOwnership.channelOf(SessionOwnership.idOf(session))).isPresent();
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
-                        session.id(), agent.id(), streaming)
+                        SessionOwnership.idOf(session), ChatAgent.id(agent), streaming)
                 .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
-                        llmConfigRepository, agent.llmConfigName()))
-                .withAttachments(sessionFiles.attachments(session.id()))
+                        llmConfigRepository, ChatAgent.model(agent)))
+                .withAttachments(sessionFiles.attachments(SessionOwnership.idOf(session)))
                 .withAgentCounts(agent, offeredToolNames())
-                .withWorkingDir(session.workingDir())
-                .withDirChoice(sessionService.workingDirChoice());
+                .withWorkingDir(session.directories().working())
+                .withDirChoice(workingDirPolicy.allowsChoice());
         return UiPatch.Operation.replace(form.id(), form.render());
     }
 
@@ -534,7 +534,7 @@ public class ChatUiController {
         }
         String userId = userId(user);
         var sessions = chats(userId);
-        var current = sessionRepository.findById(sessionId).orElseThrow();
+        var current = sessionManagement.find(runtimeId(sessionId)).orElseThrow();
         return ResponseEntity.ok(shell(current, sessions));
     }
 
@@ -555,8 +555,8 @@ public class ChatUiController {
 
         var sessions = chats(userId);
         var newest = sessions.isEmpty()
-                ? java.util.Optional.<AgentSession>empty()
-                : sessionRepository.findById(SessionId.of(sessions.get(0).id().value()));
+                ? java.util.Optional.<ManagedSession>empty()
+                : java.util.Optional.of(sessions.get(0));
         if (newest.isEmpty()) {
             var fresh = openDefaultChat(userId);
             return ResponseEntity.ok(shell(fresh, chats(userId)));
@@ -570,10 +570,10 @@ public class ChatUiController {
      * standing between one user's chat and another's, and an id is not a
      * secret — it travels in URLs, links and logs.
      */
-    private java.util.Optional<AgentSession> ownedSession(
+    private java.util.Optional<ManagedSession> ownedSession(
             SessionId sessionId, OidcUser user) {
-        return sessionRepository.findById(sessionId)
-                .filter(session -> ai.mindconnect.chatui.service.SessionOwnership.owns(session, user));
+        return sessionManagement.find(runtimeId(sessionId))
+                .filter(session -> SessionOwnership.owns(session, user));
     }
 
     /** Closes the settings dialog without touching anything. */
@@ -630,24 +630,24 @@ public class ChatUiController {
                 .toList();
     }
 
-    private UiPage shell(AgentSession session,
+    private UiPage shell(ManagedSession session,
                          List<ManagedSession> sessions) {
         return shell(session, sessions, ai.mindconnect.chatui.ui.component.ChatShellComponent.History.CHAT);
     }
 
-    private UiPage shell(AgentSession session,
+    private UiPage shell(ManagedSession session,
                          List<ManagedSession> sessions,
                          ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
-        var seen = rememberShown(session.id());
-        var agent = chatAgents.effective(session);
+        var seen = rememberShown(SessionOwnership.idOf(session));
+        var agent = effective(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
-                sessions, session, agent.name(), chat.renderContent(), agentIcons())
+                sessions, session, agent.definition().name(), chat.renderContent(), agentIcons())
                 .withActivity(runningSessions(sessions), waitingSessions(sessions))
                 .withUnseen(seen.unseen(sessions))
                 .withHistory(history)
                 .render();
-        var page = UiPage.of("/chat/sessions/" + session.id().value(), appShell);
+        var page = UiPage.of("/chat/sessions/" + SessionOwnership.idOf(session).value(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.
         if (!chat.activeStreams().isEmpty()) {
             page.setActiveStreams(chat.activeStreams());
@@ -684,10 +684,16 @@ public class ChatUiController {
                         .title("Not applied")));
     }
 
-    private AgentSession openDefaultChat(String userId) {
-        return agentRepository.findByName(DEFAULT_CHAT_AGENT)
-                .map(a -> chatOpener.open(a.id(), UserId.of(userId), null, null, List.of()))
-                .orElseGet(() -> chatOpener.open(fallbackChatAgent(), UserId.of(userId)));
+    private ManagedSession openDefaultChat(String userId) {
+        return agents.findByName(DEFAULT_CHAT_AGENT)
+                .map(agent -> opened(chatOpener.open(ChatAgent.id(agent), UserId.of(userId), null, null, List.of()).id()))
+                .orElseGet(() -> sessionManagement.open(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId),
+                        null, new SessionAgent.Own(fallbackChatAgent(), null), null, SessionDirectories.NONE));
+    }
+
+    /** The chat the opener just opened, as the session management knows it. */
+    private ManagedSession opened(SessionId sessionId) {
+        return sessionManagement.find(runtimeId(sessionId)).orElseThrow();
     }
 
     /**
@@ -698,12 +704,23 @@ public class ChatUiController {
      */
     private static final List<String> DEFAULT_TOOLS = List.of("todo_read", "todo_write");
 
+    /** How many rounds a turn of the fallback chat agent may take. */
+    private static final int FALLBACK_MAX_ROUNDS = 10;
+
     /** The fallback chat agent: the standard model, the standard tools, nobody to delegate to. */
-    private AgentDefinition fallbackChatAgent() {
+    private ai.mindconnect.agent.runtime.api.domain.AgentDefinition fallbackChatAgent() {
         var known = allToolNames();
-        return AgentDefinition.create("Chat", "", CHAT_SYSTEM_PROMPT, null, defaultLlmConfigName())
-                .withTools(DEFAULT_TOOLS.stream().filter(known::contains)
-                        .map(ai.mindconnect.agent.tool.AgentTool::of).toList());
+        String model = defaultLlmConfigName();
+        return new ai.mindconnect.agent.runtime.api.domain.AgentDefinition("Chat", "", CHAT_SYSTEM_PROMPT,
+                model == null ? ai.mindconnect.agent.runtime.api.domain.ModelSettings.NONE
+                        : ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel(model),
+                DEFAULT_TOOLS.stream().filter(known::contains)
+                        .map(name -> AgentDefinitionMapper.binding(ai.mindconnect.agent.tool.AgentTool.of(name)))
+                        .toList(),
+                FALLBACK_MAX_ROUNDS,
+                // Its own id, as every agent has one: the tools read whose agent calls them.
+                Map.of(AgentDefinitionMapper.AGENT_ID, java.util.UUID.randomUUID().toString(),
+                        SubAgentPlugin.SUB_AGENTS, List.of()));
     }
 
     /** The default prompt of a chat that has no agent behind it. */
@@ -738,8 +755,8 @@ public class ChatUiController {
     }
 
     /**
-     * The chat's tool selection as {@link ai.mindconnect.agent.tool.AgentTool}s,
-     * reusing the agent's own binding for every name it already has.
+     * The chat's tool selection as bindings, reusing the agent's own binding
+     * for every name it already has.
      *
      * <p>Rebuilding them from bare names would quietly drop what the binding
      * carries beyond the name — {@code needsApproval} on bash and
@@ -747,17 +764,16 @@ public class ChatUiController {
      * host directory, a deferred flag. Turning the model dropdown would have
      * been enough to lose all of it.
      */
-    private List<ai.mindconnect.agent.tool.AgentTool> pickTools(
-            AgentDefinition def, java.util.Map<String, Boolean> chosen) {
-        var byName = def.tools().stream().collect(java.util.stream.Collectors.toMap(
-                ai.mindconnect.agent.tool.AgentTool::name, t -> t, (a, b) -> a));
+    private List<ToolBinding> pickTools(ManagedAgent def, java.util.Map<String, Boolean> chosen) {
+        var byName = def.definition().tools().stream().collect(java.util.stream.Collectors.toMap(
+                ToolBinding::name, t -> t, (a, b) -> a));
         var known = allToolNames();
-        var picked = new java.util.LinkedHashMap<String, ai.mindconnect.agent.tool.AgentTool>();
+        var picked = new java.util.LinkedHashMap<String, ToolBinding>();
         // Whatever the dialog could not show stays: the chat did not drop it,
         // it was never asked about. Without this, opening the settings and
         // pressing Apply would silently strip an agent's Gmail tools on a
         // machine where Gmail is not configured.
-        for (var t : def.tools()) {
+        for (var t : def.definition().tools()) {
             if (!known.contains(t.name())) {
                 picked.put(t.name(), t);
             }
@@ -766,35 +782,29 @@ public class ChatUiController {
             if (!known.contains(n)) {
                 return;
             }
-            var bound = byName.getOrDefault(n, ai.mindconnect.agent.tool.AgentTool.of(n));
-            picked.put(n, bound.deferred() == deferred ? bound : withDeferred(bound, deferred));
+            var bound = byName.get(n);
+            if (bound == null) {
+                bound = AgentDefinitionMapper.binding(ai.mindconnect.agent.tool.AgentTool.of(n));
+            }
+            // The same binding, offered up front or left to search.
+            picked.put(n, bound.deferred() == deferred ? bound : new ToolBinding(bound.name(), deferred, bound.metadata()));
         });
         return List.copyOf(picked.values());
     }
 
-    /** The same binding, offered up front or left to search. */
-    private static ai.mindconnect.agent.tool.AgentTool withDeferred(
-            ai.mindconnect.agent.tool.AgentTool t, boolean deferred) {
-        return new ai.mindconnect.agent.tool.AgentTool(t.id(), t.name(), t.description(), t.overrides(),
-                t.enabled(), deferred, t.needsApproval(), t.maxResultChars());
-    }
-
     /** A definition's tools as the pickers edit them: name &rarr; deferred, in order. */
-    private static java.util.LinkedHashMap<String, Boolean> selection(AgentDefinition def) {
+    private static java.util.LinkedHashMap<String, Boolean> selection(ManagedAgent def) {
         var out = new java.util.LinkedHashMap<String, Boolean>();
-        def.tools().forEach(t -> out.putIfAbsent(t.name(), t.deferred()));
+        def.definition().tools().forEach(t -> out.putIfAbsent(t.name(), t.deferred()));
         return out;
     }
     /** Does the chat run on a prompt other than that of the stored agent its definition was taken from? */
-    private boolean ownPrompt(AgentSession session, AgentDefinition effective) {
-        return sessionManagement.find(runtimeId(session.id()))
-                .map(ai.mindconnect.agent.management.api.ManagedSession::agent)
-                .filter(agent -> agent instanceof ai.mindconnect.agent.management.api.SessionAgent.Own own
-                        && own.origin() != null)
-                .flatMap(agent -> agentRepository.findById(AgentId.of(
-                        ((ai.mindconnect.agent.management.api.SessionAgent.Own) agent).origin().value())))
-                .map(origin -> !java.util.Objects.equals(origin.systemPrompt(), effective.systemPrompt()))
-                .orElse(false);
+    private boolean ownPrompt(ManagedSession session, ManagedAgent effective) {
+        return session.agent() instanceof SessionAgent.Own own && own.origin() != null
+                && agents.find(own.origin())
+                        .map(origin -> !java.util.Objects.equals(origin.definition().instructions(),
+                                effective.definition().instructions()))
+                        .orElse(false);
     }
 
     /**
@@ -802,12 +812,8 @@ public class ChatUiController {
      * runs on a definition of its own — also one that was taken from a
      * stored agent and changed since.
      */
-    private AgentId boundAgentId(AgentSession session) {
-        return sessionManagement.find(runtimeId(session.id()))
-                .map(ai.mindconnect.agent.management.api.ManagedSession::agent)
-                .filter(agent -> agent instanceof ai.mindconnect.agent.management.api.SessionAgent.Ref)
-                .map(agent -> AgentId.of(((ai.mindconnect.agent.management.api.SessionAgent.Ref) agent).id().value()))
-                .orElse(null);
+    private AgentId boundAgentId(ManagedSession session) {
+        return session.agent() instanceof SessionAgent.Ref ref ? AgentId.of(ref.id().value()) : null;
     }
 
     /**
@@ -817,16 +823,16 @@ public class ChatUiController {
      */
     private java.util.Map<AgentId, String> agentIcons() {
         var icons = new java.util.HashMap<AgentId, String>();
-        for (AgentDefinition a : agentRepository.findAll()) {
-            icons.put(a.id(), a.iconOrDefault());
+        for (ManagedAgent a : agents.list()) {
+            icons.put(ChatAgent.id(a), ChatAgent.icon(a));
         }
         return icons;
     }
 
-    private List<AgentDefinition> selectableAgents(AgentId currentAgentId) {
-        return agentRepository.findAll().stream()
-                .filter(a -> a.status() != AgentDefinitionStatus.DEPRECATED)
-                .filter(a -> CHAT_GROUP.equals(a.groupOrDefault()) || a.id().equals(currentAgentId))
+    private List<ManagedAgent> selectableAgents(AgentId currentAgentId) {
+        return agents.list().stream()
+                .filter(a -> a.status() != ManagedAgent.Status.DEPRECATED)
+                .filter(a -> CHAT_GROUP.equals(ChatAgent.group(a)) || ChatAgent.id(a).equals(currentAgentId))
                 .toList();
     }
 
@@ -861,13 +867,13 @@ public class ChatUiController {
     @PostMapping("/agents/{agentId}/sessions")
     public ResponseEntity<UiPage> startSession(@PathVariable("agentId") String agentIdValue,
                                                @AuthenticationPrincipal OidcUser user) {
-        return startSession(agentIdValue, user, AgentSession.CHAT);
+        return startSession(agentIdValue, user, ManagedSession.CHAT);
     }
 
     /**
      * Starts a session of {@code type} with the agent and shows it in the chat —
      * for a feature that hosts its own conversations in the chat's page, such
-     * as a builder. A type other than {@link AgentSession#CHAT} keeps the
+     * as a builder. A type other than {@link ManagedSession#CHAT} keeps the
      * session out of the chat's history and out of what {@code /chat} opens.
      */
     public ResponseEntity<UiPage> startSession(String agentIdValue, OidcUser user, String type) {
@@ -884,9 +890,9 @@ public class ChatUiController {
                                                ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
         AgentId agentId = AgentId.of(agentIdValue);
         String userId = user.getPreferredUsername();
-        return agentRepository.findById(agentId)
+        return agents.find(ai.mindconnect.agent.management.api.AgentId.of(agentId.value()))
                 .map(agent -> {
-                    var session = chatOpener.open(agentId, UserId.of(userId), type, null, List.of());
+                    var session = opened(chatOpener.open(agentId, UserId.of(userId), type, null, List.of()).id());
                     return ResponseEntity.ok(shell(session, historyOf(UserId.of(userId), session), history));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -898,11 +904,11 @@ public class ChatUiController {
      * type with the same agent — a builder's drawer shows that builder's
      * conversations, not the chats and not the other builder's.
      */
-    private List<ManagedSession> historyOf(UserId userId, AgentSession session) {
-        if (session.isOfType(AgentSession.CHAT)) {
+    private List<ManagedSession> historyOf(UserId userId, ManagedSession session) {
+        if (ManagedSession.CHAT.equals(session.type())) {
             return chats(userId.value());
         }
-        String agentId = session.agentDefinitionId() == null ? null : session.agentDefinitionId().value();
+        String agentId = session.agentId().map(id -> id.value()).orElse(null);
         return sessionManagement.list(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId.value())).stream()
                 .filter(listed -> session.type().equals(listed.type())
                         && java.util.Objects.equals(listed.agentId().map(id -> id.value()).orElse(null), agentId))
@@ -961,15 +967,15 @@ public class ChatUiController {
     }
 
     /** The picker's body for the session as it stands right now. */
-    private ai.mindconnect.ui.model.UiNode toolsPicker(AgentSession session) {
-        var effective = chatAgents.effective(session);
+    private ai.mindconnect.ui.model.UiNode toolsPicker(ManagedSession session) {
+        var effective = effective(session);
         var byGroup = offeredToolsByGroup();
         var subgroups = new java.util.HashMap<String, String>();
         byGroup.values().forEach(names -> names.forEach(name -> {
             String subgroup = toolRegistry.subgroupOf(name);
             if (subgroup != null && !subgroup.isBlank()) subgroups.put(name, subgroup);
         }));
-        return ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.node(session.id(), byGroup,
+        return ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.node(SessionOwnership.idOf(session), byGroup,
                 ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.states(effective), subgroups);
     }
 
@@ -988,7 +994,7 @@ public class ChatUiController {
         var byGroup = new java.util.TreeMap<String, java.util.Set<String>>();
         toolRegistry.toolNamesByGroup().forEach((group, names) -> {
             var visible = new java.util.TreeSet<>(names);
-            visible.removeAll(AgentDefinition.DERIVED_TOOLS);
+            visible.removeAll(ChatAgent.DERIVED_TOOLS);
             if (!visible.isEmpty()) byGroup.put(group, visible);
         });
         return byGroup;
@@ -1003,7 +1009,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var effective = chatAgents.effective(sessionOpt.get());
+        var effective = effective(sessionOpt.get());
         var chosen = selection(effective);
         apply(chosen, tool, state);
         var saved = replaceTools(sessionOpt.get(), chosen, null);
@@ -1024,7 +1030,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var effective = chatAgents.effective(sessionOpt.get());
+        var effective = effective(sessionOpt.get());
         var chosen = selection(effective);
         offeredToolsByGroup().getOrDefault(group, java.util.Set.of())
                 .forEach(tool -> apply(chosen, tool, state));
@@ -1053,11 +1059,11 @@ public class ChatUiController {
     }
 
     /** The sub-agent picker's body for the session as it stands right now. */
-    private ai.mindconnect.ui.model.UiNode subAgentsPicker(AgentSession session) {
-        var effective = chatAgents.effective(session);
+    private ai.mindconnect.ui.model.UiNode subAgentsPicker(ManagedSession session) {
+        var effective = effective(session);
         return ai.mindconnect.chatui.ui.component.ChatSubAgentsComponent.node(
-                session.id(), delegatableAgents(effective),
-                java.util.Set.copyOf(effective.effectiveCallableAgents()));
+                SessionOwnership.idOf(session), delegatableAgents(effective),
+                java.util.Set.copyOf(ChatAgent.roster(effective)));
     }
 
     /**
@@ -1073,8 +1079,8 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var effective = chatAgents.effective(sessionOpt.get());
-        var roster = new java.util.LinkedHashSet<>(effective.effectiveCallableAgents());
+        var effective = effective(sessionOpt.get());
+        var roster = new java.util.LinkedHashSet<>(ChatAgent.roster(effective));
         if (on) {
             roster.add(agent);
         } else {
@@ -1091,10 +1097,9 @@ public class ChatUiController {
      * by other agents, except the chat's own and the deprecated ones — a
      * picker is a list of things you can pick.
      */
-    private List<AgentDefinition> delegatableAgents(AgentDefinition effective) {
-        return agentRepository.findAll().stream()
-                .filter(a -> a.status() != AgentDefinitionStatus.DEPRECATED)
-                .filter(AgentDefinition::mayBeCalledByAgents)
+    private List<ManagedAgent> delegatableAgents(ManagedAgent effective) {
+        return agents.list().stream()
+                .filter(a -> a.status() != ManagedAgent.Status.DEPRECATED)
                 .filter(a -> !a.id().equals(effective.id()))
                 .toList();
     }
@@ -1110,9 +1115,9 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var def = agentRepository.findByName(agent);
+        var def = agents.findByName(agent);
         if (def.isEmpty()) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(openDialog("Test " + def.get().name(),
+        return ResponseEntity.ok(openDialog("Test " + def.get().definition().name(),
                 ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.node(
                         sessionId, def.get(), null, null)));
     }
@@ -1136,7 +1141,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var defOpt = agentRepository.findByName(agent);
+        var defOpt = agents.findByName(agent);
         if (defOpt.isEmpty()) return ResponseEntity.notFound().build();
         var def = defOpt.get();
         String message = raw == null ? null : new FormBody(raw).str("message");
@@ -1154,47 +1159,48 @@ public class ChatUiController {
     }
 
     private ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result runSubAgentTest(
-            AgentSession chat, AgentDefinition def, String message) {
+            ManagedSession chat, ManagedAgent def, String message) {
         long start = System.currentTimeMillis();
-        AgentSession test = null;
+        ManagedSession test = null;
         try {
-            test = chatOpener.openUnder(chat, def.id());
+            test = sessionManagement.open(chat.userId(), chat.id(), new SessionAgent.Ref(def.id()), null,
+                    chat.directories());
             // A title of its own spares the title generator a call for a
             // session that is gone again in a minute.
-            sessionManagement.rename(runtimeId(test.id()), "Test: " + def.name());
-            String answer = startTurn(test.id(), List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(message)),
+            sessionManagement.rename(test.id(), "Test: " + def.definition().name());
+            String answer = startTurn(SessionOwnership.idOf(test), List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(message)),
                     event -> { })
                     .get(SUBAGENT_TEST_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.answered(
                     answer, System.currentTimeMillis() - start);
         } catch (java.util.concurrent.TimeoutException e) {
-            sessionTurns.cancel(runtimeId(test.id()));
+            sessionTurns.cancel(test.id());
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.failed(
                     "No answer within " + SUBAGENT_TEST_TIMEOUT.toMinutes() + " minutes — if a tool is "
                             + "waiting for approval, it asks in the chat behind this dialog.",
                     System.currentTimeMillis() - start);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            if (test != null) sessionTurns.cancel(runtimeId(test.id()));
+            if (test != null) sessionTurns.cancel(test.id());
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.failed(
                     "Interrupted", System.currentTimeMillis() - start);
         } catch (java.util.concurrent.ExecutionException | RuntimeException e) {
             Throwable cause = e instanceof java.util.concurrent.ExecutionException && e.getCause() != null
                     ? e.getCause() : e;
-            log.warn("Sub-agent test of '{}' failed: {}", def.name(), cause.getMessage());
+            log.warn("Sub-agent test of '{}' failed: {}", def.definition().name(), cause.getMessage());
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.failed(
                     cause.getMessage(), System.currentTimeMillis() - start);
         } finally {
             if (test != null) {
-                deleteWithSubSessions(test.id());
+                deleteWithSubSessions(SessionOwnership.idOf(test));
             }
         }
     }
 
     /** A session and every session it started, deepest first; best effort. */
     private void deleteWithSubSessions(SessionId sessionId) {
-        for (AgentSession child : sessionRepository.findByParentSession(sessionId)) {
-            deleteWithSubSessions(child.id());
+        for (ManagedSession child : sessionManagement.children(runtimeId(sessionId))) {
+            deleteWithSubSessions(SessionOwnership.idOf(child));
         }
         try {
             sessionManagement.delete(runtimeId(sessionId));
@@ -1208,7 +1214,7 @@ public class ChatUiController {
      * session, and the composer too — its "+" carries the tool count, which
      * would otherwise keep stating what was true before the click.
      */
-    private UiPatch afterToolChange(AgentSession saved, String bodyId,
+    private UiPatch afterToolChange(ManagedSession saved, String bodyId,
                                     ai.mindconnect.ui.model.UiNode body) {
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace(bodyId, body))
@@ -1227,21 +1233,21 @@ public class ChatUiController {
      * @param chosen tool name &rarr; deferred, the tools the chat carries
      * @param roster {@code null} keeps the chat's roster as it is
      */
-    private AgentSession replaceTools(AgentSession session, java.util.Map<String, Boolean> chosen,
+    private ManagedSession replaceTools(ManagedSession session, java.util.Map<String, Boolean> chosen,
                                       Roster roster) {
-        var effective = chatAgents.effective(session);
+        var effective = effective(session);
         // pickTools against the effective definition: it carries what this chat chose before, so a
         // binding's approval flag or mount directory survives the next click.
-        var changed = effective.withTools(pickTools(effective, chosen));
+        var changed = ChatAgent.withTools(effective.definition(), pickTools(effective, chosen));
         if (roster != null) {
-            changed = changed.withCallableAgents(roster.names());
+            changed = ChatAgent.withRoster(changed, roster.names());
         }
         // Switching a tool on and straight back off writes nothing: a chat that refers to its agent
         // keeps referring to it until something really differs.
-        if (!changed.equals(effective)) {
-            chatAgents.own(session, changed);
+        if (!changed.equals(effective.definition())) {
+            own(session, effective, changed);
         }
-        return sessionRepository.findById(session.id()).orElseThrow();
+        return sessionManagement.find(session.id()).orElseThrow();
     }
 
     /**
@@ -1290,27 +1296,27 @@ public class ChatUiController {
      * chat-page rendering and patch generation goes through this single
      * factory so the controller never reaches for the model directly.
      */
-    private ChatPage buildChatPage(AgentSession session,
-                                   AgentDefinition agent) {
-        var history = sessionManagement.messages(runtimeId(session.id()));
-        var memory  = safeMemorySnapshot(session.id());
+    private ChatPage buildChatPage(ManagedSession session,
+                                   ManagedAgent agent) {
+        var history = sessionManagement.messages(session.id());
+        var memory  = safeMemorySnapshot(SessionOwnership.idOf(session));
         // Source-of-truth for "is this turn currently streaming?" is the
         // registry — not page-local state. Lets a navigate-back during a
         // live turn render the form in Stop-mode without any client-side
         // reconciliation.
-        String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(session.id());
+        String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(SessionOwnership.idOf(session));
         var handleOpt = activeStreams.findHandle(channelId);
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
-                        buildSubAgentCards(session.id(), toolCallId, running, in, out))
+                        buildSubAgentCards(SessionOwnership.idOf(session), toolCallId, running, in, out))
                 .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
-                        llmConfigRepository, agent.llmConfigName()))
+                        llmConfigRepository, ChatAgent.model(agent)))
                 .withOwnPrompt(ownPrompt(session, agent))
-                .withBubbledApprovals(bubbledApprovalCards(session.id()))
+                .withBubbledApprovals(bubbledApprovalCards(SessionOwnership.idOf(session)))
                 .withHostLinks(hostLinks)
                 .withOfferedTools(offeredToolNames());
-        page.withAttachments(sessionFiles.attachments(session.id()));
-        page.withDirChoice(sessionService.workingDirChoice());
+        page.withAttachments(sessionFiles.attachments(SessionOwnership.idOf(session)));
+        page.withDirChoice(workingDirPolicy.allowsChoice());
         // Every render hands the SPA this session's stream — whether or not
         // a turn is running. That is the whole point: a client with nothing
         // to listen to cannot find out that someone else started a turn, so
@@ -1324,7 +1330,7 @@ public class ChatUiController {
         // to date by the catch-up frames instead (see StreamController).
         long from = sessionStreams.find(channelId)
                 .map(ai.mindconnect.chatui.service.StreamBus::lastSeq).orElse(0L);
-        String agentLabel = agent.name() != null ? agent.name() : "Agent";
+        String agentLabel = agent.definition().name() != null ? agent.definition().name() : "Agent";
         // What to call this page on a surface that links back to it. The
         // framework must not guess: it has no idea it is streaming a chat.
         // The session's own title first, the agent's name while the chat is
@@ -1337,7 +1343,7 @@ public class ChatUiController {
                         "/chat/api/streams/" + channelId + "/sse?from=" + from,
                         handleOpt.map(ai.mindconnect.chatui.service.ActiveStreams.Handle::label)
                                 .orElse(agentLabel),
-                        "/chat/sessions/" + session.id().value(),
+                        "/chat/sessions/" + SessionOwnership.idOf(session).value(),
                         returnLabel)));
         return page;
     }
@@ -1352,32 +1358,45 @@ public class ChatUiController {
         return running;
     }
 
-    /** The sessions with a tool stopped at the approval gate — the store is the truth, as for the cards. */
+    /** The sessions with a tool stopped at the approval gate — the waiting turn is the truth, as for the cards. */
     private java.util.Set<SessionId> waitingSessions(List<ManagedSession> sessions) {
         java.util.Set<SessionId> waiting = new java.util.HashSet<>();
         for (var s : sessions) {
             SessionId id = SessionId.of(s.id().value());
-            if (!approvalStore.openForRoot(id).isEmpty()) waiting.add(id);
+            if (!openApprovals(id).isEmpty()) waiting.add(id);
         }
         return waiting;
     }
 
     /**
-     * The cards for this session's OPEN sub-agent approval questions — read
-     * from the ToolApprovalRepository, the single truth for bubbled requests
-     * (entry exists = card shows; answered/cancelled/deleted = entry gone).
+     * The cards for this session's open approval questions, its own and
+     * those of the sub-agents under it — read from the turn that waits for
+     * them (a question exists = card shows; answered or cancelled = gone).
      */
     private List<ai.mindconnect.ui.model.UiList.Item> bubbledApprovalCards(SessionId sessionId) {
-        return approvalStore.openForRoot(sessionId).stream()
-                .map(open -> {
-                    var call = ai.mindconnect.chatui.ui.component.ApprovalCardComponent
-                            .parseApprovalContent(open.content());
-                    return ai.mindconnect.chatui.ui.component.ApprovalCardComponent.approvalCard(
-                            sessionId, open.callId(), call.toolName(), call.argsJson(),
-                            ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT
-                                    .format(open.requestedAt()));
-                })
+        return openApprovals(sessionId).stream().map(open -> approvalCard(sessionId, open)).toList();
+    }
+
+    /** The tool calls the session's turn waits for an approval of. */
+    private List<Interruption> openApprovals(SessionId sessionId) {
+        return sessionTurns.open(runtimeId(sessionId)).stream()
+                .filter(open -> Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null)
                 .toList();
+    }
+
+    /** The card that asks for the approval of one tool call. */
+    private static ai.mindconnect.ui.model.UiList.Item approvalCard(SessionId sessionId, Interruption interruption) {
+        String argsJson;
+        try {
+            argsJson = ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(interruption.call().arguments());
+        } catch (Exception e) {
+            argsJson = String.valueOf(interruption.call().arguments());
+        }
+        return ai.mindconnect.chatui.ui.component.ApprovalCardComponent.approvalCard(
+                sessionId, interruption.call().callId(), interruption.call().toolName(), argsJson,
+                ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT.format(java.time.Instant.now()));
     }
 
     /**
@@ -1401,12 +1420,12 @@ public class ChatUiController {
     private List<TaskCardComponent> buildSubAgentCards(SessionId parentSessionId, String toolCallId,
                                                        boolean running, String inputJson, String resultText) {
         if (toolCallId == null || toolCallId.isBlank()) return List.of();
-        List<AgentSession> children;
+        List<ManagedSession> children;
         try {
-            children = sessionRepository.findByParentSession(parentSessionId).stream()
-                    .filter(s -> toolCallId.equals(s.parentToolCallId()))
+            children = sessionManagement.children(runtimeId(parentSessionId)).stream()
+                    .filter(s -> toolCallId.equals(s.metadata().get(SubAgentPlugin.OPENED_BY_CALL)))
                     .sorted(java.util.Comparator.comparing(
-                            AgentSession::startedAt))
+                            ManagedSession::createdAt))
                     .toList();
         } catch (Exception e) {
             log.warn("Failed to list sub-sessions of {} for toolCall {}: {}",
@@ -1417,9 +1436,9 @@ public class ChatUiController {
         List<TaskCardComponent> cards = new java.util.ArrayList<>();
         for (var child : children) {
             try {
-                var childAgent = agentRepository.findById(child.agentDefinitionId()).orElse(null);
-                String agentName = childAgent != null ? childAgent.name() : "sub-agent";
-                var childHistory = sessionManagement.messages(runtimeId(child.id()));
+                var childAgent = sessionManagement.agentOf(child.id()).map(ManagedAgent::of).orElse(null);
+                String agentName = childAgent != null ? childAgent.definition().name() : "sub-agent";
+                var childHistory = sessionManagement.messages(child.id());
 
                 // A throwaway component reuses all the historic-card grouping
                 // logic for the sub-session, recursing through the same
@@ -1427,10 +1446,10 @@ public class ChatUiController {
                 // running state likewise follows its own parent-result
                 // presence, computed inside that recursive call.
                 var childComp = new ai.mindconnect.chatui.ui.component.MessageListComponent(
-                        child.id(), childAgent, childHistory, null,
-                        (tcId, r, in, out) -> buildSubAgentCards(child.id(), tcId, r, in, out));
+                        SessionOwnership.idOf(child), childAgent, childHistory, null,
+                        (tcId, r, in, out) -> buildSubAgentCards(SessionOwnership.idOf(child), tcId, r, in, out));
 
-                var childList = TaskCardComponent.subAgentChildList(child.id().value());
+                var childList = TaskCardComponent.subAgentChildList(SessionOwnership.idOf(child).value());
                 for (TaskCardComponent t : childComp.allHistoricTaskCards()) {
                     childList.item(((UiList) t.render()).getItems().get(0));
                 }
@@ -1455,23 +1474,17 @@ public class ChatUiController {
                 // Node id MUST match the live stream's id (task-sub-{sessionId})
                 // so a reload mid-run produces the same <li> and the run's
                 // continuing live patches keep landing on it.
-                String nodeId = "task-sub-" + child.id().value();
+                String nodeId = "task-sub-" + SessionOwnership.idOf(child).value();
                 cards.add(TaskCardComponent.historicSubAgent(
-                        nodeId, agentName, child.id().value(),
-                        running, failed, durationOf(child), childInput, resultText,
+                        nodeId, agentName, SessionOwnership.idOf(child).value(),
+                        running, failed, 0L, childInput, resultText,
                         childList, finalText));
             } catch (Exception e) {
                 log.warn("Failed to build sub-agent card for session {}: {}",
-                        child.id(), e.getMessage());
+                        SessionOwnership.idOf(child), e.getMessage());
             }
         }
         return cards;
-    }
-
-    /** Wall-clock duration of a (completed) session in ms, or 0 when unknown. */
-    private static long durationOf(AgentSession s) {
-        if (s.startedAt() == null || s.completedAt() == null) return 0L;
-        return java.time.Duration.between(s.startedAt(), s.completedAt()).toMillis();
     }
 
     /** The first USER CHAT message in a (sub-)session — the task it was given. */
@@ -1496,11 +1509,11 @@ public class ChatUiController {
 
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var agent = agentOpt.get();
 
-        try (var ctx = LoggingContext.session(sessionId, null, agent.name())) {
+        try (var ctx = LoggingContext.session(sessionId, null, agent.definition().name())) {
             startTurn(sessionId, List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), event -> { })
                     .join();
         }
@@ -1541,7 +1554,7 @@ public class ChatUiController {
         log.info("DELETE /chat/api/sessions/{}/messages fromSeq={} toSeq={}", sessionId.value(), fromSeq, toSeq);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
 
         if (toSeq != Integer.MAX_VALUE) {
@@ -1568,7 +1581,7 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
@@ -1622,7 +1635,7 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
+        var agentOpt = java.util.Optional.of(effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
@@ -1653,7 +1666,7 @@ public class ChatUiController {
         // DOM instead of lingering until the end-of-turn refresh.
         var session = sessionOpt.get();
         return runTurnStream(session, agentOpt.get(), parts, true,
-                handler -> startTurn(session.id(), parts, handler));
+                handler -> startTurn(SessionOwnership.idOf(session), parts, handler));
     }
 
     /**
@@ -1664,13 +1677,13 @@ public class ChatUiController {
      * same session and history, so the picture is there before the answer
      * rather than after the turn.
      */
-    private String userBubble(AgentSession session, java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> parts) {
-        var id = runtimeId(session.id());
+    private String userBubble(ManagedSession session, java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> parts) {
+        var id = session.id();
         var history = sessionManagement.messages(id).stream()
                 .map(ai.mindconnect.agent.management.api.ManagedMessage::message).toList();
         var attached = ai.mindconnect.agent.runtime.capabilities.attachment.Attachment.of(
                 sessionManagement.find(id).orElseThrow().metadata());
-        return ai.mindconnect.chatui.ui.component.MessageComponent.userBubble(session.id(),
+        return ai.mindconnect.chatui.ui.component.MessageComponent.userBubble(SessionOwnership.idOf(session),
                 ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin.userMessage(
                         attached, history, parts, Map.of()));
     }
@@ -1685,11 +1698,11 @@ public class ChatUiController {
      *                       before the turn starts — used by regenerate so the
      *                       just-deleted messages leave the DOM immediately.
      */
-    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(AgentSession session,
-                                                                          AgentDefinition agent,
+    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(ManagedSession session,
+                                                                          ManagedAgent agent,
                                                                           String text, boolean initialRefresh) {
         return runTurnStream(session, agent, List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), initialRefresh,
-                handler -> startTurn(session.id(), List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), handler));
+                handler -> startTurn(SessionOwnership.idOf(session), List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), handler));
     }
 
     /**
@@ -1697,19 +1710,19 @@ public class ChatUiController {
      * message ({@code userParts} echoed as a user bubble) or an approval answer
      * ({@code userParts == null} — the card click is the input, nothing to echo).
      */
-    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(AgentSession session,
-                                                                          AgentDefinition agent,
+    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(ManagedSession session,
+                                                                          ManagedAgent agent,
                                                                           java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> userParts,
                                                                           boolean initialRefresh,
                                                                           java.util.function.Function<SessionEventListener, java.util.concurrent.CompletableFuture<String>> turnStarter) {
-        SessionId sessionId = session.id();
+        SessionId sessionId = SessionOwnership.idOf(session);
         // Channel id == the id of the message-list container the patches
         // target. This way the client's {@code findStreamTarget} lookup
         // naturally detects "chat page mounted", and both the submitter and
         // any observer resolve the same stream.
         String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId);
         String returnHref = "/chat/sessions/" + sessionId.value();
-        String streamLabel = agent.name() != null ? agent.name() : "Agent";
+        String streamLabel = agent.definition().name() != null ? agent.definition().name() : "Agent";
         // Every node this turn puts on the page carries an id no earlier turn
         // used. A turn that fails or is cancelled leaves its live nodes where
         // they are — there is no rebuild to swap them for history — and the
@@ -1899,18 +1912,7 @@ public class ChatUiController {
                 // open stream, one per tool call that waits for an approval.
                 for (Interruption interruption : interruptions) {
                     if (!Interruption.TOOL_APPROVAL.equals(interruption.kind())) continue;
-                    String argsJson;
-                    try {
-                        argsJson = ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER
-                                .writerWithDefaultPrettyPrinter()
-                                .writeValueAsString(interruption.call().arguments());
-                    } catch (Exception e) {
-                        argsJson = String.valueOf(interruption.call().arguments());
-                    }
-                    var card = ai.mindconnect.chatui.ui.component.ApprovalCardComponent.approvalCard(
-                            sessionId, interruption.call().callId(), interruption.call().toolName(), argsJson,
-                            ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT
-                                    .format(java.time.Instant.now()));
+                    var card = approvalCard(sessionId, interruption);
                     publishPatch(bus, liveView.appendApprovalCard(card));
                 }
             }

@@ -1,8 +1,9 @@
 package ai.mindconnect.chatui.service;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ import java.util.Optional;
  * it does anything: is this the caller's chat? A session id is not a secret
  * — it travels in URLs, links, logs and the DOM — so the id alone must not
  * open a chat. The owner is the user who started it ({@link
- * AgentSession#userId()}), and a session that is not the caller's is
+ * ManagedSession#userId()}), and a session that is not the caller's is
  * reported as not existing, which is all a stranger gets to learn.
  *
  * <p>Streams are addressed by channel, and the chat's channel is derived
@@ -29,24 +30,26 @@ public class SessionOwnership {
     /** The user every request runs as when no principal is present. */
     public static final String ANONYMOUS_USER = "mc_user";
 
-    private final AgentSessionRepository sessions;
+    private final AgentRuntime runtime;
 
-    public SessionOwnership(AgentSessionRepository sessions) {
-        this.sessions = sessions;
+    public SessionOwnership(AgentRuntime runtime) {
+        this.runtime = runtime;
     }
 
     /** The session, if it exists and belongs to the caller. */
-    public Optional<AgentSession> owned(SessionId sessionId, OidcUser user) {
-        return sessions.findById(sessionId).filter(session -> owns(session, user));
+    public Optional<ManagedSession> owned(SessionId sessionId, OidcUser user) {
+        return runtime.service(SessionManagement.class)
+                .find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()))
+                .filter(session -> owns(session, user));
     }
 
     /** The session behind a chat stream channel, if it exists and belongs to the caller. */
-    public Optional<AgentSession> ownedByChannel(String channelId, OidcUser user) {
+    public Optional<ManagedSession> ownedByChannel(String channelId, OidcUser user) {
         return sessionIdOf(channelId).flatMap(id -> owned(id, user));
     }
 
     /** Whether the caller is the user who started the session. */
-    public static boolean owns(AgentSession session, OidcUser user) {
+    public static boolean owns(ManagedSession session, OidcUser user) {
         String caller = userIdOf(user);
         return caller != null && session.userId() != null && caller.equals(session.userId().value());
     }
@@ -54,6 +57,11 @@ public class SessionOwnership {
     /** The caller's user id: the OIDC preferred username, or the fixed dev user without a principal. */
     public static String userIdOf(OidcUser user) {
         return user == null ? ANONYMOUS_USER : user.getPreferredUsername();
+    }
+
+    /** The session's id as the chat's links, forms and channels carry it. */
+    public static SessionId idOf(ManagedSession session) {
+        return SessionId.of(session.id().value());
     }
 
     /** The channel the chat page streams a session's turns on. */

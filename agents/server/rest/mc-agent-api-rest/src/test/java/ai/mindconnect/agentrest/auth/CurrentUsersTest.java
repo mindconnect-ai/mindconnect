@@ -51,14 +51,14 @@ class CurrentUsersTest {
 
     @Test
     void aSessionOpensOnlyForItsOwner() {
-        var repo = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-        AgentSession alices = repo.create(AgentSession.start(AgentId.of("default-chat"), UserId.of("alice"),
-                ConversationId.random()));
-        var access = new SessionAccess(repo);
+        var sessions = new ai.mindconnect.agentrest.SessionFixture();
+        var alices = sessions.open("alice", null);
+        var id = ai.mindconnect.agent.SessionId.of(alices.id().value());
+        var access = new SessionAccess(sessions.runtime());
 
-        assertThat(access.requireOwned(alices.id(), UserId.of("alice"))).isEqualTo(alices);
-        assertThat(access.owned(alices.id(), UserId.of("bob"))).isEmpty();
-        assertThatThrownBy(() -> access.requireOwned(alices.id(), UserId.of("bob")))
+        assertThat(access.requireOwned(id, UserId.of("alice"))).isEqualTo(alices);
+        assertThat(access.owned(id, UserId.of("bob"))).isEmpty();
+        assertThatThrownBy(() -> access.requireOwned(id, UserId.of("bob")))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         assertThat(access.owned(SessionId.random(), UserId.of("alice"))).isEmpty();

@@ -1,7 +1,9 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
+import ai.mindconnect.chatui.ChatFixture;
 import ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.ToolState;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -107,8 +109,8 @@ class ChatPickerComponentsTest {
      */
     @Test
     void theToolsBadgeCountsWhatThePickerCountsOn() throws Exception {
-        var agent = AgentDefinition.create("default-chat", "Chats", "You chat.", null, "agent-default")
-                .withTools(List.of(tool("read_file", false), tool("bash", false),
+        var agent = ChatFixture.agent("default-chat", "Chats", "You chat.", "agent-default",
+                List.of(tool("read_file", false), tool("bash", false),
                         tool("web_search", true),
                         tool("gmail_send", false), tool("gmail_read", true)));
         Map<String, List<String>> byGroup =
@@ -116,16 +118,15 @@ class ChatPickerComponentsTest {
 
         String picker = json(ChatToolsPickerComponent.node(SESSION, byGroup,
                 ChatToolsPickerComponent.states(agent), Map.of()));
-        String composer = json(new ChatFormComponent(SESSION, agent.id())
+        String composer = json(new ChatFormComponent(SESSION, ChatAgent.id(agent))
                 .withAgentCounts(agent, ChatToolsPickerComponent.offered(byGroup)).render());
 
         assertThat(picker).contains("Tools · 2 on, 1 by search, 3 available");
         assertThat(composer).contains("\"badge\":\"2\"").doesNotContain("\"badge\":\"5\"");
     }
 
-    private static ai.mindconnect.agent.tool.AgentTool tool(String name, boolean deferred) {
-        return new ai.mindconnect.agent.tool.AgentTool.Json(null, name, null, Map.of(),
-                true, deferred, false, null).toTool();
+    private static ToolBinding tool(String name, boolean deferred) {
+        return new ToolBinding(name, deferred, Map.of());
     }
 
     /** Where a tool comes from is worth a line when the registry knows it. */
@@ -203,13 +204,13 @@ class ChatPickerComponentsTest {
                 .doesNotContain("/subagents/test-dialog");
     }
 
-    private static AgentDefinition verifier() {
-        return AgentDefinition.create("verifier", "Checks claims",
-                "You verify.", null, "agent-default");
+    private static ManagedAgent verifier() {
+        return ChatFixture.agent("verifier", "Checks claims",
+                "You verify.", "agent-default");
     }
 
-    private static AgentDefinition researcher() {
-        return AgentDefinition.create("web-researcher", "Reads the web and reports back",
-                "You research.", null, "agent-default");
+    private static ManagedAgent researcher() {
+        return ChatFixture.agent("web-researcher", "Reads the web and reports back",
+                "You research.", "agent-default");
     }
 }

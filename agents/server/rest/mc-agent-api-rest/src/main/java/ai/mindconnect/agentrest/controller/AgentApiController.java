@@ -668,6 +668,8 @@ public class AgentApiController {
      * request otherwise, whether the session is someone else's or missing.
      */
     private SessionId owned(String sessionId, UserId caller) {
-        return sessionAccess.requireOwned(SessionId.of(sessionId), caller).id();
+        SessionId id = SessionId.of(sessionId);
+        sessionAccess.requireOwned(id, caller);
+        return id;
     }
 }

@@ -4,7 +4,6 @@ import ai.mindconnect.agentrest.service.SessionFileService;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.springframework.http.HttpStatus;
@@ -43,11 +42,10 @@ public class ChatFilesUiController {
 
     private final FileStore fileStore;
     private final SessionFileService sessionFiles;
-    private final AgentSessionRepository sessions;
     /** Whether this installation lets a user choose a chat's directories. */
     private final ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy;
     private final ai.mindconnect.agent.management.api.SessionManagement sessionManagement;
-    private final ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents;
+    private final ai.mindconnect.agent.management.api.AgentManagement agents;
     private final SessionOwnership ownership;
     /** Whether a turn is live right now — the composer is redrawn in that state. */
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
@@ -59,10 +57,9 @@ public class ChatFilesUiController {
             ai.mindconnect.llm.port.out.LlmConfigRepository> llmConfigs;
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
-                                 AgentSessionRepository sessions,
                                  ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy,
                                  ai.mindconnect.agent.management.api.SessionManagement sessionManagement,
-                                 ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents,
+                                 ai.mindconnect.agent.management.api.AgentManagement agents,
                                  SessionOwnership ownership,
                                  ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                                  ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
@@ -71,10 +68,9 @@ public class ChatFilesUiController {
         this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
-        this.sessions = sessions;
         this.workingDirPolicy = workingDirPolicy;
         this.sessionManagement = sessionManagement;
-        this.chatAgents = chatAgents;
+        this.agents = agents;
         this.ownership = ownership;
         this.activeStreams = activeStreams;
         this.toolRegistry = toolRegistry;
@@ -114,7 +110,7 @@ public class ChatFilesUiController {
     private boolean referencedBySession(SessionId sessionId, OidcUser user, String fileId) {
         var session = ownership.owned(sessionId, user).orElse(null);
         if (session == null) return false;
-        if (session.attachedFiles().stream().anyMatch(f -> fileId.equals(f.id()))) return true;
+        if (session.attachments().stream().anyMatch(f -> fileId.equals(f.id()))) return true;
         return sessionManagement.messages(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value())).stream()
                 .flatMap(m -> m.message().content().stream())
                 .map(part -> part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Image image ? image.source()
@@ -191,20 +187,23 @@ public class ChatFilesUiController {
      * both, and half a rebuilt composer would state one of them stale.
      */
     private UiPatch.Operation attachmentCountRefresh(SessionId sessionId) {
-        var session = sessions.findById(sessionId).orElse(null);
-        var agent = session == null ? null : chatAgents.effective(session);
+        var session = sessionManagement.find(
+                ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value())).orElse(null);
+        var agent = session == null ? null
+                : ai.mindconnect.chatui.ui.component.ChatAgent.effective(sessionManagement, agents, session);
         // Whichever state the composer is in stays: a file attached mid-turn
         // must not swap the Stop button for a Send button.
         boolean streaming = activeStreams.findHandle(
                 SessionOwnership.channelOf(sessionId)).isPresent();
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
-                        sessionId, agent == null ? null : agent.id(), streaming)
+                        sessionId, ai.mindconnect.chatui.ui.component.ChatAgent.id(agent), streaming)
                 .withModelLabel(agent == null ? null : ai.mindconnect.chatui.ui.component.ModelLabel.of(
-                        llmConfigs == null ? null : llmConfigs.getIfAvailable(), agent.llmConfigName()))
+                        llmConfigs == null ? null : llmConfigs.getIfAvailable(),
+                        ai.mindconnect.chatui.ui.component.ChatAgent.model(agent)))
                 .withAttachments(sessionFiles.attachments(sessionId))
                 .withAgentCounts(agent, ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent
                         .offered(toolRegistry.toolNamesByGroup()))
-                .withWorkingDir(session == null ? null : session.workingDir())
+                .withWorkingDir(session == null ? null : session.directories().working())
                 .withDirChoice(workingDirPolicy.allowsChoice());
         return UiPatch.Operation.replace(form.id(), form.render());
     }

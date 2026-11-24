@@ -1,7 +1,5 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAppShell;
@@ -37,7 +35,7 @@ public final class ChatShellComponent implements UiComponent {
     private static final String MENU_ID = "chat-menu";
 
     private final List<ManagedSession> sessions;
-    private final AgentSession active;
+    private final ManagedSession active;
     private final String agentName;
     private final UiNode content;
     private final java.util.Map<AgentId, String> agentIcons;
@@ -79,7 +77,7 @@ public final class ChatShellComponent implements UiComponent {
         return this;
     }
 
-    public ChatShellComponent(List<ManagedSession> sessions, AgentSession active,
+    public ChatShellComponent(List<ManagedSession> sessions, ManagedSession active,
                               String agentName, UiNode content) {
         this(sessions, active, agentName, content, java.util.Map.of());
     }
@@ -91,7 +89,7 @@ public final class ChatShellComponent implements UiComponent {
      *                   an inline session agent, a deleted definition — falls
      *                   back to the generic one.
      */
-    public ChatShellComponent(List<ManagedSession> sessions, AgentSession active,
+    public ChatShellComponent(List<ManagedSession> sessions, ManagedSession active,
                               String agentName, UiNode content,
                               java.util.Map<AgentId, String> agentIcons) {
         this.sessions = sessions;
@@ -169,7 +167,7 @@ public final class ChatShellComponent implements UiComponent {
         menu.item(UiMenuItem.of("chat-new", history.newLabel()).icon("add").onClick(history.newChat()));
         menu.item(UiMenuItem.divider());
 
-        SessionId activeId = active == null ? null : active.id();
+        SessionId activeId = active == null ? null : SessionId.of(active.id().value());
         for (ManagedSession s : sessions) {
             SessionId id = SessionId.of(s.id().value());
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
@@ -198,7 +196,7 @@ public final class ChatShellComponent implements UiComponent {
     /** The icon of the agent this conversation belongs to, or the generic one. */
     private String iconFor(ManagedSession s) {
         String icon = s.agentId().map(id -> agentIcons.get(AgentId.of(id.value()))).orElse(null);
-        return icon == null ? AgentDefinition.DEFAULT_ICON : icon;
+        return icon == null ? ChatAgent.DEFAULT_ICON : icon;
     }
 
     private static String ago(Instant when) {

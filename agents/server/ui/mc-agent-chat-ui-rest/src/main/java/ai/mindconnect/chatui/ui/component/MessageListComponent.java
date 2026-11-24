@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
@@ -72,7 +72,7 @@ public final class MessageListComponent implements UiComponent {
     }
 
     private final SessionId sessionId;
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final List<ManagedMessage> history;
     private final WorkingMemory memory;
     private final SubAgentTreeProvider subAgentTree;
@@ -91,12 +91,12 @@ public final class MessageListComponent implements UiComponent {
 
 
 
-    public MessageListComponent(SessionId sessionId, AgentDefinition agent,
+    public MessageListComponent(SessionId sessionId, ManagedAgent agent,
                                 List<ManagedMessage> history, WorkingMemory memory) {
         this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE);
     }
 
-    public MessageListComponent(SessionId sessionId, AgentDefinition agent,
+    public MessageListComponent(SessionId sessionId, ManagedAgent agent,
                                 List<ManagedMessage> history, WorkingMemory memory,
                                 SubAgentTreeProvider subAgentTree) {
         this.sessionId = sessionId;
@@ -180,13 +180,13 @@ public final class MessageListComponent implements UiComponent {
         // from the others — and with the history a closed drawer, the header is
         // the only place that can say which chat you are in. An untitled chat
         // falls back to the agent's name; "New chat" would say nothing at all.
-        String agentName = agent == null ? "Chat" : agent.name();
+        String agentName = agent == null ? "Chat" : agent.definition().name();
         boolean titled = sessionTitle != null && !sessionTitle.isBlank();
         var list = UiList.of(id(), titled ? sessionTitle : agentName);
         // The icon leads the title, the way every other screen's does — the
         // agent's own where it has one, so the conversation is recognisable
         // as this agent's and not just as "a chat".
-        list.icon(agent == null ? "chat" : agent.iconOrDefault());
+        list.icon(agent == null ? "chat" : ChatAgent.icon(agent));
         list.withCssClass("chat-container");
         // The history is a drawer now, opened from here. chat-ui.js owns the
         // click: the drawer is client state, and the server has no opinion
@@ -447,7 +447,7 @@ public final class MessageListComponent implements UiComponent {
     private void addWelcomeOrEmpty(UiList list) {
         String welcome = agent.welcomeMessage();
         if (welcome != null && !welcome.isBlank()) {
-            list.item(UiList.Item.of("welcome", agent.name())
+            list.item(UiList.Item.of("welcome", agent.definition().name())
                     .content(UiMarkdown.of("welcome-md", welcome)));
         } else {
             list.item(UiList.Item.of("empty", "No messages yet")

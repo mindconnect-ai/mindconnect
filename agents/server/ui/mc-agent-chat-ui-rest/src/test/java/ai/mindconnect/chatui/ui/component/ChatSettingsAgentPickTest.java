@@ -2,7 +2,8 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.chatui.ChatFixture;
 import ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -18,29 +19,29 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ChatSettingsAgentPickTest {
 
-    private static final AgentDefinition DEFAULT_CHAT =
-            AgentDefinition.create("default-chat", "d", "You are a skilled assistant.", null, "agent-default");
-    private static final AgentDefinition SECRETARY =
-            AgentDefinition.create("secretary", "d", "You are the user's secretary.", null, "claude-default");
+    private static final ManagedAgent DEFAULT_CHAT =
+            ChatFixture.agent("default-chat", "d", "You are a skilled assistant.", "agent-default");
+    private static final ManagedAgent SECRETARY =
+            ChatFixture.agent("secretary", "d", "You are the user's secretary.", "claude-default");
 
     private static final Values CURRENT = new Values("agent-default", "You are a skilled assistant. Be brief.");
     private static final Values SUBMITTED = new Values("openai-default", "My own prompt");
 
     @Test
     void aDifferentAgentBringsItsOwnModelAndPrompt() {
-        assertThat(ChatSettingsComponent.valuesFor(SECRETARY, DEFAULT_CHAT.id(), CURRENT, SUBMITTED))
+        assertThat(ChatSettingsComponent.valuesFor(SECRETARY, ChatAgent.id(DEFAULT_CHAT), CURRENT, SUBMITTED))
                 .isEqualTo(new Values("claude-default", "You are the user's secretary."));
     }
 
     @Test
     void theChatsOwnAgentShowsWhatTheChatRunsOnIncludingItsOverrides() {
-        assertThat(ChatSettingsComponent.valuesFor(DEFAULT_CHAT, DEFAULT_CHAT.id(), CURRENT, SUBMITTED))
+        assertThat(ChatSettingsComponent.valuesFor(DEFAULT_CHAT, ChatAgent.id(DEFAULT_CHAT), CURRENT, SUBMITTED))
                 .isEqualTo(CURRENT);
     }
 
     @Test
     void noAgentKeepsWhatTheFieldsHold() {
-        assertThat(ChatSettingsComponent.valuesFor(null, DEFAULT_CHAT.id(), CURRENT, SUBMITTED)).isEqualTo(SUBMITTED);
+        assertThat(ChatSettingsComponent.valuesFor(null, ChatAgent.id(DEFAULT_CHAT), CURRENT, SUBMITTED)).isEqualTo(SUBMITTED);
     }
 
     @Test
@@ -48,7 +49,7 @@ class ChatSettingsAgentPickTest {
         SessionId session = SessionId.of("s-1");
         String out = new ObjectMapper().findAndRegisterModules().writeValueAsString(
                 new ChatSettingsComponent(session, List.of(), List.of(DEFAULT_CHAT, SECRETARY),
-                        "agent-default", DEFAULT_CHAT.id(), "p").render());
+                        "agent-default", ChatAgent.id(DEFAULT_CHAT), "p").render());
 
         assertThat(out).contains("\"url\":\"/chat/api/sessions/s-1/settings/agent\"");
     }
@@ -57,6 +58,6 @@ class ChatSettingsAgentPickTest {
     void anAgentOfNoIdIsNeverTheCurrentOne() {
         assertThat(ChatSettingsComponent.valuesFor(SECRETARY, null, CURRENT, SUBMITTED).systemPrompt())
                 .isEqualTo("You are the user's secretary.");
-        assertThat(AgentId.random()).isNotEqualTo(SECRETARY.id());
+        assertThat(AgentId.random()).isNotEqualTo(ChatAgent.id(SECRETARY));
     }
 }

@@ -2,13 +2,14 @@ package ai.mindconnect.agentrest.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.AttachedFile;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionAttachment;
+import ai.mindconnect.agent.management.api.SessionDirectories;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolActivation;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
 import ai.mindconnect.vectorstore.embedding.EntityType;
 import ai.mindconnect.vectorstore.tools.DirectIngestion;
@@ -61,13 +62,8 @@ public class SessionFileService {
 
     private final FileStore fileStore;
     private final ObjectProvider<VectorStores> storesProvider;
-    private final ObjectProvider<DynamicToolActivations> activationsProvider;
-    private final AgentSessionRepository sessions;
-    /**
-     * Where a session's attachments are kept; {@code null} in an application that runs the earlier runtime
-     * alone, which keeps them on the session itself.
-     */
-    private final ai.mindconnect.agent.management.api.SessionManagement sessionManagement;
+    private final ObjectProvider<ToolActivation> activationsProvider;
+    private final AgentRuntime runtime;
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
     private final Path spoolBase;
     /** Where a call works — every store call names the namespace. */
@@ -77,9 +73,8 @@ public class SessionFileService {
 
     public SessionFileService(FileStore fileStore,
                               ObjectProvider<VectorStores> storesProvider,
-                              ObjectProvider<DynamicToolActivations> activationsProvider,
-                              AgentSessionRepository sessions,
-                              ObjectProvider<ai.mindconnect.agent.management.api.SessionManagement> sessionManagement,
+                              ObjectProvider<ToolActivation> activationsProvider,
+                              AgentRuntime runtime,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
                               ObjectProvider<ai.mindconnect.agent.management.directory.UserHome> userHome,
@@ -88,15 +83,26 @@ public class SessionFileService {
         this.fileStore = fileStore;
         this.storesProvider = storesProvider;
         this.activationsProvider = activationsProvider;
-        this.sessions = sessions;
-        this.sessionManagement = sessionManagement.getIfAvailable();
+        this.runtime = runtime;
         this.workflowsProvider = workflowsProvider;
         this.spoolBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
         this.userHome = userHome.getIfAvailable(ai.mindconnect.agent.management.directory.UserHome::none);
     }
 
     /** The copy of an attached file on disk: in the session's uploads directory when there is one. */
-    private java.util.Optional<Path> uploadsDir(ai.mindconnect.agent.runtime.domain.AgentSession session) {
+    private SessionManagement sessions() {
+        return runtime.service(SessionManagement.class);
+    }
+
+    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId id) {
+        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value());
+    }
+
+    private static ai.mindconnect.agent.UserId userOf(ManagedSession session) {
+        return session.userId() == null ? null : ai.mindconnect.agent.UserId.of(session.userId().value());
+    }
+
+    private java.util.Optional<Path> uploadsDir(ManagedSession session) {
         return userHome.uploadsDirOf(session.userId().value(), session.id().value());
     }
 
@@ -106,7 +112,7 @@ public class SessionFileService {
      * attached file goes through here, images included: whatever the model
      * does with a file, the file tools can open it by that path.
      */
-    private java.util.Optional<Path> copyIntoUploads(AgentSession session, StoredFile stored) throws java.io.IOException {
+    private java.util.Optional<Path> copyIntoUploads(ManagedSession session, StoredFile stored) throws java.io.IOException {
         java.util.Optional<Path> target = uploadsDir(session).map(dir -> dir.resolve(stored.name()));
         if (target.isPresent()) {
             try (InputStream content = fileStore.content(stored.id())) {
@@ -122,23 +128,27 @@ public class SessionFileService {
      * system prompt names the copy's path, so the file tools must be allowed
      * to open it. False when the session is gone.
      */
-    private boolean record(SessionId sessionId, AttachedFile attached, java.util.Optional<Path> copy) {
-        if (sessionManagement == null) {
-            if (sessions.update(sessionId, current -> current.withAttachedFiles(List.of(attached))).isEmpty()) {
-                return false;
-            }
-        } else {
-            try {
-                sessionManagement.attach(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()),
-                        new ai.mindconnect.agent.management.api.SessionAttachment(attached.id(), attached.name(),
-                                attached.mediaType(), attached.sizeBytes(), attached.path()));
-            } catch (IllegalArgumentException unknownSession) {
-                return false;
-            }
+    private boolean record(SessionId sessionId, SessionAttachment attached, java.util.Optional<Path> copy) {
+        try {
+            ManagedSession session = sessions().attach(runtimeId(sessionId), attached);
+            copy.map(c -> c.getParent().getParent().toString())
+                    .filter(dir -> !reaches(session.directories(), Path.of(dir)))
+                    .ifPresent(dir -> {
+                        List<String> additional = new java.util.ArrayList<>(session.directories().additional());
+                        additional.add(dir);
+                        sessions().changeDirectories(session.id(),
+                                new SessionDirectories(session.directories().working(), additional));
+                    });
+            return true;
+        } catch (IllegalArgumentException unknownSession) {
+            return false;
         }
-        java.util.Optional<String> ownDir = copy.map(c -> c.getParent().getParent().toString());
-        ownDir.ifPresent(dir -> sessions.update(sessionId, current -> current.withAdditionalDir(dir)));
-        return true;
+    }
+
+    /** Is the directory the working one or an additional one, or inside one of them? */
+    private static boolean reaches(SessionDirectories directories, Path dir) {
+        return (directories.working() != null && dir.startsWith(Path.of(directories.working())))
+                || directories.additional().stream().anyMatch(held -> dir.startsWith(Path.of(held)));
     }
 
     /**
@@ -146,8 +156,8 @@ public class SessionFileService {
      * record, images included. {@link #listAttachments} adds the searchable
      * chunks each ingested file produced.
      */
-    public List<AttachedFile> attachments(SessionId sessionId) {
-        return sessions.findById(sessionId).map(AgentSession::attachedFiles).orElse(List.of());
+    public List<SessionAttachment> attachments(SessionId sessionId) {
+        return sessions().find(runtimeId(sessionId)).map(ManagedSession::attachments).orElse(List.of());
     }
 
     /**
@@ -164,10 +174,10 @@ public class SessionFileService {
             if (stores.registry().instance(storeName).isEmpty()) {
                 return Map.of();
             }
-            List<AttachedFile> attached = attachments(sessionId);
+            List<SessionAttachment> attached = attachments(sessionId);
             Map<String, Long> chunks = new java.util.LinkedHashMap<>();
             for (var entity : stores.store(storeName).entities()) {
-                String fileId = attachedFileOf(entity.ref(), attached).map(AttachedFile::id).orElse(entity.ref().id());
+                String fileId = attachedFileOf(entity.ref(), attached).map(SessionAttachment::id).orElse(entity.ref().id());
                 chunks.merge(fileId, entity.chunks(), Long::sum);
             }
             return chunks;
@@ -180,7 +190,7 @@ public class SessionFileService {
     }
 
     /** The attached file an entry of the session's store stands for: by id, or — from before 0.9 — by name. */
-    private static java.util.Optional<AttachedFile> attachedFileOf(EntityRef ref, List<AttachedFile> attached) {
+    private static java.util.Optional<SessionAttachment> attachedFileOf(EntityRef ref, List<SessionAttachment> attached) {
         return attached.stream()
                 .filter(f -> ref.type().equals(EntityType.FILE)
                         ? f.id().equals(ref.id())
@@ -197,8 +207,8 @@ public class SessionFileService {
      * untouched.
      */
     public void deleteAttachment(SessionId sessionId, String fileIdOrName) {
-        List<AttachedFile> attached = attachments(sessionId);
-        String fileName = attached.stream().filter(f -> f.id().equals(fileIdOrName)).map(AttachedFile::name)
+        List<SessionAttachment> attached = attachments(sessionId);
+        String fileName = attached.stream().filter(f -> f.id().equals(fileIdOrName)).map(SessionAttachment::name)
                 .findFirst().orElse(Path.of(fileIdOrName).getFileName().toString());
         VectorStores stores = storesProvider.getIfAvailable();
         String storeName = "session-" + sessionId.value();
@@ -222,19 +232,14 @@ public class SessionFileService {
                 }
             }
         }
-        sessions.findById(sessionId).ifPresent(session -> uploadsDir(session).ifPresent(dir -> {
+        sessions().find(runtimeId(sessionId)).ifPresent(session -> uploadsDir(session).ifPresent(dir -> {
             try {
                 Files.deleteIfExists(dir.resolve(fileName));
             } catch (java.io.IOException ignored) {
                 // The record and the entry are gone; a stale copy is harmless.
             }
         }));
-        if (sessionManagement == null) {
-            sessions.update(sessionId, session -> session.withoutAttachedFile(fileName));
-        } else {
-            sessionManagement.detach(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()),
-                    fileName);
-        }
+        sessions().detach(runtimeId(sessionId), fileName);
     }
 
     /**
@@ -243,10 +248,10 @@ public class SessionFileService {
      * — activated for the session, like {@code vector_search} on ingest.
      */
     private void activateViewer(SessionId sessionId) {
-        DynamicToolActivations activations = activationsProvider.getIfAvailable();
+        ToolActivation activations = activationsProvider.getIfAvailable();
         if (activations != null) {
-            activations.activate(sessionId,
-                    List.of(ViewAttachmentTool.NAME));
+            activations.activate(runtimeId(sessionId),
+                    List.of("view_attachment"));
         }
     }
 
@@ -258,9 +263,9 @@ public class SessionFileService {
      * prompt's "open it by that path" is advice the agent can follow.
      */
     private void activateFileTools(SessionId sessionId) {
-        DynamicToolActivations activations = activationsProvider.getIfAvailable();
+        ToolActivation activations = activationsProvider.getIfAvailable();
         if (activations != null) {
-            activations.activate(sessionId, List.of("file_read", "file_list"));
+            activations.activate(runtimeId(sessionId), List.of("file_read", "file_list"));
         }
     }
 
@@ -279,8 +284,9 @@ public class SessionFileService {
     }
 
     private AttachResult ingest(SessionId sessionId, StoredFile stored) {
-        AttachedFile attached = new AttachedFile(stored.id().value(), stored.name(), stored.contentType(), stored.size());
-        var sessionOpt = sessions.findById(sessionId);
+        SessionAttachment attached = new SessionAttachment(stored.id().value(), stored.name(), stored.contentType(),
+                stored.size(), null);
+        var sessionOpt = sessions().find(runtimeId(sessionId));
         if (sessionOpt.isEmpty()) {
             return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
         }
@@ -300,8 +306,8 @@ public class SessionFileService {
                 log.warn("Copying image '{}' into the directory of session {} failed, attaching it without a path: {}",
                         stored.name(), sessionId.value(), e.getMessage());
             }
-            final AttachedFile bare = attached;
-            AttachedFile image = copy.map(c -> bare.withPath(c.toString())).orElse(bare);
+            final SessionAttachment bare = attached;
+            SessionAttachment image = copy.map(c -> bare.withPath(c.toString())).orElse(bare);
             if (!record(sessionId, image, copy)) {
                 return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
             }
@@ -346,7 +352,7 @@ public class SessionFileService {
                 try (InputStream content = fileStore.content(stored.id())) {
                     text = new String(content.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                 }
-                DirectIngestion.ingest(store, ref, session.userId(), "1", stored.name(), text);
+                DirectIngestion.ingest(store, ref, userOf(session), "1", stored.name(), text);
             } else {
                 WorkflowDataRepository workflows = workflowsProvider.getIfAvailable();
                 if (workflows == null) {
@@ -367,7 +373,7 @@ public class SessionFileService {
                 if (copy.isPresent()) {
                     Path sessionDir = copy.get().getParent().getParent();
                     String file = sessionDir.relativize(copy.get()).toString().replace('\\', '/');
-                    ToolCallScope scope = ToolCallScope.ofSession(session.userId(), sessionId, sessionDir.toString());
+                    ToolCallScope scope = ToolCallScope.ofSession(userOf(session), sessionId, sessionDir.toString());
                     result = scope.runWith(() -> executor.executeWorkflow(workflow,
                             Map.of("file", file, "store", storeName, "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(), scope)));
@@ -382,7 +388,7 @@ public class SessionFileService {
                             Map.of("file", spoolBase.relativize(target).toString(), "store", storeName,
                                     "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(),
-                                    new ToolCallScope(session.userId(), sessionId, null)));
+                                    new ToolCallScope(userOf(session), sessionId, null)));
                 }
                 if (!result.isSuccess()) {
                     return new AttachResult(stored, storeName, false,
@@ -391,9 +397,9 @@ public class SessionFileService {
             }
             // The agent gets vector_search in this session from the next round
             // on (persisted on the session), defaulting to exactly this store.
-            DynamicToolActivations activations = activationsProvider.getIfAvailable();
+            ToolActivation activations = activationsProvider.getIfAvailable();
             if (activations != null) {
-                activations.activate(sessionId, List.of("vector_search"));
+                activations.activate(runtimeId(sessionId), List.of("vector_search"));
             }
             if (copy.isPresent()) activateFileTools(sessionId);
             if (attached.isPdf()) activateViewer(sessionId);

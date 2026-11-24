@@ -3,11 +3,13 @@ package ai.mindconnect.chatui.ui.page;
 import ai.mindconnect.chatui.ui.component.ChatFormComponent;
 import ai.mindconnect.chatui.ui.component.MessageListComponent;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionAgent;
+import ai.mindconnect.chatui.ui.component.ChatAgent;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.agent.management.api.ManagedMessage;
-import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiSection;
@@ -50,18 +52,19 @@ public final class ChatPage {
         return p;
     }
 
-    private final AgentSession session;
-    private final AgentDefinition agent;
+    private final ManagedSession session;
+    private final ManagedAgent agent;
+    private final SessionId sessionId;
 
     private final MessageListComponent messages;
     private final ChatFormComponent    chatForm;
 
-    public ChatPage(AgentSession session, AgentDefinition agent,
+    public ChatPage(ManagedSession session, ManagedAgent agent,
                     List<ManagedMessage> history, WorkingMemory memory) {
         this(session, agent, history, memory, false);
     }
 
-    public ChatPage(AgentSession session, AgentDefinition agent,
+    public ChatPage(ManagedSession session, ManagedAgent agent,
                     List<ManagedMessage> history, WorkingMemory memory,
                     boolean streaming) {
         this(session, agent, history, memory, streaming,
@@ -78,19 +81,20 @@ public final class ChatPage {
      *                     sessions); {@link MessageListComponent.SubAgentTreeProvider#NONE}
      *                     for a flat fallback.
      */
-    public ChatPage(AgentSession session, AgentDefinition agent,
+    public ChatPage(ManagedSession session, ManagedAgent agent,
                     List<ManagedMessage> history, WorkingMemory memory,
                     boolean streaming,
                     MessageListComponent.SubAgentTreeProvider subAgentTree) {
         this.session = session;
         this.agent = agent;
-        this.messages = new MessageListComponent(session.id(), agent, history, memory, subAgentTree)
+        this.sessionId = SessionId.of(session.id().value());
+        this.messages = new MessageListComponent(sessionId, agent, history, memory, subAgentTree)
                 .withSessionTitle(session.title())
-                .withParentSession(session.parentSessionId());
-        this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
-                .withModelLabel(agent.llmConfigName())
+                .withParentSession(session.parentId() == null ? null : SessionId.of(session.parentId().value()));
+        this.chatForm = new ChatFormComponent(sessionId, ChatAgent.id(agent), streaming)
+                .withModelLabel(ChatAgent.model(agent))
                 .withAgentCounts(agent, List.of())
-                .withWorkingDir(session.workingDir());
+                .withWorkingDir(session.directories().working());
     }
 
     /**
@@ -135,24 +139,23 @@ public final class ChatPage {
             ai.mindconnect.chatui.ui.ChatHostLinks links) {
         var items = new java.util.ArrayList<ai.mindconnect.ui.model.UiMenuItem>();
 
-        if (session.parentSessionId() != null) {
+        if (session.parentId() != null) {
             items.add(ai.mindconnect.ui.model.UiMenuItem.link("parent", "Parent session",
-                    "/chat/sessions/" + session.parentSessionId().value()).icon("arrow-up"));
+                    "/chat/sessions/" + session.parentId().value()).icon("arrow-up"));
         }
         // Only a chat that references a registry agent has an agent to go
         // back to. An inline session agent's id resolves to nothing, so the
         // link would land on an agent page for an agent that does not exist.
-        boolean registryAgent = session.mainAgent()
-                .map(a -> a instanceof SessionAgentRef)
-                .orElse(true);
-        if (registryAgent) {
-            String back = links.backHref(session.agentDefinitionId(), session.id());
+        boolean registryAgent = session.agent() == null || session.agent() instanceof SessionAgent.Ref;
+        if (registryAgent && session.agentId().isPresent()) {
+            String back = links.backHref(
+                    ai.mindconnect.agent.AgentId.of(session.agentId().get().value()), sessionId);
             if (back != null) {
                 items.add(ai.mindconnect.ui.model.UiMenuItem.link("back", "Back to agent", back)
                         .icon("back"));
             }
         }
-        for (var tool : links.sessionTools(session.id())) {
+        for (var tool : links.sessionTools(sessionId)) {
             items.add(ai.mindconnect.ui.model.UiMenuItem.of(tool.id(), tool.label())
                     .icon(tool.icon())
                     .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", tool.url())));
@@ -190,7 +193,7 @@ public final class ChatPage {
 
 
     /** The files hanging on the conversation, counted on the composer's "+" and in its menu. */
-    public ChatPage withAttachments(java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> attachments) {
+    public ChatPage withAttachments(java.util.List<ai.mindconnect.agent.management.api.SessionAttachment> attachments) {
         this.chatForm.withAttachments(attachments);
         return this;
     }
@@ -364,7 +367,7 @@ public final class ChatPage {
     public UiPatch streamFirstToken(String pendingId, String typingId) {
         return patch(
                 removeTyping(typingId),
-                messages.appendBotPending(pendingId, agent.name()));
+                messages.appendBotPending(pendingId, agent.definition().name()));
     }
 
     private UiPatch.Operation appendTyping(String typingId) {

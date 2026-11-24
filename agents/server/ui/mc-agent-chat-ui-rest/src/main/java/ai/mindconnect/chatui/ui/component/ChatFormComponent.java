@@ -13,8 +13,8 @@ import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiPatch;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AttachedFile;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.SessionAttachment;
 import ai.mindconnect.agent.SessionId;
 
 /**
@@ -91,9 +91,9 @@ public final class ChatFormComponent implements UiComponent {
      * Puts the file count on the "+" — so it is visible while typing — and the
      * document and picture counts on the menu's Upload files and Add images entries.
      */
-    public ChatFormComponent withAttachments(java.util.List<AttachedFile> attachments) {
+    public ChatFormComponent withAttachments(java.util.List<SessionAttachment> attachments) {
         this.imageCount = attachments == null ? 0
-                : (int) attachments.stream().filter(AttachedFile::isImage).count();
+                : (int) attachments.stream().filter(SessionAttachment::isImage).count();
         this.documentCount = attachments == null ? 0 : attachments.size() - imageCount;
         return this;
     }
@@ -112,10 +112,10 @@ public final class ChatFormComponent implements UiComponent {
      *
      * @param offeredTools every tool name the registry can hand out here
      */
-    public ChatFormComponent withAgentCounts(AgentDefinition agent,
+    public ChatFormComponent withAgentCounts(ManagedAgent agent,
                                              java.util.Collection<String> offeredTools) {
         this.toolCount = ChatToolsPickerComponent.onCount(agent, offeredTools);
-        this.subAgentCount = agent == null ? 0 : agent.effectiveCallableAgents().size();
+        this.subAgentCount = agent == null ? 0 : ChatAgent.roster(agent).size();
         return this;
     }
 

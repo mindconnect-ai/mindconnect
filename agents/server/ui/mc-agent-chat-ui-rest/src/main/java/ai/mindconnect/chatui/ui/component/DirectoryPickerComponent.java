@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.directory.WorkingDirBrowser;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 import ai.mindconnect.ui.model.UiAction;
@@ -55,7 +55,7 @@ public final class DirectoryPickerComponent {
      * The dialog's form, showing {@code listing} — one level of the tree —
      * with its directory in the path field.
      */
-    public static UiForm form(SessionId sessionId, AgentSession session, WorkingDirBrowser.Listing listing) {
+    public static UiForm form(SessionId sessionId, ManagedSession session, WorkingDirBrowser.Listing listing) {
         var form = UiForm.of(ID, null)
                 .field(UiField.text(PATH_FIELD, "Working directory", listing.current())
                         .asEditable()
@@ -112,16 +112,16 @@ public final class DirectoryPickerComponent {
      * removable, plus a way to add the one shown above — the button names
      * it, so "this folder" is never in doubt.
      */
-    private static UiNode additional(SessionId sessionId, AgentSession session, WorkingDirBrowser.Listing listing) {
+    private static UiNode additional(SessionId sessionId, ManagedSession session, WorkingDirBrowser.Listing listing) {
         var list = UiList.of(ID + "-extra", "Additional directories").icon("folder-plus")
                 .action(UiAction.secondary("add", "Add " + label(listing.current(), sessionId)).icon("add")
                         .onClick(trigger(on(ChatUiController.class).addDir(sessionId, null, null), ID)));
-        for (String dir : session.additionalDirs()) {
+        for (String dir : session.directories().additional()) {
             list.item(UiList.Item.of(ID + "-x-" + itemId(dir), dir).icon("folder")
                     .action(UiAction.danger("remove", "Remove").icon("remove")
                             .onClick(trigger(on(ChatUiController.class).removeDir(sessionId, dir, null)))));
         }
-        if (session.additionalDirs().isEmpty()) {
+        if (session.directories().additional().isEmpty()) {
             list.item(UiList.Item.of(ID + "-x-none", "None yet. Step into a folder above — a library next to "
                     + "the project, a data folder — and add it here; the chat then reaches it by absolute "
                     + "path beside its working directory. Add as many as you need, then go back to the "
