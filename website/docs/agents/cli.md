@@ -67,7 +67,11 @@ current agent. Everything starting with `/` is a command.
 | `/history` | Show the conversation (chat messages only) |
 | `/history <n>` | Show only the last `<n>` chat pairs |
 | `/memory` | Show full context: system prompt + current window + token usage |
-| `/compress` | Compress all messages into a summary, clear working memory |
+| `/compress` | Summarise everything before the last turn — for an agent whose [memory](./memory.md) keeps a summary |
+
+When a tool needs an approval, the turn waits and the CLI asks: in local mode
+answer at the keyboard — `y` allows the call once, `a` allows the tool for
+the rest of the session, `n` denies it — then Enter.
 
 ### Tools & inspection
 

@@ -13,14 +13,16 @@ carry the implementations.
 
 | Module | Purpose |
 |--------|---------|
-| `mc-agent-runtime-core` | The runtime's core: agent and session domain, the ports around it (chat, tools, token counting, memory strategies, repositories) and the use cases — turn loop, prompt assembly, tool dispatch. Free of storage, HTTP and templating. |
-| `mc-agent-runtime` | The adapters: file and in-memory repositories, the local in-process runtime, the Pebble prompt renderer, the tokenizer-backed token counters. |
-| `mc-agent-memory-strategies` | The [memory strategies](./memory.md) — keep everything, window, summarizing window, auto-compact. Swap this module to change memory behaviour. |
+| `mc-agent-loop-core` | The agent loop on its own: one turn as rounds of asking the model and advancing tool calls. Storage, the model and tool execution sit behind three ports; nothing but the JDK and SLF4J. |
+| `mc-agent-runtime-api` | The runtime's API and nothing else: the services a program opens sessions and submits turns with (`SessionService`, `TurnService`), the ports agents, tools, the model and the session store sit behind, and the hook points capabilities attach to. |
+| `mc-agent-runtime-capabilities` | What a runtime has by default, each a plugin of its own: skills, tool search, sub-agents, permissions, [memory](./memory.md), attachments, tool results, traces, guards, reviewers, session titles, the prompt. None knows the engine, so each can be left out or replaced. |
+| `mc-agent-management-api` | What a user interface or an operator does beside running turns: agents (`AgentManagement`) and sessions (`SessionManagement`) — list, rename, move, delete, read what was said. Interfaces and values only. |
+| `mc-agent-skill`, `mc-agent-trace` | Skills and LLM call traces as domain types with their repositories on files and in memory. |
+| `mc-file-store-core` | The file store's ports: `FileStore`, `StoredFile`, the `FileStoreBackend` SPI. |
 | `mc-llm-gateway-core` | The [gateway's](./llm-gateway.md) core: chat/streaming types and the ports (`LlmChat`, `LlmGateway`, `LlmConfigRepository`) — light enough to be a compile dependency of anything. |
 | `mc-llm-gateway` | The gateway implementation: provider adapters, routing, retry/throttle decorators. |
 | `mc-message-repository-core` | Conversations, participants and messages as plain domain types, their ports, and the `ConversationService` use case. |
 | `mc-message-repository` | File-backed and in-memory implementations of those ports. |
-| `mc-file-store-core` | The file store's ports: `FileStore`, `StoredFile`, the `FileStoreBackend` SPI — the runtime core depends on them. |
 | `mc-file-store` | The filesystem backend of the file store. |
 | `mc-agent-tool-spi` | What a tool *is*: `Tool`, `ToolFactory`, `MultiToolProvider`, `ToolRegistry`, `ToolEnvironment` + the ServiceLoader registry — see [creating a tool](./creating-a-tool.md). |
 
@@ -29,7 +31,7 @@ carry the implementations.
 | Module | Purpose |
 |--------|---------|
 | `mc-agent-protocol` | The protocol vocabulary: `Response`, `Item`, `Conversation`, events and commands — pure types, zero runtime dependencies. |
-| `mc-agent-protocol-mc-runtime` | The protocol surface implemented against the Mindconnect runtime. |
+| `mc-agent-protocol-runtime` | The protocol surface implemented on the runtime: a response is a turn, a session a managed session, a conversation the messages of one. |
 | `mc-agent-protocol-openai` | The same surface implemented against the real OpenAI Responses + Conversations API. |
 
 ## `tools/core/` — the built-in tool providers
@@ -73,7 +75,9 @@ See [vector store & file store](./vector-store.md).
 |--------|---------|
 | `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres. |
 | `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres. |
-| `postgres/mc-agent-runtime-pg` | The runtime's seven repository ports on Postgres — definitions, sessions, traces, todo lists, summaries, working memory, workspace files. |
+| `postgres/mc-agent-runtime-engine-pg`, `postgres/mc-agent-management-pg` | The engine's session repository and the agent repository on Postgres — a JSONB document per session and per agent. |
+| `postgres/mc-agent-skill-pg`, `postgres/mc-agent-trace-pg`, `postgres/mc-agent-tools-todo-pg`, `postgres/mc-agent-tools-usermemory-pg` | Skills, LLM call traces, todo lists and the users' memory on Postgres. |
+| `postgres/mc-agent-runtime-infrastructure-pg` | `PostgresStorePlugin`: every store of an installation from one database, as a plugin for the runtime's builder. |
 | `postgres/mc-file-store-pg` | `FileStore` on Postgres — uploads as `bytea` rows; also the `postgres` backend of the SPI. |
 
 All of them build on `common/mc-jdbc`, a tiny JDBC helper (JSONB document
@@ -83,26 +87,26 @@ tables, typed rows, transactions — no ORM). See [Persistence](./persistence.md
 
 | Module | Purpose |
 |--------|---------|
-| `mc-agent-starter-runtime` | Builds the runtime for a Spring Boot application from the same features the embedded builder installs, configured from the `mindconnect.*` properties, and exports its beans; the persistence starters supply the `Persistence`, the namespace starter the scope. |
-| `mc-agent-starter-file` | File persistence, the default: every repository port, the LLM-config store and the file store under `mindconnect.data.base-dir`. |
-| `mc-agent-starter-postgres` | `mindconnect.persistence=postgres`: every port from one pooled `DataSource`, tables created on start. |
+| `mc-agent-starter-runtime-engine` | Builds the one `AgentRuntime` of a Spring Boot application through the SDK's builder, from the `mindconnect.*` properties, and hands its services out as beans; the namespace starter supplies the scope, the application adds `Plugin` beans. See [Embedding](./embedding.md#the-same-runtime-in-spring-boot). |
+| `mc-agent-starter-file` | What is installation-wide and not the runtime's on files, the default: users, API tokens, credentials. The runtime's own stores come from the runtime starter (`mindconnect.persistence=file`). |
+| `mc-agent-starter-postgres` | `mindconnect.persistence=postgres`: the pooled `DataSource` and the same installation-wide stores on Postgres; the runtime starter builds the runtime's stores on that database. |
 | `mc-agent-starter-registry` | The registry for a server: the store of configured registries (file or Postgres, seeded from `initial-data/registries/` and `mindconnect.registry.default-source`), the GitHub client, the installers and the `RegistryService`. |
 | `mc-agent-starter-extension` | The extensions of an installation: the manifests on the classpath, the start-up audit, a namespace's and a brand's decisions (file or Postgres), the `ExtensionService`. |
 | `mc-agent-starter-workflow` | Workflows for a server: the workflow stores in the namespace of the call (file or Postgres), the admin's runs in the request's namespace and for its user, the agent-call and tool-call steps wired to the runtime. |
 
-An app has both on the classpath; the property picks. The runtime's own
-Spring wiring (`DefaultAgentRuntimeConfig`) still lives in `mc-agent-runtime`
-and is imported by the apps — moving it into a starter of its own is the
-next step.
+An app has both persistence starters on the classpath; the property picks.
 
-## `builder/` & `demo/` — embedding
+## `engine/`, `client/` & `demo/` — the runtime, assembled
 
 | Module | Purpose |
 |--------|---------|
-| `mc-agent-runtime-builder` | Spring-free `AgentRuntimeBuilder` facade for embedding the runtime in any Java program; every capability module (tools, vector stores, file store, workflows) is optional. Given a thread-bound scope (`scope(…)`), the runtime works in the namespace of the current call and its tasks carry their scope; without one, in a single namespace. |
-| `mc-agent-runtime-feature-core` | The `CoreFeature` every builder installs: the LLM layer, conversations and messages, agent definitions and sessions. `AgentRuntimeBuilder.of(persistence)` with it alone is the smallest runtime that chats. |
-| `mc-agent-runtime-feature-skills`, `-tools`, `-workflows`, `-file-upload`, `-transcription`, `-subagents`, `-taskqueue` | Optional features, one Maven module each, registered as services so `installFromClasspath()` finds them: stored skills, the tool registry over the `mc-agent-tools-*` modules, persisted workflows, files attached to a chat, speech to text, delegation to sub-agents, the configured task queue. See [Embedding the runtime](./embedding.md). |
-| `mc-agent-simple-demo` | Runnable embedding examples: a minimal chat, and a chat with an attached file searched through the session's vector store. |
+| `engine/mc-agent-runtime-engine` | Runs turns: the runtime API's services on the task queue, with the agent loop turning inside each turn task. A turn is a task, each tool call a child task. The module that carries the task queue and the LLM gateway. |
+| `engine/mc-agent-management` | The management API on stores — sessions on the engine's session repository, agents on a repository of their own — as `ManagementPlugin`; `DirectoryPlugin` for where sessions work; `AgentJson` for an agent as a file. |
+| `engine/mc-agent-runtime-infrastructure` | What a runtime that serves an installation is assembled from, as plugins: the stores on files or in memory, the LLM gateway, the tool registry, the file and vector stores, the skill sources, the tokenizer, the users' channels. |
+| `client/mc-agent-sdk` | The runtime for a Java program: one dependency and one builder, `AgentRuntime.builder()`, that put the engine and the default capabilities together — see [Embedding](./embedding.md). |
+| `client/mc-agent-cli-local` | A coding harness on the command line that runs wholly on this machine, on the SDK alone: no server and no Spring. |
+| `demo/mc-agent-simple-demo` | Runnable embedding examples: a minimal chat and agents delegating to agents, on a runtime built from the SDK's builder and the infrastructure plugins (`DemoRuntime`). |
+| `demo/mc-extension-demo` | The worked example of an [extension](./admin-ui/extensions.md): tools, a plugin, a page and seeds in one jar. |
 
 ## `server/` — what runs
 

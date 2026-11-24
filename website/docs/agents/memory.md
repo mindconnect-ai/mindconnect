@@ -6,204 +6,139 @@ sidebar_position: 4
 # Memory
 
 Each agent keeps its own conversation history. How much of that history reaches
-the LLM on every turn — and how it is compressed when it grows — is decided by a
-per-agent **memory strategy**.
+the LLM on every call — and what happens when it no longer fits — is decided by
+a per-agent **memory strategy**.
 
 ## Memory strategies
 
-A memory strategy controls what goes into the live context window, when it is
-compressed, and what (if anything) is added to the system prompt. Each agent
-picks one strategy via its `MemoryConfig`.
+A memory strategy decides what of the history is sent with a model call. It
+works on the request of that one call and never on the session: the session
+keeps every message, so nothing is lost and another strategy can be tried on
+the same history. Each agent picks one strategy in its `memory` setting.
 
 | Strategy | What it does | Use when |
 |----------|--------------|----------|
-| **Auto-compact** | History flows through verbatim. When the window crosses a configured ratio of the context window, the whole conversation is collapsed into one summary and the window restarts. | Long, open-ended chats — the "Claude Code" pattern. The bundled conversational agents (`assistant-with-tools`, `research-lead`, `planner`) use it. |
-| **Summarizing window** | Keeps a sliding window; summarization of older messages into the system prompt is **opt-in** (`autoSummarize`), and large tool results are compressed once the window crosses a ratio. | **The system default** when an agent has no `memoryConfig`. |
-| **Windowed** | Keeps the last *N* stored messages. No summarization. | Predictable, simple recency — older turns just drop off. |
-| **Full history** | Every stored message goes to the LLM. | Very large context windows; nothing should ever be dropped. |
-| **No memory** | Stateless — only the system prompt and the current message reach the LLM. | One-shot tools and stateless task runners. |
+| **`window`** | The newest turns that fit; what is older is not sent. Old tool results are shortened first. | **The default** when an agent sets nothing: bounded, and without a model call of its own. |
+| **`compact`** | As `window`, but what is no longer sent is summarised first, and the summary travels with every later call. | Long, open-ended chats. |
+| **`full`** | Every stored message goes to the LLM, as it was said. | Very large context windows; nothing should ever be left out. |
+| **`none`** | Only the turn underway reaches the LLM. | One-shot tools and stateless task runners. |
 
-### Auto-compression (auto-compact)
+### How a history is made to fit
 
-Live messages are sent through unchanged, so the model always sees the real,
-recent exchange. After each turn the runtime measures the live window's tokens;
-once they exceed `compactAtRatio` of the model's context window, the entire
-live conversation is distilled into a single `ConversationSummary`, and the
-window restarts from that summary (placed as a `USER_MESSAGE` by default).
+For `window` and `compact` the budget is `maxConversationRatio` of the model's
+context window (128,000 tokens are assumed for a model whose window is not
+known). Three steps, in this order, each only as far as needed:
 
-The **whole conversation** is the unit of compaction — but there is one
-optional, finer knob: `toolResultEviction` (`afterTurns`, `aboveTokens`)
-replaces bulky older tool results with a short stub before compaction kicks in.
-It is off by default; the agent can pull an evicted result back with the
-built-in `fetch_tool_result` tool. A loaded skill is never evicted: it is the
-instructions for the task at hand, and the model would only reload it.
+1. **Old tool results are shown as a note.** Starting with the oldest, a
+   result is replaced by
+   `[Tool result removed to save context: N tokens, id=<message id>]` until
+   the history fits. The newest `keepRecentToolResults` results are never
+   touched. A result shown as a note once stays that note in every later call,
+   also when the history would fit again — a history whose beginning changes
+   from call to call costs the provider's prompt cache every time. The result
+   itself is still in the session: an agent that has the
+   `fetch_tool_result` tool reads it again by the id the note names.
+2. **The oldest turns are left out.** Turns are left out whole, so a tool call
+   never loses its result, and the turn underway is always sent whole. With
+   `compact`, the turns left out are summarised first — together with the
+   summary there already is — and half the budget stays for what is sent as
+   said.
+3. **`maxMessages`** — if set, at most so many messages are sent, again
+   counted in whole turns.
 
-The current strategy and window are visible through the `/memory` endpoint and
-in the admin UI's working-memory view.
+The summary of a `compact` agent is kept with the session, in its metadata
+(`SessionSummaryStore`): it lasts as long as the session and is deleted with
+it. It reaches the model as a section *Earlier conversation (summarized)* at
+the end of the instructions, or — `summaryPlacement: user_message` — as a
+message of the user's ahead of the rest of the history. The model that writes
+it is the one named by `mindconnect.agent.stateless.llm-config-name`; without
+that setting, the agent's own.
+
+What a session would send right now is visible through the `/memory` endpoint
+and in the admin UI's working-memory view: the instructions, the summary, and
+every message with whether it is sent and whether it is shortened.
 
 ## Configuring the strategy
 
-The strategy is the agent's `memoryConfig` — a JSON object whose `kind` picks
-the strategy and whose remaining fields are that strategy's knobs. Three ways
-to set it:
+The setting is the `memory` object in the agent's metadata. Three ways to set
+it:
 
 - **Admin UI** — the agent edit form has a *Memory (JSON)* field, pre-filled
-  with the agent's **effective** config (so an unconfigured agent shows the
-  real defaults it runs with). Leave it blank to keep the stored setting;
-  invalid JSON is rejected on save. The agent detail page shows the active
-  kind at a glance.
-- **Agent JSON file** — the `memoryConfig` object in
+  with the setting the agent carries (`{"strategy": "window"}` for an agent
+  that carries none). Leave it blank to keep the stored setting; invalid JSON
+  and a strategy there is none of are rejected on save. The agent detail page
+  shows the active strategy at a glance.
+- **Agent JSON file** — `definition.metadata.memory` in the stored shape, or
+  the `memoryConfig` object of the flat shape (see
+  [below](#memoryconfig-in-agent-files-of-the-flat-shape)), in
   [`agent-definitions/*.json`](./agent-json.md).
-- **Nothing** — an agent without a `memoryConfig` runs with
-  `summarizing_window` in its default settings (see below).
+- **Nothing** — an agent without a setting runs with `window` in its default
+  settings.
 
-## Strategy reference
-
-### `summarizing_window` (the system default)
-
-A sliding live window with three independent mechanisms: budget-driven
-trimming, opt-in summarization of old ranges, and per-tool-result compression.
+## Setting reference
 
 ```json
 {
-  "kind": "summarizing_window",
-  "maxConversationRatio": 0.80,
-  "maxMessageRatio": 0.20,
-  "compressToolResults": true,
-  "minToolResultCompressTokens": 500,
-  "toolResultThresholdRatio": 0.02,
-  "compressWhenWindowAboveRatio": 0.50,
-  "autoSummarize": false,
-  "autoSummarizeRatio": 0.75,
-  "summaryPlacement": "SYSTEM_PROMPT",
-  "maxHistoryFetch": 500
+  "strategy": "compact",
+  "maxConversationRatio": 0.8,
+  "maxMessages": 20,
+  "keepRecentToolResults": 3,
+  "summaryPlacement": "system_prompt"
 }
 ```
 
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `maxConversationRatio` | `0.80` | Fraction of the context window the live message tail may consume; older messages are trimmed off the window (not deleted) beyond it. |
-| `maxMessageRatio` | `0.20` | Cap for a single message — anything larger is truncated in the window. |
-| `compressToolResults` | `true` | **Master switch** for tool-result compression. `false` turns all of it off. |
-| `minToolResultCompressTokens` | `500` | Floor for the per-result size threshold: smaller results are never compressed. |
-| `toolResultThresholdRatio` | `0.02` | The threshold as a fraction of the context window; effective threshold = `max(min, window × ratio)`. |
-| `compressWhenWindowAboveRatio` | `0.50` | Compression only starts once the live window exceeds this fraction of the context window — no pressure, no compression. |
-| `autoSummarize` | `false` | Opt-in: after a turn, summarize old unsummarized ranges once the live window exceeds `autoSummarizeRatio`. |
-| `autoSummarizeRatio` | `0.75` | The trigger for `autoSummarize`. |
-| `summaryPlacement` | `SYSTEM_PROMPT` | Where summaries are injected: `SYSTEM_PROMPT` (appended under "Earlier conversation") or `USER_MESSAGE` (synthetic "session is being continued" message, Claude-Code-style). |
-| `maxHistoryFetch` | `500` | Page size when loading history. |
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `strategy` | `window` | `none`, `full`, `window` or `compact`. |
+| `maxConversationRatio` | `0.8` | Share of the model's context window the history may take. A share, not tokens: the same agent keeps working when it is given a model with another window. |
+| `maxMessages` | no limit | At most so many messages are sent, counted in whole turns. |
+| `keepRecentToolResults` | `3` | The newest tool results are never shortened. |
+| `summaryPlacement` | `system_prompt` | Where the summary of `compact` goes: `system_prompt` or `user_message`. |
 
-#### How tool-result compression decides (the Claude model)
+`full` and `none` read none of the other fields.
 
-Compression runs at the **start of every turn execution** (first run and every
-wake), over the freshly loaded conversation. A result is only compressed when
-**all** of these hold:
+### `memoryConfig` in agent files of the flat shape
 
-1. **The model has read it** — an assistant message follows it. The results a
-   wake is about are unread and always stay full: a round never loses what it
-   just fetched.
-2. **It is not among the newest three results** — the model may still be
-   comparing recent outputs in detail, whatever turn they belong to.
-3. **The window is under pressure** (`compressWhenWindowAboveRatio`).
-4. **The single result is above the size threshold.**
+An agent file in the flat shape names its strategy by `kind`. It is read as
+follows:
 
-Compression is **lossless at the store**: the original stays in the message's
-`content`, the stub goes to `compressedContent`, and only the rendered window
-shrinks. The stub carries a preview plus the hint *"call the tool again if you
-need the full output"*, so the model knows the way back.
+| `kind` | Becomes |
+|--------|---------|
+| `full` | `full` |
+| `none` | `none` |
+| `windowed` | `window` with `maxMessages` = `windowSize` (20 if absent) |
+| `summarizing_window` | `compact` if `autoSummarize` is `true`, else `window`; `maxConversationRatio` and `summaryPlacement` are taken over |
+| `auto_compact` | `compact`; `compactAtRatio` becomes `maxConversationRatio`, `summaryPlacement` is taken over |
 
-### `auto_compact`
+Every other field of the flat shape — `toolResultEviction`,
+`compressToolResults`, `maxMessageRatio`, `maxHistoryFetch` and the
+thresholds beside them — is not read.
 
-The Claude Code pattern — see [Auto-compression](#auto-compression-auto-compact)
-above for the behaviour.
+## How a plugin changes what the model is sent
 
-```json
-{
-  "kind": "auto_compact",
-  "compactAtRatio": 0.80,
-  "summaryPlacement": "USER_MESSAGE",
-  "toolResultEviction": { "afterTurns": 1, "aboveTokens": 500 }
-}
-```
-
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `compactAtRatio` | `0.80` | Compaction fires when the live window exceeds this fraction of the context window. |
-| `summaryPlacement` | `USER_MESSAGE` | Where the one summary lands on the next request. |
-| `toolResultEviction` | `null` (off) | Optional: replace tool results **older than `afterTurns` user turns** and **at least `aboveTokens` tokens** with a pointer stub — at render time only, nothing is written. The agent reloads the full content via the built-in `fetch_tool_result` tool (enable it on the agent when using eviction). |
-
-Eviction is the "drop tool traffic after the turn" knob: `afterTurns: 1`
-means everything before the current user turn is a candidate. Note that it
-has **no** keep-newest-three protection — only the turn boundary and the
-token floor guard it.
-
-### `windowed`
-
-```json
-{ "kind": "windowed", "windowSize": 20 }
-```
-
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `windowSize` | `20` | The last *N* stored messages go to the LLM; older ones simply fall off. No summaries, no compression. |
-
-### `full`
-
-```json
-{ "kind": "full", "maxHistoryFetch": 500 }
-```
-
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `maxHistoryFetch` | `500` | Upper bound on messages loaded — everything loaded goes to the LLM verbatim. No summaries, no compression. |
-
-### `none`
-
-```json
-{ "kind": "none" }
-```
-
-No flags. Only the system prompt and the current turn's messages reach the
-LLM — for one-shot helpers and stateless task runners.
-
-## How messages reach the model
-
-Whatever a strategy selects, one port turns the stored messages into the
-model's messages: `LlmMessageMapper`, with `MessageToLlmMessageMapper` as
-the default. It maps user and assistant text, tool calls and tool results,
-and renders what a message's metadata means for the model — a user message
-that announced attachments gets the attachment notice ahead of its text
-(see [Vector store](./vector-store.md#how-the-agent-learns-about-an-attachment)).
-It also renders a message's media parts: an image or document travels as
-the provider's content block when the target model declares it reads that
-kind (`LlmConfig.capabilities`) and the message belongs to the current
-turn, as a placeholder line otherwise (see
-[images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts)).
-The bytes come through the `PartContentReader` port — the host's file
-store. The working-memory view in the Admin UI shows the same text and
-token counts the model receives, with each media part named on a line of
-its own.
-
-It is the read-side extension point, and deliberately the only one: there
-is no per-message-type hook, the mapper sees them all. A Spring host
-replaces it by defining a bean of type `LlmMessageMapper`; an embedder
-passes one to `AgentRuntimeBuilder.llmMessageMapper(...)`.
+Memory is a plugin like any other (`MemoryPlugin`): it changes the request of
+a model call in the `RuntimeHook.MODEL_CALL` hook. That hook is the
+extension point for whatever else has to shape the request — a plugin
+registers `registry.before(RuntimeHook.MODEL_CALL, …)` and returns the call
+with another request (see
+[Writing a plugin](./embedding.md#writing-a-plugin)). The working-memory view
+in the Admin UI counts tokens with the same counter memory uses.
 
 ## What the Compact button does
 
-The session view's *Compact* action calls the strategy's `compress()`:
+The session view's *Compact* action (and `POST /api/sessions/{id}/compress`)
+asks memory to summarise now:
 
 | Strategy | Compact button |
 |----------|----------------|
-| `summarizing_window` (or nothing configured) | Summarizes unsummarized ranges and compresses large tool results, then refreshes the working-memory snapshot. |
-| `auto_compact` | Runs a full compaction (one summary, window restarts). |
-| `windowed`, `full`, `none` | **No-op** — these strategies never compress. |
+| `compact` | Summarises everything before the last turn, together with the summary there already is. The last turn stays as said. |
+| `window`, `full`, `none` | **Nothing** — these strategies keep no summary. |
 
 ## Related: per-tool result caps
 
 Independent of the memory strategy, every tool reference on an agent can set
 **`maxResultChars`** (tool form: *Max result chars*): the tool's output is cut
-at persist time with a visible truncation note. Unlike compression this is
-**real loss** — the cut part never reaches the store — so it is opt-in per
-tool, meant for tools known to over-produce. A runtime-wide safety cap of
-100k characters applies to every tool regardless.
+before it is kept, with a visible truncation note. Unlike a result memory
+shows as a note this is **real loss** — the cut part never reaches the
+store — so it is opt-in per tool, meant for tools known to over-produce. A
+runtime-wide cap of 100,000 characters applies to every tool regardless.

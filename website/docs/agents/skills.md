@@ -150,11 +150,18 @@ like a project's [`AGENTS.md`](./prompt-renderer.md).
 ## Embedding without Spring
 
 ```java
-AgentRuntimeBuilder builder = AgentRuntimeBuilder.useFilePersistence(dataDir)   // mc-agent-runtime-feature-skills on the classpath
-        .agentDefinition(agent.withSkills(AgentDefinition.SkillsConfig.all()));
-builder.feature(SkillsFeature.class).skillFromClasspath("skills/weekly-report.md");
-AgentRuntime runtime = builder.build();
+AgentRuntime runtime = AgentRuntime.builder()          // mc-agent-sdk
+        .model(chat)
+        .skill(new SkillDefinition("weekly-report", "How the weekly report is written here",
+                instructions, List.of()))
+        .build();
 ```
+
+A skill handed to the builder is one every agent may load, unless the agent's
+metadata names its skills (`skills`, a list of names). Skills from a store,
+the user's directory and the project come with `SkillSourcePlugin`
+(`mc-agent-runtime-infrastructure`), on top of a store plugin — see
+[Embedding](./embedding.md#what-an-installation-adds).
 
 ## Skills, tools and sub-agents
 

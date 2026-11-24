@@ -225,8 +225,7 @@ backend-agnostic — the built-in `filesystem` backend streams from disk
 ServiceLoader drop away.
 
 The Admin UI's chat **file attachments** and the vector-store file upload run
-through it, and `AgentRuntimeBuilder.attachFile(...)` uses it for embedding
-scenarios (see `mc-agent-simple-demo`).
+through it.
 
 ### How the agent learns about an attachment
 
@@ -253,8 +252,8 @@ it as removed and the model reads a note that the content is no longer
 available and must not be searched for. Neither event rewrites an earlier
 message — the record is read in order, so a file attached again after a
 removal is announced again, and an attach notice names only files that are
-still attached. All of this is rendered by the `LlmMessageMapper`
-(see [Memory](./memory.md#how-messages-reach-the-model)).
+still attached. All of this is rendered by the `AttachmentPlugin` when the
+request to the model is built.
 
 ### Images and documents as message parts
 

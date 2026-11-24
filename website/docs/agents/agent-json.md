@@ -23,8 +23,7 @@ The format of a file in
   "memoryConfig": {
     "kind": "auto_compact",
     "compactAtRatio": 0.8,
-    "summaryPlacement": "USER_MESSAGE",
-    "toolResultEviction": { "afterTurns": 2, "aboveTokens": 800 }
+    "summaryPlacement": "USER_MESSAGE"
   },
   "responseReviewers": [],
   "callableAgents": ["web-researcher", "verifier"],
@@ -69,13 +68,14 @@ Controls how the conversation is kept within the model's context window.
 
 | Field | Description |
 |-------|-------------|
-| `kind` | One of `none`, `windowed` (sliding window), `summarizing_window`, `auto_compact` (summarize when full), `full` (keep everything). |
-| `compactAtRatio` | For `auto_compact`: compact when the window reaches this fraction of the budget (e.g. `0.8`). |
-| `summaryPlacement` | Where the summary goes — `USER_MESSAGE` (auto-compact default) or `SYSTEM_PROMPT` (summarizing-window default). |
-| `toolResultEviction` | Drop bulky tool results: `afterTurns` (age) and `aboveTokens` (size). A loaded skill stays. |
+| `kind` | One of `none`, `windowed` (the last `windowSize` messages), `summarizing_window`, `auto_compact` (summarize what no longer fits), `full` (keep everything). |
+| `compactAtRatio` | For `auto_compact`: the share of the model's context window the history may take (e.g. `0.8`). `summarizing_window` names it `maxConversationRatio`. |
+| `summaryPlacement` | Where the summary goes — `USER_MESSAGE` or `SYSTEM_PROMPT` (the default). |
 
-When `memoryConfig` is omitted the runtime uses the **`summarizing_window`
-default** — not `auto_compact`.
+This is the flat shape; how each `kind` is read, and the `memory` setting of
+the stored shape, is on the [Memory](./memory.md#setting-reference) page.
+Other fields — `toolResultEviction` among them — are not read. When
+`memoryConfig` is omitted the agent runs with the `window` strategy.
 
 ### `tools[]`
 

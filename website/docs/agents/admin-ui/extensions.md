@@ -68,7 +68,7 @@ off by the operator, or the manifest's default.
   manifests with one id (the first is kept), two extensions replacing the
   same bean, a required extension that is not installed, a `remote` manifest
   found on the classpath.
-- **Without a manifest** — jars that bring tools or runtime features through
+- **Without a manifest** — jars that bring tools or runtime plugins through
   `ServiceLoader` without a manifest to answer for them. They are loaded
   exactly as before, but nothing here can switch them off. The host's own
   modules (Maven group `ai.mindconnect`) are not listed.
@@ -130,7 +130,7 @@ a workflow's file name without `.json`.
   "permissions": [],
   "contributes": {
     "tools":   { "providers": [ "ai.acme.CrmToolProvider" ], "names": [ "acme_*" ] },
-    "features": [ "ai.acme.CrmFeature" ],
+    "features": [ "ai.acme.CrmPlugin" ],
     "content": { "agents": [ "acme-sales" ], "skills": [], "workflows": [] },
     "ui": {
       "menu":   [ { "id": "nav-acme", "label": "Acme", "href": "/admin/acme-crm", "icon": "briefcase", "group": "nav-group-tools" },
@@ -157,7 +157,7 @@ a workflow's file name without `.json`.
 | `permissions[]` | What the extension asks for — shown to the admin; the host enforces nothing from it yet. |
 | `contributes.tools.providers[]` | The `ToolFactory` / `MultiToolProvider` classes the classpath finds. A provider named here is managed wherever its jar is. |
 | `contributes.tools.names[]` | The tool names the extension carries, as patterns (`acme_*`, `crm_export`). **This is what a namespace that switched the extension off stops seeing.** |
-| `contributes.features[]` | `RuntimeFeature` classes, like the providers above. |
+| `contributes.features[]` | The runtime plugins the jar brings — classes implementing `ai.mindconnect.plugin.Plugin`, registered in `META-INF/services/ai.mindconnect.plugin.Plugin` — like the providers above. |
 | `contributes.content` | Agents, skills and workflows the jar seeds (`initial-data/**`), by name — installed into every namespace where the extension is on; see [Content per namespace](#content-per-namespace). |
 | `contributes.ui.menu[]` | Sidebar entries. With `label` and `href` the host renders the entry itself — into the shipped group `group` names (`nav-group-ai`, `nav-group-tools`, `nav-group-data`), or into a new group called `groupLabel` with the icon `groupIcon` (the first entry that names one gives the group its icon; a shipped group keeps its own); for admins of the namespace, and for its plain users too when `roles` names `USER`. An entry with only an `id` declares one the jar's own `AdminMenuContribution` registers; an id both declare is the bean's. **Either way an entry whose id a switched-off extension declares is left out of the menu** for that namespace. |
 | `contributes.ui.routes[]` | The screens and the REST API the extension serves, as prefix patterns under one of the extension's own homes (see [Route homes](#route-homes)): `/admin/<id>/**`, `/ext/<id>/**` or `/api/<id>/**` — a route anywhere else is reported and ignored, so no manifest can claim a shipped screen or endpoint. The host answers **404** on every one of them where the extension is off. Admin-only unless `roles` names `USER`; then a plain user of the namespace may open the route, and menu entries with that role are shown to them. |
@@ -212,8 +212,8 @@ short fantasy adventure with the LLM as game master:
   `initial-data/agent-definitions/` into a namespace once the extension is on
   there (`contributes.content`): it tells the story, offers choices and
   asks the player to roll;
-- a runtime feature, `DemoFeature` (a bean of the jar's auto-configuration,
-  and in `META-INF/services` for library hosts), which decorates the core's
+- a runtime plugin, `DemoPlugin` (a bean of the jar's auto-configuration,
+  and in `META-INF/services/ai.mindconnect.plugin.Plugin`), which decorates the core's
   `LlmCallTraceRepository` to count LLM calls — `contributes.decorates` —
   and keeps a store of its own for every die rolled, per namespace, on files
   under `<namespace>/ext/demo-dungeon/` or in the Postgres schema

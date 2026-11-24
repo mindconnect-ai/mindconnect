@@ -35,3 +35,43 @@
   definition and its settings (`instructions`, `tools`, `memory`, `subAgents`, …).
 - The task board shows the turns and tool calls of the runtime with their agent
   and their owner, and a namespace sees its own tasks only.
+- **embedding:** **a runtime is built through `AgentRuntime.builder()` and made
+  of plugins.** The builder in `mc-agent-sdk` takes the model, agents, tools,
+  skills, guards and permissions; everything else — stores, the LLM gateway,
+  the tool registry, skills from disk, the tokenizer — is a plugin handed to
+  it, and a plugin of a kind the builder installs itself takes its place. A
+  Spring Boot application gets the same runtime from the one starter
+  `mc-agent-starter-runtime-engine`, with its services as beans, and adds to
+  it by defining a `Plugin` bean. See the Embedding page.
+- **extensions:** **an extension brings a runtime plugin instead of a runtime
+  feature.** A class implementing `ai.mindconnect.plugin.Plugin`, registered in
+  `META-INF/services/ai.mindconnect.plugin.Plugin` and, in a Spring host, a
+  bean. The manifest still lists it under `contributes.features`.
+- **persistence:** **`mindconnect.persistence` takes `memory` beside `file` and
+  `postgres`:** nothing is kept past the process, for tests and demos.
+- **memory:** **an agent's memory setting has four strategies** — `window` (the
+  default), `compact`, `full` and `none` — under `memory` in its metadata. The
+  five `memoryConfig` kinds of an agent file are read into them;
+  `toolResultEviction` and the tool-result compression thresholds are no longer
+  read. A summary is kept with its session and deleted with it. Summaries the
+  earlier runtime wrote are not carried over: a long chat is summarised anew
+  the next time it no longer fits.
+- **tools:** **`fetch_tool_result` reads a result that memory replaced with a
+  note, by the id the note names.** An old tool result is shown to the model as
+  `[Tool result removed to save context: N tokens, id=…]` and stays in the
+  session; a result is no longer summarised by a model on the way in, only cut
+  at its binding's `maxResultChars`, at most 100,000 characters.
+- **sub-agents:** **the depth sub-agents may be nested to is a setting,**
+  `mindconnect.agent.sub-agents.max-depth` (default 5). A call beyond it fails
+  with an error the calling agent reads.
+- Titles and summaries are written by the model
+  `mindconnect.agent.stateless.llm-config-name` names; without the setting, by
+  the model of the agent whose session it is.
+- Token counts — the working-memory view, the budget memory fits a history
+  into — come from one tokenizer for every model (`o200k_base`): exact for
+  current OpenAI models, an estimate for the others.
+- The Responses API and the CLI run on the new runtime. A response that reaches
+  its round or output limit ends `incomplete` with the reason. The CLI in local
+  mode answers a tool approval at the keyboard: `y` once, `a` for the session,
+  `n` to deny.
+- Deleting a session deletes its traces and its todo list with it.

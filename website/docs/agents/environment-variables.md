@@ -1,10 +1,4 @@
-| `mindconnect.namespace` | `local` | The default namespace: the one start-up work runs in, and open to every signed-in user until `mindconnect.namespace-admins` names its admins — the runtime build, the tool warm-up, the seed loaders. A request or task that names none does **not** land here: with the namespace starter the scope is strict and an unbound thread that touches a store fails instead, because on a server that silence is a leak between namespaces. Bound to `MC_NAMESPACE` in the apps' yaml. |
-| `mindconnect.agent.sub-agents.max-depth` | `5` | How deep a chain of sub-agents may go before a turn is refused. Delegation itself comes from `mc-agent-runtime-feature-subagents`; without that module on the classpath an agent's roster yields no `run_agent`. |
-| `mindconnect.task-queue.retention` | — | How long finished task trees stay readable (ISO-8601, e.g. `PT1H`). Unset keeps them, which is what the Admin UI's task monitor reads. |
-| `mindconnect.task-queue.maintenance-interval` | `PT20S` | How often the queue renews leases, reclaims dead ones and applies the retention. |
-| `mindconnect.task-queue.store` | `memory` | `memory`, or `jdbc` for a store in the runtime's Postgres that several nodes share, each claiming with a lease. `jdbc` needs `mindconnect.persistence=postgres`. |
-| `mindconnect.task-queue.node-id` | host and pid | This node's name on a shared store. |
-| `mindconnect.task-queue.lease` | `PT30S` | How long a claim on a shared store holds before another node may take the task over. |---
+---
 title: Environment variables
 sidebar_position: 10
 ---
@@ -89,7 +83,7 @@ tables list names only. Removing a variable lets the next place answer.
 The lookup is pluggable: the gateways take an `EnvVarResolver`, the servers
 wire the chain above (`UserEnvVarResolver`, `NamespaceEnvVarResolver`,
 `EnvVarResolver.system()`), a library gets the process environment unless it
-passes `AgentRuntimeBuilder.envVarResolver(…)` — a vault, say — and any Spring
+hands its own to `LlmPlugin` — a vault, say — and any Spring
 host may define an `EnvVarResolver` bean of its own.
 
 ## Core
@@ -113,8 +107,8 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 
 | Property | Default | Notes |
 |----------|---------|-------|
-| `mindconnect.persistence` | `file` | `file` or `postgres` — bound to `MC_PERSISTENCE` in the apps' yaml. |
-| `mindconnect.namespace` | `local` | The default namespace: where a request or thread works that names none — bound to `MC_NAMESPACE` in the apps' yaml. Open to every signed-in user while `namespace-admins` names nobody. |
+| `mindconnect.persistence` | `file` | `file`, `postgres`, or `memory` for a runtime that keeps nothing past the process — bound to `MC_PERSISTENCE` in the apps' yaml. |
+| `mindconnect.namespace` | `local` | The default namespace: the one start-up work runs in, and open to every signed-in user until `mindconnect.namespace-admins` names its admins — the runtime build, the tool warm-up, the seed loaders. A request or task that names none does **not** land here: with the namespace starter the scope is strict and an unbound thread that touches a store fails instead, because on a server that silence is a leak between namespaces. Bound to `MC_NAMESPACE` in the apps' yaml. |
 | `mindconnect.namespace-admins` | _(empty)_ | The admins of that namespace, as e-mail addresses; naming anybody closes it (see `MC_NAMESPACE_ADMINS`). |
 | `mindconnect.email-domain` | `local` | What a bare name becomes an address with, and the address of an account whose provider gives none. |
 | `mindconnect.time-zone` | the JVM's zone | The time zone of a user who has none of their own yet — an IANA id such as `Europe/Zurich`; a user's own comes from their browser or their profile page (see [the user's time zone](./prompt-renderer.md#the-users-time-zone)). A value that is no zone stops the app from starting. Bound to `MC_TIME_ZONE` in the apps' yaml. |
@@ -137,6 +131,13 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.file-store.*` | — | File-store backend: `backend`. The `filesystem` backend keeps uploads in `<data.base-dir>/<namespace>/files`. |
 | `mindconnect.cors.allowed-origins` | `*` | Origins that may call the REST endpoints from a browser (`/api`, `/chat/api`, `/v1`), comma-separated. `*` lets every origin call without credentials; a list of origins may also send the session cookie. Both server apps. |
 | `mindconnect.agent.trace.max-per-session` | `50` | LLM call-trace retention per session. |
+| `mindconnect.agent.sub-agents.max-depth` | `5` | How deep a chain of sub-agents may go: a call beyond it fails with an error the calling agent reads. |
+| `mindconnect.agent.stateless.llm-config-name` | _(unset)_ | The LLM config of what the runtime does on its own account — a chat's title, a summary of older turns. Unset, each runs on the model of the agent whose session it is. |
+| `mindconnect.task-queue.retention` | — | How long finished task trees stay readable (ISO-8601, e.g. `PT1H`). Unset keeps them, which is what the Admin UI's task monitor reads. |
+| `mindconnect.task-queue.maintenance-interval` | `PT20S` | How often the queue renews leases, reclaims dead ones and applies the retention. |
+| `mindconnect.task-queue.store` | `memory` | `memory`, or `jdbc` for a store in the runtime's Postgres that several nodes share, each claiming with a lease. `jdbc` needs `mindconnect.persistence=postgres`. |
+| `mindconnect.task-queue.node-id` | host and pid | This node's name on a shared store. |
+| `mindconnect.task-queue.lease` | `PT30S` | How long a claim on a shared store holds before another node may take the task over. |
 | `mindconnect.branding.*` | — | What the Admin UI calls itself: `title`, `document-title`, `logo`, `logo-href`, `favicon`, `theme`, `stylesheets`, `assets-dir` — see [Branding](./admin-ui/index.md#branding-the-app). `MC_BRANDING_TITLE`, `MC_BRANDING_LOGO` and `MC_BRANDING_ASSETS_DIR` in the Admin UI's yaml. |
 
 ## Running on a server
