@@ -1,6 +1,9 @@
 package ai.mindconnect.llm.adapter;
 
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -83,6 +87,26 @@ public class ProviderModelCatalog {
      */
     public static boolean needsApiKey(LlmProvider provider) {
         return provider != LlmProvider.OLLAMA && provider != LlmProvider.OPENROUTER;
+    }
+
+    /**
+     * The models an endpoint offers, asked with a key as it is stored: {@code
+     * ${VAR}} expanded and {@code enc:} decrypted, exactly as a gateway would
+     * before a call. For a form that has a provider, an endpoint and a key but
+     * no config yet.
+     */
+    public ModelListing<Model> fetch(LlmProvider provider, String baseUrl, String apiKey,
+                                     EnvVarResolver environment, EncryptionHelper encryption) {
+        LlmConfig probe = new LlmConfig(LlmConfigId.random(), "probe", provider, null, baseUrl, apiKey,
+                0, 0, Map.of(), null, false, null, null, null, LlmConfigType.CHAT, null);
+        LlmConfig asked = probe;
+        try {
+            asked = probe.resolved(environment, encryption);
+        } catch (RuntimeException e) {
+            // A key that cannot be decrypted (a rotated secret) must not take
+            // down the form — the listing simply fails and says why.
+        }
+        return fetch(asked);
     }
 
     /**

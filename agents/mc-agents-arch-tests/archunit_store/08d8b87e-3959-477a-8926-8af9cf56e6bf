@@ -20,7 +20,6 @@ ai.mindconnect.adminui.ui.component.ToolCatalogComponent$Entry has 3 constructor
 ai.mindconnect.adminui.ui.component.ToolTableComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.TraceTableComponent has 2 constructors
 ai.mindconnect.adminui.ui.component.UserToolsComponent$Row has 2 constructors
-ai.mindconnect.adminui.ui.controller.LlmConfigUiController has 3 constructors
 ai.mindconnect.adminui.ui.controller.LlmPriceUiController has 2 constructors
 ai.mindconnect.adminui.ui.controller.MemoryAdminUiController has 2 constructors
 ai.mindconnect.adminui.ui.controller.NotificationUiController has 3 constructors
