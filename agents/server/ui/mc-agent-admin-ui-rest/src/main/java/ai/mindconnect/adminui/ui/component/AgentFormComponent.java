@@ -13,7 +13,7 @@ import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.agent.skill.domain.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -42,8 +42,8 @@ public final class AgentFormComponent implements UiComponent {
     private final LlmConfigRepository llmConfigRepository;
     private final List<ManagedAgent> all;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
-    /** What the skills picker offers; null when this host wires no catalog. */
-    private final SkillCatalog skillCatalog;
+    /** What the skills picker offers; null when this host wires no skill store. */
+    private final SkillRepository skills;
 
     /**
      * @param agent {@code null} for the new-agent form, an existing
@@ -61,13 +61,13 @@ public final class AgentFormComponent implements UiComponent {
                               LlmConfigRepository llmConfigRepository,
                               List<ManagedAgent> all,
                               com.fasterxml.jackson.databind.ObjectMapper objectMapper,
-                              SkillCatalog skillCatalog) {
+                              SkillRepository skills) {
         this.agent = agent;
         this.definition = agent == null ? null : agent.definition();
         this.llmConfigRepository = llmConfigRepository;
         this.all = all;
         this.objectMapper = objectMapper;
-        this.skillCatalog = skillCatalog;
+        this.skills = skills;
     }
 
     @Override
@@ -267,8 +267,8 @@ public final class AgentFormComponent implements UiComponent {
     public UiField skillsField(String mode, List<String> ticked) {
         List<String> picked = ticked == null ? List.of() : ticked;
         java.util.SortedSet<String> names = new java.util.TreeSet<>(picked);
-        if (skillCatalog != null) {
-            skillCatalog.all(null, null).stream().map(Skill::name).forEach(names::add);
+        if (skills != null) {
+            skills.findAll().stream().filter(Skill::enabled).map(Skill::name).forEach(names::add);
         }
         UiField field = UiField.multiselect("skills", "Skills to load", picked,
                         names.stream().map(name -> UiField.Option.of(name, name)).toList())

@@ -8,7 +8,13 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.tools.usermemory.adapter.InMemoryUserMemoryRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.RepositoryAgentManagement;
+import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
 import ai.mindconnect.agent.tools.usermemory.MemoryType;
 import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
@@ -36,14 +42,16 @@ class UserMemoryUiControllerTest {
     private static final UserId BOB = UserId.of("bob");
 
     private final UserMemoryService memory = new UserMemoryService(new InMemoryUserMemoryRepository(ScopeSupplier.local()));
-    private final InMemoryAgentDefinitionRepository agents = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
+    private final AgentManagement agents = new RepositoryAgentManagement(
+            new InMemoryAgentRepository(NamespaceProvider.fixed("test")));
     private final UserMemoryUiController controller = new UserMemoryUiController(memory, agents);
 
     @Test
     void theTabListsTheUsersOwnEntriesWithTheAgentByName() throws Exception {
-        AgentDefinition secretary = agents.save(AgentDefinition.create("secretary", "d", "p", null, "cfg"));
+        AgentId secretary = AgentId.of(agents.create(ManagedAgent.of(new AgentDefinition("secretary", "d", "p",
+                ModelSettings.NONE, java.util.List.of(), 5, java.util.Map.of()))).id().value());
         memory.write(ALICE, "role", MemoryType.USER, "Head of purchasing", "Leads purchasing.", null);
-        memory.write(ALICE, secretary.id(), "travel", MemoryType.PROJECT, "Books via Egencia", "c", null);
+        memory.write(ALICE, secretary, "travel", MemoryType.PROJECT, "Books via Egencia", "c", null);
         memory.write(BOB, "bobs", MemoryType.USER, "Bob's own", "c", null);
 
         String tab = json(controller.tab(ALICE).orElseThrow());

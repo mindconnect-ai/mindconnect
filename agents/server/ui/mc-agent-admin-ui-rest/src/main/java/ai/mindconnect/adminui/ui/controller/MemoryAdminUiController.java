@@ -3,8 +3,7 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
 import ai.mindconnect.agent.tools.usermemory.MemoryReach;
 import ai.mindconnect.agent.tools.usermemory.MemoryReadTool;
@@ -63,16 +62,15 @@ public class MemoryAdminUiController {
 
     /** Null on a runtime without the memory. */
     private final UserMemoryService memory;
-    private final AgentDefinitionRepository agents;
+    private final AgentManagement agents;
 
     @Autowired
-    public MemoryAdminUiController(ObjectProvider<ai.mindconnect.agent.sdk.AgentRuntime> runtime,
-                                   ObjectProvider<AgentDefinitionRepository> agents) {
+    public MemoryAdminUiController(ObjectProvider<ai.mindconnect.agent.sdk.AgentRuntime> runtime) {
         this(runtime.stream().findFirst().flatMap(found -> found.find(UserMemoryService.class)).orElse(null),
-                agents.getIfAvailable());
+                runtime.stream().findFirst().flatMap(found -> found.find(AgentManagement.class)).orElse(null));
     }
 
-    MemoryAdminUiController(UserMemoryService memory, AgentDefinitionRepository agents) {
+    MemoryAdminUiController(UserMemoryService memory, AgentManagement agents) {
         this.memory = memory;
         this.agents = agents;
     }
@@ -126,12 +124,6 @@ public class MemoryAdminUiController {
      * of it are left from a time they did, so they can still be seen and
      * deleted. The shared memory is not here: it belongs to no agent.
      */
-    public Optional<UiNode> agentTab(AgentDefinition agent) {
-        return agent == null ? Optional.empty()
-                : agentTab(agent.id(), agent.tools() == null ? List.of() : agent.tools());
-    }
-
-    /** The same, for an agent known by its id and its tools. */
     public Optional<UiNode> agentTab(AgentId agentId, List<AgentTool> tools) {
         if (memory == null) return Optional.empty();
         List<MemoryEntry> entries = ownEntries(agentId);

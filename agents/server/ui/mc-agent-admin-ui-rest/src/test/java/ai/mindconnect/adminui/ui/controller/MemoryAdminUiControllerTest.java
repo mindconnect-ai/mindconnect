@@ -5,7 +5,6 @@ import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tools.usermemory.adapter.InMemoryUserMemoryRepository;
 import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
@@ -69,12 +68,12 @@ class MemoryAdminUiControllerTest {
 
     @Test
     void anAgentWithItsOwnMemoryGetsATabWithWhatItKeepsAboutItsUsers() throws Exception {
-        AgentDefinition secretary = agent("secretary", "agent");
+        Agent secretary = agent("secretary", "agent");
         memory.write(UserId.of("alice"), secretary.id(), "travel", MemoryType.PROJECT, "Egencia", "c", null);
         memory.write(UserId.of("bob"), secretary.id(), "hotel", MemoryType.PROJECT, "Marriott", "c", null);
         memory.write(UserId.of("alice"), "role", MemoryType.USER, "Head of purchasing", "c", null);
 
-        String tab = json(controller.agentTab(secretary).orElseThrow());
+        String tab = json(controller.agentTab(secretary.id(), secretary.tools()).orElseThrow());
 
         assertThat(tab).contains(UserMemoryComponent.AGENT_TABLE_ID, "Egencia", "Marriott", "\"alice\"", "\"bob\"",
                 "?agent=" + secretary.id().value()).doesNotContain("Head of purchasing");
@@ -82,17 +81,17 @@ class MemoryAdminUiControllerTest {
 
     @Test
     void anAgentOnTheSharedMemoryHasNoTabUnlessEntriesOfItsOwnAreLeft() throws Exception {
-        AgentDefinition chat = agent("default-chat", null);
-        assertThat(controller.agentTab(chat)).isEmpty();
-        assertThat(controller.agentTab(agent("plain", "user"))).isEmpty();
+        Agent chat = agent("default-chat", null);
+        assertThat(controller.agentTab(chat.id(), chat.tools())).isEmpty();
+        assertThat(controller.agentTab(agent("plain", "user").id(), agent("plain", "user").tools())).isEmpty();
 
         memory.write(UserId.of("alice"), chat.id(), "old", MemoryType.USER, "Left from before", "c", null);
-        assertThat(json(controller.agentTab(chat).orElseThrow())).contains("left from before", "Left from before");
+        assertThat(json(controller.agentTab(chat.id(), chat.tools()).orElseThrow())).contains("left from before", "Left from before");
     }
 
     @Test
     void aDeleteFromTheAgentsTabRedrawsThatTable() throws Exception {
-        AgentDefinition secretary = agent("secretary", "agent");
+        Agent secretary = agent("secretary", "agent");
         MemoryEntry travel = memory.write(UserId.of("alice"), secretary.id(), "travel", MemoryType.PROJECT,
                 "Egencia", "c", null).entry();
 
@@ -102,11 +101,14 @@ class MemoryAdminUiControllerTest {
                 .doesNotContain(UserMemoryComponent.ADMIN_TABLE_ID);
     }
 
-    private static AgentDefinition agent(String name, String scope) {
+    /** What the tab is asked with: an agent's id and its tools. */
+    private record Agent(AgentId id, List<AgentTool> tools) { }
+
+    private static Agent agent(String name, String scope) {
         List<AgentTool> tools = scope == null
                 ? List.of(AgentTool.of("memory_write"))
                 : List.of(AgentTool.of("memory_write", null, Map.of("scope", scope)));
-        return AgentDefinition.create(name, "d", "p", null, "cfg").withTools(tools);
+        return new Agent(AgentId.random(), tools);
     }
 
     @Test

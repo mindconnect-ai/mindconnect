@@ -61,15 +61,15 @@ public class VectorStoreUiController {
     private final ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService;
     private final ai.mindconnect.agentrest.auth.CurrentUsers currentUsers;
     private final ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess;
-    private final ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions;
+    private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
 
     public VectorStoreUiController(VectorStores stores, LlmConfigRepository llmConfigs,
                                       ai.mindconnect.filestore.FileStore fileStore,
                                       ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService,
                                       ai.mindconnect.agentrest.auth.CurrentUsers currentUsers,
                                       ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess,
-                                      ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions) {
-        this.sessions = sessions;
+                                      ai.mindconnect.agent.sdk.AgentRuntime runtime) {
+        this.runtime = runtime;
         this.stores = stores;
         this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
@@ -483,7 +483,7 @@ public class VectorStoreUiController {
      * attached — images included, which are never indexed — and the stores the
      * caller can reach that list them. A chat's upload store counts as its chat.
      */
-    private record FileUsages(Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.runtime.domain.AgentSession>> chats,
+    private record FileUsages(Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.management.api.ManagedSession>> chats,
                               Map<String, List<VectorStoreInstance>> stores) {
 
         String summary(String fileId) {
@@ -498,11 +498,12 @@ public class VectorStoreUiController {
     }
 
     private FileUsages fileUsages(ai.mindconnect.agent.UserId caller) {
-        Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.runtime.domain.AgentSession>> chats = new java.util.HashMap<>();
-        Map<String, ai.mindconnect.agent.runtime.domain.AgentSession> ownChats = new java.util.HashMap<>();
-        for (var session : sessions.findByUser(caller)) {
+        Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.management.api.ManagedSession>> chats = new java.util.HashMap<>();
+        Map<String, ai.mindconnect.agent.management.api.ManagedSession> ownChats = new java.util.HashMap<>();
+        for (var session : runtime.service(ai.mindconnect.agent.management.api.SessionManagement.class)
+                .list(ai.mindconnect.agent.runtime.api.domain.UserId.of(caller.value()))) {
             ownChats.put(session.id().value(), session);
-            for (var attached : session.attachedFiles()) {
+            for (var attached : session.attachments()) {
                 chats.computeIfAbsent(attached.id(), k -> new java.util.LinkedHashMap<>())
                         .put(session.id().value(), session);
             }
@@ -561,7 +562,7 @@ public class VectorStoreUiController {
                     "title", chat.title() == null || chat.title().isBlank()
                             ? "Chat " + chat.id().value().substring(0, Math.min(8, chat.id().value().length()))
                             : chat.title(),
-                    "started", chat.startedAt() == null ? "" : chat.startedAt().toString().replace("T", " ").substring(0, 16)));
+                    "started", chat.createdAt() == null ? "" : chat.createdAt().toString().replace("T", " ").substring(0, 16)));
         }
         body.child(chatsOfFile.isEmpty() ? UiText.of("vs-file-no-chats", "Not attached to any of your chats.") : chats);
 

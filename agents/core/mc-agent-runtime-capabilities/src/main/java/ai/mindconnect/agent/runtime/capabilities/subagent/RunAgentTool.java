@@ -56,6 +56,9 @@ final class RunAgentTool implements Tool {
         this.inherited = inherited;
     }
 
+    /** As a catalog shows it: for no caller, so without names. */
+    static final ToolDefinition CATALOGUED = new ToolDefinition(NAME, DESCRIPTION, PARAMETERS);
+
     /** With the names in it: a model reads a tool's description far more reliably than it calls list_agents. */
     static ToolDefinition definition(AgentDefinition caller) {
         return new ToolDefinition(NAME, DESCRIPTION + " Available to you: "

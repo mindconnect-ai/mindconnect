@@ -9,7 +9,7 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -55,13 +55,13 @@ public final class ToolDetailComponent implements UiComponent {
         }
 
         // Schema comes from the registry, or — for inline tools (run_agent /
-        // run_agents, handled by AgentChatService) — from the inline defs.
+        // run_agents, brought by the sub-agent plugin) — from its definitions.
         Object schema = null;
         var resolved = toolRegistry.resolve(tool, ToolCallScope.detached(null));
         if (resolved.isPresent()) {
             schema = resolved.get().parametersSchema();
         } else {
-            schema = AgentChatService.inlineToolDefinitions().stream()
+            schema = SubAgentPlugin.delegationTools().stream()
                     .filter(d -> d.name().equals(tool.name()))
                     .map(d -> (Object) d.parametersSchema())
                     .findFirst().orElse(null);

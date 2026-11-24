@@ -54,6 +54,14 @@ public final class SubAgentPlugin implements Plugin {
     private final Predicate<String> inherited;
 
     /**
+     * The tools an agent gets by naming sub-agents, for a catalog to list:
+     * nobody binds them by hand, so no registry of bindable tools knows them.
+     */
+    public static List<ToolDefinition> delegationTools() {
+        return List.of(RunAgentTool.CATALOGUED, RunAgentsTool.DEFINITION, ListAgentsTool.DEFINITION);
+    }
+
+    /**
      * @param inherited which entries of a caller's session metadata its
      *                  sub-agent's session takes over, by key: where it
      *                  works, yes; what a store or a user interface keeps

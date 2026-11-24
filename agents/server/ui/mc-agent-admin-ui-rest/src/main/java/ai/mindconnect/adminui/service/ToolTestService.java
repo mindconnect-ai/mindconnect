@@ -1,6 +1,5 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
@@ -47,15 +46,6 @@ public class ToolTestService {
      * invokes the tool. {@code argumentsJson == null || ""} is treated as
      * "no arguments" ({@code {}}). Returns the full execution outcome —
      * the UI renders both success and failure shapes from the same record.
-     */
-    public Result test(AgentDefinition agent, AgentTool agentTool, String argumentsJson) {
-        return test(agentTool, argumentsJson);
-    }
-
-    /**
-     * Tests a tool without an agent context — used by the top-level tool
-     * catalog, where there is no owning agent. This is the real
-     * implementation; the agent-based overload delegates here.
      */
     public Result test(AgentTool agentTool, String argumentsJson) {
         long t0 = System.currentTimeMillis();

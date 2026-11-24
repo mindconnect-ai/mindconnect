@@ -9,8 +9,8 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.llm.domain.ToolDefinition;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -63,11 +63,11 @@ public final class ToolFormComponent implements UiComponent {
     public UiNode render() {
         boolean isNew = tool == null;
 
-        // Inline tools (run_agent / run_agents) are handled by AgentChatService,
+        // Inline tools (run_agent / run_agents) are brought by the sub-agent plugin,
         // not the ToolRegistry. They are no longer bound by hand — the roster
         // brings them — but a schema lookup for an old row still finds them.
         Map<String, ToolDefinition> inlineDefs = new LinkedHashMap<>();
-        for (var def : AgentChatService.inlineToolDefinitions()) {
+        for (var def : SubAgentPlugin.delegationTools()) {
             inlineDefs.put(def.name(), def);
         }
 
@@ -111,7 +111,7 @@ public final class ToolFormComponent implements UiComponent {
             if (resolved.isPresent()) {
                 schema = resolved.get().parametersSchema();
             } else if (inlineDefs.containsKey(tool.name())) {
-                // run_agent / run_agents: schema lives in AgentChatService.
+                // run_agent / run_agents: the schema is the sub-agent plugin's.
                 schema = inlineDefs.get(tool.name()).parametersSchema();
             }
         }
