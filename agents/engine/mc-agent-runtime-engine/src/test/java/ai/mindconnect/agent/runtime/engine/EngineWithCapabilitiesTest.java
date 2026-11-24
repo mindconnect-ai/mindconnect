@@ -180,7 +180,7 @@ class EngineWithCapabilitiesTest {
         ModelRequest asked = model.requests.get(0);
         assertThat(asked.instructions()).startsWith("You lead.").contains("citations: How to cite sources.");
         assertThat(asked.tools()).extracting(ToolDefinition::name).containsExactlyInAnyOrder(
-                "bash", "ask_user", "load_skill", "tool_search", "run_agent", "run_agents", "list_agents");
+                "bash", "ask_user", "skill", "tool_search", "run_agent", "run_agents", "list_agents");
         assertThat(traces).extracting(TraceRecord::kind).containsExactly(TraceRecord.MODEL_CALL);
     }
 

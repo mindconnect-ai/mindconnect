@@ -14,7 +14,8 @@ import ai.mindconnect.agent.runtime.api.port.out.Tool;
 /** Gives the agent a skill's instructions when it asks for them, instead of carrying all of them in every call. */
 final class LoadSkillTool implements Tool {
 
-    static final String NAME = "load_skill";
+    /** The name agents, prompts and stored bindings have always known the tool by. */
+    static final String NAME = "skill";
     static final ToolDefinition DEFINITION = new ToolDefinition(NAME,
             "Loads a skill and returns its instructions. Call it before doing what the skill is for.",
             Map.of("type", "object",

@@ -76,8 +76,8 @@ public final class SkillPlugin implements Plugin {
         if (skills.isEmpty()) {
             return "";
         }
-        StringBuilder text = new StringBuilder("\n\n## Skills\n\nLoad a skill with "
-                + LoadSkillTool.NAME + " before doing what it is for.\n");
+        StringBuilder text = new StringBuilder("\n\n## Skills\n\nLoad a skill with the `"
+                + LoadSkillTool.NAME + "` tool before doing what it is for.\n");
         skills.forEach(skill -> text.append("- ").append(skill.name()).append(": ")
                 .append(skill.description()).append('\n'));
         return text.toString();

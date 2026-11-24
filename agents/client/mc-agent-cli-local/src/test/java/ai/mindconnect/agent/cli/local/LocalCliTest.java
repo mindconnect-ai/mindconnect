@@ -117,7 +117,7 @@ class LocalCliTest {
         ModelRequest asked = requests.get(0);
         assertThat(asked.instructions()).startsWith("You review code.").contains("style: The house style");
         assertThat(asked.tools()).extracting(ToolDefinition::name)
-                .containsExactlyInAnyOrder("read_file", "load_skill");
+                .containsExactlyInAnyOrder("read_file", "skill");
         assertThat(output()).contains("Looks fine.");
     }
 

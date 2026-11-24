@@ -89,7 +89,7 @@ class CapabilitiesWithoutEngineTest {
         AgentDefinition picky = new AgentDefinition("picky", "Picks.", "You pick.", ModelSettings.NONE, List.of(), 5,
                 Map.of(SkillPlugin.SKILLS, List.of("other")));
         AgentContext context = new AgentContext(SESSION, picky, CONTEXT.turnId());
-        ToolCall load = new ToolCall("c1", "load_skill", Map.of("name", "citations"), CONTEXT.turnId(), SESSION.id());
+        ToolCall load = new ToolCall("c1", "skill", Map.of("name", "citations"), CONTEXT.turnId(), SESSION.id());
 
         assertThat(registry.run(RuntimeHook.INSTRUCTIONS, context, asked -> asked.agent().instructions()))
                 .isEqualTo("You pick.");
@@ -101,7 +101,7 @@ class CapabilitiesWithoutEngineTest {
     @Test
     void the_offer_holds_back_deferred_tools_and_adds_what_the_capabilities_bring() {
         assertThat(offeredNames()).containsExactlyInAnyOrder(
-                "web_search", "bash", "load_skill", "tool_search", "run_agent", "run_agents", "list_agents");
+                "web_search", "bash", "skill", "tool_search", "run_agent", "run_agents", "list_agents");
     }
 
     @Test
