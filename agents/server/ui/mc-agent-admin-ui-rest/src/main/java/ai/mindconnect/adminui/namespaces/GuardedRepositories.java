@@ -4,8 +4,6 @@ import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import java.util.function.UnaryOperator;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.domain.SkillId;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
@@ -85,38 +83,6 @@ public final class GuardedRepositories {
         @Override
         public Optional<ManagedAgent> findByName(String name) {
             return delegate.findByName(name);
-        }
-    }
-
-    /** Agents: created, renamed, given tools and deleted by admins. */
-    public record Agents(AgentDefinitionRepository delegate, NamespaceWriteGuard guard)
-            implements AgentDefinitionRepository {
-
-        @Override
-        public AgentDefinition save(AgentDefinition definition) {
-            guard.requireAdmin("an agent");
-            return delegate.save(definition);
-        }
-
-        @Override
-        public void deleteById(AgentId id) {
-            guard.requireAdmin("an agent");
-            delegate.deleteById(id);
-        }
-
-        @Override
-        public Optional<AgentDefinition> findById(AgentId id) {
-            return delegate.findById(id);
-        }
-
-        @Override
-        public Optional<AgentDefinition> findByName(String name) {
-            return delegate.findByName(name);
-        }
-
-        @Override
-        public List<AgentDefinition> findAll() {
-            return delegate.findAll();
         }
     }
 
