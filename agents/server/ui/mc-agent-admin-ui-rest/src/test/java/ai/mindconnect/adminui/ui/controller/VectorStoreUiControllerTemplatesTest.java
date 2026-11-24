@@ -14,14 +14,14 @@ class VectorStoreUiControllerTemplatesTest {
 
     @Test
     void theBuiltInNameAndNoNameAreRefusedWithAReason() {
-        assertThat(VectorStoreUiController.saveRefusal(VectorStores.DEFAULT_TEMPLATE))
+        assertThat(VectorStoreTemplateUiController.saveRefusal(VectorStores.DEFAULT_TEMPLATE))
                 .contains("built-in template")
                 .contains("mindconnect.vector-store.embedding-config")
                 .endsWith("nothing was saved.");
-        assertThat(VectorStoreUiController.saveRefusal(" " + VectorStores.DEFAULT_TEMPLATE + " "))
+        assertThat(VectorStoreTemplateUiController.saveRefusal(" " + VectorStores.DEFAULT_TEMPLATE + " "))
                 .as("surrounding blanks do not slip past").contains("built-in template");
-        assertThat(VectorStoreUiController.saveRefusal(null)).isEqualTo("The template needs a name — nothing was saved.");
-        assertThat(VectorStoreUiController.saveRefusal("   ")).isEqualTo("The template needs a name — nothing was saved.");
-        assertThat(VectorStoreUiController.saveRefusal("chat-uploads")).isNull();
+        assertThat(VectorStoreTemplateUiController.saveRefusal(null)).isEqualTo("The template needs a name — nothing was saved.");
+        assertThat(VectorStoreTemplateUiController.saveRefusal("   ")).isEqualTo("The template needs a name — nothing was saved.");
+        assertThat(VectorStoreTemplateUiController.saveRefusal("chat-uploads")).isNull();
     }
 }
