@@ -28,6 +28,7 @@ import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.ui.model.UiDialog;
@@ -147,8 +148,13 @@ public class AgentUiController {
                                                  @PathVariable("sessionId") String sessionIdValue,
                                                  @AuthenticationPrincipal OidcUser user) {
         String userId = user.getPreferredUsername();
+        var sessionId = ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionIdValue);
+        // The tab lists the caller's sessions only; someone else's is answered like a missing one.
+        if (sessions.find(sessionId).filter(session -> SessionOwnership.owns(session, user)).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
         // Through the management: what else is kept of the session goes with it.
-        sessions.delete(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionIdValue));
+        sessions.delete(sessionId);
         return agents.find(AgentId.of(idValue))
                 .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessions).refreshSessions()))
                 .orElse(ResponseEntity.notFound().build());
@@ -162,12 +168,15 @@ public class AgentUiController {
     }
 
     @PostMapping
-    public ResponseEntity<UiPage> create(@RequestBody Map<String, Object> raw,
-                                         @AuthenticationPrincipal OidcUser user) {
+    public ResponseEntity<?> create(@RequestBody Map<String, Object> raw,
+                                    @AuthenticationPrincipal OidcUser user) {
         var body = new FormBody(raw);
         String name = body.str("name");
         if (name == null || name.isBlank()) {
             throw DomainException.invalid("An agent needs a name");
+        }
+        if (agents.findByName(name).isPresent()) {
+            return ResponseEntity.ok(VersionedForms.nameTaken("Agent", name));
         }
         ManagedAgent created;
         try {
@@ -200,6 +209,10 @@ public class AgentUiController {
             changed = (fromForm(existing, body));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
+        }
+        String name = changed.definition().name();
+        if (agents.findByName(name).filter(other -> !other.id().equals(id)).isPresent()) {
+            return ResponseEntity.ok(VersionedForms.nameTaken("Agent", name));
         }
         // A form without a version is one that checks nothing: it saves over what is stored now.
         Long opened = VersionedForms.version(body);

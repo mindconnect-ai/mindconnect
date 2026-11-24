@@ -75,3 +75,6 @@
   mode answers a tool approval at the keyboard: `y` once, `a` for the session,
   `n` to deny.
 - Deleting a session deletes its traces and its todo list with it.
+- The admin UI answers an agent name another agent already has with a message
+  and keeps the form, and deletes a session from an agent's Sessions tab only
+  for the user it belongs to.
