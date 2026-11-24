@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.management.api.ManagedAgent;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
@@ -71,9 +71,9 @@ public final class ToolDetailComponent implements UiComponent {
                 .field(UiField.text("description", "Description", tool.description()))
                 .field(UiField.textarea("overrides", "Overrides (JSON)", overridesJson))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
-                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id().value(), tool.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).editToolForm(agent.id().value(), tool.id().value()))))
                 .action(UiAction.secondary("test", "Test").icon("flash")
-                        .onClick(trigger(on(AgentUiController.class).testToolDialog(agent.id().value(), tool.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).testToolDialog(agent.id().value(), tool.id().value()))))
                 .link(UiLink.of("back",
                         "/admin/agents/" + agent.id().value() + "?section=tools&row=" + tool.id().value(),
                         "← Back to Agent"));

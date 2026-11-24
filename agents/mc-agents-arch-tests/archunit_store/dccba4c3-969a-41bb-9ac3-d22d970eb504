@@ -1,4 +1,3 @@
-ai.mindconnect.adminui.ui.controller.AgentUiController depends on more than 25 other classes of the project
 ai.mindconnect.adminui.ui.controller.LlmConfigUiController depends on more than 25 other classes of the project
 ai.mindconnect.adminui.ui.controller.ProfileUiController depends on more than 25 other classes of the project
 ai.mindconnect.adminui.ui.controller.SessionUiController depends on more than 25 other classes of the project

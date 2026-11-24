@@ -1,4 +1,3 @@
-ai.mindconnect.adminui.ui.controller.AgentUiController has more than 30 methods
 ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration has more than 30 methods
 ai.mindconnect.agentrest.controller.AgentApiController has more than 30 methods
 ai.mindconnect.calendar.caldav.ICalendar has more than 30 methods

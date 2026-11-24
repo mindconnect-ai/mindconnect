@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.management.api.ManagedAgent;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -47,21 +47,21 @@ public final class ToolTableComponent implements UiComponent {
     public UiTable render() {
         var table = UiTable.of(id(), "Tools").stackOnMobile(true)
                 .action(UiAction.primary("add-tool", "Add Tool").icon("add")
-                        .onClick(trigger(on(AgentUiController.class).newToolForm(agent.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).newToolForm(agent.id().value()))))
                 .action(UiAction.secondary("add-tools", "Add a group…").icon("add")
-                        .onClick(trigger(on(AgentUiController.class).newToolBundleForm(agent.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).newToolBundleForm(agent.id().value()))))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("description", "Description"))
                 .column(UiTable.Column.text("overrides", "Overrides"))
                 .column(UiTable.Column.text("deferred", "Deferred"))
                 .column(UiTable.Column.text("needsApproval", "Approval"))
                 .rowAction(UiAction.secondary("view", "View").icon("show")
-                        .onClick(trigger(on(AgentUiController.class).viewTool(agent.id().value(), ROW_ID.toString()))))
+                        .onClick(trigger(on(AgentToolUiController.class).viewTool(agent.id().value(), ROW_ID.toString()))))
                 .rowAction(UiAction.secondary("edit", "Edit").icon("edit")
-                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id().value(), ROW_ID.toString()))))
+                        .onClick(trigger(on(AgentToolUiController.class).editToolForm(agent.id().value(), ROW_ID.toString()))))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this tool?")
-                        .onClick(trigger(on(AgentUiController.class).deleteTool(agent.id().value(), ROW_ID.toString(), null))));
+                        .onClick(trigger(on(AgentToolUiController.class).deleteTool(agent.id().value(), ROW_ID.toString(), null))));
 
         for (AgentTool t : AgentSetting.tools(agent)) {
             table.row(Map.of(

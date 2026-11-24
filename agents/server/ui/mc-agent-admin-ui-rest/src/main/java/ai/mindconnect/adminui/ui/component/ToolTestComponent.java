@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.ui.component;
 import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.management.api.ManagedAgent;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
@@ -75,7 +75,7 @@ public final class ToolTestComponent implements UiComponent {
                 .asEditable().asRequired()
                 .hint("A JSON object passed to Tool.execute(Map). Empty object = no arguments."))
             .action(UiAction.primary("send", "Send").icon("send")
-                    .onClick(trigger(on(AgentUiController.class).runToolTest(agent.id().value(), tool.id().value(), null),
+                    .onClick(trigger(on(AgentToolUiController.class).runToolTest(agent.id().value(), tool.id().value(), null),
                             id())))
             // Close only removes the overlay (a tiny remove-patch) — never a
             // page reload, so the page state behind the dialog survives.

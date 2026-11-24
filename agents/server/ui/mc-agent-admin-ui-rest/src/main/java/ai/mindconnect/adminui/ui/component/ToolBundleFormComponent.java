@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.tool.ToolBundles;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAction;
@@ -54,7 +54,7 @@ public final class ToolBundleFormComponent implements UiComponent {
                 .field(UiField.bool("deferred", "Deferred (via tool search only)", false).asEditable()
                         .hint("Not offered to the LLM up front — the agent finds them with tool_search."))
                 .action(UiAction.primary("save", "Add").icon("add")
-                        .onClick(trigger(on(AgentUiController.class).addToolBundle(agent.id().value(), null, null), id())))
+                        .onClick(trigger(on(AgentToolUiController.class).addToolBundle(agent.id().value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel").dispatch("GET", backHref))
                 .link(UiLink.of("back", backHref, "← Back to Agent"));
     }

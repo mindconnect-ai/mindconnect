@@ -72,9 +72,10 @@ class AgentUiControllerTest {
         registry.provide(SessionManagement.class, () -> sessions);
         registry.start();
         var beans = new StaticListableBeanFactory();
-        controller = new AgentUiController(new AgentRuntime(registry, () -> { }), null, null, null, json,
+        AgentRuntime runtime = new AgentRuntime(registry, () -> { });
+        controller = new AgentUiController(runtime, null, json,
                 beans.getBeanProvider(ai.mindconnect.agent.skill.port.out.SkillRepository.class),
-                beans.getBeanProvider(MemoryAdminUiController.class));
+                new AgentDetailView(runtime, beans.getBeanProvider(MemoryAdminUiController.class)));
     }
 
     @Test

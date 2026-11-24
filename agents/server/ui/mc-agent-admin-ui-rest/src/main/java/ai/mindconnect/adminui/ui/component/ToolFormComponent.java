@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.management.api.ManagedAgent;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
@@ -162,8 +162,8 @@ public final class ToolFormComponent implements UiComponent {
 
         form.action(UiAction.primary("save", "Save").icon("save")
                         .onClick(isNew
-                                ? trigger(on(AgentUiController.class).addTool(agent.id().value(), null, null), id())
-                                : trigger(on(AgentUiController.class)
+                                ? trigger(on(AgentToolUiController.class).addTool(agent.id().value(), null, null), id())
+                                : trigger(on(AgentToolUiController.class)
                                           .updateTool(agent.id().value(), tool.id().value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel")
                         .dispatch("GET", backHref))
