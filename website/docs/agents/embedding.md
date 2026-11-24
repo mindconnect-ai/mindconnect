@@ -175,6 +175,42 @@ public final class AuditPlugin implements Plugin {
   the order of installation matters only where one replaces another's service
   or adds to the prompt after it.
 
+### Settings a plugin reads
+
+A plugin reads named settings instead of taking them in its constructor. It
+declares them, so the host knows which exist:
+
+```java
+public final class AuditPlugin implements Plugin {
+
+    static final Setting<Path> DIR = Setting.path("audit.dir", "where the audit log is written");
+    static final Setting<String> PERSISTENCE =
+            Setting.text("audit.persistence", "where audit records are kept")
+                    .sharedWith("persistence").defaultsTo("file");
+
+    @Override public List<Setting<?>> settings() { return List.of(DIR, PERSISTENCE); }
+
+    @Override public void install(PluginRegistry registry) {
+        registry.provide(AuditLog.class, () -> new FileAuditLog(registry.setting(DIR)));
+    }
+}
+```
+
+- A setting **has a default or is required**. A required one that is not set,
+  or one set to text that cannot be read, stops the host when it starts — all
+  of them named at once, each with its plugin.
+- `sharedWith` makes a setting stand in for a shared one: `audit.persistence`
+  where it is set, `persistence` otherwise, then the default.
+- `whenNeeded()` is for a setting one case needs — a directory only when
+  things are kept on files. It is not checked at the start and is an error
+  where it is read and missing.
+- The values come from a `SettingSource` the host provides before it installs
+  its plugins: `registry.provide(SettingSource.class, () -> SettingSource.of(map))`.
+  Without one every setting has its default. A key that is set and that no
+  installed plugin declared is logged as a warning when the host starts.
+- Settings are text, numbers, switches and paths, fixed when the host starts.
+  An object — a data source, a clock — is a service, not a setting.
+
 ## The same runtime in Spring Boot
 
 The server applications build their runtime the same way.

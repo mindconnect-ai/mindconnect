@@ -44,6 +44,20 @@ public interface PluginRegistry extends AutoCloseable {
      */
     <T> Supplier<T> supplier(Class<T> type);
 
+    // ── settings: named values of the installation ─────────────────────────
+
+    /**
+     * The value of a setting: what the {@link SettingSource} holds under its
+     * key, else under the keys it is shared with, else its default.
+     *
+     * @throws IllegalStateException when nothing is set and it has no
+     *                               default, or what is set cannot be read
+     */
+    <T> T setting(Setting<T> setting);
+
+    /** Every setting a plugin declared or read, in the order they came up — what there is to set. */
+    List<Setting<?>> settings();
+
     // ── contributions: every plugin's is kept ──────────────────────────────
 
     /** Adds one of many under a type. */
@@ -85,7 +99,7 @@ public interface PluginRegistry extends AutoCloseable {
 
     // ── lifecycle ──────────────────────────────────────────────────────────
 
-    /** Checks that every required plugin and service is there, then starts the plugins. */
+    /** Checks that every required plugin, service and setting is there, then starts the plugins. */
     void start();
 
     @Override

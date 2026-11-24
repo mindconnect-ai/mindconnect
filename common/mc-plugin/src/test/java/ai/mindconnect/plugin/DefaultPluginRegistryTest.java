@@ -464,4 +464,107 @@ class DefaultPluginRegistryTest {
         assertThatThrownBy(() -> registry.install(plugin("late", r -> { })))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("late");
     }
+
+    // ── settings ────────────────────────────────────────────────────────────
+
+    private static final Setting<String> PERSISTENCE =
+            Setting.text("persistence", "where the installation keeps things").defaultsTo("memory");
+    private static final Setting<String> SKILL_PERSISTENCE =
+            Setting.text("skills.persistence", "where skills are kept").sharedWith("persistence")
+                    .defaultsTo("memory");
+
+    /** A plugin that declares settings and does nothing else. */
+    private static Plugin declaring(String name, Setting<?>... settings) {
+        return new Plugin() {
+            @Override public String name() {
+                return name;
+            }
+
+            @Override public List<Setting<?>> settings() {
+                return List.of(settings);
+            }
+
+            @Override public void install(PluginRegistry registry) {
+            }
+        };
+    }
+
+    private void set(java.util.Map<String, String> settings) {
+        registry.provide(SettingSource.class, () -> SettingSource.of(settings));
+    }
+
+    @Test
+    void a_setting_nobody_set_has_its_default_also_when_the_host_brought_no_settings() {
+        assertThat(registry.setting(PERSISTENCE)).isEqualTo("memory");
+    }
+
+    @Test
+    void a_setting_is_read_as_what_it_is() {
+        set(java.util.Map.of("timeout", " 30 ", "strict", "TRUE", "data", "/var/data"));
+
+        assertThat(registry.setting(Setting.number("timeout", ""))).isEqualTo(30);
+        assertThat(registry.setting(Setting.flag("strict", ""))).isTrue();
+        assertThat(registry.setting(Setting.path("data", ""))).isEqualTo(java.nio.file.Path.of("/var/data"));
+    }
+
+    @Test
+    void a_setting_shared_with_another_takes_its_own_value_then_the_shared_one_then_its_default() {
+        assertThat(registry.setting(SKILL_PERSISTENCE)).isEqualTo("memory");
+
+        set(java.util.Map.of("persistence", "postgres"));
+        assertThat(registry.setting(SKILL_PERSISTENCE)).isEqualTo("postgres");
+
+        set(java.util.Map.of("persistence", "postgres", "skills.persistence", "file"));
+        assertThat(registry.setting(SKILL_PERSISTENCE)).isEqualTo("file");
+    }
+
+    @Test
+    void starting_fails_and_names_every_setting_that_is_required_and_not_set_or_cannot_be_read() {
+        set(java.util.Map.of("timeout", "soon"));
+        registry.install(declaring("mail", Setting.text("mail.host", "the server mail is sent through")));
+        registry.install(declaring("steps", Setting.number("timeout", "seconds a step may take").defaultsTo(60),
+                PERSISTENCE));
+
+        assertThatThrownBy(registry::start).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("mail: Setting mail.host is not set (the server mail is sent through)")
+                .hasMessageContaining("steps: Setting timeout is 'soon': not a whole number");
+    }
+
+    @Test
+    void a_setting_only_one_case_needs_is_not_asked_for_at_the_start_and_is_an_error_where_it_is_read() {
+        Setting<java.nio.file.Path> dataDir = Setting.path("data.dir", "where files are kept").whenNeeded();
+        registry.install(declaring("files", dataDir));
+
+        registry.start();
+
+        assertThatThrownBy(() -> registry.setting(dataDir)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Setting data.dir is not set (where files are kept)");
+    }
+
+    @Test
+    void a_switch_set_to_neither_true_nor_false_is_refused_rather_than_read_as_off() {
+        set(java.util.Map.of("strict", "yes"));
+
+        assertThatThrownBy(() -> registry.setting(Setting.flag("strict", "")))
+                .hasMessageContaining("Setting strict is 'yes': neither true nor false");
+    }
+
+    @Test
+    void a_key_no_plugin_declared_does_not_keep_the_host_from_starting() {
+        set(java.util.Map.of("persistance", "postgres"));
+        registry.install(declaring("store", PERSISTENCE));
+
+        registry.start();
+
+        assertThat(registry.setting(PERSISTENCE)).isEqualTo("memory");
+    }
+
+    @Test
+    void the_registry_knows_every_setting_a_plugin_declared_or_read() {
+        registry.install(declaring("store", PERSISTENCE));
+        registry.setting(SKILL_PERSISTENCE);
+
+        assertThat(registry.settings()).extracting(Setting::key)
+                .containsExactly("persistence", "skills.persistence");
+    }
 }

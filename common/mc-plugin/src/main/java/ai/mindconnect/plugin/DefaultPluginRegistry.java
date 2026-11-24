@@ -41,6 +41,9 @@ public final class DefaultPluginRegistry implements PluginRegistry {
     private final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
     private final Map<Class<?>, List<Object>> contributions = new ConcurrentHashMap<>();
     private final Map<String, Hooks> hooks = new ConcurrentHashMap<>();
+    /** The declared settings by key, each with the plugin that declared it first; {@code null} for one only read. */
+    private final Map<String, Setting<?>> settings = Collections.synchronizedMap(new LinkedHashMap<>());
+    private final Map<String, String> declaredBy = new ConcurrentHashMap<>();
     private boolean started;
 
     @Override
@@ -55,6 +58,11 @@ public final class DefaultPluginRegistry implements PluginRegistry {
             }
         }
         plugins.put(plugin.name(), plugin);
+        for (Setting<?> setting : plugin.settings()) {
+            if (settings.putIfAbsent(setting.key(), setting) == null) {
+                declaredBy.put(setting.key(), plugin.name());
+            }
+        }
         plugin.install(this);
         return this;
     }
@@ -100,6 +108,76 @@ public final class DefaultPluginRegistry implements PluginRegistry {
     @Override
     public <T> Supplier<T> supplier(Class<T> type) {
         return () -> get(type);
+    }
+
+    // ── settings ────────────────────────────────────────────────────────────
+
+    @Override
+    public <T> T setting(Setting<T> setting) {
+        settings.putIfAbsent(setting.key(), setting);
+        Optional<T> set = read(setting);
+        if (set.isPresent()) {
+            return set.get();
+        }
+        if (setting.defaultValue() == null) {
+            throw new IllegalStateException(notSet(setting));
+        }
+        return setting.defaultValue();
+    }
+
+    @Override
+    public List<Setting<?>> settings() {
+        synchronized (settings) {
+            return List.copyOf(settings.values());
+        }
+    }
+
+    /** What is set for it, read; empty when nothing is. */
+    private <T> Optional<T> read(Setting<T> setting) {
+        SettingSource source = find(SettingSource.class).orElse(key -> Optional.empty());
+        for (String key : setting.keys()) {
+            Optional<String> text = source.get(key);
+            if (text.isPresent()) {
+                try {
+                    return Optional.of(setting.parser().apply(text.get()));
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalStateException("Setting " + key + " is '" + text.get() + "': "
+                            + e.getMessage());
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static String notSet(Setting<?> setting) {
+        return "Setting " + String.join(" or ", setting.keys()) + " is not set"
+                + (setting.description() == null || setting.description().isBlank()
+                        ? "" : " (" + setting.description() + ")");
+    }
+
+    /** What is wrong with the settings as they stand, each problem with the plugin it is one for. */
+    private List<String> settingProblems() {
+        List<String> problems = new ArrayList<>();
+        for (Setting<?> setting : settings()) {
+            String plugin = declaredBy.get(setting.key());
+            String whose = plugin == null ? "" : plugin + ": ";
+            try {
+                if (read(setting).isEmpty() && setting.required()) {
+                    problems.add(whose + notSet(setting));
+                }
+            } catch (IllegalStateException e) {
+                problems.add(whose + e.getMessage());
+            }
+        }
+        return problems;
+    }
+
+    /** The keys that are set and that no plugin knows: a misspelt key sets nothing, and nobody is told. */
+    private List<String> unknownSettingKeys() {
+        Set<String> known = new LinkedHashSet<>();
+        settings().forEach(setting -> known.addAll(setting.keys()));
+        return find(SettingSource.class).map(SettingSource::keys).orElse(Set.of()).stream()
+                .filter(key -> !known.contains(key)).sorted().toList();
     }
 
     // ── contributions ───────────────────────────────────────────────────────
@@ -216,6 +294,16 @@ public final class DefaultPluginRegistry implements PluginRegistry {
         if (!missing.isEmpty()) {
             throw new IllegalStateException("No plugin provides a required service: "
                     + missing.stream().collect(Collectors.joining("; ")));
+        }
+        List<String> problems = settingProblems();
+        if (!problems.isEmpty()) {
+            throw new IllegalStateException("The settings do not let the host start: "
+                    + String.join("; ", problems));
+        }
+        // Said, not refused: a key left over from a plugin that is no longer installed harms nobody.
+        List<String> unknown = unknownSettingKeys();
+        if (!unknown.isEmpty()) {
+            log.warn("Settings no installed plugin reads: {}", String.join(", ", unknown));
         }
         if (!started) {
             plugins.values().forEach(Plugin::start);

@@ -1,5 +1,6 @@
 package ai.mindconnect.plugin;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -31,6 +32,16 @@ public interface Plugin {
      */
     default Set<Class<?>> requires() {
         return Set.of();
+    }
+
+    /**
+     * The settings this plugin reads. Declared so that the host knows which
+     * exist: a required one that is not set, or one set to text that cannot
+     * be read, is an error while starting, and a key no plugin declared is
+     * named as unknown.
+     */
+    default List<Setting<?>> settings() {
+        return List.of();
     }
 
     void install(PluginRegistry registry);
