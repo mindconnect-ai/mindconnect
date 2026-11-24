@@ -39,7 +39,7 @@ import ai.mindconnect.agent.runtime.capabilities.trace.LoggingTraceSink;
 import ai.mindconnect.agent.runtime.capabilities.trace.TracePlugin;
 import ai.mindconnect.agent.runtime.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.runtime.llm.LlmGatewayModelPlugin;
-import ai.mindconnect.agent.sdk.inmemory.InMemorySessionStorePlugin;
+import ai.mindconnect.agent.runtime.store.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.service.EnginePlugin;
 import ai.mindconnect.llm.port.in.LlmChat;

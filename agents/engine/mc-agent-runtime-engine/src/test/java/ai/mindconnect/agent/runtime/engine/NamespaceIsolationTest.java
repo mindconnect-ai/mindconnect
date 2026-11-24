@@ -38,7 +38,7 @@ import ai.mindconnect.agent.runtime.capabilities.permission.InMemoryApprovalMemo
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
-import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
+import ai.mindconnect.agent.runtime.store.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.service.EnginePlugin;
 import ai.mindconnect.plugin.DefaultPluginRegistry;

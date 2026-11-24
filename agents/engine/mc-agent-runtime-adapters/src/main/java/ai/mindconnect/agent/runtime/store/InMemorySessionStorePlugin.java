@@ -1,9 +1,7 @@
-package ai.mindconnect.agent.sdk.inmemory;
+package ai.mindconnect.agent.runtime.store;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;

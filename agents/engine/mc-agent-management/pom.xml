@@ -15,9 +15,11 @@
     <name>mc-agent-management</name>
     <packaging>jar</packaging>
     <description>
-        The management API on stores: sessions on the engine's session
-        repository and the message repository, agents on a repository of its
-        own, in memory or on files.
+        The management API on stores: sessions on the session repository of
+        mc-agent-runtime-adapters and the message repository, agents on a
+        repository of its own, in memory or on files. As ManagementPlugin it
+        also answers the runtime's session store from the same repositories,
+        so what the runtime writes is what the management lists. No engine.
     </description>
 
     <dependencies>

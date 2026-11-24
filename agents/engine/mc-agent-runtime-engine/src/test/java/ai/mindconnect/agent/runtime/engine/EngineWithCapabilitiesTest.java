@@ -55,7 +55,7 @@ import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
-import ai.mindconnect.agent.runtime.engine.adapter.memory.InMemorySessionStorePlugin;
+import ai.mindconnect.agent.runtime.store.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.service.EnginePlugin;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
