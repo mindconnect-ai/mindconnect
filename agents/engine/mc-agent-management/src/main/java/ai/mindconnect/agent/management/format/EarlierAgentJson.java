@@ -178,7 +178,14 @@ final class EarlierAgentJson {
         return node.hasNonNull(field) ? node.get(field).asText() : null;
     }
 
+    /** Written as text in the earlier runtime's database, and as seconds since the epoch in its files. */
     private static Instant instant(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value != null && value.isNumber()) {
+            java.math.BigDecimal seconds = value.decimalValue();
+            return Instant.ofEpochSecond(seconds.longValue(),
+                    seconds.remainder(java.math.BigDecimal.ONE).movePointRight(9).longValue());
+        }
         return text(node, field) == null ? null : Instant.parse(text(node, field));
     }
 }
