@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.management;
 
+import java.util.List;
+
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
@@ -9,12 +11,16 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
 import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
+import ai.mindconnect.agent.runtime.store.SessionMessages;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
+import ai.mindconnect.plugin.Setting;
 
 /**
  * The agents and sessions of an installation, kept in the repositories the
@@ -27,6 +33,11 @@ public final class ManagementPlugin implements Plugin {
     @Override
     public String name() {
         return "management";
+    }
+
+    @Override
+    public List<Setting<?>> settings() {
+        return List.of(SessionMessages.SETTING);
     }
 
     @Override
@@ -51,7 +62,11 @@ public final class ManagementPlugin implements Plugin {
     }
 
     private static SessionStore sessionStore(PluginRegistry registry) {
-        return new RepositorySessionStore(registry.get(SessionRepository.class),
-                registry.get(MessageRepository.class), registry.get(JsonMapperFactory.class));
+        return switch (registry.setting(SessionMessages.SETTING)) {
+            case OWN -> new DefaultSessionStore(registry.get(SessionRepository.class),
+                    registry.get(SessionMessageRepository.class));
+            case CONVERSATION -> new RepositorySessionStore(registry.get(SessionRepository.class),
+                    registry.get(MessageRepository.class), registry.get(JsonMapperFactory.class));
+        };
     }
 }

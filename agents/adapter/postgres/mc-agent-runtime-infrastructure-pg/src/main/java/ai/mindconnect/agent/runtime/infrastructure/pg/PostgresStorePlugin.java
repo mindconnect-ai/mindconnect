@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.infrastructure.pg;
 
 import java.nio.file.Path;
+import java.time.Clock;
 
 import javax.sql.DataSource;
 
@@ -11,6 +12,8 @@ import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.pg.PgSessionRepository;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
+import ai.mindconnect.agent.runtime.engine.adapter.pg.PgSessionMessageRepository;
+import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.runtime.infrastructure.StorePlugin;
 import ai.mindconnect.agent.skill.adapter.pg.PgSkillRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
@@ -71,6 +74,11 @@ public final class PostgresStorePlugin extends StorePlugin {
             registry.provide(FileStore.class, () -> new PgFileStoreFactory(registry.get(Sql.class),
                     registry.get(ScopeSupplier.class)).fileStore());
         }
+    }
+
+    @Override
+    protected SessionMessageRepository sessionMessages(PluginRegistry registry, ScopeSupplier namespaces) {
+        return new PgSessionMessageRepository(registry.get(Sql.class), namespaces, Clock.systemUTC()).initSchema();
     }
 
     @Override

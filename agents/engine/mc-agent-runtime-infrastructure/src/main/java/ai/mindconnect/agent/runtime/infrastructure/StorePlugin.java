@@ -6,6 +6,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRepository;
 import ai.mindconnect.agent.tools.todo.TodoListRepository;
@@ -74,6 +75,9 @@ public abstract class StorePlugin implements Plugin {
     /** The stores, made once the plugins are installed: what they need is in {@code registry} by then. */
     protected abstract Stores stores(PluginRegistry registry);
 
+    /** The sessions' messages, where they are kept apart from the message repository; made on first use. */
+    protected abstract SessionMessageRepository sessionMessages(PluginRegistry registry, ScopeSupplier namespaces);
+
     /** Whether the place keeps the operator's tool settings; where it does not, no such repository is provided. */
     protected abstract boolean keepsToolSettings();
 
@@ -102,6 +106,7 @@ public abstract class StorePlugin implements Plugin {
         registry.provide(ConversationManager.class, () -> new ConversationService(
                 registry.get(ConversationRepository.class), registry.get(MessageRepository.class)));
         registry.provide(SessionRepository.class, () -> stores.get().sessions(namespaces.get()));
+        registry.provide(SessionMessageRepository.class, () -> sessionMessages(registry, namespaces.get()));
         registry.provide(AgentRepository.class, () -> stores.get().agents(namespaces.get()));
         registry.provide(SkillRepository.class, () -> stores.get().skills());
         registry.provide(LlmCallTraceRepository.class, () -> stores.get().traces());

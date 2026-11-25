@@ -1,12 +1,15 @@
 package ai.mindconnect.agent.runtime.infrastructure;
 
 import java.nio.file.Path;
+import java.time.Clock;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
+import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRepository;
@@ -38,6 +41,11 @@ public final class InMemoryStorePlugin extends StorePlugin {
     public InMemoryStorePlugin(Path sideDirectory, int maxTracesPerSession) {
         this.sideDirectory = sideDirectory;
         this.maxTracesPerSession = maxTracesPerSession;
+    }
+
+    @Override
+    protected SessionMessageRepository sessionMessages(PluginRegistry registry, ScopeSupplier namespaces) {
+        return new InMemorySessionMessageRepository(namespaces, Clock.systemUTC());
     }
 
     @Override

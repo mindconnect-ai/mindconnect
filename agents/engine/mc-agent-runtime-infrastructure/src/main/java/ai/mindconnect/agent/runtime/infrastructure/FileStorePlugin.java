@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.infrastructure;
 
 import java.nio.file.Path;
+import java.time.Clock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -9,6 +10,8 @@ import ai.mindconnect.agent.management.adapter.FileAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.store.FileSessionRepository;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
+import ai.mindconnect.agent.runtime.store.FileSessionMessageRepository;
+import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.skill.adapter.FileSkillRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRepository;
@@ -40,6 +43,12 @@ public final class FileStorePlugin extends StorePlugin {
     public FileStorePlugin(Path dataDir, int maxTracesPerSession) {
         this.dataDir = dataDir;
         this.maxTracesPerSession = maxTracesPerSession;
+    }
+
+    @Override
+    protected SessionMessageRepository sessionMessages(PluginRegistry registry, ScopeSupplier namespaces) {
+        return new FileSessionMessageRepository(dataDir, registry.get(ObjectMapper.class), namespaces,
+                Clock.systemUTC());
     }
 
     @Override

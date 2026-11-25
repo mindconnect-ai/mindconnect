@@ -120,6 +120,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | Property | Default | Notes |
 |----------|---------|-------|
 | `mindconnect.persistence` | `file` | `file`, `postgres`, or `memory` for a runtime that keeps nothing past the process — bound to `MC_PERSISTENCE` in the apps' yaml. |
+| `mindconnect.sessions.messages` | `conversation` | Where a session's messages are kept: `conversation` in the message repository as before, `own` in a `SessionMessageRepository` of their own (see [Persistence](./persistence.md#ports-and-adapters)). Sessions stored the one way are not read the other way. |
 | `mindconnect.namespace` | `local` | The default namespace: the one start-up work runs in, and open to every signed-in user until `mindconnect.namespace-admins` names its admins — the runtime build, the tool warm-up, the seed loaders. A request or task that names none does **not** land here: with the namespace starter the scope is strict and an unbound thread that touches a store fails instead, because on a server that silence is a leak between namespaces. Bound to `MC_NAMESPACE` in the apps' yaml. |
 | `mindconnect.namespace-admins` | _(empty)_ | The admins of that namespace, as e-mail addresses; naming anybody closes it (see `MC_NAMESPACE_ADMINS`). |
 | `mindconnect.email-domain` | `local` | What a bare name becomes an address with, and the address of an account whose provider gives none. |

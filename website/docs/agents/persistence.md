@@ -34,7 +34,8 @@ concept is an interface, with an adapter per backend:
 |------|--------|--------------|------------------|
 | `AgentRepository` | Agents | `FileAgentRepository` | `PgAgentRepository` |
 | `SessionRepository` | Sessions (incl. parent/child links, and what is kept with a session: attachments, approvals, the summary) | `FileSessionRepository` | `PgSessionRepository` |
-| `MessageRepository` | Conversation messages | `FileMessageRepository` | `PgMessageRepository` |
+| `SessionMessageRepository` | A session's messages, with `mindconnect.sessions.messages=own` | `FileSessionMessageRepository` (`sessions/<id>/messages/`) | `PgSessionMessageRepository` |
+| `MessageRepository` | Conversation messages; a session's messages too while `mindconnect.sessions.messages=conversation` | `FileMessageRepository` | `PgMessageRepository` |
 | `ConversationRepository` | Conversation metadata | `FileConversationRepository` | `PgConversationRepository` |
 | `TodoListRepository` | Session todo lists | `FileTodoListRepository` | `PgTodoListRepository` |
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
@@ -150,7 +151,8 @@ statement. The namespace column is part of every primary key and every query,
 so two processes bound to different namespaces can share one database. A document in the database is the same JSON the file adapter would
 have written, rendered by the application's `ObjectMapper`.
 
-The tables are named `mc_managed_agent`, `mc_session`,
+The tables are named `mc_managed_agent`, `mc_session`, `mc_session_message` (with
+`mc_session_message_seq`, each session's last place),
 `mc_conversation`, `mc_message`, `mc_todo_list`, `mc_llm_call_trace`,
 `mc_skill`, `mc_user_memory`, `mc_llm_config`, `mc_llm_price`,
 `mc_workflow`, `mc_workflow_instance`, `mc_file`, `mc_vector_store_template`,

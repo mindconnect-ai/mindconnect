@@ -101,6 +101,7 @@ import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.namespace.service.StartupScope;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.plugin.Plugin;
+import ai.mindconnect.plugin.SettingSource;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.taskqueue.LoggingTaskListener;
 import ai.mindconnect.taskqueue.TaskQueue;
@@ -179,6 +180,9 @@ public class RuntimeEngineAutoConfiguration {
                 // The application's JSON, as its customizers say; Spring's ObjectMapper is this one.
                 .plugin(new JacksonPlugin(json.orderedStream().toList()))
                 .plugin(provides("scope", registry -> {
+                    // A plugin's setting is the application's property of that name under mindconnect.
+                    registry.provide(SettingSource.class,
+                            () -> key -> Optional.ofNullable(env.getProperty("mindconnect." + key)));
                     registry.provide(ToolActivation.class, () -> activation);
                     // The model of what the runtime does on its own account: a title, a summary.
                     Optional.ofNullable(blankToNull(env.getProperty("mindconnect.agent.stateless.llm-config-name")))
