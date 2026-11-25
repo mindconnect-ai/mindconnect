@@ -131,11 +131,4 @@ public final class ConversationHistory {
     public int currentRun() {
         return currentTurn().map(ChatTurn::lastRun).orElse(0);
     }
-
-    /** Whether ANY turn holds a TOOL_RESULT for {@code callId}. */
-    public boolean hasToolResult(String callId) {
-        return messages.stream()
-                .anyMatch(m -> m.type() == MessageType.TOOL_RESULT
-                        && callId.equals(m.metadata().get("callId")));
-    }
 }

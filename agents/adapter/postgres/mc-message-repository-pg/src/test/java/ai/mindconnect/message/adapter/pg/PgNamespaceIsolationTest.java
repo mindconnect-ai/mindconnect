@@ -47,7 +47,7 @@ class PgNamespaceIsolationTest {
         var messagesB = new PgMessageRepository(sql, ScopeSupplier.fixed(B)).initSchema();
 
         ConversationId id = ConversationId.random();
-        Conversation conversation = Conversation.create(id, "topic", ConversationType.USER_AGENT,
+        Conversation conversation = Conversation.create(id, "topic", ConversationType.SUPPORT,
                 List.of(Participant.user(id, UserId.of("david"), "David")));
         conversationsA.save(conversation);
         Message first = messagesA.append(id, seq -> message(id, "a" + seq, seq));

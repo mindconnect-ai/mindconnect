@@ -34,7 +34,7 @@ class PgConversationRepositoryTest {
     private static Conversation at(String topic, String createdAt) {
         Instant t = Instant.parse(createdAt);
         ConversationId id = ConversationId.random();
-        return new Conversation(id, topic, ConversationType.USER_AGENT,
+        return new Conversation(id, topic, ConversationType.SUPPORT,
                 ConversationStatus.OPEN, List.of(Participant.user(id, UserId.of("david"), "David")), t, t);
     }
 

@@ -37,7 +37,7 @@ class FileMessageRepositoryConcurrencyTest {
         FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
         Message message = repo.append(conversation, seq -> Message.of(conversation, "agent", ParticipantType.AGENT,
-                MessageType.TOOL_RESULT, "x".repeat(20_000), seq));
+                MessageType.CHAT, "x".repeat(20_000), seq));
 
         AtomicBoolean writing = new AtomicBoolean(true);
         Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
@@ -76,7 +76,7 @@ class FileMessageRepositoryConcurrencyTest {
         FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
         Message message = repo.append(conversation, seq -> Message.of(conversation, "agent", ParticipantType.AGENT,
-                MessageType.TOOL_RESULT, "result", seq));
+                MessageType.CHAT, "result", seq));
         Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
 
         Thread tokens = Thread.ofPlatform().start(() -> run(failures, () -> {

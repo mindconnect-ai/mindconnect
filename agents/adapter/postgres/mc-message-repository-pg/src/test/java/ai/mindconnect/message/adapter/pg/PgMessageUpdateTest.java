@@ -34,7 +34,7 @@ class PgMessageUpdateTest {
     @Test
     void concurrentChangesOfOneMessageBothLand() throws Exception {
         Message message = repo.append(conversation, seq -> Message.of(conversation, "agent", ParticipantType.AGENT,
-                MessageType.TOOL_RESULT, "result", seq));
+                MessageType.CHAT, "result", seq));
         Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
 
         Thread tokens = Thread.ofPlatform().start(() -> run(failures, () -> {

@@ -48,7 +48,7 @@ class ConversationServiceTest {
                 Participant.agent(conversation, AgentId.of("agent-1"), "Bot")
         );
 
-        Conversation result = service.createConversation(conversation, "Support Chat", ConversationType.USER_AGENT, participants);
+        Conversation result = service.createConversation(conversation, "Support Chat", ConversationType.SUPPORT, participants);
 
         assertThat(result.id()).isNotNull();
         assertThat(result.topic()).isEqualTo("Support Chat");
@@ -58,7 +58,7 @@ class ConversationServiceTest {
     @Test
     void addMessage_ToConversation_appendsToConversation() {
         Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
 
         String senderId = "user-1";
         Message msg = service.addMessageToConversation(conv.id(), senderId, ParticipantType.USER, MessageType.CHAT, "Hello!", null);
@@ -71,7 +71,7 @@ class ConversationServiceTest {
     @Test
     void addMessage_ToConversation_incrementsSequence() {
         Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
         String sender = "user-1";
 
         service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "msg 1", null);
@@ -83,7 +83,7 @@ class ConversationServiceTest {
     @Test
     void addMessage_withParts_derivesContentFromTheTextParts() {
         Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
         List<ContentPart> parts = List.of(
                 new ContentPart.Text("What is in this picture?"),
                 new ContentPart.Image("f-1", "photo.png", "image/png", 240_000L));
@@ -101,7 +101,7 @@ class ConversationServiceTest {
     @Test
     void addMessage_withText_hasNoPartsButReadsAsOneTextPart() {
         Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
 
         Message msg = service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER,
                 MessageType.CHAT, "Hello!", null);
@@ -113,7 +113,7 @@ class ConversationServiceTest {
     @Test
     void addMessage_withParts_appendsAfterExistingMessages() {
         Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
         String sender = "user-1";
         service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "first", null);
 
@@ -133,7 +133,7 @@ class ConversationServiceTest {
     @Test
     void loadHistory_returnsMessagesInOrder() {
         Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
         String sender = "user-1";
         service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "first", null);
         service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "second", null);
@@ -150,9 +150,9 @@ class ConversationServiceTest {
     @Test
     void deleteConversation_removesTheConversationAndAllItsMessages() {
         Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
         Conversation other = service.createConversation(ConversationId.random(), "other",
-                ConversationType.USER_AGENT, List.of());
+                ConversationType.SUPPORT, List.of());
         service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "one", null);
         service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "two", null);
         service.addMessageToConversation(other.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "keep", null);

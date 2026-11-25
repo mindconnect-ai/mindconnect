@@ -25,19 +25,16 @@ public record Message(
         Integer tokenCount,
         Integer compressedTokenCount,
         /**
-         * Wall-clock duration that produced this message, in milliseconds.
-         * Meaningful for outputs the agent process generated:
-         *   • {@link MessageType#TOOL_RESULT} → tool execution time
-         *   • {@link MessageType#CHAT} from agent → LLM round-trip latency
-         * Null for inputs ({@link ParticipantType#USER} CHAT, {@link MessageType#TOOL_CALL}).
+         * Wall-clock duration that produced this message, in milliseconds:
+         * for an agent's {@link MessageType#CHAT}, the model's round trip.
+         * Null for what a user wrote.
          */
         Long durationMs,
         /**
          * The agent chat-turn that produced this message.
          * <p>
-         * One turn produces one user CHAT (the prompt) plus all the
-         * assistant TOOL_CALL / TOOL_RESULT / CHAT messages emitted by the
-         * tool-loop until the final answer — and, now and then, a further
+         * One turn produces one user CHAT (the prompt) plus the
+         * assistant's CHAT messages until the final answer — and, now and then, a further
          * user CHAT the runtime inserts on the user's behalf (an attachment
          * shown again at the assistant's request). All of them share the
          * same {@code turnId}; that is what keeps the inserted message in

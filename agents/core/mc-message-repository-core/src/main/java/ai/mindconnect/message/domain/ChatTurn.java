@@ -49,11 +49,4 @@ public record ChatTurn(Message userMessage, List<Message> messages) {
     public boolean open() {
         return assistantAnswer().isEmpty();
     }
-
-    /** Whether this turn holds a TOOL_RESULT for {@code callId} (pairing runs on metadata). */
-    public boolean hasToolResult(String callId) {
-        return messages.stream()
-                .anyMatch(m -> m.type() == MessageType.TOOL_RESULT
-                        && callId.equals(m.metadata().get("callId")));
-    }
 }
