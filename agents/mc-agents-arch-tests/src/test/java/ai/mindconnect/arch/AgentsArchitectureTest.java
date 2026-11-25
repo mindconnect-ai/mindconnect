@@ -16,19 +16,18 @@ class AgentsArchitectureTest {
     static final ArchTests conventions = ArchTests.in(McArchRules.class);
 
     /**
-     * A session's messages are read through the runtime's SessionStore, never
-     * past it: the store that keeps them in the message repository is about
-     * to be replaced by one of their own. Frozen with whoever still builds the
-     * old store; the store goes, and the rule with it, once nobody does.
-     * Migrations read what was kept the old way: that is what they are for.
+     * The runtime knows no conversations: a session keeps its messages in a
+     * repository of its own, and conversations are a model of their own that
+     * a bridge will join to sessions. The installation's store plugins and
+     * the starter provide the conversation repositories for whoever else
+     * uses them. Frozen with the traces, which are still filed under a
+     * conversation id that is the session's.
      */
     @ArchTest
-    static final ArchRule sessionsAreReadThroughTheStore = FreezingArchRule.freeze(
-            noClasses().that().resideOutsideOfPackages("ai.mindconnect.agent.runtime.store..",
-                            "ai.mindconnect.agent.migration..")
-                    .should().dependOnClassesThat()
-                    .haveFullyQualifiedName("ai.mindconnect.agent.runtime.store.RepositorySessionStore")
-                    .orShould().dependOnClassesThat()
-                    .haveFullyQualifiedName("ai.mindconnect.agent.runtime.store.SessionMessageMapper")
-                    .as("Sessions: a session's messages are read through the SessionStore"));
+    static final ArchRule runtimeKnowsNoConversations = FreezingArchRule.freeze(
+            noClasses().that().resideInAPackage("ai.mindconnect.agent..")
+                    .and().resideOutsideOfPackages("ai.mindconnect.agent.runtime.infrastructure..",
+                            "ai.mindconnect.agent.starter..")
+                    .should().dependOnClassesThat().resideInAPackage("ai.mindconnect.message..")
+                    .as("Sessions: the runtime knows no conversations"));
 }

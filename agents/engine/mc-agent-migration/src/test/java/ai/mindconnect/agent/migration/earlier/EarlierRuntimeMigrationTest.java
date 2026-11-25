@@ -23,7 +23,6 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.jackson.IdJsonModule;
-import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.adapter.FileAgentRepository;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -35,13 +34,9 @@ import ai.mindconnect.agent.runtime.capabilities.memory.SessionSummaryStore;
 import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
 import ai.mindconnect.agent.runtime.store.FileSessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.FileSessionRepository;
-import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
-import ai.mindconnect.agent.runtime.store.SessionMessageMigration;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.message.adapter.file.FileMessageRepository;
 
 /**
  * A data directory the earlier runtime wrote, taken over on files: an agent,
@@ -89,25 +84,31 @@ class EarlierRuntimeMigrationTest {
                 {"id": "x", "conversationId": "c1", "content": "They talked about owls.",
                  "fromSequenceNum": 1, "toSequenceNum": 2, "messageCount": 2}
                 """);
-        // The conversation as the earlier runtime left it: written through a session that only names it.
-        FileMessageRepository messages = new FileMessageRepository(data, json, SCOPE);
-        SessionStore writer = new RepositorySessionStore(new InMemorySessionRepository(SCOPE), messages, MAPPERS);
-        writer.create(new Session(SessionId.of("w"), UserId.of("ada"), null, null,
-                Map.of(RepositorySessionStore.CONVERSATION_ID, "c1"), Instant.EPOCH));
-        writer.append(SessionId.of("w"), List.of(
-                TurnMessage.user(List.of(new ContentPart.Text("Tell me about owls"))).inTurn("t1"),
-                TurnMessage.assistant("They hunt at night.").inTurn("t1"),
-                TurnMessage.user(List.of(new ContentPart.Text("And mice?"))).inTurn("t2")));
+        // The conversations as the message repository left them: a file per message, named by its place.
+        message(local, "c1", 1, "m1", "CHAT", "USER", "Tell me about owls", "t1");
+        message(local, "c1", 2, "m2", "TOOL_CALL", "AGENT",
+                "{\\\"toolCalls\\\":[{\\\"id\\\":\\\"call_1\\\",\\\"name\\\":\\\"search\\\",\\\"arguments\\\":{\\\"q\\\":\\\"owls\\\"}}]}", "t1");
+        message(local, "c1", 3, "m3", "TOOL_RESULT", "AGENT",
+                "{\\\"toolCallId\\\":\\\"call_1\\\",\\\"toolName\\\":\\\"search\\\",\\\"result\\\":\\\"They hunt at night.\\\"}", "t1");
+        message(local, "c1", 4, "m4", "CHAT", "AGENT", "They hunt at night.", "t1");
+        message(local, "c1", 5, "m5", "APPROVAL_REQUEST", "AGENT", "", "t1");
         // A sub-agent's session had a conversation of its own, under an id that is not the session's.
-        writer.create(new Session(SessionId.of("w2"), UserId.of("ada"), null, null,
-                Map.of(RepositorySessionStore.CONVERSATION_ID, "c2"), Instant.EPOCH));
-        writer.append(SessionId.of("w2"), List.of(TurnMessage.assistant("Mice hide.").inTurn("t1")));
+        message(local, "c2", 1, "m6", "CHAT", "AGENT", "Mice hide.", "t1");
 
         sessions = new FileSessionRepository(data, json, SCOPE);
         target = new FileSessionMessageRepository(data, json, SCOPE, NOW);
         migration = new EarlierRuntimeMigration(new FileEarlierRuntimeData(data, json, SCOPE),
-                new FileAgentRepository(data, json, SCOPE), sessions,
-                new RepositorySessionStore(sessions, messages, MAPPERS), target, new AgentJson(json), NOW);
+                new FileAgentRepository(data, json, SCOPE), sessions, target, new AgentJson(json), json, NOW);
+    }
+
+    private static void message(Path namespace, String conversation, int place, String id, String type,
+                                String sender, String content, String turn) throws IOException {
+        write(namespace.resolve("conversations/" + conversation + "/messages/" + String.format("%010d", place)
+                + "_" + id + ".json"), """
+                {"id": "%s", "conversationId": "%s", "senderId": "x", "senderType": "%s", "type": "%s",
+                 "content": "%s", "metadata": {}, "sequenceNum": %d, "sentAt": "2026-09-03T10:00:0%dZ",
+                 "compressed": false, "turnId": "%s"}
+                """.formatted(id, conversation, sender, type, content, place, place, turn));
     }
 
     private static void write(Path file, String content) throws IOException {
@@ -137,15 +138,25 @@ class EarlierRuntimeMigrationTest {
                 .containsEntry("activatedTools", List.of("read_pdf"))
                 .containsEntry(ManagedSession.AGENT, ManagedSession.REF)
                 .containsEntry(ManagedSession.AGENT_ID, "a1")
-                .containsEntry(SessionMessageMigration.MIGRATED_AT, "2026-11-25T12:00:00Z");
+                .containsEntry(EarlierRuntimeMigration.MIGRATED_AT, "2026-11-25T12:00:00Z");
         assertThat((List<?>) owls.metadata().get(ManagedSession.ATTACHMENTS)).singleElement()
                 .isEqualTo(Map.of("id", "f1", "name", "owl.png", "path", "/up/owl.png", "mediaType", "image/png",
                         "sizeBytes", 12));
         SessionStore moved = new DefaultSessionStore(sessions, target);
-        assertThat(moved.history(SessionId.of("s1"))).extracting(stored -> stored.message().text())
-                .containsExactly("Tell me about owls", "They hunt at night.", "And mice?");
-        assertThat(moved.history(SessionId.of("s1"))).extracting(StoredMessage::sequence).containsExactly(1L, 2L, 3L);
-        String second = moved.messages(SessionId.of("s1")).get(1).id();
+        assertThat(moved.history(SessionId.of("s1"))).extracting(stored -> stored.message().type()).containsExactly(
+                TurnMessage.Type.USER, TurnMessage.Type.TOOL_CALL, TurnMessage.Type.TOOL_RESULT,
+                TurnMessage.Type.ASSISTANT);
+        assertThat(moved.history(SessionId.of("s1"))).extracting(StoredMessage::sequence)
+                .containsExactly(1L, 2L, 3L, 4L);
+        assertThat(moved.history(SessionId.of("s1")).get(0).storedAt()).isEqualTo(Instant.parse("2026-09-03T10:00:01Z"));
+        TurnMessage call = moved.messages(SessionId.of("s1")).get(1);
+        assertThat(call.id()).isEqualTo("m2");
+        assertThat(call.toolCalls()).singleElement()
+                .isEqualTo(new TurnMessage.ToolCall("call_1", "search", Map.of("q", "owls")));
+        TurnMessage result = moved.messages(SessionId.of("s1")).get(2);
+        assertThat(result.text()).isEqualTo("They hunt at night.");
+        assertThat(result.metadata()).containsEntry("callId", "call_1").containsEntry("toolName", "search");
+        String second = call.id();
         assertThat(new SessionSummaryStore(() -> moved).find(SessionId.of("s1")).orElseThrow()
                 .throughMessageId()).isEqualTo(second);
 

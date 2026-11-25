@@ -19,8 +19,9 @@ import ai.mindconnect.filerepo.FileRepo;
 /**
  * The earlier runtime's files of a namespace: agents under
  * {@code system/agents/{id}.json}, sessions under
- * {@code sessions/{id}/session.json}, a conversation's summaries under
- * {@code conversations/{id}/summaries/}.
+ * {@code sessions/{id}/session.json}, a conversation's messages and
+ * summaries under {@code conversations/{id}/messages/} and
+ * {@code conversations/{id}/summaries/}, named by their place.
  */
 public final class FileEarlierRuntimeData implements EarlierRuntimeData {
 
@@ -60,6 +61,13 @@ public final class FileEarlierRuntimeData implements EarlierRuntimeData {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public List<Map<String, Object>> messages(String conversationId) {
+        return files(namespace().resolve("conversations").resolve(conversationId).resolve("messages"))
+                .map(file -> object(read(file)))
+                .toList();
     }
 
     @Override

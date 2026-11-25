@@ -40,8 +40,6 @@ import ai.mindconnect.agent.migration.plugin.FileMigrationPlugin;
 import ai.mindconnect.agent.migration.plugin.MigrationPlugin;
 import ai.mindconnect.agent.migration.MigrationRunner;
 import ai.mindconnect.agent.migration.pg.PgMigrationPlugin;
-import ai.mindconnect.agent.runtime.store.SessionMessageMigration;
-import ai.mindconnect.agent.runtime.store.SessionMessages;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.ManagementPlugin;
@@ -98,7 +96,6 @@ import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -247,41 +244,29 @@ public class RuntimeEngineAutoConfiguration {
         Namespace startup = new Namespace(env.getProperty("mindconnect.namespace", "local"));
         AgentRuntime runtime = StartupScope.call(scope, startup, builder::build);
         built.set(runtime);
-        prepareNamespaces(runtime, scope, startup,
-                env.getProperty("mindconnect.migrations.enabled", Boolean.class, true),
-                SessionMessages.of(settings) == SessionMessages.OWN);
+        if (env.getProperty("mindconnect.migrations.enabled", Boolean.class, true)) {
+            migrateNamespaces(runtime, scope, startup);
+        }
         log.info("Agent runtime built: persistence {}, namespace {}", persistence,
                 scope instanceof ThreadBoundScopeSupplier ? "per call" : startup.value());
         return runtime;
     }
 
     /**
-     * Brings every namespace's data up to this version the first time the
-     * namespace is used after start — a namespace bound for the first time
-     * waits for it — or at once where there is one namespace only: the
-     * migrations it has not had, then, where a session's messages are kept in
-     * their own repository, the move of those still kept as conversations.
+     * Brings every namespace's data up to this version, with the migrations it
+     * has not had, the first time the namespace is used after start — a
+     * namespace bound for the first time waits for it — or at once where there
+     * is one namespace only.
      */
-    private static void prepareNamespaces(AgentRuntime runtime, ScopeSupplier scope, Namespace startup,
-                                          boolean migrate, boolean moveMessages) {
-        if (!migrate && !moveMessages) {
-            return;
-        }
+    private static void migrateNamespaces(AgentRuntime runtime, ScopeSupplier scope, Namespace startup) {
         Consumer<Namespace> prepare = namespace -> {
-            if (migrate) {
-                MigrationRunner migrations = runtime.service(MigrationRunner.class);
-                for (AppliedMigration applied : migrations.run()) {
-                    log.info("Migration {} ({}) in namespace {}: {}", applied.id(), applied.version(),
-                            namespace.value(), applied.report());
-                }
-                log.info("Data of namespace {} at version {}", namespace.value(),
-                        migrations.dataVersion().orElse("(none migrated)"));
+            MigrationRunner migrations = runtime.service(MigrationRunner.class);
+            for (AppliedMigration applied : migrations.run()) {
+                log.info("Migration {} ({}) in namespace {}: {}", applied.id(), applied.version(),
+                        namespace.value(), applied.report());
             }
-            if (moveMessages) {
-                SessionMessageMigration.Report report = runtime.service(SessionMessageMigration.class).run();
-                log.info("Session messages of namespace {}: {} sessions moved, {} moved before",
-                        namespace.value(), report.migrated().size(), report.skipped().size());
-            }
+            log.info("Data of namespace {} at version {}", namespace.value(),
+                    migrations.dataVersion().orElse("(none migrated)"));
         };
         if (scope instanceof ThreadBoundScopeSupplier bound) {
             bound.onBind(new NamespaceFirstUse("Migrating data", prepare));

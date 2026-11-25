@@ -1,5 +1,5 @@
 #
-#Wed Nov 25 14:28:00 CET 2026
+#Wed Nov 25 16:47:14 CET 2026
 Contracts\:\ the\ agents'\ contracts\ know\ no\ Jackson=9e55dafd-9356-41e9-8c54-7bd6810ae774
 Conventions\:\ SLF4J\ everywhere,\ never\ java.util.logging=36fb2450-9f11-4764-aba9-e8aa058a3fa7
 Conventions\:\ every\ ObjectMapper\ comes\ from\ JsonMapperFactory=ca05a5d2-1cb4-4b24-8699-16ad86a6bcdc
@@ -17,4 +17,4 @@ D3\:\ a\ class\ has\ at\ most\ 30\ methods=216cd1b2-3a38-4ecc-a25e-9d65ddc943f9
 D3\:\ a\ constructor\ takes\ at\ most\ 7\ parameters\ (a\ record\ is\ exempt)=172902a0-9cad-43cf-a1e0-6a4fc6638487
 D4\:\ a\ class\ name\ says\ what\ the\ thing\ is\ for\ (no\ Helper,\ Util,\ Support,\ Commons,\ Holder,\ Manager)=2b514d31-1d5b-4880-a7e5-b58d2ae22808
 D4\:\ a\ method\ name\ says\ what\ it\ does\ (no\ process,\ handle,\ do)=fbca0bde-6f8f-4449-963c-53daa5a62111
-Sessions\:\ a\ session's\ messages\ are\ read\ through\ the\ SessionStore=e6a87f48-c87a-49a6-a465-72c11e178535
+Sessions\:\ the\ runtime\ knows\ no\ conversations=03e2fe96-5559-4143-89d6-0d4d59ef151d

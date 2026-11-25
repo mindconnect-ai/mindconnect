@@ -23,32 +23,11 @@ import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
  * that is replaced by another has to keep this, or the sessions written by
  * the one are not what the other reads.
  *
- * <p>A store this does not hold for in every point says so by overriding the
- * question that names the point, and the test then holds what it does
- * instead.
  */
 public abstract class SessionStoreContract {
 
     /** A store of its own, empty, for the one test that asks. */
     protected abstract SessionStore store();
-
-    /**
-     * Whether a message appended with an id keeps it. The migration of
-     * stored sessions to another store needs that: metadata and traces name
-     * messages by their id.
-     */
-    protected boolean keepsAGivenId() {
-        return true;
-    }
-
-    /**
-     * Whether a place that was removed stays unused. Whoever removed the end
-     * of a session and still holds the places of what was there would
-     * otherwise address a message that came later.
-     */
-    protected boolean givesAPlaceOnce() {
-        return true;
-    }
 
     private static Session aSession(String id) {
         return new Session(SessionId.of(id), UserId.of("ada"), null, null, Map.of("cwd", "/tmp/project"),
@@ -170,7 +149,7 @@ public abstract class SessionStoreContract {
     }
 
     @Test
-    void a_message_appended_with_an_id_keeps_it_where_the_store_says_so() {
+    void a_message_appended_with_an_id_keeps_it() {
         SessionStore store = store();
         Session session = aSession("s1");
         store.create(session);
@@ -178,13 +157,9 @@ public abstract class SessionStoreContract {
         TurnMessage stored = store.append(session.id(),
                 List.of(TurnMessage.assistant("from before").stored("m-earlier"))).get(0);
 
-        if (keepsAGivenId()) {
-            assertThat(stored.id()).isEqualTo("m-earlier");
-            assertThat(store.messages(session.id())).extracting(TurnMessage::id).containsExactly("m-earlier");
-        } else {
-            assertThat(stored.id()).isNotEqualTo("m-earlier");
-            assertThat(store.messages(session.id())).extracting(TurnMessage::id).containsExactly(stored.id());
-        }
+        // Metadata and traces name messages by their id: a session moved from elsewhere keeps them.
+        assertThat(stored.id()).isEqualTo("m-earlier");
+        assertThat(store.messages(session.id())).extracting(TurnMessage::id).containsExactly("m-earlier");
     }
 
     @Test
@@ -219,11 +194,8 @@ public abstract class SessionStoreContract {
         assertThat(removed).isEqualTo(2);
         List<StoredMessage> history = store.history(session.id());
         assertThat(history).extracting(entry -> entry.message().text()).containsExactly("one", "four");
-        if (givesAPlaceOnce()) {
-            assertThat(history.get(1).sequence()).isGreaterThan(second);
-        } else {
-            assertThat(history.get(1).sequence()).isEqualTo(second);
-        }
+        // Whoever removed the end and still holds those places must not address a message that came later.
+        assertThat(history.get(1).sequence()).isGreaterThan(second);
     }
 
     @Test

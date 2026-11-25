@@ -1,11 +1,8 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
@@ -15,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -79,10 +75,9 @@ class UserStreamTest {
         monitor = new TaskMonitor(queue, TaskMonitorTest.runtimeWithAlicesSession(ALICE_SESSION,
                 ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test"))));
         var stored = new ai.mindconnect.agent.runtime.store.InMemorySessionRepository(ScopeSupplier.local());
-        var messages = new ai.mindconnect.message.adapter.memory.InMemoryMessageRepository(ScopeSupplier.local());
+        var messages = new ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository(ScopeSupplier.local(), java.time.Clock.systemUTC());
         sessions = new ai.mindconnect.agent.management.RepositorySessionManagement(stored,
-                new ai.mindconnect.agent.runtime.store.RepositorySessionStore(stored, messages,
-                        new ai.mindconnect.jackson.JsonMapperFactory(List.of())),
+                new ai.mindconnect.agent.runtime.store.DefaultSessionStore(stored, messages),
                 new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ScopeSupplier.local()),
                 ai.mindconnect.agent.management.api.SessionDirectoryPolicy.unrestricted(), List.of(),
                 new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> Optional.empty()));

@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -26,9 +25,6 @@ import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
 import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
 import ai.mindconnect.agent.runtime.store.FileSessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.FileSessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
-import ai.mindconnect.agent.runtime.store.SessionMessages;
-import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.sdk.AgentRuntimeBuilder;
 import ai.mindconnect.jackson.JsonMapperFactory;
@@ -71,23 +67,13 @@ public final class LocalRuntime {
         HarnessDirectories directories = new HarnessDirectories(home);
         ScopeSupplier scope = ScopeSupplier.fixed(new Namespace(NAMESPACE));
         Path data = home.resolve(".mc").resolve("data");
-        // Made when the runtime first asks for it, by then the settings can be read; the approvals ask after that.
-        AtomicReference<SessionStore> sessions = new AtomicReference<>();
+        SessionStore sessions = new DefaultSessionStore(new FileSessionRepository(data, json, scope),
+                new FileSessionMessageRepository(data, json, scope, Clock.systemUTC()));
         return AgentRuntime.builder()
                 .scope(scope)
                 .sessionStore(provides("session-store-file", registry ->
-                        registry.provide(SessionStore.class, () -> {
-                            FileSessionRepository stored = new FileSessionRepository(data, json, scope);
-                            SessionStore store = switch (registry.setting(SessionMessages.SETTING)) {
-                                case OWN -> new DefaultSessionStore(stored,
-                                        new FileSessionMessageRepository(data, json, scope, Clock.systemUTC()));
-                                case CONVERSATION -> new RepositorySessionStore(stored,
-                                        new FileMessageRepository(data, json, scope), this.json);
-                            };
-                            sessions.set(store);
-                            return store;
-                        })))
-                .approvalMemory(new FileApprovalMemory(sessions::get, directories, json))
+                        registry.provide(SessionStore.class, () -> sessions)))
+                .approvalMemory(new FileApprovalMemory(() -> sessions, directories, json))
                 // Writing is the one thing here that cannot be taken back by reading again.
                 .permission("write_file", PermissionEffect.ASK)
                 .plugin(new FileSourcePlugin(directories, json))

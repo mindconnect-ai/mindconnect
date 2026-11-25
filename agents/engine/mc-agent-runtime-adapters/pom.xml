@@ -16,8 +16,8 @@
     <packaging>jar</packaging>
     <description>
         What the runtime API's ports are answered with by default, each as a
-        plugin of its own: sessions kept in a session repository and the
-        message repository (in memory or on files), a model reached through
+        plugin of its own: sessions and their messages kept in repositories
+        of their own (in memory or on files), a model reached through
         the LLM gateway, and prompts rendered with Pebble. No engine: a host
         installs these next to whichever engine runs its turns, or brings
         its own in their place.
@@ -41,17 +41,6 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-gateway</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!-- Where sessions keep their messages: the message repository, in memory or on files. -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

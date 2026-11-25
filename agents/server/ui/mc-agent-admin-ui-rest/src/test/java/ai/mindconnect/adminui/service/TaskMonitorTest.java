@@ -1,7 +1,5 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.adminui.service.TaskMonitor.CancelResult;
 import ai.mindconnect.adminui.service.TaskMonitor.Snapshot;
 import ai.mindconnect.adminui.service.TaskMonitor.TaskView;
@@ -19,9 +17,9 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
@@ -93,11 +91,11 @@ class TaskMonitorTest {
     /** A runtime that knows sessions, with Alice's chat "Alice asks" in the namespace current when it is made. */
     static AgentRuntime runtimeWithAlicesSession(SessionId alices, ScopeSupplier namespaces) {
         var sessions = new InMemorySessionRepository(namespaces);
-        var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-        SessionManagement management = new RepositorySessionManagement(sessions, new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))),
+        var messages = new InMemorySessionMessageRepository(ScopeSupplier.fixed(new Namespace("test")), java.time.Clock.systemUTC());
+        SessionManagement management = new RepositorySessionManagement(sessions, new DefaultSessionStore(sessions, messages),
                 new InMemoryAgentRepository(namespaces), SessionDirectoryPolicy.unrestricted(), List.of(),
                 new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
-        new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))).create(new Session(
+        new DefaultSessionStore(sessions, messages).create(new Session(
                 alices,
                 UserId.of("alice"), null,
                 new AgentDefinition("Scout", "A test agent", "prompt", ModelSettings.NONE, List.of(), 5, Map.of()),

@@ -34,8 +34,8 @@ concept is an interface, with an adapter per backend:
 |------|--------|--------------|------------------|
 | `AgentRepository` | Agents | `FileAgentRepository` | `PgAgentRepository` |
 | `SessionRepository` | Sessions (incl. parent/child links, and what is kept with a session: attachments, approvals, the summary) | `FileSessionRepository` | `PgSessionRepository` |
-| `SessionMessageRepository` | A session's messages, with `mindconnect.sessions.messages=own` | `FileSessionMessageRepository` (`sessions/<id>/messages/`) | `PgSessionMessageRepository` |
-| `MessageRepository` | Conversation messages; a session's messages too while `mindconnect.sessions.messages=conversation` | `FileMessageRepository` | `PgMessageRepository` |
+| `SessionMessageRepository` | A session's messages | `FileSessionMessageRepository` (`sessions/<id>/messages/`) | `PgSessionMessageRepository` |
+| `MessageRepository` | Conversation messages — not a session's | `FileMessageRepository` | `PgMessageRepository` |
 | `ConversationRepository` | Conversation metadata | `FileConversationRepository` | `PgConversationRepository` |
 | `TodoListRepository` | Session todo lists | `FileTodoListRepository` | `PgTodoListRepository` |
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
@@ -236,8 +236,11 @@ The first migration, `earlier-runtime` (0.8.5), takes over what the earlier
 runtime kept: its agents (`mc_agent_definition`, `system/agents/`) become
 managed agents, its sessions (`mc_agent_session`, `sessions/<id>/session.json`)
 sessions of the runtime with the same ids, and each conversation the session's
-messages, with their ids, places and times, plus its latest summary. The
-earlier data stays where it is.
+messages, with their ids, places and times, plus its latest summary. A second,
+`session-conversations`, moves the messages of sessions this runtime kept as
+conversations before sessions had a repository of their own. Both read the
+old data as it lies, without the classes that wrote it, and leave it where it
+is.
 
 ## Other databases
 

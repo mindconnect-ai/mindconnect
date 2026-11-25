@@ -49,15 +49,6 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-jackson</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-repo</artifactId>
             <version>${project.version}</version>
         </dependency>

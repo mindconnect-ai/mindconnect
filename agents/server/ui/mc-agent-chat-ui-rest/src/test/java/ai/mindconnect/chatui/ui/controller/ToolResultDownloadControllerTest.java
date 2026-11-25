@@ -1,7 +1,5 @@
 package ai.mindconnect.chatui.ui.controller;
 
-import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
@@ -16,10 +14,10 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.chatui.service.SessionOwnership;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.PluginRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,8 +52,8 @@ class ToolResultDownloadControllerTest {
     @BeforeEach
     void setUp() {
         var stored = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
-        var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-        var store = new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule())));
+        var messages = new InMemorySessionMessageRepository(ScopeSupplier.fixed(new Namespace("test")), java.time.Clock.systemUTC());
+        var store = new DefaultSessionStore(stored, messages);
         SessionManagement management = new RepositorySessionManagement(stored, store,
                 new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
                 List.of(),

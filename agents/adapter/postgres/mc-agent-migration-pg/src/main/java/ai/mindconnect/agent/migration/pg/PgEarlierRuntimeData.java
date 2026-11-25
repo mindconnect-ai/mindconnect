@@ -12,7 +12,7 @@ import ai.mindconnect.jdbc.Sql;
 
 /**
  * The earlier runtime's tables: {@code mc_agent_definition},
- * {@code mc_agent_session} and {@code mc_conversation_summary}, each row's
+ * {@code mc_agent_session}, {@code mc_message} and {@code mc_conversation_summary}, each row's
  * document as it lies. A database the earlier runtime never wrote to has
  * none of them, and nothing is read.
  */
@@ -44,6 +44,15 @@ public final class PgEarlierRuntimeData implements EarlierRuntimeData {
         }
         return sql.query("SELECT doc FROM mc_agent_session WHERE namespace = ? ORDER BY started_at NULLS FIRST, id",
                 row -> row.json("doc", OBJECT), scope.namespace().value());
+    }
+
+    @Override
+    public List<Map<String, Object>> messages(String conversationId) {
+        if (!exists("mc_message")) {
+            return List.of();
+        }
+        return sql.query("SELECT doc FROM mc_message WHERE namespace = ? AND conversation_id = ? ORDER BY seq, id",
+                row -> row.json("doc", OBJECT), scope.namespace().value(), conversationId);
     }
 
     @Override

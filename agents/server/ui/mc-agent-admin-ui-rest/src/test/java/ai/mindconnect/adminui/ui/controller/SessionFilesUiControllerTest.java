@@ -1,7 +1,5 @@
 package ai.mindconnect.adminui.ui.controller;
 
-import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
@@ -15,9 +13,9 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
@@ -70,13 +68,13 @@ class SessionFilesUiControllerTest {
         root = work.toString();
 
         var sessions = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
-        var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-        SessionManagement management = new RepositorySessionManagement(sessions, new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))),
+        var messages = new InMemorySessionMessageRepository(ScopeSupplier.fixed(new Namespace("test")), java.time.Clock.systemUTC());
+        SessionManagement management = new RepositorySessionManagement(sessions, new DefaultSessionStore(sessions, messages),
                 new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
                 List.of(),
                 new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
         var id = ai.mindconnect.agent.SessionId.of("s1");
-        new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))).create(new Session(id,
+        new DefaultSessionStore(sessions, messages).create(new Session(id,
                 UserId.of("alice"), null, HELPER,
                 Map.of(ManagedSession.WORKING_DIRECTORY, root), Instant.parse("2026-11-01T00:00:00Z")));
         session = management.find(id).orElseThrow();

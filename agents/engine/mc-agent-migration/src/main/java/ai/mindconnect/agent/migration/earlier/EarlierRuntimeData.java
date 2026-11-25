@@ -17,6 +17,9 @@ public interface EarlierRuntimeData {
     /** Each session as the earlier runtime's JSON object. */
     List<Map<String, Object>> sessions();
 
+    /** Each message of a conversation as the message repository's JSON object, in their order. */
+    List<Map<String, Object>> messages(String conversationId);
+
     /** The latest summary of a conversation, if it has one. */
     Optional<Summary> latestSummary(String conversationId);
 
@@ -37,6 +40,11 @@ public interface EarlierRuntimeData {
 
             @Override
             public List<Map<String, Object>> sessions() {
+                return List.of();
+            }
+
+            @Override
+            public List<Map<String, Object>> messages(String conversationId) {
                 return List.of();
             }
 

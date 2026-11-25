@@ -15,10 +15,10 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.PluginRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,8 +60,8 @@ class AgentUiControllerTest {
         ScopeSupplier namespace = ScopeSupplier.fixed(new Namespace("test"));
         var agentRepository = new InMemoryAgentRepository(namespace);
         var sessionRepository = new InMemorySessionRepository(namespace);
-        var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-        var store = new RepositorySessionStore(sessionRepository, messages, new JsonMapperFactory(List.of()));
+        var messages = new InMemorySessionMessageRepository(ScopeSupplier.fixed(new Namespace("test")), java.time.Clock.systemUTC());
+        var store = new DefaultSessionStore(sessionRepository, messages);
         agents = new RepositoryAgentManagement(agentRepository);
         sessions = new RepositorySessionManagement(sessionRepository, store, agentRepository,
                 SessionDirectoryPolicy.unrestricted(), List.of(),

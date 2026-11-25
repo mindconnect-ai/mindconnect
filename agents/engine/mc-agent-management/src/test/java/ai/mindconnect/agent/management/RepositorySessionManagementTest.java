@@ -37,14 +37,10 @@ import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
-import ai.mindconnect.message.port.out.MessageRepository;
-import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.agent.jackson.IdJsonModule;
 
 /** The management API over the same repositories the runtime's session store writes to. */
 class RepositorySessionManagementTest {
@@ -54,10 +50,9 @@ class RepositorySessionManagementTest {
             ModelSettings.NONE, List.of(), 5, Map.of());
 
     private final SessionRepository sessions = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
-    private final MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
+    private final InMemorySessionMessageRepository messages = new InMemorySessionMessageRepository(ScopeSupplier.fixed(new Namespace("test")), java.time.Clock.systemUTC());
     /** What the runtime does: the sessions and messages the management API is to find. */
-    private final RepositorySessionStore runtime = new RepositorySessionStore(sessions, messages,
-            new JsonMapperFactory(List.of(new IdJsonModule())));
+    private final DefaultSessionStore runtime = new DefaultSessionStore(sessions, messages);
     private final AgentRepository agents = new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test")));
     /** The sessions a cleanup was told are gone. */
     private final List<ManagedSession> cleanedUp = new java.util.ArrayList<>();
@@ -312,8 +307,7 @@ class RepositorySessionManagementTest {
         assertThat(management.find(child)).isEmpty();
         // Whoever keeps something per session hears of each one that went, the one under it first.
         assertThat(cleanedUp).extracting(session -> session.id().value()).containsExactly("child", "top");
-        assertThat(messages.findByConversation(ai.mindconnect.message.domain.ConversationId.of("child"),
-                new ai.mindconnect.common.PageRequest(0, 10))).isEmpty();
+        assertThat(messages.findBySession(child)).isEmpty();
         assertThat(runtime.messages(other)).hasSize(1);
     }
 

@@ -1,7 +1,5 @@
 package ai.mindconnect.chatui.service;
 
-import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -15,8 +13,8 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.PluginRegistry;
 import org.junit.jupiter.api.Test;
@@ -40,9 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionOwnershipTest {
 
     private final InMemorySessionRepository stored = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
-    private final InMemoryMessageRepository messages =
-            new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-    private final SessionManagement management = new RepositorySessionManagement(stored, new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule()))),
+    private final InMemorySessionMessageRepository messages = new InMemorySessionMessageRepository(ScopeSupplier.fixed(new Namespace("test")), java.time.Clock.systemUTC());
+    private final SessionManagement management = new RepositorySessionManagement(stored, new DefaultSessionStore(stored, messages),
             new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
             List.of(),
                 new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()));
@@ -52,7 +49,7 @@ class SessionOwnershipTest {
 
     private ManagedSession opened(String user) {
         var id = SessionId.of(java.util.UUID.randomUUID().toString());
-        new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule()))).create(new Session(id,
+        new DefaultSessionStore(stored, messages).create(new Session(id,
                 ai.mindconnect.agent.UserId.of(user), null,
                 new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5, Map.of()),
                 Map.of(), Instant.parse("2026-11-01T00:00:00Z")));

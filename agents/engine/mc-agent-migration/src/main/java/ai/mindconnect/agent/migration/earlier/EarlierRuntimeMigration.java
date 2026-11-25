@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.migration.earlier;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -8,6 +7,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
@@ -21,19 +22,15 @@ import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.StoredMessage;
 import ai.mindconnect.agent.runtime.capabilities.memory.ConversationSummary;
 import ai.mindconnect.agent.runtime.capabilities.memory.SessionSummaryStore;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
-import ai.mindconnect.agent.runtime.store.SessionMessageMigration;
 import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
-import ai.mindconnect.message.domain.ConversationId;
 
 /**
  * Takes over what the earlier runtime kept: its agents become managed agents,
  * its sessions sessions of the runtime, each with the id it had, and a
  * session's conversation becomes its messages in its own repository, each
- * with its id, place and time. The conversation stays where it is and the
- * session names it, which is the way back to keeping messages as
- * conversations.
+ * with its id, place and time. All of it is read as it lies; the earlier
+ * data stays where it is.
  *
  * <p>What a session knew is kept under the keys the runtime reads: title,
  * type, working directories, attachments, approved and activated tools, and
@@ -42,30 +39,33 @@ import ai.mindconnect.message.domain.ConversationId;
  */
 public final class EarlierRuntimeMigration implements Migration {
 
+    /** Kept with a session whose messages were moved here: when. Another run leaves such a session alone. */
+    public static final String MIGRATED_AT = "messagesMigratedAt";
+
     private static final List<String> KEPT = List.of(ManagedSession.TITLE, ManagedSession.WORKING_DIRECTORY,
             ManagedSession.ADDITIONAL_DIRECTORIES, ManagedSession.ATTACHMENTS, "approvedTools", "activatedTools");
 
     private final EarlierRuntimeData earlier;
     private final AgentRepository agents;
     private final SessionRepository sessions;
-    private final RepositorySessionStore conversations;
     private final SessionMessageRepository target;
     private final AgentJson agentJson;
+    private final EarlierMessages messages;
     private final Clock clock;
 
     /**
-     * @param conversations reads a conversation's messages as the runtime's
-     * @param target        where a session's messages are kept from now on
+     * @param target where a session's messages are kept from now on
+     * @param json   reads the content of an earlier tool call or result
      */
     public EarlierRuntimeMigration(EarlierRuntimeData earlier, AgentRepository agents, SessionRepository sessions,
-                                   RepositorySessionStore conversations, SessionMessageRepository target,
-                                   AgentJson agentJson, Clock clock) {
+                                   SessionMessageRepository target, AgentJson agentJson, ObjectMapper json,
+                                   Clock clock) {
         this.earlier = earlier;
         this.agents = agents;
         this.sessions = sessions;
-        this.conversations = conversations;
         this.target = target;
         this.agentJson = agentJson;
+        this.messages = new EarlierMessages(json);
         this.clock = clock;
     }
 
@@ -120,10 +120,8 @@ public final class EarlierRuntimeMigration implements Migration {
         }
         UserId user = UserId.of(text(old, "userId").orElseThrow(() -> new IllegalArgumentException("no user")));
         Optional<String> conversation = text(old, "conversationId");
-        List<StoredMessage> history = conversation.map(c -> conversations.conversation(ConversationId.of(c)))
-                .orElse(List.of());
+        List<StoredMessage> history = conversation.map(c -> messages.read(earlier.messages(c))).orElse(List.of());
         Map<String, Object> metadata = new LinkedHashMap<>();
-        conversation.ifPresent(c -> metadata.put(RepositorySessionStore.CONVERSATION_ID, c));
         metadata.put(ManagedSession.TYPE, text(old, "type").orElse(ManagedSession.CHAT));
         for (String key : KEPT) {
             if (old.get(key) != null) {
@@ -137,8 +135,8 @@ public final class EarlierRuntimeMigration implements Migration {
         });
         Optional<ConversationSummary> summary = summary(conversation, history);
         summary.ifPresent(found -> metadata.put(SessionSummaryStore.SUMMARY, SessionSummaryStore.stored(found)));
-        metadata.put(SessionMessageMigration.MIGRATED_AT, clock.instant().toString());
-        Instant started = instant(old.get("startedAt"));
+        metadata.put(MIGRATED_AT, clock.instant().toString());
+        Instant started = EarlierMessages.instant(old.get("startedAt"));
         // The messages first: a session that is there is one that was taken over whole.
         target.restore(id, history);
         sessions.create(new Session(id, user, text(old, "parentSessionId").map(SessionId::of).orElse(null),
@@ -166,18 +164,6 @@ public final class EarlierRuntimeMigration implements Migration {
                 .filter(stored -> stored.sequence() <= summary.throughSequence())
                 .reduce((first, second) -> second)
                 .map(stored -> new ConversationSummary(summary.text(), stored.message().id())));
-    }
-
-    /**
-     * Written as text in the earlier runtime's database, and as seconds since
-     * the epoch in its files; a session that has neither started at the epoch.
-     */
-    private static Instant instant(Object value) {
-        if (value instanceof Number seconds) {
-            BigDecimal exact = new BigDecimal(seconds.toString());
-            return Instant.ofEpochSecond(exact.longValue(), exact.remainder(BigDecimal.ONE).movePointRight(9).longValue());
-        }
-        return value instanceof String text && !text.isBlank() ? Instant.parse(text) : Instant.EPOCH;
     }
 
     private static Optional<String> text(Map<String, Object> json, String key) {
