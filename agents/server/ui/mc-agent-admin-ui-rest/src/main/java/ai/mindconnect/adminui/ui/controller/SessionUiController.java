@@ -14,13 +14,10 @@ import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.message.port.in.ConversationManager;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
@@ -48,18 +45,15 @@ public class SessionUiController {
     private final TodoListService todoListService;
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
-    private final ConversationManager conversations;
     private final ObjectMapper json;
 
     public SessionUiController(AgentRuntime runtime,
                              TodoListService todoListService,
-                             LlmCallTraceRepository traceRepository,
-                             ConversationManager conversations) {
+                             LlmCallTraceRepository traceRepository) {
         this.runtime = runtime;
         this.sessions = runtime.service(SessionManagement.class);
         this.todoListService = todoListService;
         this.traceRepository = traceRepository;
-        this.conversations = conversations;
         this.json = runtime.service(ObjectMapper.class);
     }
 
@@ -68,9 +62,9 @@ public class SessionUiController {
         return sessions.agentOf(session.id()).map(AgentDefinition::name).orElse("(no agent)");
     }
 
-    /** The conversation a session's messages and traces are filed under; empty for a session that is gone. */
-    private java.util.Optional<ConversationId> conversationOf(SessionId sessionId) {
-        return runtime.sessions().find(sessionId).map(RepositorySessionStore::conversationOf);
+    /** What a session's traces are filed under: the session's id, as the runtime files them. */
+    private static ConversationId tracesOf(SessionId sessionId) {
+        return ConversationId.of(sessionId.value());
     }
 
     /**
@@ -211,9 +205,7 @@ public class SessionUiController {
         List<LlmCallTraceHeader> traces = new java.util.ArrayList<>();
         for (SessionId sid : collectSessionTree(sessionId)) {
             try {
-                ConversationId convId = conversationOf(sid).orElse(null);
-                if (convId == null) continue;
-                traces.addAll(traceRepository.findHeadersByConversation(convId));
+                traces.addAll(traceRepository.findHeadersByConversation(tracesOf(sid)));
             } catch (Exception e) {
                 log.warn("Failed to load traces for session {}: {}", sid, e.getMessage());
             }
@@ -238,18 +230,15 @@ public class SessionUiController {
                 .map(trace -> {
                     SessionId owner = trace.context() != null && trace.context().sessionId() != null
                             ? trace.context().sessionId() : SessionId.of(sessionIdValue);
-                    List<Message> history;
+                    List<ManagedMessage> history;
                     try {
-                        history = conversationOf(owner)
-                                .map(conversation -> conversations.loadHistory(conversation,
-                                        new PageRequest(0, Integer.MAX_VALUE)))
-                                .orElse(List.of());
+                        history = sessions.messages(owner);
                     } catch (Exception e) {
                         log.warn("Failed to load history for session {}: {}", owner, e.getMessage());
                         history = List.of();
                     }
                     var card = new RoundtripCardComponent(trace,
-                            RoundtripCardComponent.indexToolResults(history, json), json);
+                            RoundtripCardComponent.indexToolResults(history), json);
                     var dlg = UiDialog.of(card.title(), null, card.render());
                     dlg.setId(TRACE_DIALOG_ID);
                     dlg.withCssClass("sui-dialog--wide");

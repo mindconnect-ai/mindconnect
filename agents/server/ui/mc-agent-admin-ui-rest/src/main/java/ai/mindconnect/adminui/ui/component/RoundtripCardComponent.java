@@ -2,13 +2,12 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiSection;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
@@ -38,10 +37,10 @@ public final class RoundtripCardComponent implements UiComponent {
     private static final int TOOL_RESULT_MAX_CHARS = 5_000;
 
     private final LlmCallTrace trace;
-    private final Map<String, Message> resultsByCallId;
+    private final Map<String, ManagedMessage> resultsByCallId;
     private final ObjectMapper json;
 
-    public RoundtripCardComponent(LlmCallTrace trace, Map<String, Message> resultsByCallId, ObjectMapper json) {
+    public RoundtripCardComponent(LlmCallTrace trace, Map<String, ManagedMessage> resultsByCallId, ObjectMapper json) {
         this.trace = trace;
         this.resultsByCallId = resultsByCallId;
         this.json = json;
@@ -108,20 +107,18 @@ public final class RoundtripCardComponent implements UiComponent {
     }
 
     /**
-     * Indexes persisted TOOL_RESULT messages by their {@code toolCallId}
-     * so the response tab can show each tool call together with its own
+     * Indexes a session's tool results by the call they answer
+     * ({@code callId} in their metadata) so the response tab can show each tool call together with its own
      * result block.
      */
-    public static Map<String, Message> indexToolResults(List<Message> history, ObjectMapper json) {
-        Map<String, Message> out = new HashMap<>();
+    public static Map<String, ManagedMessage> indexToolResults(List<ManagedMessage> history) {
+        Map<String, ManagedMessage> out = new HashMap<>();
         if (history == null) return out;
-        for (Message m : history) {
-            if (m.type() != MessageType.TOOL_RESULT) continue;
-            try {
-                JsonNode node = json.readTree(m.content());
-                String id = node.path("toolCallId").asText("");
-                if (!id.isBlank()) out.put(id, m);
-            } catch (Exception ignored) { /* skip malformed entries */ }
+        for (ManagedMessage m : history) {
+            if (m.message().type() == TurnMessage.Type.TOOL_RESULT
+                    && m.message().metadata().get("callId") instanceof String id && !id.isBlank()) {
+                out.put(id, m);
+            }
         }
         return out;
     }
@@ -185,20 +182,14 @@ public final class RoundtripCardComponent implements UiComponent {
      * a marker so the dialog stays scrollable. Collapsed by default —
      * operators scanning a call don't need every result body open at once.
      */
-    private void appendToolResult(UiSection stack, String tcId, Message resultMsg) {
+    private void appendToolResult(UiSection stack, String tcId, ManagedMessage resultMsg) {
         if (resultMsg == null) {
             stack.section(tcId + "-result-missing", null,
                     UiMarkdown.of(tcId + "-result-missing-md",
                             "_(no recorded tool result for this call)_"));
             return;
         }
-        String resultText;
-        try {
-            JsonNode node = json.readTree(resultMsg.content());
-            resultText = node.path("result").asText("");
-        } catch (Exception e) {
-            resultText = resultMsg.content() != null ? resultMsg.content() : "";
-        }
+        String resultText = resultMsg.message().text();
         boolean trimmed = resultText.length() > TOOL_RESULT_MAX_CHARS;
         int originalLength = resultText.length();
         if (trimmed) {
@@ -206,7 +197,7 @@ public final class RoundtripCardComponent implements UiComponent {
                     + "\n\n[trimmed " + (originalLength - TOOL_RESULT_MAX_CHARS) + " chars]";
         }
 
-        Long durationMs = resultMsg.durationMs();
+        Long durationMs = resultMsg.durationMillis();
         String summary = "Tool result"
                 + (durationMs != null ? " · " + durationMs + "ms" : "")
                 + (trimmed ? " · " + originalLength + " chars total" : "");

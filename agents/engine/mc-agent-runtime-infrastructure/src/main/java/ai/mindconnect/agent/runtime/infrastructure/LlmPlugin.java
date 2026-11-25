@@ -38,7 +38,6 @@ import ai.mindconnect.llm.service.RoutingLlmTranscriptionService;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
-import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import okhttp3.OkHttpClient;
 
@@ -109,8 +108,7 @@ public final class LlmPlugin implements Plugin {
                 registry.get(LlmConfigRepository.class), registry.get(TranscriptionGateway.class)));
 
         registry.provide(LlmCallTraceListener.class, () -> new RepositoryLlmCallTraceListener(
-                registry.get(LlmCallTraceRepository.class), registry.supplier(TurnService.class),
-                registry.supplier(SessionStore.class)));
+                registry.get(LlmCallTraceRepository.class), registry.supplier(TurnService.class)));
         // Resolved: an alias carries neither a context window nor what the model reads.
         registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(registry.get(LlmChat.class),
                 registry.get(JsonMapperFactory.class).create(), registry.get(LlmCallTraceListener.class),

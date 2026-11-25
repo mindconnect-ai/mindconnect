@@ -5,8 +5,6 @@ import java.util.function.Supplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
-import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.trace.domain.TraceContext;
 import ai.mindconnect.agent.runtime.llm.LlmCallTraceListener;
@@ -24,22 +22,18 @@ final class RepositoryLlmCallTraceListener implements LlmCallTraceListener {
 
     private final LlmCallTraceRepository traces;
     private final Supplier<TurnService> turns;
-    private final Supplier<SessionStore> sessions;
 
-    RepositoryLlmCallTraceListener(LlmCallTraceRepository traces, Supplier<TurnService> turns,
-                                   Supplier<SessionStore> sessions) {
+    RepositoryLlmCallTraceListener(LlmCallTraceRepository traces, Supplier<TurnService> turns) {
         this.traces = traces;
         this.turns = turns;
-        this.sessions = sessions;
     }
 
     @Override
     public void onCall(TurnId turnId, LlmCallEvent event) {
         turns.get().find(turnId).ifPresent(turn -> traces.save(LlmCallTrace.of(
                 new TraceContext(
-                        // Filed under the conversation the session's messages are in: where the traces page looks.
-                        sessions.get().find(turn.sessionId()).map(RepositorySessionStore::conversationOf)
-                                .orElseGet(() -> ConversationId.of(turn.sessionId().value())),
+                        // Filed under the session's id: where the traces page looks.
+                        ConversationId.of(turn.sessionId().value()),
                         turn.sessionId(),
                         ChatTurnId.of(turnId.value()),
                         null, 0, turn.agent().name()),
