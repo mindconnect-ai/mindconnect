@@ -407,6 +407,7 @@ AgentDefinition --> "*" ToolBinding : tools
 ' only-rel SessionEvent ..> TurnId
 ' @layout:end
 ' @layout:begin
-' viewport x=2656 y=855 zoom=0.61
+' with "Method dependencies"
+' viewport x=2373 y=1340 zoom=0.97
 ' @layout:end
 @enduml

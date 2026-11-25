@@ -1,0 +1,675 @@
+@startuml
+package tool {
+  interface ConnectionTester {
+    +test(connection: ToolConnection): ConnectionTest
+  }
+  class AgentToolId {
+    -value: String
+    {static} +of(value: String): AgentToolId
+    {static} +random(): AgentToolId
+    +toString(): String
+  }
+  interface ToolEnvironment {
+    +get(type: Class<T>): Optional<T>
+    +getString(key: String): Optional<String>
+    +require(type: Class<T>): T
+    +requireString(key: String): String
+  }
+  class ToolRegistryRef {
+    -registry: ToolRegistry
+    +set(registry: ToolRegistry): void
+    +get(): ToolRegistry
+  }
+  interface Connections {
+    +of(userId: UserId, provider: String): List<ToolConnection>
+    +resolve(userId: UserId, provider: String, key: String): Optional<ToolConnection>
+    {static} +none(): Connections
+  }
+  class ConnectionTest {
+    -ok: boolean
+    -message: String
+    -account: String
+    +ConnectionTest(ok: boolean, message: String)
+    {static} +ok(message: String): ConnectionTest
+    {static} +ok(message: String, account: String): ConnectionTest
+    {static} +failed(message: String): ConnectionTest
+    +namedAccount(): Optional<String>
+  }
+  interface ToolAdvisor {
+    +around(inv: Invocation, chain: Chain): Result
+    +order(): int
+    +applies(inv: Invocation): boolean
+  }
+  class Invocation {
+    -toolName: String
+    -arguments: Map<String, Object>
+    -scope: ToolCallScope
+    -toolCallId: String
+    +withArguments(next: Map<String, Object>): Invocation
+  }
+  class Result {
+    -text: String
+    -failed: boolean
+    {static} +ok(text: String): Result
+    {static} +error(text: String): Result
+    +withText(next: String): Result
+    +append(extra: String): Result
+  }
+  interface Chain {
+    +proceed(inv: Invocation): Result
+  }
+  class PinnedParamsTool {
+    {static} +OVERRIDE_KEY: String
+    -delegate: Tool
+    -pinned: Map<String, Object>
+    -PinnedParamsTool(delegate: Tool, pinned: Map<String, Object>)
+    {static} +wrap(agentTool: AgentTool, delegate: Tool): Tool
+    +name(): String
+    +description(): String
+    +parametersSchema(): Map<String, Object>
+    +execute(arguments: Map<String, Object>): String
+    +streamsResultToUser(): boolean
+  }
+  class AliasTool {
+    {static} +OVERRIDE_KEY: String
+    -delegate: Tool
+    -name: String
+    -AliasTool(delegate: Tool, name: String)
+    {static} +registryName(agentTool: AgentTool): String
+    {static} +wrap(agentTool: AgentTool, delegate: Tool): Tool
+    +name(): String
+    +description(): String
+    +parametersSchema(): Map<String, Object>
+    +execute(arguments: Map<String, Object>): String
+    +streamsResultToUser(): boolean
+  }
+  interface Acquisition {
+    +label(): String
+  }
+  class OAuth {
+    -providerName: String
+    -scopes: List<String>
+    -label: String
+    {static} +of(providerName: String, scopes: String...): OAuth
+  }
+  class Form {
+    -schema: Schema
+    -label: String
+    {static} +of(schema: Schema): Form
+  }
+  class RequiredParamsTool {
+    {static} +OVERRIDE_KEY: String
+    -delegate: Tool
+    -required: Set<String>
+    -RequiredParamsTool(delegate: Tool, required: Set<String>)
+    {static} +wrap(agentTool: AgentTool, delegate: Tool): Tool
+    +name(): String
+    +description(): String
+    +parametersSchema(): Map<String, Object>
+    +execute(arguments: Map<String, Object>): String
+    +streamsResultToUser(): boolean
+  }
+  class MapToolEnvironment {
+    -services: Map<Class<?>, Object>
+    -strings: Map<String, String>
+    -MapToolEnvironment(services: Map<Class<?>, Object>, strings: Map<String, String>)
+    {static} +builder(): Builder
+    +get(type: Class<T>): Optional<T>
+    +getString(key: String): Optional<String>
+  }
+  class Builder {
+    -services: Map<Class<?>, Object>
+    -strings: Map<String, String>
+    +service(type: Class<T>, instance: T): Builder
+    +serviceIfPresent(type: Class<?>, instance: Object): Builder
+    +string(key: String, value: String): Builder
+    +build(): MapToolEnvironment
+  }
+  interface MultiToolProvider {
+    +toolNames(): Set<String>
+    +group(): String
+    +subgroup(toolName: String): String
+    +bind(env: ToolEnvironment): void
+    +isAvailable(): boolean
+    +releaseSession(sessionId: SessionId): void
+    +userVariables(): java.util.List<ToolVariable>
+    +connectionSpec(): ConnectionSpec
+    +connectionTester(): Optional<ConnectionTester>
+    +create(toolName: String, agentTool: AgentTool, scope: ToolCallScope): Optional<Tool>
+  }
+  class FileRoots {
+    -base: Path
+    -extra: List<Path>
+    -alias: Path
+    +FileRoots(base: Path, extra: List<Path>)
+    +withAlias(other: Path): FileRoots
+    {static} +of(base: Path): FileRoots
+    {static} +of(base: String, extra: List<String>): FileRoots
+    +resolve(raw: String): Optional<Path>
+    +contains(path: Path): boolean
+    +display(path: Path): String
+    +describe(): String
+    +outsideError(raw: String): String
+    {static} ~expandHome(s: String): String
+  }
+  class ConnectionParam {
+    -name: String
+    -provider: String
+    -required: boolean
+    {static} +account(provider: String): ConnectionParam
+    {static} +of(name: String, provider: String): ConnectionParam
+  }
+  interface Tool {
+    +name(): String
+    +description(): String
+    +parametersSchema(): Map<String, Object>
+    +execute(arguments: Map<String, Object>): String
+    +streamsResultToUser(): boolean
+  }
+  class ConnectionBoundTool {
+    -delegate: ConnectedTool
+    -spec: ConnectionSpec
+    -connections: Connections
+    -userId: UserId
+    -ConnectionBoundTool(delegate: ConnectedTool, spec: ConnectionSpec, connections: Connections, userId: UserId)
+    {static} +wrap(delegate: Tool, spec: ConnectionSpec, connections: Connections, scope: ToolCallScope): Tool
+    +name(): String
+    +description(): String
+    +streamsResultToUser(): boolean
+    +parametersSchema(): Map<String, Object>
+    +execute(arguments: Map<String, Object>): String
+    -available(param: ConnectionParam): List<ToolConnection>
+    -offer(param: ConnectionParam, available: List<ToolConnection>): boolean
+    -property(param: ConnectionParam, available: List<ToolConnection>): Map<String, Object>
+    -missing(param: ConnectionParam, key: String): String
+    {static} -withProperties(schema: Map<String, Object>, offered: Map<String, Map<String, Object>>, required: List<String>): Map<String, Object>
+  }
+  class ConfiguredToolRegistry {
+    -delegate: ToolRegistry
+    -disabled: Set<String>
+    -ConfiguredToolRegistry(delegate: ToolRegistry, disabled: Set<String>)
+    {static} +of(delegate: ToolRegistry, disabledNames: String): ToolRegistry
+    {static} ~parse(disabledNames: String): Set<String>
+    +disabled(): Set<String>
+    +resolve(agentTool: AgentTool, scope: ToolCallScope): Optional<Tool>
+    +knownToolNames(): Set<String>
+    +toolNamesByGroup(): Map<String, Set<String>>
+    +declaredVariables(): java.util.List<ToolVariable>
+    +connectionSpecs(): java.util.List<ConnectionSpec>
+    +connectionSpecOf(toolName: String): java.util.Optional<ConnectionSpec>
+    +connectionTesterOf(provider: String): java.util.Optional<ConnectionTester>
+    +overridesSchema(toolName: String): Map<String, Object>
+    +subgroupOf(toolName: String): String
+    +releaseSession(sessionId: ai.mindconnect.agent.SessionId): void
+    +source(): ToolRegistry
+  }
+  class ToolCallScope {
+    -userId: UserId
+    -sessionId: SessionId
+    -agentId: AgentId
+    -rootSessionId: SessionId
+    -workingDir: String
+    -additionalDirs: List<String>
+    {static} -CURRENT: InheritableThreadLocal<ToolCallScope>
+    +ToolCallScope(userId: UserId, sessionId: SessionId, agentId: AgentId)
+    +ToolCallScope(userId: UserId, sessionId: SessionId, agentId: AgentId, rootSessionId: SessionId)
+    +ToolCallScope(userId: UserId, sessionId: SessionId, agentId: AgentId, workingDir: String, additionalDirs: List<String>)
+    {static} +detached(userId: UserId): ToolCallScope
+    {static} +ofSession(userId: UserId, sessionId: SessionId, workingDir: String): ToolCallScope
+    {static} +ofSession(userId: UserId, sessionId: SessionId, workingDir: String, additionalDirs: List<String>): ToolCallScope
+    +forAgent(agentId: AgentId): ToolCallScope
+    +inSession(): boolean
+    {static} +current(): Optional<ToolCallScope>
+    +runWith(body: Supplier<T>): T
+    +hasWorkingDir(): boolean
+    +fileRoots(fallbackBase: String): FileRoots
+  }
+  class ConnectionSpec {
+    -provider: String
+    -title: String
+    -description: String
+    -icon: String
+    -acquisitions: List<Acquisition>
+    -params: List<ConnectionParam>
+    -multiple: boolean
+    {static} +form(provider: String, title: String, schema: ai.mindconnect.schema.Schema): ConnectionSpec
+    +allowingSeveral(): ConnectionSpec
+    +description(text: String): ConnectionSpec
+    +icon(name: String): ConnectionSpec
+    +acquire(acquisition: Acquisition): ConnectionSpec
+    +params(connectionParams: ConnectionParam...): ConnectionSpec
+    +form(): java.util.Optional<Acquisition.Form>
+    +choosePerCall(): boolean
+  }
+  interface TimeZones {
+    +zoneOf(user: UserId): ZoneId
+    {static} +fixed(zone: ZoneId): TimeZones
+    {static} +system(): TimeZones
+    {static} +of(env: ToolEnvironment): TimeZones
+    {static} +parse(id: String): Optional<ZoneId>
+  }
+  class ToolVariable {
+    -name: String
+    -title: String
+    -description: String
+    -required: boolean
+    -secret: boolean
+    -defaultValue: String
+    -declaredBy: String
+    {static} +required(name: String, title: String, description: String): ToolVariable
+    {static} +secret(name: String, title: String, description: String): ToolVariable
+    {static} +optionalSecret(name: String, title: String, description: String): ToolVariable
+    {static} +withDefault(name: String, title: String, description: String, defaultValue: String): ToolVariable
+    {static} +optional(name: String, title: String, description: String): ToolVariable
+    +declaredBy(source: String): ToolVariable
+    +hasDefault(): boolean
+  }
+  interface ToolConnection {
+    +key(): String
+    +label(): String
+    +provider(): String
+    +value(field: String): String
+    +usable(): boolean
+  }
+  class AgentTool {
+    -id: AgentToolId
+    -name: String
+    -description: String
+    -overrides: Map<String, Object>
+    -enabled: boolean
+    -deferred: boolean
+    -needsApproval: boolean
+    -maxResultChars: Integer
+    +AgentTool(id: AgentToolId, name: String, description: String, overrides: Map<String, Object>)
+    {static} +of(name: String): AgentTool
+    {static} +of(name: String, description: String): AgentTool
+    {static} +of(name: String, description: String, overrides: Map<String, Object>): AgentTool
+    +toJson(): Json
+    {static} +fromJson(tools: List<Json>): List<AgentTool>
+    {static} +toJson(tools: List<AgentTool>): List<Json>
+  }
+  class Json {
+    -id: String
+    -name: String
+    -description: String
+    -overrides: Map<String, Object>
+    -enabled: Boolean
+    -deferred: Boolean
+    -needsApproval: Boolean
+    -maxResultChars: Integer
+    +toTool(): AgentTool
+  }
+  interface ToolFactory {
+    +name(): String
+    +group(): String
+    +bind(env: ToolEnvironment): void
+    +isAvailable(): boolean
+    +overridesSchema(): java.util.Map<String, Object>
+    +userVariables(): java.util.List<ToolVariable>
+    +connectionSpec(): ConnectionSpec
+    +connectionTester(): java.util.Optional<ConnectionTester>
+    +create(agentTool: AgentTool, scope: ToolCallScope): Tool
+  }
+  interface ConnectedTool {
+    +execute(arguments: Map<String, Object>, connections: BoundConnections): String
+    +execute(arguments: Map<String, Object>): String
+  }
+  interface ToolRepository {
+    +settings(toolName: String): ToolSettings
+    +all(): Map<String, ToolSettings>
+    +save(toolName: String, settings: ToolSettings): void
+    +delete(toolName: String): void
+    +version(): long
+  }
+  class BoundConnections {
+    -byParam: Map<String, ToolConnection>
+    {static} +of(param: String, connection: ToolConnection): BoundConnections
+    +get(param: String): ToolConnection
+    +one(): ToolConnection
+    +isEmpty(): boolean
+  }
+  interface ToolRegistry {
+    +resolve(agentTool: AgentTool, scope: ToolCallScope): Optional<Tool>
+    +resolveAll(agentTools: List<AgentTool>, scope: ToolCallScope): List<Tool>
+    +knownToolNames(): Set<String>
+    +toolNamesByGroup(): Map<String, Set<String>>
+    +overridesSchema(toolName: String): Map<String, Object>
+    +subgroupOf(toolName: String): String
+    +declaredVariables(): List<ToolVariable>
+    +connectionSpecs(): List<ConnectionSpec>
+    +connectionSpecOf(toolName: String): Optional<ConnectionSpec>
+    +connectionTesterOf(provider: String): Optional<ConnectionTester>
+    +releaseSession(sessionId: SessionId): void
+    +source(): ToolRegistry
+  }
+  class OverlayToolRegistry {
+    -delegate: ToolRegistry
+    -repository: ToolRepository
+    -snapshot: Snapshot
+    +OverlayToolRegistry(delegate: ToolRegistry, repository: ToolRepository)
+    +resolve(agentTool: AgentTool, scope: ToolCallScope): Optional<Tool>
+    {static} -agentSpeaksForItself(agentTool: AgentTool): boolean
+    +knownToolNames(): Set<String>
+    +toolNamesByGroup(): Map<String, Set<String>>
+    +declaredVariables(): java.util.List<ToolVariable>
+    +connectionSpecs(): java.util.List<ConnectionSpec>
+    +connectionSpecOf(toolName: String): java.util.Optional<ConnectionSpec>
+    +connectionTesterOf(provider: String): java.util.Optional<ConnectionTester>
+    +overridesSchema(toolName: String): Map<String, Object>
+    +subgroupOf(toolName: String): String
+    +releaseSession(sessionId: SessionId): void
+    +source(): ToolRegistry
+    +settingsFor(toolName: String): ToolSettings
+    -filtered(names: Set<String>): Set<String>
+    -overlay(): Map<String, ToolSettings>
+  }
+  class Snapshot {
+    -version: long
+    -settings: Map<String, ToolSettings>
+  }
+  class SpiToolRegistry {
+    {static} -log: Logger
+    {static} -RETRY_DELAYS: long[]
+    {static} -FIRST_ROUND_GRACE_MS: long
+    -factoriesByName: Map<String, ToolFactory>
+    -providers: List<MultiToolProvider>
+    -warmUpThreads: List<Thread>
+    -retryDelays: long[]
+    -environment: ToolEnvironment
+    -warmedUp: java.util.concurrent.atomic.AtomicBoolean
+    -firstRound: java.util.concurrent.CountDownLatch
+    +SpiToolRegistry(environment: ToolEnvironment)
+    +SpiToolRegistry(environment: ToolEnvironment, classLoader: ClassLoader)
+    {static} +deferred(environment: ToolEnvironment): SpiToolRegistry
+    ~SpiToolRegistry(environment: ToolEnvironment, classLoader: ClassLoader, retryDelays: long[])
+    -SpiToolRegistry(environment: ToolEnvironment, classLoader: ClassLoader, retryDelays: long[], warmUpNow: boolean)
+    +warmUp(): void
+    -startWarmUp(): void
+    -awaitFirstRound(): void
+    -bindWithRetries(provider: MultiToolProvider, environment: ToolEnvironment): void
+    +close(): void
+    +knownToolNames(): Set<String>
+    +connectionSpecs(): List<ConnectionSpec>
+    +connectionSpecOf(toolName: String): Optional<ConnectionSpec>
+    +connectionTesterOf(provider: String): Optional<ConnectionTester>
+    -bindConnection(spec: ConnectionSpec, tool: Tool, scope: ToolCallScope): Tool
+    +declaredVariables(): List<ToolVariable>
+    {static} -collect(byName: Map<String, ToolVariable>, declared: List<ToolVariable>, source: String): void
+    +toolNamesByGroup(): Map<String, Set<String>>
+    -ready(): List<MultiToolProvider>
+    {static} -groupOrDefault(group: String): String
+    +overridesSchema(toolName: String): Map<String, Object>
+    +subgroupOf(toolName: String): String
+    +releaseSession(sessionId: SessionId): void
+    +resolve(agentTool: AgentTool, scope: ToolCallScope): Optional<Tool>
+    {static} ~decorate(agentTool: AgentTool, tool: Tool): Tool
+  }
+  interface UserToolRoster {
+    +apply(userId: UserId, agentId: AgentId, agentRefs: List<AgentTool>): List<AgentTool>
+    {static} +none(): UserToolRoster
+  }
+  class DescribedTool {
+    -delegate: Tool
+    -description: String
+    -parameterDescriptions: Map<String, String>
+    -DescribedTool(delegate: Tool, description: String, parameterDescriptions: Map<String, String>)
+    {static} +wrap(delegate: Tool, settings: ToolSettings): Tool
+    {static} +withDescription(delegate: Tool, description: String): Tool
+    +name(): String
+    +description(): String
+    +parametersSchema(): Map<String, Object>
+    +execute(arguments: Map<String, Object>): String
+    +streamsResultToUser(): boolean
+  }
+  class ToolBundles {
+    -bundles: List<Bundle>
+    -ToolBundles(bundles: List<Bundle>)
+    {static} +of(registry: ToolRegistry, offered: Predicate<String>): ToolBundles
+    {static} +none(): ToolBundles
+    +all(): List<Bundle>
+    +isEmpty(): boolean
+    +expand(keys: List<String>): List<String>
+    {static} +isSet(key: String): boolean
+    +find(key: String): Optional<Bundle>
+    +label(key: String): String
+    {static} ~displayGroup(group: String): String
+    {static} -count(n: int): String
+  }
+  class Bundle {
+    -key: String
+    -label: String
+    -tools: List<String>
+    +single(): boolean
+  }
+  class ToolSettings {
+    -enabled: Boolean
+    -description: String
+    -parameterDescriptions: Map<String, String>
+    {static} +none(): ToolSettings
+    +isEmpty(): boolean
+    +withoutDescription(): ToolSettings
+    +enabledOrDefault(): boolean
+  }
+  package workspace {
+    interface WorkspaceFiles {
+      +roots(): FileRoots
+      +identity(): String
+      +stat(path: Path): Optional<WorkspaceEntry>
+      +list(directory: Path): List<WorkspaceEntry>
+      +walk(start: Path, excludedDirectoryNames: java.util.Set<String>, walker: WorkspaceWalker): void
+      +readAllBytes(file: Path): byte[]
+      +readHead(file: Path, maxBytes: int): byte[]
+      +write(file: Path, content: byte[]): void
+      +delete(path: Path): void
+      +localFile(file: Path): LocalFile
+      +exists(path: Path): boolean
+      +isDirectory(path: Path): boolean
+      +isRegularFile(path: Path): boolean
+      +lastModifiedMillis(path: Path): long
+      {static} +local(roots: FileRoots): WorkspaceFiles
+    }
+    interface LocalFile {
+      +path(): Path
+      +close(): void
+    }
+    interface WorkspaceProvider {
+      +files(scope: ToolCallScope, tool: AgentTool, localRoots: FileRoots): WorkspaceFiles
+      +commands(scope: ToolCallScope, tool: AgentTool): Optional<CommandRunner>
+      {static} +localOrProvided(provider: Optional<WorkspaceProvider>, scope: ToolCallScope, tool: AgentTool, localRoots: FileRoots): WorkspaceFiles
+    }
+    class LocalWorkspaceFiles {
+      -roots: FileRoots
+      +LocalWorkspaceFiles(roots: FileRoots)
+      +roots(): FileRoots
+      +stat(path: Path): Optional<WorkspaceEntry>
+      +list(directory: Path): List<WorkspaceEntry>
+      +walk(start: Path, excludedDirectoryNames: Set<String>, walker: WorkspaceWalker): void
+      +readAllBytes(file: Path): byte[]
+      +readHead(file: Path, maxBytes: int): byte[]
+      +write(file: Path, content: byte[]): void
+      +delete(path: Path): void
+      +localFile(file: Path): LocalFile
+      {static} -entry(path: Path, attrs: BasicFileAttributes): WorkspaceEntry
+      {static} -result(step: WorkspaceWalker.Step): FileVisitResult
+    }
+    interface CommandRunner {
+      +workingDirectory(): String
+      +run(command: String, stdin: String, env: Map<String, String>, timeout: Duration): Result
+    }
+    class Result2 {
+      -exitCode: int
+      -output: String
+      -truncated: boolean
+      -timedOut: boolean
+      -durationMs: long
+    }
+    class CommandException {
+      +CommandException(message: String)
+      +CommandException(message: String, cause: Throwable)
+    }
+    class WorkspaceEntry {
+      -path: Path
+      -directory: boolean
+      -regularFile: boolean
+      -size: long
+      -lastModifiedMillis: long
+      +name(): String
+    }
+    interface WorkspaceWalker {
+      +directory(directory: WorkspaceEntry): Step
+      +file(file: WorkspaceEntry): Step
+    }
+    enum Step {
+      CONTINUE
+      SKIP_SUBTREE
+      TERMINATE
+    }
+  }
+}
+
+Tool <|.. PinnedParamsTool
+Tool <|.. AliasTool
+Acquisition <|.. OAuth
+Acquisition <|.. Form
+Tool <|.. RequiredParamsTool
+ToolEnvironment <|.. MapToolEnvironment
+Tool <|.. ConnectionBoundTool
+ToolRegistry <|.. ConfiguredToolRegistry
+WorkspaceFiles <|.. LocalWorkspaceFiles
+Tool <|-- ConnectedTool
+ToolRegistry <|.. OverlayToolRegistry
+ToolRegistry <|.. SpiToolRegistry
+Tool <|.. DescribedTool
+ConnectionTester ..> ConnectionTest
+ToolRegistryRef --> ToolRegistry : registry
+Connections ..> ToolConnection
+ToolAdvisor ..> Result2
+Invocation --> ToolCallScope : scope
+Result ..> Result2
+Chain ..> Result2
+PinnedParamsTool --> Tool : delegate
+AliasTool --> Tool : delegate
+RequiredParamsTool --> Tool : delegate
+MapToolEnvironment ..> Builder
+Builder ..> MapToolEnvironment
+MultiToolProvider ..> ToolVariable
+MultiToolProvider ..> ConnectionSpec
+MultiToolProvider ..> ConnectionTester
+MultiToolProvider ..> Tool
+ConnectionBoundTool --> ConnectedTool : delegate
+ConnectionBoundTool --> ConnectionSpec : spec
+ConnectionBoundTool --> Connections : connections
+ConnectionBoundTool ..> Tool
+ConnectionBoundTool ..> ToolConnection
+ConfiguredToolRegistry --> ToolRegistry : delegate
+ConfiguredToolRegistry ..> Tool
+ConfiguredToolRegistry ..> ToolVariable
+ConfiguredToolRegistry ..> ConnectionSpec
+ConfiguredToolRegistry ..> ConnectionTester
+ToolCallScope --> ToolCallScope : CURRENT
+ToolCallScope ..> FileRoots
+ConnectionSpec --> "*" Acquisition : acquisitions
+ConnectionSpec --> "*" ConnectionParam : params
+ConnectionSpec ..> Form
+WorkspaceFiles ..> FileRoots
+WorkspaceFiles ..> WorkspaceEntry
+WorkspaceFiles ..> LocalFile
+WorkspaceProvider ..> WorkspaceFiles
+WorkspaceProvider ..> CommandRunner
+LocalWorkspaceFiles --> FileRoots : roots
+LocalWorkspaceFiles ..> WorkspaceEntry
+LocalWorkspaceFiles ..> LocalFile
+CommandRunner ..> Result2
+WorkspaceWalker ..> Step
+AgentTool --> AgentToolId : id
+AgentTool ..> Json
+Json ..> AgentTool
+ToolFactory ..> ToolVariable
+ToolFactory ..> ConnectionSpec
+ToolFactory ..> ConnectionTester
+ToolFactory ..> Tool
+ToolRepository ..> ToolSettings
+BoundConnections --> "*" ToolConnection : byParam
+ToolRegistry ..> Tool
+ToolRegistry ..> ToolVariable
+ToolRegistry ..> ConnectionSpec
+ToolRegistry ..> ConnectionTester
+OverlayToolRegistry --> ToolRegistry : delegate
+OverlayToolRegistry --> ToolRepository : repository
+OverlayToolRegistry --> Snapshot : snapshot
+OverlayToolRegistry ..> Tool
+OverlayToolRegistry ..> ToolVariable
+OverlayToolRegistry ..> ConnectionSpec
+OverlayToolRegistry ..> ConnectionTester
+OverlayToolRegistry ..> ToolSettings
+Snapshot --> "*" ToolSettings : settings
+SpiToolRegistry --> "*" ToolFactory : factoriesByName
+SpiToolRegistry --> "*" MultiToolProvider : providers
+SpiToolRegistry --> ToolEnvironment : environment
+SpiToolRegistry ..> ConnectionSpec
+SpiToolRegistry ..> ConnectionTester
+SpiToolRegistry ..> Tool
+SpiToolRegistry ..> ToolVariable
+UserToolRoster ..> AgentTool
+DescribedTool --> Tool : delegate
+ToolBundles --> "*" Bundle : bundles
+' @code:begin
+' ConnectionTester mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ConnectionTester.java#ConnectionTester
+' AgentToolId mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/AgentToolId.java#AgentToolId
+' ToolEnvironment mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolEnvironment.java#ToolEnvironment
+' ToolRegistryRef mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolRegistryRef.java#ToolRegistryRef
+' Connections mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/Connections.java#Connections
+' ConnectionTest mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ConnectionTest.java#ConnectionTest
+' ToolAdvisor mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolAdvisor.java#ToolAdvisor
+' Invocation mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolAdvisor.java#Invocation
+' Result mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolAdvisor.java#Result
+' Chain mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolAdvisor.java#Chain
+' PinnedParamsTool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/PinnedParamsTool.java#PinnedParamsTool
+' AliasTool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/AliasTool.java#AliasTool
+' Acquisition mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/Acquisition.java#Acquisition
+' OAuth mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/Acquisition.java#OAuth
+' Form mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/Acquisition.java#Form
+' RequiredParamsTool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/RequiredParamsTool.java#RequiredParamsTool
+' MapToolEnvironment mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/MapToolEnvironment.java#MapToolEnvironment
+' Builder mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/MapToolEnvironment.java#Builder
+' MultiToolProvider mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/MultiToolProvider.java#MultiToolProvider
+' FileRoots mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/FileRoots.java#FileRoots
+' ConnectionParam mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ConnectionParam.java#ConnectionParam
+' Tool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/Tool.java#Tool
+' ConnectionBoundTool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ConnectionBoundTool.java#ConnectionBoundTool
+' ConfiguredToolRegistry mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ConfiguredToolRegistry.java#ConfiguredToolRegistry
+' ToolCallScope mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolCallScope.java#ToolCallScope
+' ConnectionSpec mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ConnectionSpec.java#ConnectionSpec
+' TimeZones mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/TimeZones.java#TimeZones
+' ToolVariable mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolVariable.java#ToolVariable
+' WorkspaceFiles mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/WorkspaceFiles.java#WorkspaceFiles
+' LocalFile mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/WorkspaceFiles.java#LocalFile
+' WorkspaceProvider mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/WorkspaceProvider.java#WorkspaceProvider
+' LocalWorkspaceFiles mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/LocalWorkspaceFiles.java#LocalWorkspaceFiles
+' CommandRunner mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/CommandRunner.java#CommandRunner
+' Result2 mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/CommandRunner.java#Result
+' CommandException mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/CommandRunner.java#CommandException
+' WorkspaceEntry mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/WorkspaceEntry.java#WorkspaceEntry
+' WorkspaceWalker mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/WorkspaceWalker.java#WorkspaceWalker
+' Step mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/workspace/WorkspaceWalker.java#Step
+' ToolConnection mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolConnection.java#ToolConnection
+' AgentTool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/AgentTool.java#AgentTool
+' Json mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/AgentTool.java#Json
+' ToolFactory mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolFactory.java#ToolFactory
+' ConnectedTool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ConnectedTool.java#ConnectedTool
+' ToolRepository mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolRepository.java#ToolRepository
+' BoundConnections mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/BoundConnections.java#BoundConnections
+' ToolRegistry mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolRegistry.java#ToolRegistry
+' OverlayToolRegistry mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/OverlayToolRegistry.java#OverlayToolRegistry
+' Snapshot mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/OverlayToolRegistry.java#Snapshot
+' SpiToolRegistry mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/SpiToolRegistry.java#SpiToolRegistry
+' UserToolRoster mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/UserToolRoster.java#UserToolRoster
+' DescribedTool mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/DescribedTool.java#DescribedTool
+' ToolBundles mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolBundles.java#ToolBundles
+' Bundle mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolBundles.java#Bundle
+' ToolSettings mindconnect/agents/core/mc-agent-tool-spi/src/main/java/ai/mindconnect/agent/tool/ToolSettings.java#ToolSettings
+' @code:end
+' @layout:begin
+' viewport x=1267 y=3156 zoom=0.2
+' @layout:end
+@enduml
