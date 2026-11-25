@@ -270,6 +270,12 @@ public final class RepositorySessionManagement implements SessionManagement {
         store.deleteMessages(sessionId, sequence, Long.MAX_VALUE);
     }
 
+    @Override
+    public int deleteMessages(SessionId sessionId, int from, int to) {
+        existing(sessionId);
+        return store.deleteMessages(sessionId, from, to);
+    }
+
     private ManagedSession changed(SessionId sessionId, UnaryOperator<Session> change) {
         return sessions.update(sessionId, change).map(this::managed)
                 .orElseThrow(() -> missing(sessionId));

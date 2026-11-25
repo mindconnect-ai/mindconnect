@@ -15,11 +15,8 @@ import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agentrest.dto.SessionMessageResponse;
 import ai.mindconnect.agentrest.dto.SessionResponse;
-import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.agentrest.dto.ToolApproval;
 import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.auth.SessionAccess;
@@ -34,7 +31,6 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
-import ai.mindconnect.message.domain.Message;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
@@ -68,13 +64,10 @@ public class AgentApiController {
     private static final Logger log = LoggerFactory.getLogger(AgentApiController.class);
 
     private static final int DEFAULT_MAX_ROUNDS = 10;
-    private static final PageRequest EVERYTHING = new PageRequest(0, Integer.MAX_VALUE);
 
     /** How long a finished turn's stream waits for its Done frame before it closes anyway. */
 
     private final WorkingDirPolicy workingDirPolicy;
-    /** The messages as they are stored: the history endpoint answers with them as they are. */
-    private final MessageRepository messages;
     private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns;
     private final ai.mindconnect.agentrest.service.TurnFrameStream frameStream;
     private final ai.mindconnect.agent.management.api.SessionManagement management;
@@ -88,7 +81,6 @@ public class AgentApiController {
     private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
 
     public AgentApiController(WorkingDirPolicy workingDirPolicy,
-                            MessageRepository messages,
                             ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
                             ai.mindconnect.agentrest.service.TurnFrameStream frameStream,
                             ai.mindconnect.agent.sdk.AgentRuntime runtime,
@@ -104,7 +96,6 @@ public class AgentApiController {
         this.dirBrowser = dirBrowser != null ? dirBrowser
                 : new ai.mindconnect.agent.management.directory.WorkingDirBrowser(workingDirPolicy);
         this.workingDirPolicy = workingDirPolicy;
-        this.messages = messages;
         this.sessionTurns = sessionTurns;
         this.frameStream = frameStream;
         this.management = runtime.service(ai.mindconnect.agent.management.api.SessionManagement.class);
@@ -595,10 +586,11 @@ public class AgentApiController {
 
     @Operation(tags = "Sessions", summary = "Load the session's message history")
     @GetMapping("/sessions/{sessionId}/history")
-    public List<Message> loadHistory(@PathVariable String sessionId, @CurrentUser UserId caller) {
+    public List<SessionMessageResponse> loadHistory(@PathVariable String sessionId, @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         log.info("GET /api/sessions/{}/history", sessionId);
-        List<Message> history = messages.findByConversation(conversationOf(id), EVERYTHING);
+        List<SessionMessageResponse> history = management.messages(id).stream()
+                .map(SessionMessageResponse::of).toList();
         log.info("Returning {} message(s) for session {}", history.size(), sessionId);
         return history;
     }
@@ -623,10 +615,7 @@ public class AgentApiController {
         SessionId id = owned(sessionId, caller);
         log.info("DELETE /api/sessions/{}/messages fromSeq={} toSeq={}", sessionId, fromSeq, toSeq);
         if (fromSeq > toSeq) throw new IllegalArgumentException("fromSeq must be <= toSeq");
-        ConversationId conversation = conversationOf(id);
-        int deleted = (int) messages.findByConversation(conversation, EVERYTHING).stream()
-                .filter(message -> message.sequenceNum() >= fromSeq && message.sequenceNum() <= toSeq).count();
-        messages.deleteBySequenceRange(conversation, fromSeq, toSeq);
+        int deleted = management.deleteMessages(id, fromSeq, toSeq);
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "deletedMessages", deleted));
@@ -717,12 +706,6 @@ public class AgentApiController {
      * The session's id, once it is known to be the caller's — a 404 for the
      * request otherwise, whether the session is someone else's or missing.
      */
-    /** The conversation the session's messages are kept in. */
-    private ConversationId conversationOf(SessionId sessionId) {
-        return runtime.sessions().find(sessionId).map(RepositorySessionStore::conversationOf)
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        org.springframework.http.HttpStatus.NOT_FOUND, "No such session"));
-    }
 
     /** What the session's turn waits for, as the approval cards a client draws. */
     private List<ToolApproval> openApprovals(SessionId sessionId) {

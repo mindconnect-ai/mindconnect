@@ -49,6 +49,31 @@ the request. In Swagger UI, **Authorize** takes the token. See
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
 
+The history is a list of the session's messages, oldest first, each with its
+place in the session and the message as the turn wrote it:
+
+```json
+[
+  {
+    "id": "f4e1…", "sequence": 2, "sentAt": "2026-11-25T10:49:00.031Z",
+    "message": {
+      "id": "f4e1…", "turnId": "t1", "type": "TOOL_CALL",
+      "content": [],
+      "toolCalls": [ { "callId": "call_1", "name": "get_current_datetime", "arguments": {} } ],
+      "metadata": { "callIds": ["call_1"] }
+    },
+    "durationMillis": null, "tokens": null
+  }
+]
+```
+
+`type` is `USER`, `ASSISTANT`, `TOOL_CALL`, `TOOL_DISPATCHED` or `TOOL_RESULT`. A
+content part names its kind: `{"kind": "text", "text": "…"}`, or
+`{"kind": "image", "source": {…}, "detail": "AUTO"}`. A tool result carries its
+text in `content` and `callId`, `toolName` and `failed` in `metadata`.
+`sequence` is what `DELETE /api/sessions/{id}/messages?fromSeq=&toSeq=` removes
+by.
+
 An agent is answered, and read from a file, in one shape — the agent as it is
 stored:
 

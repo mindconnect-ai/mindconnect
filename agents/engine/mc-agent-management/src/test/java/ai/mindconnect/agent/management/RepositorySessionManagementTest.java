@@ -285,6 +285,18 @@ class RepositorySessionManagementTest {
     }
 
     @Test
+    void a_range_of_messages_is_deleted_by_their_places_and_counted() {
+        SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
+        runtime.append(id, List.of(TurnMessage.assistant("one"), TurnMessage.assistant("two"),
+                TurnMessage.assistant("three")));
+        int second = management.messages(id).get(1).sequence();
+
+        assertThat(management.deleteMessages(id, second, second)).isEqualTo(1);
+
+        assertThat(runtime.messages(id)).extracting(TurnMessage::text).containsExactly("one", "three");
+    }
+
+    @Test
     void deleting_a_session_takes_what_was_said_in_it_and_the_sessions_under_it() {
         SessionId top = open("top", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
         SessionId child = open("child", "ada", "top", "2026-11-02T00:00:00Z", Map.of()).id();

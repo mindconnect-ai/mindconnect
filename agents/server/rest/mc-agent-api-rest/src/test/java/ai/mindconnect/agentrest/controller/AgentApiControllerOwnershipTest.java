@@ -65,8 +65,6 @@ class AgentApiControllerOwnershipTest {
                         call.<UserId>getArgument(1).value()));
         AgentApiController controller = new AgentApiController(
                 ai.mindconnect.agent.management.directory.WorkingDirPolicy.unrestricted(),
-                new ai.mindconnect.message.adapter.memory.InMemoryMessageRepository(
-                        ScopeSupplier.fixed(new Namespace("test"))),
                 sessionTurns, frameStream, sessions.runtime(), compaction, opener,
                 new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule()))),
                 new SessionAccess(sessions.runtime()), new ObjectMapper(), null);
@@ -146,6 +144,33 @@ class AgentApiControllerOwnershipTest {
         org.mockito.Mockito.verify(sessionTurns).open(SessionId.of(alices));
         org.mockito.Mockito.verify(compaction).compact(SessionId.of(alices));
         assertThat(sessionsOf("alice")).isEmpty();
+    }
+
+    @Test
+    void theHistoryGivesEachMessageItsPlaceAndTheMessageAsTheTurnWroteIt() throws Exception {
+        String alices = sessions.openOn(AGENT, "alice").id().value();
+        sessions.store().append(SessionId.of(alices), List.of(
+                ai.mindconnect.agent.loop.domain.TurnMessage.user(List.of(
+                        new ai.mindconnect.agent.loop.domain.ContentPart.Text("What time is it?"))).inTurn("t1"),
+                ai.mindconnect.agent.loop.domain.TurnMessage.toolCalls(List.of(
+                        new ai.mindconnect.agent.loop.domain.TurnMessage.ToolCall("call_1", "clock", java.util.Map.of())))
+                        .inTurn("t1")));
+        callers.actAs("alice");
+
+        mvc.perform(get("/api/sessions/{id}/history", alices))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sequence").value(1))
+                .andExpect(jsonPath("$[0].message.type").value("USER"))
+                .andExpect(jsonPath("$[0].message.turnId").value("t1"))
+                .andExpect(jsonPath("$[0].message.content[0].kind").value("text"))
+                .andExpect(jsonPath("$[0].message.content[0].text").value("What time is it?"))
+                .andExpect(jsonPath("$[1].message.type").value("TOOL_CALL"))
+                .andExpect(jsonPath("$[1].message.toolCalls[0].callId").value("call_1"))
+                .andExpect(jsonPath("$[1].message.toolCalls[0].name").value("clock"));
+        mvc.perform(delete("/api/sessions/{id}/messages", alices).param("fromSeq", "2").param("toSeq", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedMessages").value(1));
+        assertThat(management.messages(SessionId.of(alices))).hasSize(1);
     }
 
     @Test

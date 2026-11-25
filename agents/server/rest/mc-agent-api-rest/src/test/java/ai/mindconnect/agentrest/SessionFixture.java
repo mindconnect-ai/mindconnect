@@ -62,6 +62,11 @@ public final class SessionFixture {
         return runtime;
     }
 
+    /** The runtime's store, for a test that puts messages into a session as a turn would. */
+    public SessionStore store() {
+        return store;
+    }
+
     public SessionManagement management() {
         return management;
     }

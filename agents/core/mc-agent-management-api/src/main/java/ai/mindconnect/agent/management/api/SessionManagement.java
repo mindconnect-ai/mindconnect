@@ -115,6 +115,15 @@ public interface SessionManagement {
     void deleteMessagesFrom(SessionId sessionId, int sequence);
 
     /**
+     * Deletes the messages whose place lies between {@code from} and
+     * {@code to}, both included.
+     *
+     * @return how many were deleted
+     * @throws IllegalArgumentException if there is no such session
+     */
+    int deleteMessages(SessionId sessionId, int from, int to);
+
+    /**
      * Hears what changes about this user's sessions, in whichever namespace
      * they are, until the subscription is closed: one is opened, renamed or
      * deleted, a turn in one begins, asks or ends. What a list of sessions
