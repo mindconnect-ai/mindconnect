@@ -50,7 +50,7 @@ public final class ManagementPlugin implements Plugin {
                 new ManagedAgentResolver(registry.get(AgentManagement.class)).resolve(agentName, session));
     }
 
-    private static RepositorySessionStore sessionStore(PluginRegistry registry) {
+    private static SessionStore sessionStore(PluginRegistry registry) {
         return new RepositorySessionStore(registry.get(SessionRepository.class),
                 registry.get(MessageRepository.class), registry.get(JsonMapperFactory.class));
     }
