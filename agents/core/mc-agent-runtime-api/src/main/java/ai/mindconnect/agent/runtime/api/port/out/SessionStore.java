@@ -4,9 +4,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
+import java.util.stream.IntStream;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.domain.StoredMessage;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 
@@ -60,6 +62,32 @@ public interface SessionStore {
         return messages(sessionId).stream()
                 .filter(message -> turnId.value().equals(message.turnId()))
                 .toList();
+    }
+
+    /**
+     * The session's messages with their place in it, oldest first. A store
+     * that keeps places of its own answers with those; this one counts.
+     */
+    default List<StoredMessage> history(SessionId sessionId) {
+        List<TurnMessage> all = messages(sessionId);
+        return IntStream.range(0, all.size())
+                .mapToObj(index -> new StoredMessage(all.get(index), index + 1, null))
+                .toList();
+    }
+
+    /**
+     * Removes the messages whose place lies between {@code from} and
+     * {@code to}, both included — what undoing the end of a session means.
+     *
+     * @return how many were removed
+     */
+    default int deleteMessages(SessionId sessionId, long from, long to) {
+        throw new UnsupportedOperationException(getClass().getSimpleName() + " removes no messages");
+    }
+
+    /** Removes every message of the session, before the session itself goes. */
+    default void deleteMessages(SessionId sessionId) {
+        throw new UnsupportedOperationException(getClass().getSimpleName() + " removes no messages");
     }
 
     /**

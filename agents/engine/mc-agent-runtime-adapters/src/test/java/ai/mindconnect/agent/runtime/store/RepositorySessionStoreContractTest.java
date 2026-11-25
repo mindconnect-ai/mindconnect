@@ -22,7 +22,8 @@ import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
  * repository, over both kinds of repository.
  *
  * <p>It gives every message an id of the message repository's, also one that
- * came with an id: an appended message with an id does not keep it.
+ * came with an id: an appended message with an id does not keep it. In
+ * memory, a place that was removed is given again to the next message.
  */
 class RepositorySessionStoreContractTest {
 
@@ -40,6 +41,11 @@ class RepositorySessionStoreContractTest {
 
         @Override
         protected boolean keepsAGivenId() {
+            return false;
+        }
+
+        @Override
+        protected boolean givesAPlaceOnce() {
             return false;
         }
     }

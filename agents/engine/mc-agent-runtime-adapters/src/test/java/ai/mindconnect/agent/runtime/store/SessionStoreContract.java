@@ -15,6 +15,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.domain.StoredMessage;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 
 /**
@@ -37,6 +38,15 @@ public abstract class SessionStoreContract {
      * messages by their id.
      */
     protected boolean keepsAGivenId() {
+        return true;
+    }
+
+    /**
+     * Whether a place that was removed stays unused. Whoever removed the end
+     * of a session and still holds the places of what was there would
+     * otherwise address a message that came later.
+     */
+    protected boolean givesAPlaceOnce() {
         return true;
     }
 
@@ -175,6 +185,76 @@ public abstract class SessionStoreContract {
             assertThat(stored.id()).isNotEqualTo("m-earlier");
             assertThat(store.messages(session.id())).extracting(TurnMessage::id).containsExactly(stored.id());
         }
+    }
+
+    @Test
+    void the_history_gives_each_message_its_place_in_order() {
+        SessionStore store = store();
+        Session session = aSession("s1");
+        store.create(session);
+        List<TurnMessage> stored = store.append(session.id(), List.of(
+                TurnMessage.user(List.of(new ContentPart.Text("one"))),
+                TurnMessage.assistant("two"),
+                TurnMessage.user(List.of(new ContentPart.Text("three")))));
+
+        List<StoredMessage> history = store.history(session.id());
+
+        assertThat(history).extracting(StoredMessage::message).isEqualTo(stored);
+        assertThat(history).extracting(StoredMessage::sequence).isSorted().doesNotHaveDuplicates();
+        assertThat(history.get(0).sequence()).isPositive();
+    }
+
+    @Test
+    void removing_from_a_place_on_takes_those_messages_and_no_place_is_given_twice() {
+        SessionStore store = store();
+        Session session = aSession("s1");
+        store.create(session);
+        store.append(session.id(), List.of(TurnMessage.assistant("one"), TurnMessage.assistant("two"),
+                TurnMessage.assistant("three")));
+        long second = store.history(session.id()).get(1).sequence();
+
+        int removed = store.deleteMessages(session.id(), second, Long.MAX_VALUE);
+        store.append(session.id(), List.of(TurnMessage.assistant("four")));
+
+        assertThat(removed).isEqualTo(2);
+        List<StoredMessage> history = store.history(session.id());
+        assertThat(history).extracting(entry -> entry.message().text()).containsExactly("one", "four");
+        if (givesAPlaceOnce()) {
+            assertThat(history.get(1).sequence()).isGreaterThan(second);
+        } else {
+            assertThat(history.get(1).sequence()).isEqualTo(second);
+        }
+    }
+
+    @Test
+    void removing_a_range_takes_only_the_messages_in_it() {
+        SessionStore store = store();
+        Session session = aSession("s1");
+        store.create(session);
+        store.append(session.id(), List.of(TurnMessage.assistant("one"), TurnMessage.assistant("two"),
+                TurnMessage.assistant("three")));
+        long second = store.history(session.id()).get(1).sequence();
+
+        assertThat(store.deleteMessages(session.id(), second, second)).isEqualTo(1);
+
+        assertThat(store.messages(session.id())).extracting(TurnMessage::text).containsExactly("one", "three");
+    }
+
+    @Test
+    void removing_all_messages_leaves_the_session_and_the_others() {
+        SessionStore store = store();
+        Session one = aSession("s1");
+        Session other = aSession("s2");
+        store.create(one);
+        store.create(other);
+        store.append(one.id(), List.of(TurnMessage.assistant("to one")));
+        store.append(other.id(), List.of(TurnMessage.assistant("to the other")));
+
+        store.deleteMessages(one.id());
+
+        assertThat(store.messages(one.id())).isEmpty();
+        assertThat(store.find(one.id())).isPresent();
+        assertThat(store.messages(other.id())).extracting(TurnMessage::text).containsExactly("to the other");
     }
 
     @Test

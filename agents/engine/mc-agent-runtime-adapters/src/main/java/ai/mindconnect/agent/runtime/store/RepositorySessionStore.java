@@ -11,6 +11,7 @@ import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.domain.StoredMessage;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
@@ -88,6 +89,36 @@ public final class RepositorySessionStore implements SessionStore {
                 .map(mapper::turnMessage)
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    @Override
+    public List<StoredMessage> history(SessionId sessionId) {
+        return sessions.find(sessionId)
+                .map(session -> messages.findByConversation(SessionMessageMapper.conversationOf(session), EVERYTHING))
+                .orElse(List.of()).stream()
+                .flatMap(stored -> mapper.turnMessage(stored).stream()
+                        .map(message -> new StoredMessage(message, stored.sequenceNum(), stored.sentAt())))
+                .toList();
+    }
+
+    @Override
+    public int deleteMessages(SessionId sessionId, long from, long to) {
+        Session session = sessions.find(sessionId).orElseThrow(() -> missing(sessionId));
+        ConversationId conversation = SessionMessageMapper.conversationOf(session);
+        // The message repository counts places in int; a place beyond that is beyond every message.
+        int first = (int) Math.min(from, Integer.MAX_VALUE);
+        int last = (int) Math.min(to, Integer.MAX_VALUE);
+        int removed = (int) messages.findByConversation(conversation, EVERYTHING).stream()
+                .filter(message -> message.sequenceNum() >= first && message.sequenceNum() <= last)
+                .count();
+        messages.deleteBySequenceRange(conversation, first, last);
+        return removed;
+    }
+
+    @Override
+    public void deleteMessages(SessionId sessionId) {
+        sessions.find(sessionId).ifPresent(session ->
+                messages.deleteByConversation(SessionMessageMapper.conversationOf(session)));
     }
 
     @Override
