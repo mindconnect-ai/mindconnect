@@ -21,6 +21,6 @@ class AgentsArchitectureTest {
      */
     @ArchTest
     static final ArchRule agentsKnowNoConversations = noClasses().that().resideInAPackage("ai.mindconnect.agent..")
-            .should().dependOnClassesThat().resideInAPackage("ai.mindconnect.message..")
+            .should().dependOnClassesThat().resideInAPackage("ai.mindconnect.conversation..")
             .as("Sessions: the agents know no conversations");
 }

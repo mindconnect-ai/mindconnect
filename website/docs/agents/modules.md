@@ -21,8 +21,6 @@ carry the implementations.
 | `mc-file-store-core` | The file store's ports: `FileStore`, `StoredFile`, the `FileStoreBackend` SPI. |
 | `mc-llm-gateway-core` | The [gateway's](./llm-gateway.md) core: chat/streaming types and the ports (`LlmChat`, `LlmGateway`, `LlmConfigRepository`) — light enough to be a compile dependency of anything. |
 | `mc-llm-gateway` | The gateway implementation: provider adapters, routing, retry/throttle decorators. |
-| `mc-message-repository-core` | Conversations, participants and messages as plain domain types, their ports, and the `ConversationService` use case. |
-| `mc-message-repository` | File-backed and in-memory implementations of those ports. |
 | `mc-file-store` | The filesystem backend of the file store. |
 | `mc-agent-tool-spi` | What a tool *is*: `Tool`, `ToolFactory`, `MultiToolProvider`, `ToolRegistry`, `ToolEnvironment` + the ServiceLoader registry — see [creating a tool](./creating-a-tool.md). |
 
@@ -74,7 +72,6 @@ See [vector store & file store](./vector-store.md).
 | Module | Purpose |
 |--------|---------|
 | `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres. |
-| `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres. |
 | `postgres/mc-agent-runtime-engine-pg`, `postgres/mc-agent-management-pg` | The session repository and the agent repository on Postgres — a JSONB document per session and per agent. |
 | `postgres/mc-agent-skill-pg`, `postgres/mc-agent-trace-pg`, `postgres/mc-agent-tools-todo-pg`, `postgres/mc-agent-tools-usermemory-pg` | Skills, LLM call traces, todo lists and the users' memory on Postgres. |
 | `postgres/mc-agent-runtime-infrastructure-pg` | `PostgresStorePlugin`: every store of an installation from one database, as a plugin for the runtime's builder. |

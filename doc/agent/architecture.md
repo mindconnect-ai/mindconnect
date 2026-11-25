@@ -88,7 +88,6 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       (file & in-memory repos, Pebble prompt renderer, tokenizer)
     - `mc-agent-memory-strategies`: working-memory strategies (window, summarizing window, auto-compact)
     - `mc-llm-gateway-core` / `mc-llm-gateway`: LLM abstraction ports / provider adapters + routing
-    - `mc-message-repository-core` / `mc-message-repository`: conversation & message storage
     - `mc-file-store-core` / `mc-file-store`: the runtime's uploads, id-addressed — the ports the
       runtime core depends on / the filesystem backend (Postgres: `adapter/postgres/mc-file-store-pg`)
     - `mc-agent-tool-spi`: what a tool is — `Tool`, `ToolFactory`, `MultiToolProvider`, registry;

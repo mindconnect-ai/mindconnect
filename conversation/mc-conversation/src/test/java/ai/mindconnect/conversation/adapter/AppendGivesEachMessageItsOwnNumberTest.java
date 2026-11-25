@@ -1,0 +1,106 @@
+package ai.mindconnect.conversation.adapter;
+
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.conversation.domain.ConversationId;
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.conversation.adapter.file.FileMessageRepository;
+import ai.mindconnect.conversation.adapter.memory.InMemoryMessageRepository;
+import ai.mindconnect.conversation.domain.Message;
+import ai.mindconnect.conversation.domain.MessageType;
+import ai.mindconnect.conversation.domain.ParticipantType;
+import ai.mindconnect.conversation.port.out.MessageRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Handing out a sequence number is the store's job, and no two appenders
+ * may leave with the same one. Both stores that live in this module are
+ * held to it: the numbers run 1, 2, 3 …, a store with messages already in
+ * it carries on from the highest, and twenty threads appending at the same
+ * moment produce twenty different numbers. Reading the highest number and
+ * writing the row apart is what used to give a busy turn two messages
+ * claiming the same place in the conversation.
+ */
+class AppendGivesEachMessageItsOwnNumberTest {
+
+    @TempDir
+    static Path dir;
+
+    private static final Namespace NS = new Namespace("local");
+    private static final String SENDER = UUID.randomUUID().toString();
+
+    static List<MessageRepository> stores() {
+        return List.of(new InMemoryMessageRepository(ScopeSupplier.local()),
+                new FileMessageRepository(dir.resolve(UUID.randomUUID().toString()),
+                        new ObjectMapper().registerModule(new JavaTimeModule()), ScopeSupplier.fixed(NS)));
+    }
+
+    private static Message message(ConversationId conversation, int seq) {
+        return Message.of(conversation, SENDER, ParticipantType.USER, MessageType.CHAT, "m" + seq, seq);
+    }
+
+    @ParameterizedTest
+    @MethodSource("stores")
+    void theNumbersRunFromOne_andAStoreWithMessagesCarriesOn(MessageRepository store) {
+        ConversationId conversation = ConversationId.random();
+
+        assertThat(store.append(conversation, seq -> message(conversation, seq)).sequenceNum()).isEqualTo(1);
+        assertThat(store.append(conversation, seq -> message(conversation, seq)).sequenceNum()).isEqualTo(2);
+
+        ConversationId older = ConversationId.random();
+        IntStream.rangeClosed(1, 7).forEach(seq -> store.save(message(older, seq)));
+        assertThat(store.append(older, seq -> message(older, seq)).sequenceNum())
+                .as("picks up above what is already stored").isEqualTo(8);
+
+        ConversationId fresh = ConversationId.random();
+        assertThat(store.append(fresh, s -> message(fresh, s)).sequenceNum())
+                .as("each conversation counts on its own").isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @MethodSource("stores")
+    void twentyThreadsAppendingAtOnceGetTwentyDifferentNumbers(MessageRepository store) throws Exception {
+        int writers = 20;
+        ConversationId conversation = ConversationId.random();
+        var start = new CountDownLatch(1);
+        var done = new CountDownLatch(writers);
+        var failures = new CopyOnWriteArrayList<Throwable>();
+
+        try (var pool = Executors.newFixedThreadPool(writers)) {
+            for (int i = 0; i < writers; i++) {
+                pool.submit(() -> {
+                    try {
+                        start.await();
+                        store.append(conversation, seq -> message(conversation, seq));
+                    } catch (Throwable t) {
+                        failures.add(t);
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            start.countDown();
+            assertThat(done.await(60, TimeUnit.SECONDS)).isTrue();
+        }
+
+        assertThat(failures).isEmpty();
+        assertThat(store.findByConversation(conversation, new PageRequest(0, 100)))
+                .extracting(Message::sequenceNum)
+                .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, writers).boxed().toList());
+    }
+}

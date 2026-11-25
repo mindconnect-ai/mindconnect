@@ -98,7 +98,7 @@
         <module>agents/core/mc-llm-gateway-core</module>
         <module>agents/core/mc-llm-gateway</module>
         <module>agents/adapter/postgres/mc-llm-gateway-pg</module>
-        <module>agents/adapter/postgres/mc-message-repository-pg</module>
+        <module>conversation/mc-conversation-pg</module>
         <module>agents/adapter/postgres/mc-file-store-pg</module>
         <module>agents/server/core/mc-user-core</module>
         <module>agents/server/core/mc-user</module>
@@ -117,8 +117,8 @@
         <module>agents/springstarter/mc-agent-starter-extension</module>
         <module>agents/springstarter/mc-agent-starter-workflow</module>
         <module>agents/server/core/mc-credentials</module>
-        <module>agents/core/mc-message-repository-core</module>
-        <module>agents/core/mc-message-repository</module>
+        <module>conversation/mc-conversation-core</module>
+        <module>conversation/mc-conversation</module>
         <module>agents/responses-api/mc-agent-protocol</module>
         <module>agents/responses-api/mc-agent-protocol-openai</module>
         <module>agents/responses-api/mc-agent-protocol-runtime</module>
@@ -190,6 +190,7 @@
         <module>common/mc-common-arch-tests</module>
         <module>taskqueue/mc-task-queue-arch-tests</module>
         <module>workflow/mc-workflow-arch-tests</module>
+        <module>conversation/mc-conversation-arch-tests</module>
         <module>agents/mc-agents-arch-tests</module>
     </modules>
 

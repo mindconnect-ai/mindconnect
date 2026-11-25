@@ -94,11 +94,6 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-message-repository-pg</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-runtime-pg</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -225,16 +220,6 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-credentials-pg</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-message-repository-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-message-repository</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

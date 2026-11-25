@@ -148,8 +148,6 @@ ai.mindconnect.mcp.gateway.admin.ui.McpServerFormView has 2 constructors
 ai.mindconnect.mcp.proxy.McpProxyException has 2 constructors
 ai.mindconnect.mcp.proxy.McpSessionRegistry has 2 constructors
 ai.mindconnect.mcp.proxy.SdkMcpProxy has 2 constructors
-ai.mindconnect.message.adapter.pg.PgConversationRepository has 2 constructors
-ai.mindconnect.message.adapter.pg.PgMessageRepository has 2 constructors
 ai.mindconnect.namespace.adapter.pg.PgNamespacePurge has 2 constructors
 ai.mindconnect.namespace.adapter.pg.PgNamespaceRepository has 2 constructors
 ai.mindconnect.namespace.domain.NamespaceDefinition has 3 constructors
