@@ -80,12 +80,12 @@ class UserStreamTest {
                 ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test"))));
         var stored = new ai.mindconnect.agent.runtime.store.InMemorySessionRepository(ScopeSupplier.local());
         var messages = new ai.mindconnect.message.adapter.memory.InMemoryMessageRepository(ScopeSupplier.local());
-        sessions = new ai.mindconnect.agent.management.RepositorySessionManagement(stored, messages,
+        sessions = new ai.mindconnect.agent.management.RepositorySessionManagement(stored,
+                new ai.mindconnect.agent.runtime.store.RepositorySessionStore(stored, messages,
+                        new ai.mindconnect.jackson.JsonMapperFactory(List.of())),
                 new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ScopeSupplier.local()),
                 ai.mindconnect.agent.management.api.SessionDirectoryPolicy.unrestricted(), List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> Optional.empty()),
-                new ai.mindconnect.agent.runtime.store.RepositorySessionStore(stored, messages,
-                        new ai.mindconnect.jackson.JsonMapperFactory(List.of())));
+                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> Optional.empty()));
         stream = new UserStream(Optional.of(monitor), sessions, new ObjectMapper());
     }
 

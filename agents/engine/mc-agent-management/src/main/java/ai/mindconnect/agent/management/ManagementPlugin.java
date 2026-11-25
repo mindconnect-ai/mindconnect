@@ -39,11 +39,10 @@ public final class ManagementPlugin implements Plugin {
                 registry.get(SessionRepository.class),
                 session -> registry.get(TurnService.class).runningTurn(session)));
         registry.provide(SessionManagement.class, () -> new RepositorySessionManagement(
-                registry.get(SessionRepository.class), registry.get(MessageRepository.class),
+                registry.get(SessionRepository.class), registry.get(SessionStore.class),
                 registry.get(AgentRepository.class),
                 registry.find(SessionDirectoryPolicy.class).orElseGet(SessionDirectoryPolicy::unrestricted),
-                registry.all(SessionCleanup.class), registry.get(SessionLifecycle.class),
-                sessionStore(registry)));
+                registry.all(SessionCleanup.class), registry.get(SessionLifecycle.class)));
         // Hears every session, of whatever namespace: what a user is told is about their sessions everywhere.
         registry.contribute(SessionEventListener.class,
                 event -> registry.get(SessionLifecycle.class).onEvent(event));

@@ -94,10 +94,9 @@ class TaskMonitorTest {
     static AgentRuntime runtimeWithAlicesSession(SessionId alices, ScopeSupplier namespaces) {
         var sessions = new InMemorySessionRepository(namespaces);
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-        SessionManagement management = new RepositorySessionManagement(sessions, messages,
+        SessionManagement management = new RepositorySessionManagement(sessions, new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))),
                 new InMemoryAgentRepository(namespaces), SessionDirectoryPolicy.unrestricted(), List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()),
-                new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))));
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
         new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))).create(new Session(
                 alices,
                 UserId.of("alice"), null,

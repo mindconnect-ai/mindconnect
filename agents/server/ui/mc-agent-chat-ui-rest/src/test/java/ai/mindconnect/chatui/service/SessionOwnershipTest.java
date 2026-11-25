@@ -42,11 +42,10 @@ class SessionOwnershipTest {
     private final InMemorySessionRepository stored = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
     private final InMemoryMessageRepository messages =
             new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-    private final SessionManagement management = new RepositorySessionManagement(stored, messages,
+    private final SessionManagement management = new RepositorySessionManagement(stored, new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule()))),
             new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
             List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()),
-                new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule()))));
+                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()));
     private final SessionOwnership ownership = new SessionOwnership(runtimeOver(management));
 
     private final ManagedSession alices = opened("alice");

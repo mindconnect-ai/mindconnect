@@ -61,9 +61,9 @@ class RepositorySessionManagementTest {
     private final AgentRepository agents = new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test")));
     /** The sessions a cleanup was told are gone. */
     private final List<ManagedSession> cleanedUp = new java.util.ArrayList<>();
-    private final SessionManagement management = new RepositorySessionManagement(sessions, messages, agents,
+    private final SessionManagement management = new RepositorySessionManagement(sessions, runtime, agents,
             SessionDirectoryPolicy.unrestricted(), List.of(cleanedUp::add),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()), runtime);
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
 
     private Session open(String id, String user, String parent, String createdAt, Map<String, Object> metadata) {
         Session session = new Session(SessionId.of(id), UserId.of(user), parent == null ? null : SessionId.of(parent),
@@ -177,9 +177,9 @@ class RepositorySessionManagementTest {
                 return Optional.of("/home/" + user.value() + "/" + session.value());
             }
         };
-        SessionManagement placing = new RepositorySessionManagement(sessions, messages, agents,
+        SessionManagement placing = new RepositorySessionManagement(sessions, runtime, agents,
             homes, List.of(cleanedUp::add),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()), runtime);
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
 
         ManagedSession referring = placing.open(ADA, null, new SessionAgent.Ref(owl.id()), null, SessionDirectories.NONE);
         assertThat(referring.agent()).isEqualTo(new SessionAgent.Ref(owl.id()));
@@ -248,9 +248,9 @@ class RepositorySessionManagementTest {
                 return Optional.of("/home/" + user.value() + "/" + session.value());
             }
         };
-        SessionManagement guarded = new RepositorySessionManagement(sessions, messages, agents,
+        SessionManagement guarded = new RepositorySessionManagement(sessions, runtime, agents,
             underSrv, List.of(cleanedUp::add),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()), runtime);
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
         SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
 
         assertThat(guarded.changeDirectories(id, new SessionDirectories("/srv/owls", List.of("/srv/mice")))
@@ -309,11 +309,10 @@ class RepositorySessionManagementTest {
     void a_sessions_status_is_read_from_its_turn_and_not_kept() {
         SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
         java.util.concurrent.atomic.AtomicReference<TurnStatus> turn = new java.util.concurrent.atomic.AtomicReference<>();
-        SessionManagement reading = new RepositorySessionManagement(sessions, messages, agents,
+        SessionManagement reading = new RepositorySessionManagement(sessions, runtime, agents,
                 SessionDirectoryPolicy.unrestricted(), List.of(),
                 new SessionLifecycle(sessions, session -> java.util.Optional.ofNullable(turn.get())
-                        .map(status -> new Turn(TurnId.of("t1"), null, session, HELPER, status, List.of(), null, null))),
-                runtime);
+                        .map(status -> new Turn(TurnId.of("t1"), null, session, HELPER, status, List.of(), null, null))));
 
         assertThat(reading.find(id).orElseThrow().status()).isEqualTo(ManagedSession.Status.IDLE);
         turn.set(TurnStatus.RUNNING);
@@ -325,8 +324,8 @@ class RepositorySessionManagementTest {
     @Test
     void a_user_hears_what_changes_about_their_sessions_and_nobody_elses() throws InterruptedException {
         SessionLifecycle lifecycle = new SessionLifecycle(sessions, session -> java.util.Optional.empty());
-        SessionManagement telling = new RepositorySessionManagement(sessions, messages, agents,
-                SessionDirectoryPolicy.unrestricted(), List.of(), lifecycle, runtime);
+        SessionManagement telling = new RepositorySessionManagement(sessions, runtime, agents,
+                SessionDirectoryPolicy.unrestricted(), List.of(), lifecycle);
         List<SessionLifecycleEvent> ada = new java.util.concurrent.CopyOnWriteArrayList<>();
         List<SessionLifecycleEvent> bob = new java.util.concurrent.CopyOnWriteArrayList<>();
         telling.lifecycle(ADA, ada::add);

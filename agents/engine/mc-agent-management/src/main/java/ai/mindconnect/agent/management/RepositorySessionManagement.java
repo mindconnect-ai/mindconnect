@@ -30,44 +30,33 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
-import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.message.port.out.MessageRepository;
 
 /**
- * Session management on the two repositories the engine's session store is
- * put together from: the sessions in the engine's own, what was said in the
- * message repository. It reads and writes what the runtime reads and writes,
+ * Session management on the session repository and the runtime's session
+ * store, which keeps what was said. It reads and writes what the runtime reads and writes,
  * so a session renamed here is the session a turn finds. A session that
  * refers to a managed agent finds it in the agent repository.
  */
 public final class RepositorySessionManagement implements SessionManagement {
 
-    private static final PageRequest EVERYTHING = new PageRequest(0, Integer.MAX_VALUE);
-
     private final SessionRepository sessions;
-    private final MessageRepository messages;
+    /** The runtime's store, for what was said in a session: the management reads it as a turn does. */
+    private final SessionStore store;
     private final AgentRepository agents;
     private final SessionDirectoryPolicy directoryPolicy;
     private final List<SessionCleanup> cleanups;
     private final SessionLifecycle lifecycle;
-    private final RepositorySessionStore store;
 
-    /**
-     * @param lifecycle where a session's status is read from and its users are told what changes
-     * @param store     the runtime's store on the same two repositories: a stored message is read
-     *                  as the turn message it was written from the way the runtime reads it
-     */
-    public RepositorySessionManagement(SessionRepository sessions, MessageRepository messages,
+    /** @param lifecycle where a session's status is read from and its users are told what changes */
+    public RepositorySessionManagement(SessionRepository sessions, SessionStore store,
                                        AgentRepository agents, SessionDirectoryPolicy directoryPolicy,
-                                       List<SessionCleanup> cleanups, SessionLifecycle lifecycle,
-                                       RepositorySessionStore store) {
-        this.store = store;
+                                       List<SessionCleanup> cleanups, SessionLifecycle lifecycle) {
         this.cleanups = List.copyOf(cleanups);
         this.lifecycle = lifecycle;
         this.sessions = sessions;
-        this.messages = messages;
+        this.store = store;
         this.agents = agents;
         this.directoryPolicy = directoryPolicy;
     }
@@ -254,7 +243,7 @@ public final class RepositorySessionManagement implements SessionManagement {
     public void delete(SessionId sessionId) {
         sessions.findByParent(sessionId).forEach(child -> delete(child.id()));
         sessions.find(sessionId).ifPresent(session -> {
-            messages.deleteByConversation(RepositorySessionStore.conversationOf(session));
+            store.deleteMessages(sessionId);
             sessions.delete(sessionId);
             ManagedSession deleted = managed(session);
             cleanups.forEach(cleanup -> cleanup.deleted(deleted));
@@ -267,18 +256,18 @@ public final class RepositorySessionManagement implements SessionManagement {
 
     @Override
     public List<ManagedMessage> messages(SessionId sessionId) {
-        return messages.findByConversation(RepositorySessionStore.conversationOf(existing(sessionId)), EVERYTHING)
-                .stream()
-                .flatMap(stored -> store.turnMessageOf(stored).stream()
-                        .map(message -> new ManagedMessage(stored.id().value(), stored.sequenceNum(),
-                                stored.sentAt(), message, stored.durationMs(), stored.tokenCount())))
+        existing(sessionId);
+        // A store keeps no duration or token count of a message: nothing has measured them for a session.
+        return store.history(sessionId).stream()
+                .map(stored -> new ManagedMessage(stored.message().id(), (int) stored.sequence(),
+                        stored.storedAt(), stored.message(), null, null))
                 .toList();
     }
 
     @Override
     public void deleteMessagesFrom(SessionId sessionId, int sequence) {
-        messages.deleteBySequenceRange(RepositorySessionStore.conversationOf(existing(sessionId)),
-                sequence, Integer.MAX_VALUE);
+        existing(sessionId);
+        store.deleteMessages(sessionId, sequence, Long.MAX_VALUE);
     }
 
     private ManagedSession changed(SessionId sessionId, UnaryOperator<Session> change) {

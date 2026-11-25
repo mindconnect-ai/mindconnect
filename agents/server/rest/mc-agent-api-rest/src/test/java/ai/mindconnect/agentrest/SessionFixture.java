@@ -43,11 +43,10 @@ public final class SessionFixture {
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         store = new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule())));
         // A spy, so a test can look at what reached the management.
-        management = org.mockito.Mockito.spy(new RepositorySessionManagement(sessions, messages,
+        management = org.mockito.Mockito.spy(new RepositorySessionManagement(sessions, store,
                 new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
                 List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()),
-                store));
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty())));
         PluginRegistry registry = new DefaultPluginRegistry();
         registry.provide(SessionManagement.class, () -> management);
         // Enough of the runtime's own session service to find a session by its id.
