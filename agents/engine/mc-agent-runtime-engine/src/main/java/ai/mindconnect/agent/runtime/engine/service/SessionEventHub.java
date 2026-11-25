@@ -11,7 +11,6 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
@@ -30,11 +29,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Hands the events of sessions and turns to whoever listens, through
- * channels: one for the lifecycle of all sessions — few events, what a list
- * of sessions follows — and one for the stream of each tree of
- * sessions, a session with every session under it. The turn workers publish
- * here; the session service and the turn service subscribe here.
+ * Hands the events of sessions to whoever listens, through channels: one for
+ * each tree of sessions, a session with every session under it. The turn
+ * workers publish here; the session service and the turn service subscribe
+ * here — to a session, or to one turn of it.
  *
  * <p>A channel numbers what it is given, keeps the newest of it and gives
  * each listener a queue and a thread of its own, so a slow listener costs
@@ -50,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * <p>Events live in this object: a listener in another process hears
  * nothing.
  */
-public final class SessionEventHub implements SessionEventPublisher, UserSessionFeed {
+public final class SessionEventHub implements SessionEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(SessionEventHub.class);
     private static final Duration IDLE = Duration.ofMinutes(10);
@@ -85,25 +83,6 @@ public final class SessionEventHub implements SessionEventPublisher, UserSession
         this.sessions = sessions;
         this.scope = scope;
         this.contributed = contributed;
-    }
-
-    @Override
-    public Subscription follow(UserId user, long afterSeq, Consumer<Entry> listener) {
-        return coarseChannel().subscribe(afterSeq,
-                happened -> user.equals(happened.session().userId()),
-                asSubscriber(event -> listener.accept(new Entry(event.seq(), event.value().namespace(),
-                        event.value().session(), event.value().event().ofSubAgent(),
-                        event.value().event()))))::close;
-    }
-
-    @Override
-    public long latestSeq() {
-        return coarseChannel().lastSeq();
-    }
-
-    @Override
-    public long earliestKeptSeq() {
-        return coarseChannel().earliestBufferedSeq();
     }
 
     /** Hears one session as it happens, and with {@code childSessions} every session under it, from now on. */
@@ -182,20 +161,6 @@ public final class SessionEventHub implements SessionEventPublisher, UserSession
         Happened happened = new Happened(scope.namespace().value(), session, ancestorsOf(session),
                 List.copyOf(turns), event);
         streamChannel(rootOf(session)).publish(happened);
-        if (isCoarse(event)) {
-            coarseChannel().publish(happened);
-        }
-    }
-
-    /**
-     * What a list of sessions is told of: that a turn begins, asks and ends,
-     * and whatever a capability has to say. Everything else is for whoever
-     * has the session open.
-     */
-    private static boolean isCoarse(SessionEvent event) {
-        return event.is(StreamEvent.ASKING_LLM) || event.is(StreamEvent.APPROVAL_REQUESTED)
-                || event.is(StreamEvent.INPUT_REQUESTED) || event.is(StreamEvent.WAITING) || event.is(StreamEvent.DONE)
-                || event.is(StreamEvent.ERROR) || event.known() instanceof StreamEvent.Other;
     }
 
     private static boolean isUnder(Happened happened, SessionId sessionId, boolean childSessions) {
@@ -215,11 +180,6 @@ public final class SessionEventHub implements SessionEventPublisher, UserSession
         } catch (RuntimeException e) {
             log.warn("A session event listener failed: {}", e.toString());
         }
-    }
-
-    /** One for all namespaces: a user's sessions are followed wherever they are, and the events are few. */
-    private Channel<Happened> coarseChannel() {
-        return channels.channel("coarse");
     }
 
     /** Keyed by the namespace: the same session id elsewhere is another session. */

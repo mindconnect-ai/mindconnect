@@ -93,7 +93,8 @@ class TaskMonitorTest {
         var sessions = new InMemorySessionRepository(namespaces);
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
-                new InMemoryAgentRepository(namespaces), SessionDirectoryPolicy.unrestricted(), List.of());
+                new InMemoryAgentRepository(namespaces), SessionDirectoryPolicy.unrestricted(), List.of(),
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
         new RepositorySessionStore(sessions, messages).create(new Session(
                 alices,
                 UserId.of("alice"), null,

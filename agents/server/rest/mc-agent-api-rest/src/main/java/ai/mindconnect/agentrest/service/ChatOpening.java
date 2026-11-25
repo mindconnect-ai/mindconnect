@@ -7,9 +7,6 @@ import org.springframework.stereotype.Service;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
-import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
@@ -41,10 +38,6 @@ public class ChatOpening {
                 new SessionAgent.Ref(agent), type,
                 new SessionDirectories(workingDirectory,
                         additionalDirectories == null ? List.of() : additionalDirectories));
-        // What the user's other pages hear of it: their session lists grow by one.
-        runtime.service(SessionEventPublisher.class).publish(new SessionEvent(
-                UserEventFrame.SESSION_STARTED, session.id(), null, null,
-                java.util.Map.of("agentId", agent.value(), "type", session.type())));
         return session;
     }
 }

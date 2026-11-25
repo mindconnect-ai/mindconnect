@@ -21,7 +21,10 @@ import ai.mindconnect.agent.management.api.SessionAttachment;
 import ai.mindconnect.agent.management.api.SessionCleanup;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
+import ai.mindconnect.agent.management.api.SessionLifecycleEvent;
+import ai.mindconnect.agent.management.api.SessionLifecycleListener;
 import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -48,11 +51,14 @@ public final class RepositorySessionManagement implements SessionManagement {
     private final AgentRepository agents;
     private final SessionDirectoryPolicy directoryPolicy;
     private final List<SessionCleanup> cleanups;
+    private final SessionLifecycle lifecycle;
 
+    /** @param lifecycle where a session's status is read from and its users are told what changes */
     public RepositorySessionManagement(SessionRepository sessions, MessageRepository messages,
                                        AgentRepository agents, SessionDirectoryPolicy directoryPolicy,
-                                       List<SessionCleanup> cleanups) {
+                                       List<SessionCleanup> cleanups, SessionLifecycle lifecycle) {
         this.cleanups = List.copyOf(cleanups);
+        this.lifecycle = lifecycle;
         this.sessions = sessions;
         this.messages = messages;
         this.agents = agents;
@@ -98,32 +104,34 @@ public final class RepositorySessionManagement implements SessionManagement {
                 .distinct().toList());
         Session session = new Session(id, user, parent, definition, metadata, Instant.now());
         sessions.create(session);
-        return managed(session);
+        ManagedSession opened = managed(session);
+        // A session opened under another one is its sub-agent's or its fork's: no list of the user's grows by it.
+        if (parent == null) {
+            lifecycle.tell(user, new SessionLifecycleEvent.Opened(id, opened.agentId().orElse(null), opened.type()));
+        }
+        return opened;
     }
 
     @Override
     public List<ManagedSession> list(UserId user) {
-        return sessions.findByUser(user).stream().map(RepositorySessionManagement::managed).toList();
+        return sessions.findByUser(user).stream().map(this::managed).toList();
     }
 
     @Override
     public List<ManagedSession> children(SessionId sessionId) {
-        return sessions.findByParent(sessionId).stream().map(RepositorySessionManagement::managed).toList();
+        return sessions.findByParent(sessionId).stream().map(this::managed).toList();
     }
 
     @Override
     public Optional<ManagedSession> find(SessionId sessionId) {
-        return sessions.find(sessionId).map(RepositorySessionManagement::managed);
+        return sessions.find(sessionId).map(this::managed);
     }
 
     @Override
     public ManagedSession rename(SessionId sessionId, String title) {
-        return changed(sessionId, session -> session.withMetadata(ManagedSession.TITLE, title));
-    }
-
-    @Override
-    public ManagedSession changeStatus(SessionId sessionId, ManagedSession.Status status) {
-        return changed(sessionId, session -> session.withMetadata(ManagedSession.STATUS, status.name()));
+        ManagedSession renamed = changed(sessionId, session -> session.withMetadata(ManagedSession.TITLE, title));
+        lifecycle.tell(renamed.userId(), new SessionLifecycleEvent.Renamed(sessionId, title));
+        return renamed;
     }
 
     @Override
@@ -243,6 +251,10 @@ public final class RepositorySessionManagement implements SessionManagement {
             sessions.delete(sessionId);
             ManagedSession deleted = managed(session);
             cleanups.forEach(cleanup -> cleanup.deleted(deleted));
+            // As with opening: a session under another one was in no list of the user's.
+            if (session.parentId() == null) {
+                lifecycle.tell(session.userId(), new SessionLifecycleEvent.Deleted(sessionId));
+            }
         });
     }
 
@@ -263,7 +275,7 @@ public final class RepositorySessionManagement implements SessionManagement {
     }
 
     private ManagedSession changed(SessionId sessionId, UnaryOperator<Session> change) {
-        return sessions.update(sessionId, change).map(RepositorySessionManagement::managed)
+        return sessions.update(sessionId, change).map(this::managed)
                 .orElseThrow(() -> missing(sessionId));
     }
 
@@ -275,7 +287,7 @@ public final class RepositorySessionManagement implements SessionManagement {
         return new IllegalArgumentException("There is no session " + sessionId.value());
     }
 
-    private static ManagedSession managed(Session session) {
+    private ManagedSession managed(Session session) {
         return new ManagedSession(
                 session.id(),
                 session.userId(),
@@ -283,8 +295,7 @@ public final class RepositorySessionManagement implements SessionManagement {
                 agentOf(session),
                 session.metadata().get(ManagedSession.TITLE) instanceof String title ? title : null,
                 session.metadata().get(ManagedSession.TYPE) instanceof String type ? type : ManagedSession.CHAT,
-                session.metadata().get(ManagedSession.STATUS) instanceof String status
-                        ? ManagedSession.Status.valueOf(status) : ManagedSession.Status.ACTIVE,
+                lifecycle.statusOf(session.id()),
                 new SessionDirectories(
                         session.metadata().get(ManagedSession.WORKING_DIRECTORY) instanceof String working
                                 ? working : null,
@@ -292,5 +303,10 @@ public final class RepositorySessionManagement implements SessionManagement {
                                 ? more.stream().map(String::valueOf).toList() : List.of()),
                 session.createdAt(),
                 session.metadata());
+    }
+
+    @Override
+    public Subscription lifecycle(UserId user, SessionLifecycleListener listener) {
+        return lifecycle.subscribe(user, listener);
     }
 }

@@ -36,7 +36,6 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
@@ -85,7 +84,6 @@ public class AgentApiController {
     private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
     private final ai.mindconnect.agentrest.service.ChatOpening chatOpener;
     private final ai.mindconnect.filestore.FileStore fileStore;
-    private final UserSessionFeed userSessions;
     private final SessionAccess sessionAccess;
     private final ObjectMapper compactMapper;
     private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
@@ -98,7 +96,6 @@ public class AgentApiController {
                             ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction,
                             ai.mindconnect.agentrest.service.ChatOpening chatOpener,
                             ai.mindconnect.filestore.FileStore fileStore,
-                            UserSessionFeed userSessions,
                             SessionAccess sessionAccess,
                             ObjectMapper objectMapper,
                             @org.springframework.lang.Nullable
@@ -116,7 +113,6 @@ public class AgentApiController {
         this.runtime = runtime;
         this.chatOpener = chatOpener;
         this.fileStore = fileStore;
-        this.userSessions = userSessions;
         this.sessionAccess = sessionAccess;
         this.compactMapper = objectMapper.copy().disable(
                 com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
@@ -498,40 +494,31 @@ public class AgentApiController {
 
     @Operation(tags = "Sessions", summary = "Attach to the caller's event stream",
             description = "The path names the caller — their own user id or 'me'; any other user "
-                    + "answers 404. The coarse feed across all of the caller's sessions: "
-                    + "session_started, session_titled, turn_started, turn_finished, "
-                    + "approval_requested and approval_answered — what a session list or a "
-                    + "notification needs, without attaching to any session. Same reconnect story "
-                    + "as the session stream: the first frame is {type:'attached'} with the buffer "
-                    + "bounds, then every buffered event after afterSeq replays and the stream "
-                    + "continues live; each frame carries seq, the cursor for the next "
-                    + "reconnect. The tokens of a turn are not here — attach to the session's "
-                    + "own stream for those.")
+                    + "answers 404. What changes about the caller's sessions, across all of them: "
+                    + "session_started, session_titled, session_status and session_deleted — what a "
+                    + "session list or a notification needs, without attaching to any session. The "
+                    + "first frame is {type:'attached'}; the stream tells what changes from then on, "
+                    + "and a client that was away reads the list of sessions anew. What a turn says "
+                    + "is not here — attach to the session's own stream for that.")
     @GetMapping(value = "/users/{userId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter userStream(@PathVariable String userId,
-                                 @RequestParam(defaultValue = "0") long afterSeq,
-                                 @CurrentUser UserId caller) {
+    public SseEmitter userStream(@PathVariable String userId, @CurrentUser UserId caller) {
         UserId user = UserPaths.requireSelf(userId, caller);
-        log.info("GET /api/users/{}/stream afterSeq={}", user, afterSeq);
+        log.info("GET /api/users/{}/stream", user);
         SseEmitter emitter = new SseEmitter(120_000L);
 
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        var subscription = userSessions.follow(user, afterSeq, entry -> {
+        var subscription = management.lifecycle(user, event -> {
             try {
                 attachedSent.await();
-                for (UserEventFrame frame : UserEventFrame.of(entry)) {
-                    emitter.send(SseEmitter.event().data(
-                            compactMapper.writeValueAsString(frame), MediaType.APPLICATION_JSON));
-                }
+                emitter.send(SseEmitter.event().data(
+                        compactMapper.writeValueAsString(UserEventFrame.of(event)), MediaType.APPLICATION_JSON));
             } catch (Exception e) {
                 emitter.completeWithError(e);
             }
         });
         try {
             emitter.send(SseEmitter.event().data(
-                    compactMapper.writeValueAsString(UserEventFrame.Attached.of(
-                            userSessions.earliestKeptSeq(), userSessions.latestSeq())),
-                    MediaType.APPLICATION_JSON));
+                    compactMapper.writeValueAsString(UserEventFrame.Attached.now()), MediaType.APPLICATION_JSON));
         } catch (Exception e) {
             subscription.close();
             emitter.completeWithError(e);

@@ -42,7 +42,8 @@ class SessionOwnershipTest {
             new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
     private final SessionManagement management = new RepositorySessionManagement(stored, messages,
             new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
-            List.of());
+            List.of(),
+                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()));
     private final SessionOwnership ownership = new SessionOwnership(runtimeOver(management));
 
     private final ManagedSession alices = opened("alice");

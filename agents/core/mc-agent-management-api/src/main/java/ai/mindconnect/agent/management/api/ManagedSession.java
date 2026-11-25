@@ -16,7 +16,7 @@ import ai.mindconnect.agent.UserId;
  * agent, metadata it does not read; this is the same session with what a
  * person looks at spelled out.
  *
- * <p>Title, type, status and directories are kept in the session's metadata
+ * <p>Title, type and directories are kept in the session's metadata
  * under the keys named here, so whoever opens a session through the runtime
  * can set them from the start.
  *
@@ -51,8 +51,6 @@ public record ManagedSession(
     public static final String TITLE = "title";
     /** Metadata key of a session's type. */
     public static final String TYPE = "type";
-    /** Metadata key of a session's status, the name of a {@link Status}. */
-    public static final String STATUS = "status";
     /** Metadata key of the directory a session's tools work in. */
     public static final String WORKING_DIRECTORY = "workingDir";
     /** Metadata key of the further directories a session's tools may reach: a list of paths. */
@@ -102,11 +100,17 @@ public record ManagedSession(
         return metadata.get(AGENT_ID) instanceof String id ? Optional.of(AgentId.of(id)) : Optional.empty();
     }
 
-    /** Whether a session is still worked in. Not whether a turn runs in it right now: that its turns say. */
+    /**
+     * What goes on in a session right now. Read from its turns whenever the
+     * session is read, never stored: a status that is kept is wrong after
+     * the first turn that dies.
+     */
     public enum Status {
-        ACTIVE,
-        COMPLETED,
-        ERROR,
-        CANCELLED
+        /** No turn runs. */
+        IDLE,
+        /** A turn runs, or waits for its tools or its turn. */
+        BUSY,
+        /** A turn stopped to ask and waits for an answer: an approval, a question. */
+        WAITING
     }
 }

@@ -32,7 +32,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
 import ai.mindconnect.agent.management.ManagementPlugin;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -370,7 +369,6 @@ public class RuntimeEngineAutoConfiguration {
     @Bean WorkingDirBrowser workingDirBrowser(AgentRuntime r) { return r.service(WorkingDirBrowser.class); }
     @Bean WorkingDirPolicy workingDirPolicy(AgentRuntime r) { return r.service(WorkingDirPolicy.class); }
     @Bean UserHome userHome(AgentRuntime r) { return r.service(UserHome.class); }
-    @Bean UserSessionFeed userSessionFeed(AgentRuntime r) { return r.service(UserSessionFeed.class); }
     @Bean TodoListService todoListService(AgentRuntime r) { return r.service(TodoListService.class); }
     @Bean UserMemoryService userMemoryService(AgentRuntime r) { return r.service(UserMemoryService.class); }
     @Bean SkillRepository skillRepository(AgentRuntime r) { return r.service(SkillRepository.class); }

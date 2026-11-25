@@ -66,7 +66,7 @@ sibling) and in `mc-agent-management`:
 | `LlmPlugin` | the stored LLM configurations as models: a gateway per provider family behind one chat that routes by the configuration's name, embeddings, transcription, credentials encrypted with a key, a trace of every provider call — and the runtime's model on top |
 | `ToolRegistryPlugin` | the tool registry over the `mc-agent-tools-*` modules on the classpath, less the tools switched off, with the operator's settings laid over them; a tool asks its environment for a service of the runtime, a service of the host, or a setting |
 | `FilePlugin` | the file store uploads go into, the vector stores, and the reader that hands a model the bytes of a file |
-| `ManagementPlugin` | `AgentManagement` and `SessionManagement` over the stores, and the stored agents as the agents found by name |
+| `ManagementPlugin` | `AgentManagement` and `SessionManagement` over the stores, the stored agents as the agents found by name, a session's status (`IDLE`, `BUSY`, `WAITING`) and what a user is told about their sessions (`SessionManagement.lifecycle`) |
 | `DirectoryPlugin` | each user's home, the directories a session may work in, and what the model is told about them |
 | `SkillSourcePlugin` | [skills](./skills.md) from the store, the user's directory and the project |
 | `TokenizerPlugin` | token counts from a tokenizer instead of an estimate |
@@ -165,6 +165,29 @@ listener that comes late.
 Events are told inside the process that runs the turn. With a task queue
 shared by several nodes, a listener on another node hears nothing;
 `runningTurn` is right on every node.
+
+### Following a user's sessions
+
+A list of sessions follows no stream. Which sessions are busy and which wait
+is a session's `status`, read with the session
+(`SessionManagement.list`, `find`), and what changes about them the
+management tells:
+
+```java
+runtime.service(SessionManagement.class).lifecycle(userId, event -> {
+    switch (event) {
+        case SessionLifecycleEvent.Opened opened -> addRow(opened.sessionId());
+        case SessionLifecycleEvent.Renamed renamed -> rename(renamed.sessionId(), renamed.title());
+        case SessionLifecycleEvent.StatusChanged changed -> badge(changed.sessionId(), changed.status());
+        case SessionLifecycleEvent.Deleted deleted -> removeRow(deleted.sessionId());
+    }
+});
+```
+
+That is the management's, not the runtime's: it hears every session as a
+plugin does and makes the few things a list shows of it. A runtime without
+`ManagementPlugin` has no such feed — a host that wants one of its own
+contributes a `SessionEventListener`.
 
 ## Writing a plugin
 

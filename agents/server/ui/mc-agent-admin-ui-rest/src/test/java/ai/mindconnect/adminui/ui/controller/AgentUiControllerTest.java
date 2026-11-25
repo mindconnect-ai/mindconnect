@@ -62,7 +62,8 @@ class AgentUiControllerTest {
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         agents = new RepositoryAgentManagement(agentRepository);
         sessions = new RepositorySessionManagement(sessionRepository, messages, agentRepository,
-                SessionDirectoryPolicy.unrestricted(), List.of());
+                SessionDirectoryPolicy.unrestricted(), List.of(),
+                new ai.mindconnect.agent.management.SessionLifecycle(sessionRepository, session -> java.util.Optional.empty()));
         scout = agents.create(ManagedAgent.of(SCOUT));
         new RepositorySessionStore(sessionRepository, messages)
                 .create(new Session(ALICES, UserId.of("alice"), null, SCOUT, Map.of(), NOW));

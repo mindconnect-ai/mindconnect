@@ -8,6 +8,7 @@ import java.util.Optional;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 
 /**
  * What is done with sessions beside running turns in them. A session is
@@ -51,8 +52,6 @@ public interface SessionManagement {
 
     /** @throws IllegalArgumentException here and below, if there is no such session */
     ManagedSession rename(SessionId sessionId, String title);
-
-    ManagedSession changeStatus(SessionId sessionId, ManagedSession.Status status);
 
     /**
      * Other directories for the session. A directory it does not have yet
@@ -114,4 +113,14 @@ public interface SessionManagement {
      * an answer is thrown away to be given again.
      */
     void deleteMessagesFrom(SessionId sessionId, int sequence);
+
+    /**
+     * Hears what changes about this user's sessions, in whichever namespace
+     * they are, until the subscription is closed: one is opened, renamed or
+     * deleted, a turn in one begins, asks or ends. What a list of sessions
+     * follows.
+     *
+     * <p>From now on: how the sessions stand is read with {@link #list}.
+     */
+    Subscription lifecycle(UserId user, SessionLifecycleListener listener);
 }

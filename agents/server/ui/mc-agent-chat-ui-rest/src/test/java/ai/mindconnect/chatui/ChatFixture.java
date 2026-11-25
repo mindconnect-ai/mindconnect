@@ -41,7 +41,7 @@ public final class ChatFixture {
                                          List<String> additionalDirectories) {
         return new ManagedSession(SessionId.of(UUID.randomUUID().toString()), UserId.of(user), null,
                 agent == null ? null : new SessionAgent.Ref(agent.id()), null, ManagedSession.CHAT,
-                ManagedSession.Status.ACTIVE, new SessionDirectories(workingDirectory, additionalDirectories),
+                ManagedSession.Status.IDLE, new SessionDirectories(workingDirectory, additionalDirectories),
                 Instant.now(), agent == null ? Map.of() : Map.of(ManagedSession.AGENT_ID, agent.id().value()));
     }
 }

@@ -17,7 +17,7 @@ class ChatShellComponentBadgeTest {
     private static ManagedSession chat(SessionId id, String title, Instant startedAt) {
         return new ManagedSession(id,
                 ai.mindconnect.agent.UserId.of("ada"), null, null, title, ManagedSession.CHAT,
-                ManagedSession.Status.ACTIVE, SessionDirectories.NONE, startedAt, java.util.Map.of());
+                ManagedSession.Status.IDLE, SessionDirectories.NONE, startedAt, java.util.Map.of());
     }
 
     private static SessionId id(ManagedSession chat) {

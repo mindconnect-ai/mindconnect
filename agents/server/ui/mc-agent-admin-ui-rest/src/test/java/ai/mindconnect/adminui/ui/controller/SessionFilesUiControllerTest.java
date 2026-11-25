@@ -71,7 +71,8 @@ class SessionFilesUiControllerTest {
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
                 new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
-                List.of());
+                List.of(),
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
         var id = ai.mindconnect.agent.SessionId.of("s1");
         new RepositorySessionStore(sessions, messages).create(new Session(id,
                 UserId.of("alice"), null, HELPER,

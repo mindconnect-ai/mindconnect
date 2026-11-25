@@ -55,7 +55,8 @@ class ToolResultDownloadControllerTest {
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionManagement management = new RepositorySessionManagement(stored, messages,
                 new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
-                List.of());
+                List.of(),
+                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()));
         var store = new RepositorySessionStore(stored, messages);
         store.create(new Session(ALICES, UserId.of("alice"), null,
                 new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5, Map.of()),

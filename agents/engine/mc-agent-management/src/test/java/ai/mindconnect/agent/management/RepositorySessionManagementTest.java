@@ -25,6 +25,12 @@ import ai.mindconnect.agent.management.port.out.AgentRepository;
 import java.util.Optional;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
+import ai.mindconnect.agent.runtime.api.domain.TurnId;
+import ai.mindconnect.agent.runtime.api.domain.Turn;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.management.api.SessionLifecycleEvent;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -52,7 +58,8 @@ class RepositorySessionManagementTest {
     /** The sessions a cleanup was told are gone. */
     private final List<ManagedSession> cleanedUp = new java.util.ArrayList<>();
     private final SessionManagement management = new RepositorySessionManagement(sessions, messages, agents,
-            SessionDirectoryPolicy.unrestricted(), List.of(cleanedUp::add));
+            SessionDirectoryPolicy.unrestricted(), List.of(cleanedUp::add),
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
 
     private Session open(String id, String user, String parent, String createdAt, Map<String, Object> metadata) {
         Session session = new Session(SessionId.of(id), UserId.of(user), parent == null ? null : SessionId.of(parent),
@@ -78,17 +85,17 @@ class RepositorySessionManagementTest {
         open("plain", "ada", null, "2026-11-01T00:00:00Z", Map.of());
         open("set-up", "ada", null, "2026-11-02T00:00:00Z", Map.of(
                 ManagedSession.TITLE, "Owls", ManagedSession.TYPE, "research",
-                ManagedSession.STATUS, "COMPLETED", ManagedSession.WORKING_DIRECTORY, "/srv/owls",
+                ManagedSession.WORKING_DIRECTORY, "/srv/owls",
                 ManagedSession.ADDITIONAL_DIRECTORIES, List.of("/srv/shared")));
 
         assertThat(management.find(SessionId.of("plain"))).contains(new ManagedSession(SessionId.of("plain"), ADA,
-                null, new SessionAgent.Own(HELPER, null), null, ManagedSession.CHAT, ManagedSession.Status.ACTIVE, SessionDirectories.NONE,
+                null, new SessionAgent.Own(HELPER, null), null, ManagedSession.CHAT, ManagedSession.Status.IDLE, SessionDirectories.NONE,
                 Instant.parse("2026-11-01T00:00:00Z"), Map.of()));
         assertThat(management.find(SessionId.of("set-up"))).contains(new ManagedSession(SessionId.of("set-up"), ADA,
-                null, new SessionAgent.Own(HELPER, null), "Owls", "research", ManagedSession.Status.COMPLETED,
+                null, new SessionAgent.Own(HELPER, null), "Owls", "research", ManagedSession.Status.IDLE,
                 new SessionDirectories("/srv/owls", List.of("/srv/shared")), Instant.parse("2026-11-02T00:00:00Z"),
                 Map.of(ManagedSession.TITLE, "Owls", ManagedSession.TYPE, "research",
-                        ManagedSession.STATUS, "COMPLETED", ManagedSession.WORKING_DIRECTORY, "/srv/owls",
+                        ManagedSession.WORKING_DIRECTORY, "/srv/owls",
                         ManagedSession.ADDITIONAL_DIRECTORIES, List.of("/srv/shared"))));
     }
 
@@ -99,13 +106,11 @@ class RepositorySessionManagementTest {
                 List.of(), 5, Map.of());
 
         management.rename(id, "Owls");
-        management.changeStatus(id, ManagedSession.Status.CANCELLED);
         management.changeDirectories(id, new SessionDirectories("/srv/owls", List.of()));
         management.setMetadata(id, "chat.pinned", true);
         ManagedSession changed = management.changeAgent(id, other);
 
         assertThat(changed.title()).isEqualTo("Owls");
-        assertThat(changed.status()).isEqualTo(ManagedSession.Status.CANCELLED);
         assertThat(changed.agent()).isEqualTo(new SessionAgent.Own(other, null));
         assertThat(changed.metadata()).containsEntry("chat.pinned", true);
         Session found = runtime.find(id).orElseThrow();
@@ -169,7 +174,8 @@ class RepositorySessionManagementTest {
             }
         };
         SessionManagement placing = new RepositorySessionManagement(sessions, messages, agents,
-            homes, List.of(cleanedUp::add));
+            homes, List.of(cleanedUp::add),
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
 
         ManagedSession referring = placing.open(ADA, null, new SessionAgent.Ref(owl.id()), null, SessionDirectories.NONE);
         assertThat(referring.agent()).isEqualTo(new SessionAgent.Ref(owl.id()));
@@ -239,7 +245,8 @@ class RepositorySessionManagementTest {
             }
         };
         SessionManagement guarded = new RepositorySessionManagement(sessions, messages, agents,
-            underSrv, List.of(cleanedUp::add));
+            underSrv, List.of(cleanedUp::add),
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
         SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
 
         assertThat(guarded.changeDirectories(id, new SessionDirectories("/srv/owls", List.of("/srv/mice")))
@@ -292,5 +299,61 @@ class RepositorySessionManagementTest {
         assertThat(messages.findByConversation(ai.mindconnect.message.domain.ConversationId.of("child"),
                 new ai.mindconnect.common.PageRequest(0, 10))).isEmpty();
         assertThat(runtime.messages(other)).hasSize(1);
+    }
+
+    @Test
+    void a_sessions_status_is_read_from_its_turn_and_not_kept() {
+        SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
+        java.util.concurrent.atomic.AtomicReference<TurnStatus> turn = new java.util.concurrent.atomic.AtomicReference<>();
+        SessionManagement reading = new RepositorySessionManagement(sessions, messages, agents,
+                SessionDirectoryPolicy.unrestricted(), List.of(),
+                new SessionLifecycle(sessions, session -> java.util.Optional.ofNullable(turn.get())
+                        .map(status -> new Turn(TurnId.of("t1"), null, session, HELPER, status, List.of(), null, null))));
+
+        assertThat(reading.find(id).orElseThrow().status()).isEqualTo(ManagedSession.Status.IDLE);
+        turn.set(TurnStatus.RUNNING);
+        assertThat(reading.find(id).orElseThrow().status()).isEqualTo(ManagedSession.Status.BUSY);
+        turn.set(TurnStatus.INTERRUPTED);
+        assertThat(reading.find(id).orElseThrow().status()).isEqualTo(ManagedSession.Status.WAITING);
+    }
+
+    @Test
+    void a_user_hears_what_changes_about_their_sessions_and_nobody_elses() throws InterruptedException {
+        SessionLifecycle lifecycle = new SessionLifecycle(sessions, session -> java.util.Optional.empty());
+        SessionManagement telling = new RepositorySessionManagement(sessions, messages, agents,
+                SessionDirectoryPolicy.unrestricted(), List.of(), lifecycle);
+        List<SessionLifecycleEvent> ada = new java.util.concurrent.CopyOnWriteArrayList<>();
+        List<SessionLifecycleEvent> bob = new java.util.concurrent.CopyOnWriteArrayList<>();
+        telling.lifecycle(ADA, ada::add);
+        telling.lifecycle(UserId.of("bob"), bob::add);
+
+        SessionId id = telling.open(ADA, null, new SessionAgent.Own(HELPER, null), null, SessionDirectories.NONE).id();
+        SessionId below = open("below", "ada", id.value(), "2026-11-01T00:00:00Z", Map.of()).id();
+        telling.rename(id, "Owls");
+        // What a turn does reaches the list as the status of the session the user sees.
+        lifecycle.onEvent(SessionEvent.of(StreamEvent.ASKING_LLM, id, TurnId.of("t1"), null,
+                new StreamEvent.AskingLlm(false)));
+        lifecycle.onEvent(SessionEvent.of(StreamEvent.TOKEN, id, TurnId.of("t1"), null, new StreamEvent.Token("x")));
+        lifecycle.onEvent(SessionEvent.of(StreamEvent.WAITING, below, TurnId.of("t2"), TurnId.of("t1"),
+                new StreamEvent.Waiting()));
+        lifecycle.onEvent(SessionEvent.of(StreamEvent.DONE, below, TurnId.of("t2"), TurnId.of("t1"),
+                new StreamEvent.Done(TurnStatus.COMPLETED, "", null)));
+        lifecycle.onEvent(SessionEvent.of(StreamEvent.DONE, id, TurnId.of("t1"), null,
+                new StreamEvent.Done(TurnStatus.COMPLETED, "Done.", null)));
+        lifecycle.onEvent(new SessionEvent("session.title", id, null, null, Map.of("title", "Owls at night")));
+        telling.delete(id);
+
+        for (int i = 0; i < 200 && ada.size() < 7; i++) {
+            Thread.sleep(10);
+        }
+        assertThat(ada).containsExactly(
+                new SessionLifecycleEvent.Opened(id, null, ManagedSession.CHAT),
+                new SessionLifecycleEvent.Renamed(id, "Owls"),
+                new SessionLifecycleEvent.StatusChanged(id, ManagedSession.Status.BUSY),
+                new SessionLifecycleEvent.StatusChanged(id, ManagedSession.Status.WAITING),
+                new SessionLifecycleEvent.StatusChanged(id, ManagedSession.Status.IDLE),
+                new SessionLifecycleEvent.Renamed(id, "Owls at night"),
+                new SessionLifecycleEvent.Deleted(id));
+        assertThat(bob).isEmpty();
     }
 }
