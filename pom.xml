@@ -129,6 +129,7 @@
         <module>agents/core/mc-agent-runtime-api</module>
         <module>agents/core/mc-agent-runtime-capabilities</module>
         <module>agents/engine/mc-agent-runtime-adapters</module>
+        <module>agents/engine/mc-agent-migration</module>
         <module>agents/engine/mc-agent-runtime-engine</module>
         <module>agents/core/mc-agent-trace</module>
         <module>agents/adapter/postgres/mc-agent-trace-pg</module>
@@ -144,6 +145,7 @@
         <module>agents/engine/mc-agent-runtime-infrastructure</module>
         <module>agents/adapter/postgres/mc-agent-runtime-infrastructure-pg</module>
         <module>agents/adapter/postgres/mc-agent-runtime-engine-pg</module>
+        <module>agents/adapter/postgres/mc-agent-migration-pg</module>
         <module>agents/adapter/postgres/mc-agent-management-pg</module>
         <module>agents/client/mc-agent-sdk</module>
         <module>agents/client/mc-agent-cli-local</module>

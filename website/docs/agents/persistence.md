@@ -215,6 +215,30 @@ podman run -d -p 5433:5432 -e POSTGRES_PASSWORD=test pgvector/pgvector:pg17-trix
 
 Override with `MC_JDBC_TEST_URL`, `MC_JDBC_TEST_USER`, `MC_JDBC_TEST_PASSWORD`.
 
+## Migrations
+
+What a new version needs changed in stored data is a **migration**: a Java
+class in `agents/engine/mc-agent-migration` that implements `Migration` — an
+id, the version of mindconnect it came with, and `migrate()`. The runner
+applies the migrations a namespace has not had yet, ordered by version, and
+logs each one with that namespace's data: the table `mc_migration` in Postgres,
+`<namespace>/system/migrations/<id>.json` on files. The highest version in the
+log is the version the namespace's data is at. A migration that fails is not
+logged, stops the ones after it, and runs again on the next start, so a
+migration must leave what it finds done already.
+
+The runtime starter runs them in every namespace the first time it is used
+after start (all existing namespaces are used at start), before anything else
+works there; `mindconnect.migrations.enabled=false` switches that off. Another
+module adds one by contributing a `Migration` to the plugin registry.
+
+The first migration, `earlier-runtime` (0.8.5), takes over what the earlier
+runtime kept: its agents (`mc_agent_definition`, `system/agents/`) become
+managed agents, its sessions (`mc_agent_session`, `sessions/<id>/session.json`)
+sessions of the runtime with the same ids, and each conversation the session's
+messages, with their ids, places and times, plus its latest summary. The
+earlier data stays where it is.
+
 ## Other databases
 
 Every storage concept is a port, so a third backend means implementing those

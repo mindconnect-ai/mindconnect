@@ -37,7 +37,11 @@ public final class SessionSummaryStore implements SummaryStore {
 
     @Override
     public void save(SessionId sessionId, ConversationSummary summary) {
-        sessions.get().update(sessionId, session -> session.withMetadata(SUMMARY,
-                Map.of(TEXT, summary.text(), THROUGH, summary.throughMessageId())));
+        sessions.get().update(sessionId, session -> session.withMetadata(SUMMARY, stored(summary)));
+    }
+
+    /** The summary as a session's metadata holds it under {@link #SUMMARY}: for whoever writes a session whole. */
+    public static Map<String, Object> stored(ConversationSummary summary) {
+        return Map.of(TEXT, summary.text(), THROUGH, summary.throughMessageId());
     }
 }

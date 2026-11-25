@@ -79,6 +79,16 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-migration</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-migration-pg</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-management-pg</artifactId>
             <version>${project.version}</version>
         </dependency>

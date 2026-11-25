@@ -94,8 +94,17 @@ public final class RepositorySessionStore implements SessionStore {
     @Override
     public List<StoredMessage> history(SessionId sessionId) {
         return sessions.find(sessionId)
-                .map(session -> messages.findByConversation(SessionMessageMapper.conversationOf(session), EVERYTHING))
-                .orElse(List.of()).stream()
+                .map(session -> conversation(SessionMessageMapper.conversationOf(session)))
+                .orElse(List.of());
+    }
+
+    /**
+     * A conversation's messages with their places, read by its id whatever
+     * session names it: for moving what the earlier runtime kept, whose
+     * sub-agents' sessions had conversations of their own.
+     */
+    public List<StoredMessage> conversation(ConversationId conversation) {
+        return messages.findByConversation(conversation, EVERYTHING).stream()
                 .flatMap(stored -> mapper.turnMessage(stored).stream()
                         .map(message -> new StoredMessage(message, stored.sequenceNum(), stored.sentAt())))
                 .toList();

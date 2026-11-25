@@ -35,6 +35,11 @@ import ai.mindconnect.jackson.JacksonPlugin;
 import ai.mindconnect.jackson.JsonMapperCustomizer;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.migration.AppliedMigration;
+import ai.mindconnect.agent.migration.plugin.FileMigrationPlugin;
+import ai.mindconnect.agent.migration.plugin.MigrationPlugin;
+import ai.mindconnect.agent.migration.MigrationRunner;
+import ai.mindconnect.agent.migration.pg.PgMigrationPlugin;
 import ai.mindconnect.agent.runtime.store.SessionMessageMigration;
 import ai.mindconnect.agent.runtime.store.SessionMessages;
 import ai.mindconnect.agent.scope.Scope;
@@ -197,6 +202,9 @@ public class RuntimeEngineAutoConfiguration {
                 // another file store is named, and the store plugin's answer is the later one.
                 .plugin(new FilePlugin(env.getProperty("mindconnect.file-store.backend", "filesystem"), dataDir))
                 .plugin(stores)
+                // The migrations, with their log where the stores are; run per namespace once the runtime is up.
+                .plugin(new MigrationPlugin())
+                .plugin(migrationPlace(persistence, dataDir))
                 // A resolver of the application's own wins; else the sources the plugins contribute.
                 .plugin(new LlmPlugin(blankToNull(env.getProperty("mindconnect.encryption.secret-key")),
                         (EnvVarResolver) hostBean(context, EnvVarResolver.class).orElse(null)))
@@ -239,31 +247,57 @@ public class RuntimeEngineAutoConfiguration {
         Namespace startup = new Namespace(env.getProperty("mindconnect.namespace", "local"));
         AgentRuntime runtime = StartupScope.call(scope, startup, builder::build);
         built.set(runtime);
-        if (SessionMessages.of(settings) == SessionMessages.OWN) {
-            moveSessionMessages(runtime, scope, startup);
-        }
+        prepareNamespaces(runtime, scope, startup,
+                env.getProperty("mindconnect.migrations.enabled", Boolean.class, true),
+                SessionMessages.of(settings) == SessionMessages.OWN);
         log.info("Agent runtime built: persistence {}, namespace {}", persistence,
                 scope instanceof ThreadBoundScopeSupplier ? "per call" : startup.value());
         return runtime;
     }
 
     /**
-     * Moves the sessions' messages out of the conversations, in every namespace
-     * the first time it is used after start — a namespace bound for the first
-     * time waits for its move — or at once where there is one namespace only.
+     * Brings every namespace's data up to this version the first time the
+     * namespace is used after start — a namespace bound for the first time
+     * waits for it — or at once where there is one namespace only: the
+     * migrations it has not had, then, where a session's messages are kept in
+     * their own repository, the move of those still kept as conversations.
      */
-    private static void moveSessionMessages(AgentRuntime runtime, ScopeSupplier scope, Namespace startup) {
-        SessionMessageMigration migration = runtime.service(SessionMessageMigration.class);
-        Consumer<Namespace> move = namespace -> {
-            SessionMessageMigration.Report report = migration.run();
-            log.info("Session messages of namespace {}: {} sessions moved, {} moved before",
-                    namespace.value(), report.migrated().size(), report.skipped().size());
+    private static void prepareNamespaces(AgentRuntime runtime, ScopeSupplier scope, Namespace startup,
+                                          boolean migrate, boolean moveMessages) {
+        if (!migrate && !moveMessages) {
+            return;
+        }
+        Consumer<Namespace> prepare = namespace -> {
+            if (migrate) {
+                MigrationRunner migrations = runtime.service(MigrationRunner.class);
+                for (AppliedMigration applied : migrations.run()) {
+                    log.info("Migration {} ({}) in namespace {}: {}", applied.id(), applied.version(),
+                            namespace.value(), applied.report());
+                }
+                log.info("Data of namespace {} at version {}", namespace.value(),
+                        migrations.dataVersion().orElse("(none migrated)"));
+            }
+            if (moveMessages) {
+                SessionMessageMigration.Report report = runtime.service(SessionMessageMigration.class).run();
+                log.info("Session messages of namespace {}: {} sessions moved, {} moved before",
+                        namespace.value(), report.migrated().size(), report.skipped().size());
+            }
         };
         if (scope instanceof ThreadBoundScopeSupplier bound) {
-            bound.onBind(new NamespaceFirstUse("Moving session messages", move));
+            bound.onBind(new NamespaceFirstUse("Migrating data", prepare));
         } else {
-            StartupScope.run(scope, startup, () -> move.accept(startup));
+            StartupScope.run(scope, startup, () -> prepare.accept(startup));
         }
+    }
+
+    /** Where the migrations keep their log and find the earlier runtime's data: where the stores are. */
+    private static Plugin migrationPlace(String persistence, Path dataDir) {
+        return switch (persistence) {
+            case "postgres" -> new PgMigrationPlugin();
+            // Nothing is kept: the log lasts as long as the process, and there is no earlier data.
+            case "memory" -> provides("migrations-memory", registry -> { });
+            default -> new FileMigrationPlugin(dataDir);
+        };
     }
 
     /** The tools bind their providers once the context is up — not while it is still refreshing. */

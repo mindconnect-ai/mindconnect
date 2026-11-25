@@ -20,10 +20,12 @@ class AgentsArchitectureTest {
      * past it: the store that keeps them in the message repository is about
      * to be replaced by one of their own. Frozen with whoever still builds the
      * old store; the store goes, and the rule with it, once nobody does.
+     * Migrations read what was kept the old way: that is what they are for.
      */
     @ArchTest
     static final ArchRule sessionsAreReadThroughTheStore = FreezingArchRule.freeze(
-            noClasses().that().resideOutsideOfPackage("ai.mindconnect.agent.runtime.store..")
+            noClasses().that().resideOutsideOfPackages("ai.mindconnect.agent.runtime.store..",
+                            "ai.mindconnect.agent.migration..")
                     .should().dependOnClassesThat()
                     .haveFullyQualifiedName("ai.mindconnect.agent.runtime.store.RepositorySessionStore")
                     .orShould().dependOnClassesThat()
