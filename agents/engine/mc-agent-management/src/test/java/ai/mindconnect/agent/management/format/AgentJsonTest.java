@@ -26,7 +26,7 @@ import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
  */
 class AgentJsonTest {
 
-    private final AgentJson files = new AgentJson(new ObjectMapper().registerModule(new JavaTimeModule())
+    private final AgentJson files = new AgentJson(new ObjectMapper().registerModule(new JavaTimeModule()).findAndRegisterModules()
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
 
     @Test

@@ -1,5 +1,6 @@
 #
-#Wed Nov 25 10:58:48 CET 2026
+#Wed Nov 25 11:24:08 CET 2026
+Contracts\:\ the\ agents'\ contracts\ know\ no\ Jackson=8ee06ada-b1bb-483f-8d79-df2753bc23ff
 Conventions\:\ SLF4J\ everywhere,\ never\ java.util.logging=a93c072a-3273-4634-919b-0b4f2d78cffd
 Conventions\:\ every\ ObjectMapper\ comes\ from\ JsonMapperFactory=3ba6aa47-7551-462c-bacc-591e376581c1
 Conventions\:\ one\ constructor\ per\ class=fc2f2e97-0fe6-467d-872f-55c02c513d74

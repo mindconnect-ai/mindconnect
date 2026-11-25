@@ -23,7 +23,7 @@ class FileNamespaceRepositoryTest {
     @TempDir
     Path dir;
 
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).findAndRegisterModules();
 
     private static final Email DAVID = Email.of("david@local");
     private static final Email ALICE = Email.of("alice@local");

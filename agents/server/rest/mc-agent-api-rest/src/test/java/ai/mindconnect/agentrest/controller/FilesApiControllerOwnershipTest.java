@@ -6,9 +6,13 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
+import ai.mindconnect.json.JsonMapperFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.converter.ResourceHttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -45,6 +49,9 @@ class FilesApiControllerOwnershipTest {
     void setUp() {
         store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
         mvc = MockMvcBuilders.standaloneSetup(new FilesApiController(store))
+                // Spring's own JSON converter knows no module of the installation; the app's mapper does.
+                .setMessageConverters(new ResourceHttpMessageConverter(), new StringHttpMessageConverter(),
+                        new MappingJackson2HttpMessageConverter(JsonMapperFactory.create()))
                 .setCustomArgumentResolvers(callers.resolver()).build();
     }
 

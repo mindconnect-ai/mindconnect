@@ -1,8 +1,6 @@
 package ai.mindconnect.agent.tool;
 
 import ai.mindconnect.agent.EntityId;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
  * Identifies one tool binding of an agent.
@@ -12,13 +10,12 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * belongs to is known from the {@code AgentDefinition} that lists it, and, at
  * call time, from the {@link ToolCallScope}. See {@link EntityId}.
  */
-public record AgentToolId(@JsonValue String value) implements EntityId {
+public record AgentToolId(String value) implements EntityId {
 
     public AgentToolId {
         EntityId.check(value);
     }
 
-    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
     public static AgentToolId of(String value) {
         return new AgentToolId(value);
     }

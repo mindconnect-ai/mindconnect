@@ -199,6 +199,20 @@ public final class McArchRules {
             .should().callCodeUnitWhere(buildAMapper())
             .as("Conventions: every ObjectMapper comes from JsonMapperFactory"));
 
+    /**
+     * Contracts: the agents' contracts know no Jackson. The ids, the scope, the
+     * tool SPI, the runtime API and the loop are what a library user builds on,
+     * and they are to bring no foreign jar along; how an id stands in JSON is
+     * mc-agent-jackson's. Named by package, so it holds when modules merge.
+     */
+    @ArchTest
+    static final ArchRule contractsKnowNoJackson = FreezingArchRule.freeze(
+        noClasses().that().resideInAPackage("ai.mindconnect.agent")
+            .or().resideInAnyPackage("ai.mindconnect.agent.scope..", "ai.mindconnect.agent.tool..",
+                "ai.mindconnect.agent.runtime.api..", "ai.mindconnect.agent.loop..")
+            .should().dependOnClassesThat().resideInAPackage("com.fasterxml..")
+            .as("Contracts: the agents' contracts know no Jackson"));
+
     private static DescribedPredicate<JavaCall<?>> buildAMapper() {
         return DescribedPredicate.describe("build an ObjectMapper themselves", call -> {
             String owner = call.getTargetOwner().getFullName();

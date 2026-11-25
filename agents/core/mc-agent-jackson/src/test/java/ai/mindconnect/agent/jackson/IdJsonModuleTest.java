@@ -7,6 +7,7 @@ import java.util.Map;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -23,6 +24,20 @@ import org.junit.jupiter.api.Test;
 class IdJsonModuleTest {
 
     private final ObjectMapper json = JsonMapperFactory.create();
+
+    record Holder(SessionId session, AgentId agent, UserId user) { }
+
+    /** Moved here from mc-agent-domain's EntityIdTest, unchanged but for the mapper: the ids carry no Jackson now. */
+    @Test
+    void inJsonAnIdIsItsValue() throws Exception {
+        ObjectMapper mapper = JsonMapperFactory.create();
+        Holder holder = new Holder(SessionId.of("s-1"), AgentId.of("web-researcher"), UserId.of("David"));
+
+        String json = mapper.writeValueAsString(holder);
+
+        assertThat(json).isEqualTo("{\"session\":\"s-1\",\"agent\":\"web-researcher\",\"user\":\"David\"}");
+        assertThat(mapper.readValue(json, Holder.class)).isEqualTo(holder);
+    }
 
     @Test
     void a_mapper_of_the_factory_has_the_module() {
