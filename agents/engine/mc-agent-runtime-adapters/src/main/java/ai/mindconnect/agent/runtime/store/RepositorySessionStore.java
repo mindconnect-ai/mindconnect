@@ -39,9 +39,23 @@ public final class RepositorySessionStore implements SessionStore {
      */
     public static final String CONVERSATION_ID = "conversationId";
 
-    /** The conversation in the message repository that holds a session's messages. */
-    public static ConversationId conversationOf(Session session) {
-        return SessionMessageMapper.conversationOf(session);
+    /**
+     * The conversation in the message repository that holds a session's
+     * messages: the one its metadata names, else the one under its own id.
+     * A sub-agent's session is opened with its caller's metadata, this key
+     * with it; one that names its caller's conversation keeps its messages
+     * under its own id, out of the caller's history. One that names another
+     * conversation has one of its own — the earlier runtime gave its
+     * sub-agents' sessions that.
+     */
+    ConversationId conversationOf(Session session) {
+        if (!(session.metadata().get(CONVERSATION_ID) instanceof String named)) {
+            return ConversationId.of(session.id().value());
+        }
+        boolean inherited = session.parentId() != null && sessions.find(session.parentId())
+                .map(parent -> conversationOf(parent).value().equals(named))
+                .orElse(false);
+        return ConversationId.of(inherited ? session.id().value() : named);
     }
 
     private static final PageRequest EVERYTHING = new PageRequest(0, Integer.MAX_VALUE);
@@ -84,7 +98,7 @@ public final class RepositorySessionStore implements SessionStore {
     @Override
     public List<TurnMessage> messages(SessionId sessionId) {
         return sessions.find(sessionId)
-                .map(session -> messages.findByConversation(SessionMessageMapper.conversationOf(session), EVERYTHING))
+                .map(session -> messages.findByConversation(conversationOf(session), EVERYTHING))
                 .orElse(List.of()).stream()
                 .map(mapper::turnMessage)
                 .flatMap(Optional::stream)
@@ -94,7 +108,7 @@ public final class RepositorySessionStore implements SessionStore {
     @Override
     public List<StoredMessage> history(SessionId sessionId) {
         return sessions.find(sessionId)
-                .map(session -> conversation(SessionMessageMapper.conversationOf(session)))
+                .map(session -> conversation(conversationOf(session)))
                 .orElse(List.of());
     }
 
@@ -113,7 +127,7 @@ public final class RepositorySessionStore implements SessionStore {
     @Override
     public int deleteMessages(SessionId sessionId, long from, long to) {
         Session session = sessions.find(sessionId).orElseThrow(() -> missing(sessionId));
-        ConversationId conversation = SessionMessageMapper.conversationOf(session);
+        ConversationId conversation = conversationOf(session);
         // The message repository counts places in int; a place beyond that is beyond every message.
         int first = (int) Math.min(from, Integer.MAX_VALUE);
         int last = (int) Math.min(to, Integer.MAX_VALUE);
@@ -127,17 +141,18 @@ public final class RepositorySessionStore implements SessionStore {
     @Override
     public void deleteMessages(SessionId sessionId) {
         sessions.find(sessionId).ifPresent(session ->
-                messages.deleteByConversation(SessionMessageMapper.conversationOf(session)));
+                messages.deleteByConversation(conversationOf(session)));
     }
 
     @Override
     public List<TurnMessage> append(SessionId sessionId, List<TurnMessage> added) {
         Session session = sessions.find(sessionId).orElseThrow(() -> missing(sessionId));
+        ConversationId conversation = conversationOf(session);
         List<TurnMessage> stored = new ArrayList<>();
         for (TurnMessage message : added) {
             // The repository hands out the place in the conversation; the id it stores under is the message's id.
-            String id = messages.append(SessionMessageMapper.conversationOf(session),
-                    sequenceNumber -> mapper.message(session, message, sequenceNumber)).id().value();
+            String id = messages.append(conversation,
+                    sequenceNumber -> mapper.message(conversation, session, message, sequenceNumber)).id().value();
             stored.add(message.stored(id));
         }
         return stored;
@@ -147,7 +162,7 @@ public final class RepositorySessionStore implements SessionStore {
     public void updateMessageMetadata(SessionId sessionId, String messageId,
                                       UnaryOperator<Map<String, Object>> change) {
         Session session = sessions.find(sessionId).orElseThrow(() -> missing(sessionId));
-        messages.update(SessionMessageMapper.conversationOf(session), MessageId.of(messageId),
+        messages.update(conversationOf(session), MessageId.of(messageId),
                         stored -> mapper.turnMessage(stored)
                                 .map(message -> mapper.withTurnMetadata(stored, change.apply(message.metadata())))
                                 .orElse(stored))

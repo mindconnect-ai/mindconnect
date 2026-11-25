@@ -54,26 +54,13 @@ final class SessionMessageMapper {
         this.json = json.create();
     }
 
-    /**
-     * The conversation a session's messages are in: the one its metadata
-     * names, else one under the session's own id. A session that continues
-     * a conversation begun elsewhere names it.
-     */
-    static ConversationId conversationOf(Session session) {
-        // Only a session at the root continues a conversation begun elsewhere. A sub-agent's session gets
-        // its caller's metadata, this key with it, and must still keep its messages out of the caller's history.
-        return ConversationId.of(session.parentId() == null
-                && session.metadata().get(RepositorySessionStore.CONVERSATION_ID) instanceof String id
-                ? id : session.id().value());
-    }
-
-    Message message(Session session, TurnMessage written, int sequenceNumber) {
+    Message message(ConversationId conversation, Session session, TurnMessage written, int sequenceNumber) {
         Map<String, Object> metadata = new LinkedHashMap<>(written.metadata());
         if (written.content().stream().anyMatch(part -> !(part instanceof ContentPart.Text))) {
             metadata.put(CONTENT, turnMessages.toJson(written).get("content"));
         }
         boolean fromUser = written.type() == TurnMessage.Type.USER;
-        return compressedAsItsMetadataSays(new Message(MessageId.random(), conversationOf(session),
+        return compressedAsItsMetadataSays(new Message(MessageId.random(), conversation,
                 fromUser ? session.userId().value()
                         : session.agent() == null ? UNNAMED_AGENT : session.agent().name(),
                 fromUser ? ParticipantType.USER : ParticipantType.AGENT, null,

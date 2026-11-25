@@ -86,14 +86,44 @@ class RepositorySessionStoreTest {
 
     @Test
     void a_sub_agents_session_keeps_its_messages_out_of_the_conversation_its_caller_continues() {
+        InMemoryMessageRepository messages = new InMemoryMessageRepository(NAMESPACES);
+        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages,
+                new JsonMapperFactory(List.of(new IdJsonModule())));
         Session caller = new Session(SessionId.of("s-caller"), UserId.of("ada"), null, null,
                 Map.of(RepositorySessionStore.CONVERSATION_ID, "c9"), Instant.EPOCH);
         // Opened with the caller's metadata, as the sub-agent tool does.
         Session called = new Session(SessionId.of("s-called"), UserId.of("ada"), caller.id(), null,
                 caller.metadata(), Instant.EPOCH);
+        store.create(caller);
+        store.create(called);
 
-        assertThat(RepositorySessionStore.conversationOf(caller).value()).isEqualTo("c9");
-        assertThat(RepositorySessionStore.conversationOf(called).value()).isEqualTo("s-called");
+        store.append(caller.id(), List.of(TurnMessage.assistant("to the caller")));
+        store.append(called.id(), List.of(TurnMessage.assistant("to the called")));
+
+        assertThat(store.messages(caller.id())).extracting(TurnMessage::text).containsExactly("to the caller");
+        assertThat(store.messages(called.id())).extracting(TurnMessage::text).containsExactly("to the called");
+        assertThat(messages.findByConversation(ConversationId.of("c9"), new PageRequest(0, 10))).hasSize(1);
+        assertThat(messages.findByConversation(ConversationId.of("s-called"), new PageRequest(0, 10))).hasSize(1);
+    }
+
+    @Test
+    void a_sub_agents_session_that_names_a_conversation_of_its_own_reads_that_one() {
+        InMemoryMessageRepository messages = new InMemoryMessageRepository(NAMESPACES);
+        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages,
+                new JsonMapperFactory(List.of(new IdJsonModule())));
+        Session caller = new Session(SessionId.of("s-caller"), UserId.of("ada"), null, null,
+                Map.of(RepositorySessionStore.CONVERSATION_ID, "c9"), Instant.EPOCH);
+        // As the earlier runtime left a sub-agent's session: its conversation under an id of its own.
+        Session called = new Session(SessionId.of("s-called"), UserId.of("ada"), caller.id(), null,
+                Map.of(RepositorySessionStore.CONVERSATION_ID, "c-called"), Instant.EPOCH);
+        store.create(caller);
+        store.create(called);
+
+        store.append(called.id(), List.of(TurnMessage.assistant("to the called")));
+
+        assertThat(messages.findByConversation(ConversationId.of("c-called"), new PageRequest(0, 10))).hasSize(1);
+        assertThat(store.messages(called.id())).extracting(TurnMessage::text).containsExactly("to the called");
+        assertThat(store.messages(caller.id())).isEmpty();
     }
 
     @Test
@@ -164,7 +194,8 @@ class RepositorySessionStoreTest {
         SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages,
                 new JsonMapperFactory(List.of(new IdJsonModule())));
         store.create(SESSION);
-        ai.mindconnect.message.domain.ConversationId conversation = RepositorySessionStore.conversationOf(SESSION);
+        ai.mindconnect.message.domain.ConversationId conversation =
+                ((RepositorySessionStore) store).conversationOf(SESSION);
         messages.append(conversation, seq -> ai.mindconnect.message.domain.Message.of(conversation, "ada",
                 ai.mindconnect.message.domain.ParticipantType.USER, ai.mindconnect.message.domain.MessageType.CHAT,
                 List.of(new ai.mindconnect.message.domain.ContentPart.Text("What is this?"),

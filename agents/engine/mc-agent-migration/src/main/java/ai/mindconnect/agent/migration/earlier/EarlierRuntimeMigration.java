@@ -33,7 +33,7 @@ import ai.mindconnect.message.domain.ConversationId;
  * session's conversation becomes its messages in its own repository, each
  * with its id, place and time. The conversation stays where it is and the
  * session names it, which is the way back to keeping messages as
- * conversations; a sub-agent's session reads only its own there.
+ * conversations.
  *
  * <p>What a session knew is kept under the keys the runtime reads: title,
  * type, working directories, attachments, approved and activated tools, and
