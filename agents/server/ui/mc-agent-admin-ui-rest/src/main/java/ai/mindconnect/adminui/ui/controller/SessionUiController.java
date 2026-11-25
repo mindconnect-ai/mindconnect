@@ -31,7 +31,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
@@ -50,7 +49,6 @@ public class SessionUiController {
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
     private final ConversationManager conversations;
-    /** Writes the raw JSON the dialogs show: Jackson's defaults, as these components have always had. */
     private final ObjectMapper json;
 
     public SessionUiController(AgentRuntime runtime,
@@ -62,7 +60,7 @@ public class SessionUiController {
         this.todoListService = todoListService;
         this.traceRepository = traceRepository;
         this.conversations = conversations;
-        this.json = runtime.service(JsonMapperFactory.class).create();
+        this.json = runtime.service(ObjectMapper.class);
     }
 
     /** The agent the session runs as, for a dialog's heading; a session without one is still shown. */
