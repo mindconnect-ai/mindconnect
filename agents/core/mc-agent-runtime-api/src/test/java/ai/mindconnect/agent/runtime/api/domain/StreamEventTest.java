@@ -1,6 +1,9 @@
 package ai.mindconnect.agent.runtime.api.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import ai.mindconnect.agent.loop.domain.TurnInterruptionEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.loop.domain.StreamEvent;
 
 import java.util.List;
 import java.util.Map;
@@ -20,29 +23,29 @@ class StreamEventTest {
 
     private record Told<T extends StreamEvent>(EventType<T> type, T payload) {
         SessionEvent event() {
-            return SessionEvent.of(type, SESSION, TURN, null, payload);
+            return SessionEvent.of(SESSION, TURN, null, payload);
         }
     }
 
     static Stream<Told<?>> everyKind() {
         return Stream.of(
-                new Told<>(StreamEvent.ASKING_LLM, new StreamEvent.AskingLlm(true)),
-                new Told<>(StreamEvent.TOKEN, new StreamEvent.Token("Hel")),
-                new Told<>(StreamEvent.THINKING, new StreamEvent.Thinking("hm")),
-                new Told<>(StreamEvent.TOOL_CALL_STARTED,
-                        new StreamEvent.ToolCallStarted("c1", "bash", Map.of("command", "ls"), 1)),
-                new Told<>(StreamEvent.TOOL_CALL_RESULT, new StreamEvent.ToolCallResult("c1", "bash", "a.txt")),
-                new Told<>(StreamEvent.TOOL_CALL_FAILED, new StreamEvent.ToolCallFailed("c1", "bash", "no such file")),
-                new Told<>(StreamEvent.APPROVAL_REQUESTED, new StreamEvent.ApprovalRequested("i1", "c1", "bash",
-                        Map.of("command", "rm"), SessionId.of("s2"))),
-                new Told<>(StreamEvent.INPUT_REQUESTED, new StreamEvent.InputRequested("i2", "user_input", "c2",
+                new Told<>(EventType.ASKING_LLM, new TurnStreamEvent.AskingLlm(true)),
+                new Told<>(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("Hel")),
+                new Told<>(EventType.THINKING, new TurnStreamEvent.Thinking("hm")),
+                new Told<>(EventType.TOOL_CALL_STARTED,
+                        new TurnStreamEvent.ToolCallStarted("c1", "bash", Map.of("command", "ls"), 1)),
+                new Told<>(EventType.TOOL_CALL_RESULT, new TurnStreamEvent.ToolCallResult("c1", "bash", "a.txt")),
+                new Told<>(EventType.TOOL_CALL_FAILED, new TurnStreamEvent.ToolCallFailed("c1", "bash", "no such file")),
+                new Told<>(EventType.APPROVAL_REQUESTED, new TurnInterruptionEvent.ApprovalRequested("i1", "c1", "bash",
+                        Map.of("command", "rm"), "s2")),
+                new Told<>(EventType.INPUT_REQUESTED, new TurnInterruptionEvent.InputRequested("i2", "user_input", "c2",
                         "ask_user", Map.of("question", "Which one?"))),
-                new Told<>(StreamEvent.WAITING, new StreamEvent.Waiting()),
-                new Told<>(StreamEvent.TURN_USAGE, new StreamEvent.TurnUsage(1200, 340)),
-                new Told<>(StreamEvent.DONE, new StreamEvent.Done(TurnStatus.INCOMPLETE, "", "MAX_ROUNDS")),
-                new Told<>(StreamEvent.ERROR, new StreamEvent.Error(TurnStatus.FAILED, "The model did not answer")),
-                new Told<>(StreamEvent.SUB_AGENT_STARTED, new StreamEvent.SubAgentStarted("researcher")),
-                new Told<>(StreamEvent.SUB_AGENT_DONE, new StreamEvent.SubAgentDone("researcher", "Paris.")));
+                new Told<>(EventType.WAITING, new SessionStreamEvent.Waiting()),
+                new Told<>(EventType.TURN_USAGE, new TurnStreamEvent.TurnUsage(1200, 340)),
+                new Told<>(EventType.DONE, new SessionStreamEvent.Done(TurnStatus.INCOMPLETE, "", "MAX_ROUNDS")),
+                new Told<>(EventType.ERROR, new SessionStreamEvent.Error(TurnStatus.FAILED, "The model did not answer")),
+                new Told<>(EventType.SUB_AGENT_STARTED, new SessionStreamEvent.SubAgentStarted("researcher")),
+                new Told<>(EventType.SUB_AGENT_DONE, new SessionStreamEvent.SubAgentDone("researcher", "Paris.")));
     }
 
     @ParameterizedTest
@@ -55,32 +58,32 @@ class StreamEventTest {
     @Test
     void the_list_of_kinds_is_the_one_the_test_knows() {
         // A kind that is added gets a line above, so that it is read back too.
-        assertThat(StreamEvent.TYPES).extracting(EventType::kind)
+        assertThat(EventType.TYPES).extracting(EventType::kind)
                 .containsExactlyInAnyOrderElementsOf(Stream.concat(
                         everyKind().map(told -> told.type().kind()), Stream.of("message")).toList());
     }
 
     @Test
     void a_whole_message_reads_back_with_what_was_said() {
-        SessionEvent event = SessionEvent.of(StreamEvent.MESSAGE, SESSION, TURN, null,
-                new StreamEvent.MessageWritten(TurnMessage.assistant("Hello.")));
+        SessionEvent event = SessionEvent.of(SESSION, TURN, null,
+                new TurnStreamEvent.MessageWritten(TurnMessage.assistant("Hello.")));
 
-        assertThat(event.as(StreamEvent.MESSAGE).orElseThrow().message().text()).isEqualTo("Hello.");
+        assertThat(event.as(EventType.MESSAGE).orElseThrow().message().text()).isEqualTo("Hello.");
     }
 
     @Test
     void a_kind_the_runtime_does_not_know_is_passed_on_as_it_is() {
         SessionEvent event = new SessionEvent("review.started", SESSION, TURN, null, Map.of("reviewer", "lenient"));
 
-        assertThat(event.known()).isEqualTo(new StreamEvent.Other(event));
-        assertThat(event.as(StreamEvent.TOKEN)).isEmpty();
+        assertThat(event.known()).isEqualTo(new SessionStreamEvent.Other(event));
+        assertThat(event.as(EventType.TEXT_DELTA)).isEmpty();
     }
 
     @Test
     void an_event_of_a_turn_another_turn_started_says_so() {
-        assertThat(SessionEvent.of(StreamEvent.TOKEN, SESSION, TURN, TurnId.of("t0"), new StreamEvent.Token("x"))
+        assertThat(SessionEvent.of(SESSION, TURN, TurnId.of("t0"), new TurnStreamEvent.TextDelta("x"))
                 .ofSubAgent()).isTrue();
-        assertThat(List.of(SessionEvent.of(StreamEvent.TOKEN, SESSION, TURN, null, new StreamEvent.Token("x"))))
+        assertThat(List.of(SessionEvent.of(SESSION, TURN, null, new TurnStreamEvent.TextDelta("x"))))
                 .noneMatch(SessionEvent::ofSubAgent);
     }
 }

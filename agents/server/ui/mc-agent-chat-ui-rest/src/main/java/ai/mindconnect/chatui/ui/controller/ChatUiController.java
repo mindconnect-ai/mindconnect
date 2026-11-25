@@ -1,6 +1,7 @@
 package ai.mindconnect.chatui.ui.controller;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.loop.domain.TurnInterruptionEvent;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.management.api.AgentManagement;
@@ -17,7 +18,9 @@ import ai.mindconnect.chatui.ui.page.ChatPage;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.loop.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
@@ -427,9 +430,9 @@ public class ChatUiController {
                 return;
             }
             switch (event.known()) {
-                case StreamEvent.Done done -> answer.complete(done.text() == null ? "" : done.text());
+                case SessionStreamEvent.Done done -> answer.complete(done.text() == null ? "" : done.text());
                 // A turn that dies does not end itself; its stream says how it broke off.
-                case StreamEvent.Error error -> answer.completeExceptionally(
+                case SessionStreamEvent.Error error -> answer.completeExceptionally(
                         error.status() == ai.mindconnect.agent.runtime.api.domain.TurnStatus.CANCELLED
                                 ? new java.util.concurrent.CancellationException("The turn was cancelled")
                                 : new IllegalStateException("The turn failed"));
@@ -1812,13 +1815,13 @@ public class ChatUiController {
                 // A thought ends with whatever it led to: anything that is not
                 // more thinking closes the open card of this scope.
                 LiveThinking thinking = thinkingFor(thinkings, sessionId, null);
-                if (!(event instanceof StreamEvent.Thinking)) {
-                    closeThinking(thinking, liveView, bus, event instanceof StreamEvent.Token);
+                if (!(event instanceof TurnStreamEvent.Thinking)) {
+                    closeThinking(thinking, liveView, bus, event instanceof TurnStreamEvent.TextDelta);
                 }
                 switch (event) {
-                    case StreamEvent.Thinking reasoning ->
+                    case TurnStreamEvent.Thinking reasoning ->
                         onThinking(thinking, null, reasoning.text(), liveView, bus);
-                    case StreamEvent.Token text -> {
+                    case TurnStreamEvent.TextDelta text -> {
                         cumulativeText.append(text.text());
                         if (!pendingAppended[0]) {
                             // First token: drop the typing bubble and append
@@ -1836,7 +1839,7 @@ public class ChatUiController {
                         sessionStreams.rememberText(channelId,
                                 publishPatch(bus, liveView.streamToken(pendingId, cumulativeText.toString())));
                     }
-                    case StreamEvent.MessageWritten appended -> {
+                    case TurnStreamEvent.MessageWritten appended -> {
                         if (appended.message().type() == TurnMessage.Type.TOOL_CALL) {
                             // The model's round is on the record now: the message that carries
                             // this call carries the thought before it too — also one that led to
@@ -1883,16 +1886,16 @@ public class ChatUiController {
                 // at the top level: anything but more thinking closes its card.
                 String scope = scopeOf(taskId, taskToSession);
                 LiveThinking thinking = thinkingFor(thinkings, sessionId, scope);
-                if (!(event instanceof StreamEvent.Thinking)) {
+                if (!(event instanceof TurnStreamEvent.Thinking)) {
                     closeThinking(thinking, liveView, bus, false);
                 }
                 switch (event) {
-                    case StreamEvent.Thinking reasoning ->
+                    case TurnStreamEvent.Thinking reasoning ->
                         onThinking(thinking, scope, reasoning.text(), liveView, bus);
-                    case StreamEvent.MessageWritten appended ->
+                    case TurnStreamEvent.MessageWritten appended ->
                         drawToolMessage(appended.message(), taskId, liveView, liveTasks, openTaskNodeId, bus,
                                 taskToSession);
-                    case StreamEvent.SubAgentDone ended -> {
+                    case SessionStreamEvent.SubAgentDone ended -> {
                         log.info("sub-agent done: {}", agentName);
                         finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession, taskId,
                                 agentName, ended.finalText() == null ? "" : ended.finalText(), null);
@@ -1920,7 +1923,7 @@ public class ChatUiController {
                 }
             }
         };
-        Consumer<StreamEvent.ApprovalRequested> asked = approval -> {
+        Consumer<TurnInterruptionEvent.ApprovalRequested> asked = approval -> {
             synchronized (liveLock) {
                 closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
                 // Durable already; this is the live mirror: push the card of the
@@ -1934,12 +1937,12 @@ public class ChatUiController {
             boolean own = event.sessionId().equals(chat);
             switch (event.known()) {
                 // Whoever asks, the card stands in this chat.
-                case StreamEvent.ApprovalRequested approval -> asked.accept(approval);
-                case StreamEvent.SubAgentStarted started when !own ->
+                case TurnInterruptionEvent.ApprovalRequested approval -> asked.accept(approval);
+                case SessionStreamEvent.SubAgentStarted started when !own ->
                     onSubAgentStarted.accept(event.sessionId(), started.agentName());
-                case StreamEvent.Other other when own -> onReview.accept(event);
+                case SessionStreamEvent.Other other when own -> onReview.accept(event);
                 // What a capability says about a sub-agent's session is not drawn here.
-                case StreamEvent.Other other -> { }
+                case SessionStreamEvent.Other other -> { }
                 case StreamEvent told when own -> onEvent.accept(told);
                 case StreamEvent told -> onSubAgentEvent.accept(event.sessionId(), told);
             }

@@ -13,7 +13,8 @@ import java.util.function.Supplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
@@ -151,7 +152,7 @@ public final class SessionEventHub implements SessionEventPublisher {
                         case Happened happened -> {
                             SessionEvent said = happened.event();
                             boolean itsEnd = turnId.equals(said.turnId())
-                                    && (said.is(StreamEvent.DONE) || said.is(StreamEvent.ERROR));
+                                    && (said.is(EventType.DONE) || said.is(EventType.ERROR));
                             if (itsEnd ? over.compareAndSet(false, true) : !over.get()) {
                                 listener.onEvent(said);
                             }
@@ -171,11 +172,11 @@ public final class SessionEventHub implements SessionEventPublisher {
     /** The end of a turn as its event, made from the turn as it stands. */
     private static SessionEvent endOf(Turn turn) {
         if (turn.outcome() == null) {
-            return SessionEvent.of(StreamEvent.ERROR, turn.sessionId(), turn.id(), turn.parent(),
-                    new StreamEvent.Error(turn.status(), turn.error() != null ? turn.error()
+            return SessionEvent.of(turn.sessionId(), turn.id(), turn.parent(),
+                    new SessionStreamEvent.Error(turn.status(), turn.error() != null ? turn.error()
                             : "The turn " + (turn.status() == TurnStatus.CANCELLED ? "was cancelled" : "failed")));
         }
-        return SessionEvent.of(StreamEvent.DONE, turn.sessionId(), turn.id(), turn.parent(), new StreamEvent.Done(
+        return SessionEvent.of(turn.sessionId(), turn.id(), turn.parent(), new SessionStreamEvent.Done(
                 turn.status(), turn.outcome().text() == null ? "" : turn.outcome().text(),
                 turn.outcome().incompleteReason() == null ? null : turn.outcome().incompleteReason().name()));
     }

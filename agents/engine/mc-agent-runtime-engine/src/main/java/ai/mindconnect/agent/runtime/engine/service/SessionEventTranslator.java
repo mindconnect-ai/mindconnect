@@ -1,27 +1,24 @@
 package ai.mindconnect.agent.runtime.engine.service;
 
 import java.util.List;
+import ai.mindconnect.agent.loop.domain.TurnInterruptionEvent;
 
-import ai.mindconnect.agent.loop.domain.TurnEvent;
-import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
-import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.loop.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 
 /**
- * Turns what the agent loop reports about one turn into the events of its
- * session's stream: the loop speaks of deltas and appended messages, a
- * session of an answer being written, tool calls with their results, a
- * question, an end. One object per execution of a turn.
- *
- * <p>The loop's own events stay here: what leaves is a {@link SessionEvent}
- * of one of the kinds of {@link StreamEvent}.
+ * Puts one turn on its session's stream: what the agent loop reports of it
+ * goes there as it is, and around it what only the engine knows — that the
+ * turn is a sub-agent's, that it stops to ask, how it ended. One object per
+ * execution of a turn.
  */
 final class SessionEventTranslator {
 
@@ -38,39 +35,22 @@ final class SessionEventTranslator {
         this.turns = List.copyOf(turns);
     }
 
-    /** One event of the loop, as the events of the session it amounts to. */
-    void translate(TurnEvent event) {
-        switch (event) {
-            case TurnEvent.TurnStarted started -> {
-                if (turn.parent() != null) {
-                    publish(StreamEvent.SUB_AGENT_STARTED, new StreamEvent.SubAgentStarted(turn.agent().name()));
-                }
-                publish(StreamEvent.ASKING_LLM, new StreamEvent.AskingLlm(false));
-            }
-            case TurnEvent.TurnResumed resumed -> publish(StreamEvent.ASKING_LLM, new StreamEvent.AskingLlm(true));
-            case TurnEvent.TextDelta delta -> publish(StreamEvent.TOKEN, new StreamEvent.Token(delta.text()));
-            case TurnEvent.ReasoningDelta reasoning ->
-                    publish(StreamEvent.THINKING, new StreamEvent.Thinking(reasoning.text()));
-            case TurnEvent.MessageAppended appended -> translate(appended.message());
-            case TurnEvent.TurnEnded ended -> {
-                // A turn that waits for its tools has not ended; one that has is told of by ended().
-                if (ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
-                    publish(StreamEvent.TURN_USAGE, new StreamEvent.TurnUsage(
-                            ended.outcome().usage().inputTokens(), ended.outcome().usage().outputTokens()));
-                }
-            }
-            // A plain wait for tools is nothing a session reports.
-            case TurnEvent.TurnWaiting waiting -> { }
+    /** One event of the loop: it is the session's as it is. */
+    void report(TurnStreamEvent event) {
+        boolean begins = event instanceof TurnStreamEvent.AskingLlm asking && !asking.resumed();
+        if (begins && turn.parent() != null) {
+            publish(new SessionStreamEvent.SubAgentStarted(turn.agent().name()));
         }
+        publish(event);
     }
 
     /** The turn came to its end, and its task says so: what whoever follows it is told last. */
     void ended(TurnStatus status, TurnOutcome outcome) {
         String text = outcome.text() == null ? "" : outcome.text();
         if (turn.parent() != null) {
-            publish(StreamEvent.SUB_AGENT_DONE, new StreamEvent.SubAgentDone(turn.agent().name(), text));
+            publish(new SessionStreamEvent.SubAgentDone(turn.agent().name(), text));
         }
-        publish(StreamEvent.DONE, new StreamEvent.Done(status, text,
+        publish(new SessionStreamEvent.Done(status, text,
                 outcome.incompleteReason() == null ? null : outcome.incompleteReason().name()));
     }
 
@@ -84,8 +64,8 @@ final class SessionEventTranslator {
 
     /** As {@link #brokeOff}, for a turn no worker is left to speak for. */
     static SessionEvent brokenOff(Session session, Turn turn, TurnStatus status, String message) {
-        return SessionEvent.of(StreamEvent.ERROR, session.id(), turn.id(), turn.parent(),
-                new StreamEvent.Error(status, message != null ? message
+        return SessionEvent.of(session.id(), turn.id(), turn.parent(),
+                new SessionStreamEvent.Error(status, message != null ? message
                         : "The turn " + (status == TurnStatus.CANCELLED ? "was cancelled" : "failed")));
     }
 
@@ -94,45 +74,19 @@ final class SessionEventTranslator {
         for (Interruption asked : interruptions) {
             boolean forCall = asked.call() != null;
             if (Interruption.TOOL_APPROVAL.equals(asked.kind()) && forCall) {
-                publish(StreamEvent.APPROVAL_REQUESTED, new StreamEvent.ApprovalRequested(asked.id(),
+                publish(new TurnInterruptionEvent.ApprovalRequested(asked.id(),
                         asked.call().callId(), asked.call().toolName(), asked.call().arguments(),
-                        asked.call().sessionId()));
+                        asked.call().sessionId().value()));
             } else {
-                publish(StreamEvent.INPUT_REQUESTED, new StreamEvent.InputRequested(asked.id(), asked.kind(),
+                publish(new TurnInterruptionEvent.InputRequested(asked.id(), asked.kind(),
                         forCall ? asked.call().callId() : null, forCall ? asked.call().toolName() : null,
                         asked.details()));
             }
         }
-        publish(StreamEvent.WAITING, new StreamEvent.Waiting());
+        publish(new SessionStreamEvent.Waiting());
     }
 
-    private void translate(TurnMessage message) {
-        switch (message.type()) {
-            case TOOL_CALL -> {
-                List<TurnMessage.ToolCall> calls = message.toolCalls();
-                for (int i = 0; i < calls.size(); i++) {
-                    TurnMessage.ToolCall call = calls.get(i);
-                    publish(StreamEvent.TOOL_CALL_STARTED,
-                            new StreamEvent.ToolCallStarted(call.callId(), call.name(), call.arguments(), i));
-                }
-            }
-            case TOOL_RESULT -> {
-                String callId = String.valueOf(message.metadata().get("callId"));
-                String toolName = String.valueOf(message.metadata().getOrDefault("toolName", "tool"));
-                if (Boolean.TRUE.equals(message.metadata().get("failed"))) {
-                    publish(StreamEvent.TOOL_CALL_FAILED,
-                            new StreamEvent.ToolCallFailed(callId, toolName, message.text()));
-                } else {
-                    publish(StreamEvent.TOOL_CALL_RESULT,
-                            new StreamEvent.ToolCallResult(callId, toolName, message.text()));
-                }
-            }
-            default -> { }
-        }
-        publish(StreamEvent.MESSAGE, new StreamEvent.MessageWritten(message));
-    }
-
-    private <T> void publish(EventType<T> type, T payload) {
-        hub.publish(session, turns, SessionEvent.of(type, session.id(), turn.id(), turn.parent(), payload));
+    private void publish(StreamEvent event) {
+        hub.publish(session, turns, SessionEvent.of(session.id(), turn.id(), turn.parent(), event));
     }
 }

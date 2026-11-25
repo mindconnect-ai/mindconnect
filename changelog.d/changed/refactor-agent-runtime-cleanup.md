@@ -19,7 +19,9 @@
   of what happens in a session: the answer as it is written, tool calls, a question a turn stops for,
   how a turn ends. An event is a `SessionEvent` with a `kind` and plain `details`; the runtime's own
   kinds carry the names the REST frames have (`token`, `tool_call_started`, `approval_requested`,
-  `done`, …) and read in a typed form with `event.known()` (`StreamEvent`). A plugin publishes an event
+  `done`, …) and read in a typed form with `event.known()`: a `TurnStreamEvent` for what the agent
+  loop reports and for a question a turn stops for, a `SessionStreamEvent` for what the runtime adds, both a `StreamEvent` that names its
+  `kind()` and its values. A plugin publishes an event
   of a kind of its own instead of a `Notice`. Gone from the API: `SessionService.lifecycle(…)` and
   `lifecycleOfAll`, `TurnListener` with `onFinished`, `SessionLifecycleListener`,
   `SessionStreamListener`, and the agent loop's `TurnEvent` as what a listener is told.
@@ -28,3 +30,10 @@
   replays what the engine keeps of the session instead of a buffer of its own. The frames are the
   same; their `seq` grows with gaps, because it counts every event of the session and not only the
   ones a client is sent.
+- **Agents — the agent loop reports a turn in the words of the stream.** `TurnEvent` is
+  `TurnStreamEvent`: `AskingLlm`, `TextDelta`, `Thinking`, `ToolCallStarted`, `ToolCallResult`,
+  `ToolCallFailed`, `MessageWritten`, `TurnUsage`. The loop tells of tool calls itself; `TurnEnded`
+  and `TurnWaiting` are gone — how a turn left is what `AgentLoop.start` and `resume` return — and an
+  event no longer names its request: a listener hears the turn it was given to.
+  A question a turn stops for is a `TurnInterruptionEvent` (`ApprovalRequested`, `InputRequested`),
+  told by whoever runs the tools.

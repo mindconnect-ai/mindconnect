@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -60,7 +60,7 @@ public final class LocalCli {
         try (Subscription following = runtime.turns().subscribe(turnId, event -> {
             // The turn's own answer as it is written; what a sub-agent writes is not the answer.
             if (turnId.equals(event.turnId())) {
-                event.as(StreamEvent.TOKEN).ifPresent(token -> {
+                event.as(EventType.TEXT_DELTA).ifPresent(token -> {
                     streamed.set(true);
                     out.print(token.text());
                     out.flush();

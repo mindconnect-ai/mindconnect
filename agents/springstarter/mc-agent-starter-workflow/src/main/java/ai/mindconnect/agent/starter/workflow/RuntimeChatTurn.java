@@ -1,12 +1,13 @@
 package ai.mindconnect.agent.starter.workflow;
 
 import java.util.List;
+import ai.mindconnect.agent.loop.domain.TurnInterruptionEvent;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
@@ -35,15 +36,14 @@ final class RuntimeChatTurn implements WorkflowAgentCalls.PendingAnswer {
         Subscription following = runtime.turns().subscribe(turnId, event -> {
             boolean own = turnId.equals(event.turnId());
             switch (event.known()) {
-                case StreamEvent.ApprovalRequested asked -> toolsWaiting.add(asked.toolName());
-                case StreamEvent.InputRequested asked -> {
+                case TurnInterruptionEvent asked -> {
                     if (asked.toolName() != null) {
                         toolsWaiting.add(asked.toolName());
                     }
                 }
-                case StreamEvent.Waiting waiting ->
+                case SessionStreamEvent.Waiting waiting ->
                         outcome.complete(new WorkflowAgentCalls.Outcome(null, List.copyOf(toolsWaiting)));
-                case StreamEvent.Done done when own -> {
+                case SessionStreamEvent.Done done when own -> {
                     if (done.status() == TurnStatus.COMPLETED) {
                         outcome.complete(new WorkflowAgentCalls.Outcome(
                                 done.text() == null ? "" : done.text(), List.of()));
@@ -52,7 +52,7 @@ final class RuntimeChatTurn implements WorkflowAgentCalls.PendingAnswer {
                                 "the turn ended " + done.status().name().toLowerCase(Locale.ROOT)));
                     }
                 }
-                case StreamEvent.Error error when own ->
+                case SessionStreamEvent.Error error when own ->
                         outcome.completeExceptionally(new IllegalStateException(error.message()));
                 default -> { }
             }

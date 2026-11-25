@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import ai.mindconnect.agent.loop.domain.RoundOutcome;
 import ai.mindconnect.agent.loop.domain.ToolCalls;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.loop.domain.TurnProgress;
@@ -63,7 +63,7 @@ public final class DefaultAgentLoop implements AgentLoop {
     @Override
     public TurnOutcome start(TurnContext turn, TurnMessage userMessage) {
         TurnContext watched = withGuardedListener(turn);
-        watched.events().onEvent(new TurnEvent.TurnStarted(turn.requestId()));
+        watched.events().onEvent(new TurnStreamEvent.AskingLlm(false));
         List<TurnMessage> history = new ArrayList<>(turn.journal().load());
         // A repeated start finds its own question in the conversation and
         // must not ask it twice.
@@ -78,7 +78,7 @@ public final class DefaultAgentLoop implements AgentLoop {
     @Override
     public TurnOutcome resume(TurnContext turn) {
         TurnContext watched = withGuardedListener(turn);
-        watched.events().onEvent(new TurnEvent.TurnResumed(turn.requestId()));
+        watched.events().onEvent(new TurnStreamEvent.AskingLlm(true));
         return turnToItsEnd(watched, new ArrayList<>(turn.journal().load()));
     }
 
@@ -123,9 +123,10 @@ public final class DefaultAgentLoop implements AgentLoop {
             running.remove(requestId);
             cancelled.remove(requestId);
         }
-        turn.events().onEvent(outcome.waitsForTools()
-                ? new TurnEvent.TurnWaiting(requestId, outcome.waitingFor())
-                : new TurnEvent.TurnEnded(requestId, outcome));
+        if (!outcome.waitsForTools()) {
+            turn.events().onEvent(new TurnStreamEvent.TurnUsage(
+                    outcome.usage().inputTokens(), outcome.usage().outputTokens()));
+        }
         return outcome;
     }
 
@@ -276,9 +277,30 @@ public final class DefaultAgentLoop implements AgentLoop {
         List<TurnMessage> persisted = turn.journal().append(
                 added.stream().map(message -> message.inTurn(turn.requestId())).toList());
         history.addAll(persisted);
-        persisted.forEach(stored ->
-                turn.events().onEvent(new TurnEvent.MessageAppended(turn.requestId(), stored)));
+        persisted.forEach(stored -> {
+            toolEventsOf(stored).forEach(turn.events()::onEvent);
+            turn.events().onEvent(new TurnStreamEvent.MessageWritten(stored));
+        });
         return persisted;
+    }
+
+    /** The tool calls a message asks for, or the result it brings, each as an event of its own. */
+    private static List<TurnStreamEvent> toolEventsOf(TurnMessage message) {
+        List<TurnStreamEvent> events = new ArrayList<>();
+        if (message.type() == TurnMessage.Type.TOOL_CALL) {
+            List<TurnMessage.ToolCall> calls = message.toolCalls();
+            for (int i = 0; i < calls.size(); i++) {
+                TurnMessage.ToolCall call = calls.get(i);
+                events.add(new TurnStreamEvent.ToolCallStarted(call.callId(), call.name(), call.arguments(), i));
+            }
+        } else if (message.type() == TurnMessage.Type.TOOL_RESULT) {
+            String callId = String.valueOf(message.metadata().get("callId"));
+            String toolName = String.valueOf(message.metadata().getOrDefault("toolName", "tool"));
+            events.add(Boolean.TRUE.equals(message.metadata().get("failed"))
+                    ? new TurnStreamEvent.ToolCallFailed(callId, toolName, message.text())
+                    : new TurnStreamEvent.ToolCallResult(callId, toolName, message.text()));
+        }
+        return events;
     }
 
     /** The final answer's text as it went into the store (advisors applied). */

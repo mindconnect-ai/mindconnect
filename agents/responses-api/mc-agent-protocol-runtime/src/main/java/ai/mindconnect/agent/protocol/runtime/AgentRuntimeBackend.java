@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.protocol.runtime;
 
 import java.io.ByteArrayInputStream;
+import ai.mindconnect.agent.loop.domain.TurnInterruptionEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +14,6 @@ import java.util.function.Supplier;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
@@ -40,7 +40,8 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
@@ -269,27 +270,27 @@ public final class AgentRuntimeBackend {
         private void heard(ResponseAssembler assembler, TurnId turnId, SessionEvent event,
                            List<ConversationItem.ApprovalRequest> asked, CompletableFuture<Void> settled) {
             // Whoever of the turns asks, the response is what waits: it ends with every question of the stop.
-            if (event.is(StreamEvent.APPROVAL_REQUESTED)) {
-                asked.add(toApprovalRequest(event.as(StreamEvent.APPROVAL_REQUESTED).orElseThrow()));
+            if (event.is(EventType.APPROVAL_REQUESTED)) {
+                asked.add(toApprovalRequest(event.as(EventType.APPROVAL_REQUESTED).orElseThrow()));
                 return;
             }
-            if (event.is(StreamEvent.WAITING)) {
+            if (event.is(EventType.WAITING)) {
                 assembler.waitingForApproval(List.copyOf(asked));
                 settled.complete(null);
                 return;
             }
             if (turnId.equals(event.turnId())) {
                 assembler.accept(event);
-                if (event.is(StreamEvent.DONE) || event.is(StreamEvent.ERROR)) {
+                if (event.is(EventType.DONE) || event.is(EventType.ERROR)) {
                     settled.complete(null);
                 }
                 return;
             }
             // Of a called agent's turn only that it runs and how it ended: the rest is its own business.
             switch (event.known()) {
-                case StreamEvent.SubAgentStarted started -> assembler.subAgentStarted(event.turnId().value(),
+                case SessionStreamEvent.SubAgentStarted started -> assembler.subAgentStarted(event.turnId().value(),
                         started.agentName(), event.sessionId().value());
-                case StreamEvent.SubAgentDone ended ->
+                case SessionStreamEvent.SubAgentDone ended ->
                         assembler.subAgentEnded(event.turnId().value(), ended.finalText());
                 default -> { }
             }
@@ -413,7 +414,7 @@ public final class AgentRuntimeBackend {
     };
 
     /** The question a tool call waits on, as the item a client answers. */
-    static ConversationItem.ApprovalRequest toApprovalRequest(StreamEvent.ApprovalRequested open) {
+    static ConversationItem.ApprovalRequest toApprovalRequest(TurnInterruptionEvent.ApprovalRequested open) {
         return new ConversationItem.ApprovalRequest(open.callId(),
                 ConversationItem.ApprovalRequest.TOOL_APPROVAL,
                 Map.of("callId", open.callId(), "name", open.toolName(),

@@ -154,14 +154,14 @@ public class LocalAgentClient implements AgentClient {
             if (!turnId.equals(event.turnId())) {
                 return;
             }
-            event.as(ai.mindconnect.agent.runtime.api.domain.StreamEvent.DONE).ifPresent(done -> {
+            event.as(ai.mindconnect.agent.runtime.api.domain.EventType.DONE).ifPresent(done -> {
                 if (done.status() == TurnStatus.CANCELLED) {
                     answer.completeExceptionally(new CancellationException("The turn was cancelled"));
                 } else {
                     answer.complete(done.text() == null ? "" : done.text());
                 }
             });
-            event.as(ai.mindconnect.agent.runtime.api.domain.StreamEvent.ERROR).ifPresent(error ->
+            event.as(ai.mindconnect.agent.runtime.api.domain.EventType.ERROR).ifPresent(error ->
                     answer.completeExceptionally(error.status() == TurnStatus.CANCELLED
                             ? new CancellationException("The turn was cancelled")
                             : new RuntimeException(error.message())));

@@ -28,7 +28,8 @@ import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.management.api.SessionLifecycleEvent;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
@@ -331,15 +332,15 @@ class RepositorySessionManagementTest {
         SessionId below = open("below", "ada", id.value(), "2026-11-01T00:00:00Z", Map.of()).id();
         telling.rename(id, "Owls");
         // What a turn does reaches the list as the status of the session the user sees.
-        lifecycle.onEvent(SessionEvent.of(StreamEvent.ASKING_LLM, id, TurnId.of("t1"), null,
-                new StreamEvent.AskingLlm(false)));
-        lifecycle.onEvent(SessionEvent.of(StreamEvent.TOKEN, id, TurnId.of("t1"), null, new StreamEvent.Token("x")));
-        lifecycle.onEvent(SessionEvent.of(StreamEvent.WAITING, below, TurnId.of("t2"), TurnId.of("t1"),
-                new StreamEvent.Waiting()));
-        lifecycle.onEvent(SessionEvent.of(StreamEvent.DONE, below, TurnId.of("t2"), TurnId.of("t1"),
-                new StreamEvent.Done(TurnStatus.COMPLETED, "", null)));
-        lifecycle.onEvent(SessionEvent.of(StreamEvent.DONE, id, TurnId.of("t1"), null,
-                new StreamEvent.Done(TurnStatus.COMPLETED, "Done.", null)));
+        lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null,
+                new TurnStreamEvent.AskingLlm(false)));
+        lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null, new TurnStreamEvent.TextDelta("x")));
+        lifecycle.onEvent(SessionEvent.of(below, TurnId.of("t2"), TurnId.of("t1"),
+                new SessionStreamEvent.Waiting()));
+        lifecycle.onEvent(SessionEvent.of(below, TurnId.of("t2"), TurnId.of("t1"),
+                new SessionStreamEvent.Done(TurnStatus.COMPLETED, "", null)));
+        lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null,
+                new SessionStreamEvent.Done(TurnStatus.COMPLETED, "Done.", null)));
         lifecycle.onEvent(new SessionEvent("session.title", id, null, null, Map.of("title", "Owls at night")));
         telling.delete(id);
 

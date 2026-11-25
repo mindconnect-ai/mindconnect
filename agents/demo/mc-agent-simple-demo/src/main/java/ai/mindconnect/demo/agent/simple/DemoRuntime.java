@@ -27,7 +27,7 @@ import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.management.format.AgentJson;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
@@ -130,10 +130,10 @@ final class DemoRuntime {
                 return;
             }
             switch (event.known()) {
-                case StreamEvent.Done done when done.status() == TurnStatus.COMPLETED -> answer.complete(done.text());
-                case StreamEvent.Done done ->
+                case SessionStreamEvent.Done done when done.status() == TurnStatus.COMPLETED -> answer.complete(done.text());
+                case SessionStreamEvent.Done done ->
                         answer.completeExceptionally(new IllegalStateException("The turn ended " + done.status()));
-                case StreamEvent.Error error -> answer.completeExceptionally(new IllegalStateException(error.message()));
+                case SessionStreamEvent.Error error -> answer.completeExceptionally(new IllegalStateException(error.message()));
                 default -> { }
             }
         });

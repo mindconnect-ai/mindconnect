@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.LlmAnswer;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.Usage;
 import ai.mindconnect.agent.loop.port.out.TurnEventListener;
@@ -82,7 +82,7 @@ public final class LlmChatModelGateway implements ModelGateway {
     public LlmAnswer ask(ModelRequest request, TurnEventListener events) {
         Cancellation cancellation = new Cancellation();
         inFlight.put(request.turnId(), cancellation);
-        StreamedAnswer answer = new StreamedAnswer(request.turnId().value(), events);
+        StreamedAnswer answer = new StreamedAnswer(events);
         // The gateway reports on a thread of its own; what it reports is handed on
         // from this one, where the turn's namespace is bound.
         List<LlmCallEvent> reported = new CopyOnWriteArrayList<>();
@@ -182,7 +182,6 @@ public final class LlmChatModelGateway implements ModelGateway {
 
     /** One call's stream, put together chunk by chunk. */
     private final class StreamedAnswer {
-        private final String requestId;
         private final TurnEventListener events;
         private final StringBuilder text = new StringBuilder();
         private final Map<Integer, PartialToolCall> toolCalls = new TreeMap<>();
@@ -190,8 +189,7 @@ public final class LlmChatModelGateway implements ModelGateway {
         private Usage usage = Usage.ZERO;
         private boolean truncated;
 
-        StreamedAnswer(String requestId, TurnEventListener events) {
-            this.requestId = requestId;
+        StreamedAnswer(TurnEventListener events) {
             this.events = events;
         }
 
@@ -199,12 +197,12 @@ public final class LlmChatModelGateway implements ModelGateway {
             switch (chunk) {
                 case LlmStreamChunk.TextDelta delta -> {
                     text.append(delta.text());
-                    events.onEvent(new TurnEvent.TextDelta(requestId, delta.text()));
+                    events.onEvent(new TurnStreamEvent.TextDelta(delta.text()));
                 }
                 case LlmStreamChunk.ThinkingDelta delta -> {
                     thinking.computeIfAbsent(delta.index(), index -> new PartialThinkingBlock()).feed(delta);
                     if (delta.textFragment() != null && !delta.textFragment().isEmpty()) {
-                        events.onEvent(new TurnEvent.ReasoningDelta(requestId, delta.textFragment()));
+                        events.onEvent(new TurnStreamEvent.Thinking(delta.textFragment()));
                     }
                 }
                 case LlmStreamChunk.ToolCallDelta delta ->

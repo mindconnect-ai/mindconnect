@@ -12,7 +12,7 @@ import java.util.function.Function;
 import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.ToolCalls;
 import ai.mindconnect.agent.loop.domain.ToolResult;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.loop.port.in.AgentLoop;
@@ -101,7 +101,7 @@ class AgentLoopOpenAiLiveTest {
 
     private final InMemoryJournal log = new InMemoryJournal();
     private final List<TurnMessage> inbox = new ArrayList<>();
-    private final List<TurnEvent> events = new ArrayList<>();
+    private final List<TurnStreamEvent> events = new ArrayList<>();
     private final ImmediateExecutor executor = new ImmediateExecutor(Map.of(
             "get_weather", arguments -> "22 degrees and sunny in " + arguments.get("city")));
 
@@ -144,8 +144,9 @@ class AgentLoopOpenAiLiveTest {
         assertThat(outcome.usage().totalTokens()).isPositive();
         assertThat(log.messages.get(1).usage()).contains(outcome.usage());
         assertThat(executor.executed).isEmpty();
-        assertThat(events.get(0)).isEqualTo(new TurnEvent.TurnStarted("req1"));
-        assertThat(events.get(events.size() - 1)).isEqualTo(new TurnEvent.TurnEnded("req1", outcome));
+        assertThat(events.get(0)).isEqualTo(new TurnStreamEvent.AskingLlm(false));
+        assertThat(events.get(events.size() - 1)).isEqualTo(new TurnStreamEvent.TurnUsage(
+                outcome.usage().inputTokens(), outcome.usage().outputTokens()));
     }
 
     @Test

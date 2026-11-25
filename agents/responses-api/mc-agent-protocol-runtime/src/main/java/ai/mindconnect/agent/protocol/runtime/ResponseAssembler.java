@@ -2,7 +2,8 @@ package ai.mindconnect.agent.protocol.runtime;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.protocol.IncompleteReason;
 import ai.mindconnect.agent.protocol.Response;
@@ -117,12 +118,12 @@ public final class ResponseAssembler {
     public synchronized void accept(SessionEvent event) {
         if (status.terminal()) return;
         switch (event.known()) {
-            case StreamEvent.Token token -> onToken(token.text());
-            case StreamEvent.Thinking thinking -> onThinking(thinking.text());
-            case StreamEvent.MessageWritten written -> onMessage(written.message());
-            case StreamEvent.TurnUsage spent -> usage = new Usage(spent.inputTokens(), spent.outputTokens());
-            case StreamEvent.Done done -> onEnded(done);
-            case StreamEvent.Error error -> {
+            case TurnStreamEvent.TextDelta token -> onToken(token.text());
+            case TurnStreamEvent.Thinking thinking -> onThinking(thinking.text());
+            case TurnStreamEvent.MessageWritten written -> onMessage(written.message());
+            case TurnStreamEvent.TurnUsage spent -> usage = new Usage(spent.inputTokens(), spent.outputTokens());
+            case SessionStreamEvent.Done done -> onEnded(done);
+            case SessionStreamEvent.Error error -> {
                 if (error.status() == TurnStatus.CANCELLED) {
                     cancelled();
                 } else {
@@ -188,7 +189,7 @@ public final class ResponseAssembler {
         textBuffer.append(text);
     }
 
-    private void onEnded(StreamEvent.Done done) {
+    private void onEnded(SessionStreamEvent.Done done) {
         switch (done.status()) {
             case CANCELLED -> cancelled();
             case INCOMPLETE -> incomplete("MAX_OUTPUT_TOKENS".equals(done.incompleteReason())

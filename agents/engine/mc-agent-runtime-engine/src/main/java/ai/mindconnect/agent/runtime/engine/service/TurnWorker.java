@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.loop.port.in.AgentLoop;
 import ai.mindconnect.agent.loop.port.in.TurnContext;
@@ -100,7 +99,7 @@ final class TurnWorker implements TaskWorker {
                 new SessionEventTranslator(events, session, turn, turns.withTurnsAbove(ctx.task()));
         TurnContext context = new TurnContext(turnId.value(), turn.sessionId().value(),
                 new StoredTurnJournal(sessions, turn.sessionId(), ctx::cancelRequested),
-                sessionEvents::translate, List::of, List.of(new AnswerHookAdvisor(hooks, agentContext)));
+                sessionEvents::report, List::of, List.of(new AnswerHookAdvisor(hooks, agentContext)));
 
         // Whether the turn has begun is what the session says, not how often
         // its task was woken: a turn that waited in line was woken and has

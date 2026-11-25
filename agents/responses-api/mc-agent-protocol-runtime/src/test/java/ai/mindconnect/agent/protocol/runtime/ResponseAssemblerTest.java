@@ -13,7 +13,9 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.loop.domain.Usage;
@@ -32,12 +34,12 @@ class ResponseAssemblerTest {
     private final ResponseAssembler assembler =
             new ResponseAssembler("resp_1", "conv_1", "sess_1", "test-agent");
 
-    private static <T> SessionEvent said(EventType<T> type, T payload) {
-        return SessionEvent.of(type, SessionId.of("sess_1"), TurnId.of(TURN), null, payload);
+    private static <T extends StreamEvent> SessionEvent said(EventType<T> type, T payload) {
+        return SessionEvent.of(SessionId.of("sess_1"), TurnId.of(TURN), null, payload);
     }
 
     private static SessionEvent written(TurnMessage message) {
-        return said(StreamEvent.MESSAGE, new StreamEvent.MessageWritten(message));
+        return said(EventType.MESSAGE, new TurnStreamEvent.MessageWritten(message));
     }
 
     private static SessionEvent called(String callId, String tool, Map<String, Object> arguments) {
@@ -50,17 +52,17 @@ class ResponseAssemblerTest {
 
     /** The turn ends as the engine tells it: what it cost, then that it is over. */
     private static void ended(ResponseAssembler assembler, Usage usage, TurnStatus status, String incompleteReason) {
-        assembler.accept(said(StreamEvent.TURN_USAGE,
-                new StreamEvent.TurnUsage(usage.inputTokens(), usage.outputTokens())));
-        assembler.accept(said(StreamEvent.DONE, new StreamEvent.Done(status, "", incompleteReason)));
+        assembler.accept(said(EventType.TURN_USAGE,
+                new TurnStreamEvent.TurnUsage(usage.inputTokens(), usage.outputTokens())));
+        assembler.accept(said(EventType.DONE, new SessionStreamEvent.Done(status, "", incompleteReason)));
     }
 
     @Test
     void fullTurn_tokensToolsAndAnswer() {
         assembler.accept(called("c1", "web_search", Map.of("q", "lisbon")));
         assembler.accept(result("c1", "web_search", "3 results"));
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("It is ")));
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("sunny.")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("It is ")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("sunny.")));
         ended(assembler, Usage.ZERO, TurnStatus.COMPLETED, null);
 
         Response r = assembler.snapshot();
@@ -81,9 +83,9 @@ class ResponseAssemblerTest {
     void thinkingBecomesAReasoningItemAheadOfTheAnswer() {
         List<ResponseEvent> events = new ArrayList<>();
         assembler.subscribe(0, events::add);
-        assembler.accept(said(StreamEvent.THINKING, new StreamEvent.Thinking("Let me ")));
-        assembler.accept(said(StreamEvent.THINKING, new StreamEvent.Thinking("see.")));
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("42")));
+        assembler.accept(said(EventType.THINKING, new TurnStreamEvent.Thinking("Let me ")));
+        assembler.accept(said(EventType.THINKING, new TurnStreamEvent.Thinking("see.")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("42")));
         ended(assembler, Usage.ZERO, TurnStatus.COMPLETED, null);
 
         Response r = assembler.snapshot();
@@ -107,9 +109,9 @@ class ResponseAssemblerTest {
     void reasoningMidAnswerClosesTheMessageFirst() {
         List<ResponseEvent> events = new ArrayList<>();
         assembler.subscribe(0, events::add);
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("Sure. ")));
-        assembler.accept(said(StreamEvent.THINKING, new StreamEvent.Thinking("wait")));
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("42")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("Sure. ")));
+        assembler.accept(said(EventType.THINKING, new TurnStreamEvent.Thinking("wait")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("42")));
         ended(assembler, Usage.ZERO, TurnStatus.COMPLETED, null);
 
         List<ConversationItemRecord> output = assembler.snapshot().output();
@@ -131,7 +133,7 @@ class ResponseAssemblerTest {
         assembler.subAgentStarted("turn-2", "researcher", "sub-session");
         assembler.subAgentStarted("turn-2", "researcher", "sub-session");   // heard again with its next event
         assembler.subAgentEnded("turn-2", "X found");
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("done")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("done")));
         ended(assembler, Usage.ZERO, TurnStatus.COMPLETED, null);
 
         List<ConversationItem> items = assembler.snapshot().output().stream().map(ConversationItemRecord::item).toList();
@@ -177,7 +179,7 @@ class ResponseAssemblerTest {
 
     @Test
     void reviewerRevisionReplacesStreamedText() {
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("draft answer")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("draft answer")));
         assembler.accept(written(TurnMessage.assistant("reviewed answer")));
         ended(assembler, Usage.ZERO, TurnStatus.COMPLETED, null);
 
@@ -187,7 +189,7 @@ class ResponseAssemblerTest {
     @Test
     void replayDeliversEverythingLiveDeliversRest() {
         List<ResponseEvent> live = new ArrayList<>();
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("Hi")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("Hi")));
 
         assembler.subscribe(0, live::add);              // replay: Created, InProgress, ItemAdded, Delta
         ended(assembler, Usage.ZERO, TurnStatus.COMPLETED, null);       // live: ItemDone, Completed
@@ -204,7 +206,7 @@ class ResponseAssemblerTest {
 
     @Test
     void tokenCountsFromTheTurnReachTheResponse() {
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("hi")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("hi")));
         ended(assembler, new Usage(1200, 340), TurnStatus.COMPLETED, null);
 
         Response r = assembler.snapshot();
@@ -233,7 +235,7 @@ class ResponseAssemblerTest {
         for (int run = 0; run < 50; run++) {
             ResponseAssembler a = new ResponseAssembler("resp_" + run, "conv", "sess", "agent");
             for (int i = 0; i < 200; i++) {
-                a.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("t" + i)));
+                a.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("t" + i)));
             }
 
             List<Long> seen = new ArrayList<>();
@@ -245,7 +247,7 @@ class ResponseAssemblerTest {
                     Thread.currentThread().interrupt();
                 }
                 for (int i = 0; i < 50; i++) {
-                    a.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("late" + i)));
+                    a.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("late" + i)));
                 }
             });
             producer.start();
@@ -264,7 +266,7 @@ class ResponseAssemblerTest {
 
     @Test
     void turnFailureAfterPartialText() {
-        assembler.accept(said(StreamEvent.TOKEN, new StreamEvent.Token("partial")));
+        assembler.accept(said(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("partial")));
         assembler.fail("LLM unavailable");
 
         Response r = assembler.snapshot();

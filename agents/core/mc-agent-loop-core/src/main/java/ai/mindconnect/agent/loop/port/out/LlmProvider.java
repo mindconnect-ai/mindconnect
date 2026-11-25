@@ -24,8 +24,8 @@ public interface LlmProvider {
      * minutes, and is therefore where a {@link #cancel} must actually arrive.
      *
      * @param events where a streaming implementation reports the answer as
-     *               it arrives: {@code TurnEvent.TextDelta} and
-     *               {@code TurnEvent.ReasoningDelta}. The complete answer is
+     *               it arrives: {@code TurnStreamEvent.TextDelta} and
+     *               {@code TurnStreamEvent.Thinking}. The complete answer is
      *               still what this method returns.
      */
     LlmAnswer ask(String requestId, String sessionId, List<TurnMessage> history, TurnEventListener events);

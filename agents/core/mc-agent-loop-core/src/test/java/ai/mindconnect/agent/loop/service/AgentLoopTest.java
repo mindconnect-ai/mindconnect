@@ -15,7 +15,7 @@ import ai.mindconnect.agent.loop.domain.LlmAnswer;
 import ai.mindconnect.agent.loop.domain.RoundOutcome;
 import ai.mindconnect.agent.loop.domain.ToolCalls;
 import ai.mindconnect.agent.loop.domain.ToolResult;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.loop.domain.TurnProgress;
@@ -105,7 +105,7 @@ class AgentLoopTest {
             // a streaming model: the answer text goes out word by word first
             for (TurnMessage message : answer.messages()) {
                 for (String word : message.text().split(" ")) {
-                    if (!word.isEmpty()) events.onEvent(new TurnEvent.TextDelta(requestId, word));
+                    if (!word.isEmpty()) events.onEvent(new TurnStreamEvent.TextDelta(word));
                 }
             }
             return answer;
@@ -153,7 +153,7 @@ class AgentLoopTest {
     }
 
     private record Fixture(InMemoryJournal log, ScriptedLlm llm, HandSteeredExecutor executor,
-                           List<TurnEvent> events, List<TurnMessage> inbox) {
+                           List<TurnStreamEvent> events, List<TurnMessage> inbox) {
 
         static Fixture create() {
             return new Fixture(new InMemoryJournal(), new ScriptedLlm(), new HandSteeredExecutor(), new ArrayList<>(),
@@ -184,8 +184,8 @@ class AgentLoopTest {
         /** The stored messages the loop announced, in order. */
         List<TurnMessage> published() {
             return events.stream()
-                    .filter(TurnEvent.MessageAppended.class::isInstance)
-                    .map(event -> ((TurnEvent.MessageAppended) event).message())
+                    .filter(TurnStreamEvent.MessageWritten.class::isInstance)
+                    .map(event -> ((TurnStreamEvent.MessageWritten) event).message())
                     .toList();
         }
 
@@ -460,12 +460,12 @@ class AgentLoopTest {
         TurnOutcome outcome = f.start();
 
         assertThat(f.events).containsExactly(
-                new TurnEvent.TurnStarted("req1"),
-                new TurnEvent.MessageAppended("req1", f.log.messages.get(0)),
-                new TurnEvent.TextDelta("req1", "hello"),
-                new TurnEvent.TextDelta("req1", "there"),
-                new TurnEvent.MessageAppended("req1", f.log.messages.get(1)),
-                new TurnEvent.TurnEnded("req1", outcome));
+                new TurnStreamEvent.AskingLlm(false),
+                new TurnStreamEvent.MessageWritten(f.log.messages.get(0)),
+                new TurnStreamEvent.TextDelta("hello"),
+                new TurnStreamEvent.TextDelta("there"),
+                new TurnStreamEvent.MessageWritten(f.log.messages.get(1)),
+                usageOf(outcome));
     }
 
     @Test
@@ -475,16 +475,17 @@ class AgentLoopTest {
         f.executor.stillRunning("c1");
         f.start();
 
-        assertThat(f.events.get(f.events.size() - 1))
-                .isEqualTo(new TurnEvent.TurnWaiting("req1", Set.of("c1")));
+        // A turn that waits has not left: the call it asked for is told, its cost is not yet.
+        assertThat(f.events).contains(new TurnStreamEvent.ToolCallStarted("c1", "slow", Map.of(), 0));
+        assertThat(f.events).noneMatch(TurnStreamEvent.TurnUsage.class::isInstance);
 
         f.events.clear();
         f.executor.finishes("c1", "late result");
         f.llm.answer(TurnMessage.assistant("done"));
         TurnOutcome outcome = f.resume();
 
-        assertThat(f.events.get(0)).isEqualTo(new TurnEvent.TurnResumed("req1"));
-        assertThat(f.events.get(f.events.size() - 1)).isEqualTo(new TurnEvent.TurnEnded("req1", outcome));
+        assertThat(f.events.get(0)).isEqualTo(new TurnStreamEvent.AskingLlm(true));
+        assertThat(f.events.get(f.events.size() - 1)).isEqualTo(usageOf(outcome));
     }
 
     @Test
@@ -494,7 +495,7 @@ class AgentLoopTest {
 
         TurnOutcome outcome = f.start();
 
-        assertThat(f.events.get(f.events.size() - 1)).isEqualTo(new TurnEvent.TurnEnded("req1", outcome));
+        assertThat(f.events.get(f.events.size() - 1)).isEqualTo(usageOf(outcome));
         assertThat(outcome.status()).isEqualTo(TurnOutcome.Status.CANCELLED);
     }
 
@@ -655,7 +656,9 @@ class AgentLoopTest {
         assertThat(two.text()).isEqualTo("to the second");
         assertThat(first.log.messages).extracting(TurnMessage::turnId).containsOnly(REQUEST);
         assertThat(second.log.messages).extracting(TurnMessage::turnId).containsOnly("req2");
-        assertThat(second.events).allSatisfy(event -> assertThat(event.requestId()).isEqualTo("req2"));
+        // An event names no request: each turn's listener hears its own turn and nothing of the other.
+        assertThat(second.published()).containsExactlyElementsOf(second.log.messages);
+        assertThat(first.published()).containsExactlyElementsOf(first.log.messages);
     }
 
     // ── steering ────────────────────────────────────────────────────────────
@@ -835,5 +838,9 @@ class AgentLoopTest {
                 .filter(m -> m.type() == TurnMessage.Type.TOOL_RESULT).findFirst().orElseThrow();
         assertThat(result.metadata()).containsEntry("failed", true);
         assertThat(result.text()).contains("interrupted before completion");
+    }
+
+    private static TurnStreamEvent usageOf(TurnOutcome outcome) {
+        return new TurnStreamEvent.TurnUsage(outcome.usage().inputTokens(), outcome.usage().outputTokens());
     }
 }

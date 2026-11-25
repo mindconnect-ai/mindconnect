@@ -122,10 +122,10 @@ and, when asked, of the sessions of its sub-agents too:
 ```java
 runtime.sessions().stream(sessionId, true, event -> {
     switch (event.known()) {
-        case StreamEvent.Token token -> print(token.text());
-        case StreamEvent.ToolCallStarted call -> show(call.toolName(), call.arguments());
-        case StreamEvent.ApprovalRequested asked -> ask(asked);
-        case StreamEvent.Done done -> finish(done.text());
+        case TurnStreamEvent.TextDelta token -> print(token.text());
+        case TurnStreamEvent.ToolCallStarted call -> show(call.toolName(), call.arguments());
+        case TurnInterruptionEvent.ApprovalRequested asked -> ask(asked);
+        case SessionStreamEvent.Done done -> finish(done.text());
         default -> { }
     }
 });
@@ -135,7 +135,13 @@ An event is a `SessionEvent`: a `kind`, the session and the turn it is from,
 the turn that started that one (`parentTurnId`, set for what a sub-agent
 does), and `details` — plain values, so the event is the same on a channel,
 in a buffer and on the wire. `event.known()` gives the runtime's own kinds in
-their typed form (`StreamEvent`), `event.as(StreamEvent.TOKEN)` one of them.
+their typed form, `event.as(EventType.TEXT_DELTA)` one of them. The typed forms are
+`StreamEvent`s of two families: what the agent loop reports of a turn
+(`TurnStreamEvent` — the model is asked, the answer, tool calls, messages,
+cost, and as a `TurnInterruptionEvent` a question the turn stops for) and
+what the runtime adds about the turn as a whole (`SessionStreamEvent` — it
+stands still, the end, sub-agents). Every one of them
+names its `kind()` and writes its values itself (`toDetails()`).
 
 | Kind | Tells |
 |------|-------|
@@ -152,7 +158,7 @@ their typed form (`StreamEvent`), `event.as(StreamEvent.TOKEN)` one of them.
 A plugin tells of something of its own with an event of its own kind, through
 `SessionEventPublisher` — `session.title`, `review.started`. It reaches the
 same stream; a client that does not know the kind passes it by
-(`StreamEvent.Other`).
+(`SessionStreamEvent.Other`).
 
 The stream tells what happens from now on. A client that opens while a turn
 runs asks `runtime.turns().runningTurn(sessionId)`: the turn that has not

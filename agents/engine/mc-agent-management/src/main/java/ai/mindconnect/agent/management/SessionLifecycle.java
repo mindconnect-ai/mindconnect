@@ -11,7 +11,8 @@ import ai.mindconnect.agent.management.api.SessionLifecycleEvent;
 import ai.mindconnect.agent.management.api.SessionLifecycleListener;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
@@ -72,11 +73,11 @@ public final class SessionLifecycle implements SessionEventListener {
     public void onEvent(SessionEvent event) {
         // What a turn says while it runs is nothing a list shows: only that it begins, asks and ends.
         switch (event.known()) {
-            case StreamEvent.AskingLlm asking -> status(event, ManagedSession.Status.BUSY);
-            case StreamEvent.Waiting waiting -> status(event, ManagedSession.Status.WAITING);
-            case StreamEvent.Done done -> ended(event);
-            case StreamEvent.Error error -> ended(event);
-            case StreamEvent.Other other when TITLE_FOUND.equals(event.kind()) ->
+            case TurnStreamEvent.AskingLlm asking -> status(event, ManagedSession.Status.BUSY);
+            case SessionStreamEvent.Waiting waiting -> status(event, ManagedSession.Status.WAITING);
+            case SessionStreamEvent.Done done -> ended(event);
+            case SessionStreamEvent.Error error -> ended(event);
+            case SessionStreamEvent.Other other when TITLE_FOUND.equals(event.kind()) ->
                     sessions.find(event.sessionId()).ifPresent(session -> tell(session.userId(),
                             new SessionLifecycleEvent.Renamed(session.id(),
                                     String.valueOf(event.details().get("title")))));

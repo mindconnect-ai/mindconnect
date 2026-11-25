@@ -1,11 +1,13 @@
 package ai.mindconnect.agentrest.stream;
 
 import java.nio.charset.StandardCharsets;
+import ai.mindconnect.agent.loop.domain.TurnInterruptionEvent;
 import java.util.Optional;
 import java.util.UUID;
 
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 
 /**
@@ -31,34 +33,31 @@ public final class TurnFrameTranslator {
         String task = event.turnId() == null ? null : taskId(event.turnId());
         String session = event.sessionId().value();
         return switch (event.known()) {
-            case StreamEvent.AskingLlm asking -> shown(own, task, TurnFrame.askingLlm());
-            case StreamEvent.Token token -> shown(own, task, TurnFrame.token(token.text()));
-            case StreamEvent.Thinking thinking -> shown(own, task, TurnFrame.thinking(thinking.text()));
+            case TurnStreamEvent.AskingLlm asking -> shown(own, task, TurnFrame.askingLlm());
+            case TurnStreamEvent.TextDelta token -> shown(own, task, TurnFrame.token(token.text()));
+            case TurnStreamEvent.Thinking thinking -> shown(own, task, TurnFrame.thinking(thinking.text()));
             // A client draws one card per request; a request for several calls announces the first,
             // the rest show with their results.
-            case StreamEvent.ToolCallStarted call -> call.index() > 0 ? Optional.empty()
+            case TurnStreamEvent.ToolCallStarted call -> call.index() > 0 ? Optional.empty()
                     : shown(own, task, TurnFrame.toolCallStarted(call.toolName(), call.arguments()));
-            case StreamEvent.ToolCallResult result ->
+            case TurnStreamEvent.ToolCallResult result ->
                     shown(own, task, TurnFrame.toolCallResult(result.toolName(), result.result(), 0));
-            case StreamEvent.ToolCallFailed failed ->
+            case TurnStreamEvent.ToolCallFailed failed ->
                     shown(own, task, TurnFrame.toolCallFailed(failed.toolName(), failed.error(), 0));
             // Whoever asks, the question is the turn's: the card stands in the chat of the turn.
-            case StreamEvent.ApprovalRequested asked -> Optional.of(TurnFrame.approvalRequested(asked.requestId(),
+            case TurnInterruptionEvent.ApprovalRequested asked -> Optional.of(TurnFrame.approvalRequested(asked.requestId(),
                     asked.callId(), asked.toolName(), asked.arguments(),
-                    asked.originSessionId() == null ? session : asked.originSessionId().value()));
-            case StreamEvent.TurnUsage usage -> own
+                    asked.originSessionId() == null ? session : asked.originSessionId()));
+            case TurnStreamEvent.TurnUsage usage -> own
                     ? Optional.of(TurnFrame.turnUsage(usage.inputTokens(), usage.outputTokens())) : Optional.empty();
-            case StreamEvent.Done done -> own ? Optional.of(TurnFrame.done()) : Optional.empty();
-            case StreamEvent.SubAgentStarted started -> own ? Optional.empty()
+            case SessionStreamEvent.Done done -> own ? Optional.of(TurnFrame.done()) : Optional.empty();
+            case SessionStreamEvent.SubAgentStarted started -> own ? Optional.empty()
                     : Optional.of(TurnFrame.subAgentStarted(task, started.agentName(), 1, session));
-            case StreamEvent.SubAgentDone ended -> own ? Optional.empty()
+            case SessionStreamEvent.SubAgentDone ended -> own ? Optional.empty()
                     : Optional.of(TurnFrame.subAgentDone(task, ended.agentName(), session, ended.finalText()));
-            // How a turn broke off is told where its stream ends; the rest is nothing a client streams.
-            case StreamEvent.Error error -> Optional.empty();
-            case StreamEvent.InputRequested asked -> Optional.empty();
-            case StreamEvent.Waiting waiting -> Optional.empty();
-            case StreamEvent.MessageWritten written -> Optional.empty();
-            case StreamEvent.Other other -> Optional.empty();
+            // How a turn broke off is told where its stream ends; the rest — a question that is no
+            // approval, a whole message, a plugin's event — is nothing a client streams.
+            default -> Optional.empty();
         };
     }
 

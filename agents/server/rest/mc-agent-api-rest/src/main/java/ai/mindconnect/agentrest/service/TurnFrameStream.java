@@ -10,7 +10,7 @@ import ai.mindconnect.agentrest.stream.StreamAttachment;
 import ai.mindconnect.agentrest.stream.TurnFrame;
 import ai.mindconnect.agentrest.stream.TurnFrameTranslator;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.engine.service.SessionEventHub;
@@ -62,18 +62,18 @@ public class TurnFrameStream {
                 return;
             }
             new TurnFrameTranslator(turnId).frame(event).ifPresent(sink::frame);
-            if (event.is(StreamEvent.WAITING)) {
+            if (event.is(EventType.WAITING)) {
                 sink.asked(event.turnId());
                 if (untilAsked && over.complete(null)) {
                     sink.ended(null);
                 }
-            } else if (turnId.equals(event.turnId()) && event.is(StreamEvent.DONE)) {
+            } else if (turnId.equals(event.turnId()) && event.is(EventType.DONE)) {
                 if (over.complete(null)) {
                     sink.ended(null);
                 }
-            } else if (turnId.equals(event.turnId()) && event.is(StreamEvent.ERROR)) {
+            } else if (turnId.equals(event.turnId()) && event.is(EventType.ERROR)) {
                 if (over.complete(null)) {
-                    sink.ended(event.as(StreamEvent.ERROR).orElseThrow().message());
+                    sink.ended(event.as(EventType.ERROR).orElseThrow().message());
                 }
             }
         });

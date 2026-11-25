@@ -37,7 +37,9 @@ import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
-import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
@@ -304,7 +306,7 @@ class EngineWithCapabilitiesTest {
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Hi"));
         awaitRest(turnId);
 
-        assertThat(heard).anyMatch(event -> event.is(StreamEvent.ASKING_LLM))
+        assertThat(heard).anyMatch(event -> event.is(EventType.ASKING_LLM))
                 .allMatch(event -> event.sessionId().equals(session.id()));
     }
 
@@ -321,11 +323,11 @@ class EngineWithCapabilitiesTest {
         // The one stream tells all of it: the turn begins, calls a tool and stops to ask.
         assertThat(heard).extracting(SessionEvent::kind)
                 .containsSubsequence("asking_llm", "message", "tool_call_started", "approval_requested");
-        assertThat(heard).filteredOn(event -> event.is(StreamEvent.TOOL_CALL_STARTED)).singleElement()
-                .satisfies(event -> assertThat(event.as(StreamEvent.TOOL_CALL_STARTED).orElseThrow())
-                        .isEqualTo(new StreamEvent.ToolCallStarted("c1", "bash", Map.of(), 0)));
+        assertThat(heard).filteredOn(event -> event.is(EventType.TOOL_CALL_STARTED)).singleElement()
+                .satisfies(event -> assertThat(event.as(EventType.TOOL_CALL_STARTED).orElseThrow())
+                        .isEqualTo(new TurnStreamEvent.ToolCallStarted("c1", "bash", Map.of(), 0)));
         // A turn that waits has not finished.
-        assertThat(heard).noneMatch(event -> event.is(StreamEvent.DONE) || event.is(StreamEvent.ERROR));
+        assertThat(heard).noneMatch(event -> event.is(EventType.DONE) || event.is(EventType.ERROR));
         turns.cancel(turnId);
     }
 
@@ -338,13 +340,13 @@ class EngineWithCapabilitiesTest {
 
         turns.subscribe(turnId, heard::add);
 
-        for (int i = 0; i < 200 && heard.stream().noneMatch(event -> event.is(StreamEvent.DONE)); i++) {
+        for (int i = 0; i < 200 && heard.stream().noneMatch(event -> event.is(EventType.DONE)); i++) {
             Thread.sleep(10);
         }
         // The end comes once and last, whatever of the turn the channel still keeps.
-        assertThat(heard).filteredOn(event -> event.is(StreamEvent.DONE)).singleElement()
-                .satisfies(event -> assertThat(event.as(StreamEvent.DONE).orElseThrow())
-                        .isEqualTo(new StreamEvent.Done(TurnStatus.COMPLETED, "Hello.", null)));
+        assertThat(heard).filteredOn(event -> event.is(EventType.DONE)).singleElement()
+                .satisfies(event -> assertThat(event.as(EventType.DONE).orElseThrow())
+                        .isEqualTo(new SessionStreamEvent.Done(TurnStatus.COMPLETED, "Hello.", null)));
         assertThat(heard.get(heard.size() - 1).kind()).isEqualTo("done");
     }
 
@@ -483,8 +485,8 @@ class EngineWithCapabilitiesTest {
         assertThat(sessions.find(session.id()).orElseThrow().metadata()).containsEntry("title", "A greeting");
         // Asked of the session agent's own model: the assembly names none for such tasks.
         assertThat(model.requests.get(model.requests.size() - 1).settings()).isEqualTo(LEAD.modelSettings());
-        assertThat(heard).first().matches(event -> event.is(StreamEvent.ASKING_LLM));
-        assertThat(heard).anyMatch(event -> event.is(StreamEvent.DONE));
+        assertThat(heard).first().matches(event -> event.is(EventType.ASKING_LLM));
+        assertThat(heard).anyMatch(event -> event.is(EventType.DONE));
     }
 
     @Test
