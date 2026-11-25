@@ -18,9 +18,10 @@
 - **Agents — a session has one stream, and its events have one form.** `SessionService.stream` tells all
   of what happens in a session: the answer as it is written, tool calls, a question a turn stops for,
   how a turn ends. An event is a `SessionEvent` with a `kind` and plain `details`; the runtime's own
-  kinds carry the names the REST frames have (`token`, `tool_call_started`, `approval_requested`,
-  `done`, …) and read in a typed form with `event.known()`: a `TurnStreamEvent` for what the agent
-  loop reports and for a question a turn stops for, a `SessionStreamEvent` for what the runtime adds, both a `StreamEvent` that names its
+  kinds carry the names the REST frames have (`asking_llm`, `tool_call_started`,
+  `approval_requested`, `done`, …) and read in a typed form with `event.known()`: a
+  `TurnStreamEvent` for what the agent loop reports and for a question a turn stops for, a
+  `SessionStreamEvent` for what the runtime adds, both a `StreamEvent` that names its
   `kind()` and its values. A plugin publishes an event
   of a kind of its own instead of a `Notice`. Gone from the API: `SessionService.lifecycle(…)` and
   `lifecycleOfAll`, `TurnListener` with `onFinished`, `SessionLifecycleListener`,
@@ -36,4 +37,6 @@
   and `TurnWaiting` are gone — how a turn left is what `AgentLoop.start` and `resume` return — and an
   event no longer names its request: a listener hears the turn it was given to.
   A question a turn stops for is a `TurnInterruptionEvent` (`ApprovalRequested`, `InputRequested`),
-  told by whoever runs the tools.
+  told by whoever runs the tools. `AskingLlm` is told just before every call of the model: a turn
+  that is woken and only goes on waiting no longer says so. On a session's stream a piece of the
+  answer is of the kind `text_delta`; the REST frame is still `token`.

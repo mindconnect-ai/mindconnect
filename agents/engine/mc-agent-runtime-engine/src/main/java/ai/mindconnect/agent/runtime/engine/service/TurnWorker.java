@@ -106,9 +106,12 @@ final class TurnWorker implements TaskWorker {
         // still not said a word.
         TurnOutcome outcome;
         try {
-            outcome = sessions.messages(turn.sessionId(), turnId).isEmpty()
-                    ? loop.start(context, TurnTaskMapper.userMessage(ctx.task()))
-                    : loop.resume(context);
+            if (sessions.messages(turn.sessionId(), turnId).isEmpty()) {
+                sessionEvents.began();
+                outcome = loop.start(context, TurnTaskMapper.userMessage(ctx.task()));
+            } else {
+                outcome = loop.resume(context);
+            }
         } catch (RuntimeException e) {
             // The loop reports the end of a turn it ends itself. A turn that
             // dies under it ends too, and whoever follows the session must

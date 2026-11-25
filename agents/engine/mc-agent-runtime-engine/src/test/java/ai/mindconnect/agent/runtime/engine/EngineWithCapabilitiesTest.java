@@ -320,9 +320,11 @@ class EngineWithCapabilitiesTest {
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Run it"));
         awaitRest(turnId);
 
-        // The one stream tells all of it: the turn begins, calls a tool and stops to ask.
+        // The one stream tells all of it: the question, the model being asked, the tool it calls, the stop to ask.
         assertThat(heard).extracting(SessionEvent::kind)
-                .containsSubsequence("asking_llm", "message", "tool_call_started", "approval_requested");
+                .containsSubsequence("message", "asking_llm", "tool_call_started", "approval_requested");
+        // The model was asked once: a turn that is woken and only goes on waiting does not say it is asking.
+        assertThat(heard).filteredOn(event -> event.is(EventType.ASKING_LLM)).hasSize(1);
         assertThat(heard).filteredOn(event -> event.is(EventType.TOOL_CALL_STARTED)).singleElement()
                 .satisfies(event -> assertThat(event.as(EventType.TOOL_CALL_STARTED).orElseThrow())
                         .isEqualTo(new TurnStreamEvent.ToolCallStarted("c1", "bash", Map.of(), 0)));
@@ -485,7 +487,7 @@ class EngineWithCapabilitiesTest {
         assertThat(sessions.find(session.id()).orElseThrow().metadata()).containsEntry("title", "A greeting");
         // Asked of the session agent's own model: the assembly names none for such tasks.
         assertThat(model.requests.get(model.requests.size() - 1).settings()).isEqualTo(LEAD.modelSettings());
-        assertThat(heard).first().matches(event -> event.is(EventType.ASKING_LLM));
+        assertThat(heard).anyMatch(event -> event.is(EventType.ASKING_LLM));
         assertThat(heard).anyMatch(event -> event.is(EventType.DONE));
     }
 

@@ -19,21 +19,21 @@ import java.util.Map;
  */
 public interface TurnStreamEvent extends StreamEvent {
 
-    /** The model is asked: the turn begins, or goes on after it waited. */
-    record AskingLlm(boolean resumed) implements TurnStreamEvent {
+    /** The model is asked: told just before every call of the model, and for no other reason. */
+    record AskingLlm() implements TurnStreamEvent {
         @Override public String kind() {
             return "asking_llm";
         }
 
         @Override public Map<String, Object> toDetails() {
-            return Map.of("resumed", resumed);
+            return Map.of();
         }
     }
 
     /** A fragment of the answer text the model is writing. */
     record TextDelta(String text) implements TurnStreamEvent {
         @Override public String kind() {
-            return "token";
+            return "text_delta";
         }
 
         @Override public Map<String, Object> toDetails() {

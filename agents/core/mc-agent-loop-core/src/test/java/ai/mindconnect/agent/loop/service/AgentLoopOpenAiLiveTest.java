@@ -144,7 +144,7 @@ class AgentLoopOpenAiLiveTest {
         assertThat(outcome.usage().totalTokens()).isPositive();
         assertThat(log.messages.get(1).usage()).contains(outcome.usage());
         assertThat(executor.executed).isEmpty();
-        assertThat(events.get(0)).isEqualTo(new TurnStreamEvent.AskingLlm(false));
+        assertThat(events).contains(new TurnStreamEvent.AskingLlm());
         assertThat(events.get(events.size() - 1)).isEqualTo(new TurnStreamEvent.TurnUsage(
                 outcome.usage().inputTokens(), outcome.usage().outputTokens()));
     }

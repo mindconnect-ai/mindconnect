@@ -29,7 +29,7 @@ class StreamEventTest {
 
     static Stream<Told<?>> everyKind() {
         return Stream.of(
-                new Told<>(EventType.ASKING_LLM, new TurnStreamEvent.AskingLlm(true)),
+                new Told<>(EventType.ASKING_LLM, new TurnStreamEvent.AskingLlm()),
                 new Told<>(EventType.TEXT_DELTA, new TurnStreamEvent.TextDelta("Hel")),
                 new Told<>(EventType.THINKING, new TurnStreamEvent.Thinking("hm")),
                 new Told<>(EventType.TOOL_CALL_STARTED,

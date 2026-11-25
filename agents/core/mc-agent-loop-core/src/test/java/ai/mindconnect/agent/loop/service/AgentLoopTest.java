@@ -460,8 +460,8 @@ class AgentLoopTest {
         TurnOutcome outcome = f.start();
 
         assertThat(f.events).containsExactly(
-                new TurnStreamEvent.AskingLlm(false),
                 new TurnStreamEvent.MessageWritten(f.log.messages.get(0)),
+                new TurnStreamEvent.AskingLlm(),
                 new TurnStreamEvent.TextDelta("hello"),
                 new TurnStreamEvent.TextDelta("there"),
                 new TurnStreamEvent.MessageWritten(f.log.messages.get(1)),
@@ -479,12 +479,18 @@ class AgentLoopTest {
         assertThat(f.events).contains(new TurnStreamEvent.ToolCallStarted("c1", "slow", Map.of(), 0));
         assertThat(f.events).noneMatch(TurnStreamEvent.TurnUsage.class::isInstance);
 
+        // A resume that finds the call still running asks nobody, and says nothing.
+        f.events.clear();
+        f.resume();
+        assertThat(f.events).isEmpty();
+
         f.events.clear();
         f.executor.finishes("c1", "late result");
         f.llm.answer(TurnMessage.assistant("done"));
         TurnOutcome outcome = f.resume();
 
-        assertThat(f.events.get(0)).isEqualTo(new TurnStreamEvent.AskingLlm(true));
+        // The model is asked again only now that the call has answered.
+        assertThat(f.events).filteredOn(TurnStreamEvent.AskingLlm.class::isInstance).hasSize(1);
         assertThat(f.events.get(f.events.size() - 1)).isEqualTo(usageOf(outcome));
     }
 

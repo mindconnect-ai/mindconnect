@@ -35,12 +35,15 @@ final class SessionEventTranslator {
         this.turns = List.copyOf(turns);
     }
 
-    /** One event of the loop: it is the session's as it is. */
-    void report(TurnStreamEvent event) {
-        boolean begins = event instanceof TurnStreamEvent.AskingLlm asking && !asking.resumed();
-        if (begins && turn.parent() != null) {
+    /** The turn begins: a turn another turn started is told of as the agent that was called. */
+    void began() {
+        if (turn.parent() != null) {
             publish(new SessionStreamEvent.SubAgentStarted(turn.agent().name()));
         }
+    }
+
+    /** One event of the loop: it is the session's as it is. */
+    void report(TurnStreamEvent event) {
         publish(event);
     }
 

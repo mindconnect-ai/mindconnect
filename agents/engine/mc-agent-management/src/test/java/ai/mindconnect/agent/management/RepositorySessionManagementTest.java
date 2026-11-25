@@ -333,7 +333,7 @@ class RepositorySessionManagementTest {
         telling.rename(id, "Owls");
         // What a turn does reaches the list as the status of the session the user sees.
         lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null,
-                new TurnStreamEvent.AskingLlm(false)));
+                new TurnStreamEvent.AskingLlm()));
         lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null, new TurnStreamEvent.TextDelta("x")));
         lifecycle.onEvent(SessionEvent.of(below, TurnId.of("t2"), TurnId.of("t1"),
                 new SessionStreamEvent.Waiting()));

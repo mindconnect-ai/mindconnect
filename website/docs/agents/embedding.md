@@ -145,8 +145,8 @@ names its `kind()` and writes its values itself (`toDetails()`).
 
 | Kind | Tells |
 |------|-------|
-| `asking_llm` | the model is asked: the turn begins, or goes on after it waited |
-| `token`, `thinking` | a piece of the answer, a piece of the model's reasoning |
+| `asking_llm` | the model is asked — before every call of the model |
+| `text_delta`, `thinking` | a piece of the answer, a piece of the model's reasoning |
 | `tool_call_started`, `tool_call_result`, `tool_call_failed` | a tool call and how it came out |
 | `approval_requested`, `input_requested` | the turn stops to ask — a tool call that needs an approval, or anything else |
 | `waiting` | the turn has asked everything of this stop and stands still |

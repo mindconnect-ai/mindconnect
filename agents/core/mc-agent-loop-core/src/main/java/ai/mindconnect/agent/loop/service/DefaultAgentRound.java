@@ -8,6 +8,7 @@ import ai.mindconnect.agent.loop.domain.RoundOutcome;
 import ai.mindconnect.agent.loop.domain.ToolCalls;
 import ai.mindconnect.agent.loop.domain.ToolResult;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
 import ai.mindconnect.agent.loop.domain.Usage;
 import ai.mindconnect.agent.loop.port.in.AgentRound;
 import ai.mindconnect.agent.loop.port.out.AgentRoundToolExecutor;
@@ -57,6 +58,7 @@ public final class DefaultAgentRound implements AgentRound {
 
     private RoundOutcome askModel(String requestId, String sessionId, List<TurnMessage> history,
                                   TurnEventListener events) {
+        events.onEvent(new TurnStreamEvent.AskingLlm());
         LlmAnswer answer = llm.ask(requestId, sessionId, history, events);
         return new RoundOutcome(answer.messages(), outcomeOf(answer), answer.usage(), List.of());
     }

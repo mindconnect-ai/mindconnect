@@ -63,7 +63,6 @@ public final class DefaultAgentLoop implements AgentLoop {
     @Override
     public TurnOutcome start(TurnContext turn, TurnMessage userMessage) {
         TurnContext watched = withGuardedListener(turn);
-        watched.events().onEvent(new TurnStreamEvent.AskingLlm(false));
         List<TurnMessage> history = new ArrayList<>(turn.journal().load());
         // A repeated start finds its own question in the conversation and
         // must not ask it twice.
@@ -78,7 +77,6 @@ public final class DefaultAgentLoop implements AgentLoop {
     @Override
     public TurnOutcome resume(TurnContext turn) {
         TurnContext watched = withGuardedListener(turn);
-        watched.events().onEvent(new TurnStreamEvent.AskingLlm(true));
         return turnToItsEnd(watched, new ArrayList<>(turn.journal().load()));
     }
 

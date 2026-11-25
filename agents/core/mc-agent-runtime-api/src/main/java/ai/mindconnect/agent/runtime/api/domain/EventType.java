@@ -22,9 +22,9 @@ import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
 public record EventType<T extends StreamEvent>(String kind, Function<Map<String, Object>, T> reader) {
 
     public static final EventType<TurnStreamEvent.AskingLlm> ASKING_LLM = new EventType<>("asking_llm",
-            details -> new TurnStreamEvent.AskingLlm(Boolean.TRUE.equals(details.get("resumed"))));
+            details -> new TurnStreamEvent.AskingLlm());
 
-    public static final EventType<TurnStreamEvent.TextDelta> TEXT_DELTA = new EventType<>("token",
+    public static final EventType<TurnStreamEvent.TextDelta> TEXT_DELTA = new EventType<>("text_delta",
             details -> new TurnStreamEvent.TextDelta(text(details, "text")));
 
     public static final EventType<TurnStreamEvent.Thinking> THINKING = new EventType<>("thinking",
