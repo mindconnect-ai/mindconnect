@@ -81,4 +81,22 @@ class PgSessionStoreContractTest extends SessionStoreContract {
 
         assertThat(store.history(id)).hasSize(40).extracting(StoredMessage::sequence).doesNotHaveDuplicates();
     }
+
+    @Test
+    void restored_messages_keep_place_and_time_and_the_session_carries_on_above_them() {
+        PgSessionRepository sessions = new PgSessionRepository(sql, SCOPE).initSchema();
+        PgSessionMessageRepository messages = new PgSessionMessageRepository(sql, SCOPE, Clock.systemUTC()).initSchema();
+        SessionId id = SessionId.of("s1");
+        sessions.create(new Session(id, UserId.of("ada"), null, null, Map.of(), Instant.parse("2026-11-25T10:00:00Z")));
+        List<StoredMessage> before = List.of(
+                new StoredMessage(TurnMessage.assistant("three").stored("m3"), 3, Instant.parse("2026-11-01T10:00:00Z")),
+                new StoredMessage(TurnMessage.assistant("five").stored("m5"), 5, Instant.parse("2026-11-01T10:05:00Z")));
+
+        messages.restore(id, before);
+        messages.append(id, List.of(TurnMessage.assistant("six")));
+
+        assertThat(messages.findBySession(id).subList(0, 2)).isEqualTo(before);
+        assertThat(messages.findBySession(id)).extracting(StoredMessage::sequence).containsExactly(3L, 5L, 6L);
+        assertThat(sessions.findAll()).extracting(Session::id).containsExactly(id);
+    }
 }

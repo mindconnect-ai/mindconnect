@@ -76,6 +76,11 @@ public final class PgSessionRepository implements SessionRepository {
     }
 
     @Override
+    public List<Session> findAll() {
+        return sessions.find("WHERE namespace = ? ORDER BY created_at, id", scope.namespace().value());
+    }
+
+    @Override
     public boolean delete(SessionId id) {
         return sessions.deleteById(scope.namespace().value(), id.value());
     }

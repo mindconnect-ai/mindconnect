@@ -74,6 +74,13 @@ public final class FileSessionRepository implements SessionRepository {
                 .toList();
     }
 
+    @Override
+    public List<Session> findAll() {
+        return sessions.findAll(SESSIONS, FILE_NAME).stream()
+                .sorted(Comparator.comparing(Session::createdAt))
+                .toList();
+    }
+
     /** The session's file only: what else lies in its folder belongs to whoever put it there. */
     @Override
     public boolean delete(SessionId id) {

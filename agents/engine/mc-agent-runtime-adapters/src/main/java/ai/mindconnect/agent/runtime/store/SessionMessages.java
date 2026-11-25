@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.store;
 import java.util.Locale;
 
 import ai.mindconnect.plugin.Setting;
+import ai.mindconnect.plugin.SettingSource;
 
 /**
  * Where a session's messages are kept: as a conversation of the message
@@ -21,6 +22,11 @@ public enum SessionMessages {
     public static final Setting<SessionMessages> SETTING = Setting.of("sessions.messages",
             "Where a session's messages are kept: conversation (the message repository) or own",
             SessionMessages::parse).defaultsTo(CONVERSATION);
+
+    /** The choice of {@code settings}, for a host that reads it before the plugins do. */
+    public static SessionMessages of(SettingSource settings) {
+        return settings.get(SETTING.key()).map(SessionMessages::parse).orElse(SETTING.defaultValue());
+    }
 
     private static SessionMessages parse(String text) {
         return switch (text.strip().toLowerCase(Locale.ROOT)) {

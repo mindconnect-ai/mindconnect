@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.management;
 
+import java.time.Clock;
 import java.util.List;
 
 import ai.mindconnect.agent.management.api.AgentManagement;
@@ -13,6 +14,7 @@ import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.store.DefaultSessionStore;
 import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.store.SessionMessageMigration;
 import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.SessionMessages;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
@@ -43,6 +45,10 @@ public final class ManagementPlugin implements Plugin {
     @Override
     public void install(PluginRegistry registry) {
         registry.provide(SessionStore.class, () -> sessionStore(registry));
+        // From the conversations into the sessions' own repository; the host says when, and in which namespace.
+        registry.provide(SessionMessageMigration.class, () -> new SessionMessageMigration(
+                registry.get(SessionRepository.class), conversations(registry),
+                registry.get(SessionMessageRepository.class), Clock.systemUTC()));
         registry.provide(AgentManagement.class,
                 () -> new RepositoryAgentManagement(registry.get(AgentRepository.class)));
         // Made on first use: the turn service is built once every plugin is installed.
@@ -65,8 +71,13 @@ public final class ManagementPlugin implements Plugin {
         return switch (registry.setting(SessionMessages.SETTING)) {
             case OWN -> new DefaultSessionStore(registry.get(SessionRepository.class),
                     registry.get(SessionMessageRepository.class));
-            case CONVERSATION -> new RepositorySessionStore(registry.get(SessionRepository.class),
-                    registry.get(MessageRepository.class), registry.get(JsonMapperFactory.class));
+            case CONVERSATION -> conversations(registry);
         };
+    }
+
+    /** The store that keeps a session's messages as a conversation of the message repository. */
+    private static SessionStore conversations(PluginRegistry registry) {
+        return new RepositorySessionStore(registry.get(SessionRepository.class),
+                registry.get(MessageRepository.class), registry.get(JsonMapperFactory.class));
     }
 }

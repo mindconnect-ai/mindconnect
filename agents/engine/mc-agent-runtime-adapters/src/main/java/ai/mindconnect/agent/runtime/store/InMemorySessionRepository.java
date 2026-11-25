@@ -66,6 +66,11 @@ public final class InMemorySessionRepository implements SessionRepository {
     }
 
     @Override
+    public List<Session> findAll() {
+        return inThisNamespace().sorted(Comparator.comparing(Session::createdAt)).toList();
+    }
+
+    @Override
     public boolean delete(SessionId id) {
         return sessions.remove(key(id)) != null;
     }

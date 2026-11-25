@@ -29,6 +29,12 @@ public interface SessionMessageRepository {
      */
     List<StoredMessage> append(SessionId session, List<TurnMessage> messages);
 
+    /**
+     * Stores messages as another store kept them, each at its place and time,
+     * for moving a session here. A place taken this way is not given again.
+     */
+    void restore(SessionId session, List<StoredMessage> messages);
+
     /** Replaces one message by what {@code change} makes of it; empty if the session has no such message. */
     Optional<StoredMessage> update(SessionId session, String messageId, UnaryOperator<TurnMessage> change);
 

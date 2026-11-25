@@ -33,6 +33,9 @@ public interface SessionRepository {
     /** The sessions opened under this one — a sub-agent's, a fork taken as a child — oldest first. */
     List<Session> findByParent(SessionId parent);
 
+    /** Every session of the namespace, those under others included, oldest first: for moving them all. */
+    List<Session> findAll();
+
     /** Removes the session and nothing else; whether there was one. */
     boolean delete(SessionId id);
 }

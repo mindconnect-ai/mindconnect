@@ -65,6 +65,18 @@ public final class InMemorySessionMessageRepository implements SessionMessageRep
     }
 
     @Override
+    public void restore(SessionId session, List<StoredMessage> restored) {
+        Messages messages = sessions.computeIfAbsent(key(session), key -> new Messages());
+        synchronized (messages) {
+            for (StoredMessage message : restored) {
+                messages.stored.add(message);
+                messages.lastPlace = Math.max(messages.lastPlace, message.sequence());
+            }
+            messages.stored.sort(java.util.Comparator.comparingLong(StoredMessage::sequence));
+        }
+    }
+
+    @Override
     public Optional<StoredMessage> update(SessionId session, String messageId, UnaryOperator<TurnMessage> change) {
         Messages messages = sessions.get(key(session));
         if (messages == null) {

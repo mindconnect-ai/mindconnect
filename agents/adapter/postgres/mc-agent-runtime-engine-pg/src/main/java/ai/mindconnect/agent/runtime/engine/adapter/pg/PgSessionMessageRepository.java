@@ -116,6 +116,30 @@ public final class PgSessionMessageRepository implements SessionMessageRepositor
         });
     }
 
+    /** In one transaction, the session's last place raised to the highest one restored. */
+    @Override
+    public void restore(SessionId session, List<StoredMessage> messages) {
+        if (messages.isEmpty()) {
+            return;
+        }
+        String namespace = scope.namespace().value();
+        long highest = messages.stream().mapToLong(StoredMessage::sequence).max().orElseThrow();
+        sql.inTransaction((Sql tx) -> {
+            tx.update("""
+                    INSERT INTO mc_session_message_seq (namespace, session_id, last_seq) VALUES (?, ?, ?)
+                    ON CONFLICT (namespace, session_id)
+                    DO UPDATE SET last_seq = greatest(mc_session_message_seq.last_seq, EXCLUDED.last_seq)""",
+                    namespace, session.value(), highest);
+            for (StoredMessage message : messages) {
+                tx.update("INSERT INTO mc_session_message (namespace, session_id, seq, id, stored_at, doc) "
+                                + "VALUES (?, ?, ?, ?, ?, ?)",
+                        namespace, session.value(), message.sequence(), message.message().id(),
+                        message.storedAt().truncatedTo(ChronoUnit.MICROS),
+                        tx.json().jsonb(converter.toJson(message.message())));
+            }
+        });
+    }
+
     /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
     @Override
     public Optional<StoredMessage> update(SessionId session, String messageId, UnaryOperator<TurnMessage> change) {

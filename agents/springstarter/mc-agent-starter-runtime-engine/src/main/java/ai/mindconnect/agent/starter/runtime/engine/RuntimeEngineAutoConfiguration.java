@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import javax.sql.DataSource;
@@ -34,6 +35,8 @@ import ai.mindconnect.jackson.JacksonPlugin;
 import ai.mindconnect.jackson.JsonMapperCustomizer;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.runtime.store.SessionMessageMigration;
+import ai.mindconnect.agent.runtime.store.SessionMessages;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.ManagementPlugin;
@@ -98,6 +101,7 @@ import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.MessageRepository;
+import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.StartupScope;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.plugin.Plugin;
@@ -166,6 +170,8 @@ public class RuntimeEngineAutoConfiguration {
             case "memory" -> new InMemoryStorePlugin(dataDir, maxTraces);
             default -> new FileStorePlugin(dataDir, maxTraces);
         };
+        // A plugin's setting is the application's property of that name under mindconnect.
+        SettingSource settings = key -> Optional.ofNullable(env.getProperty("mindconnect." + key));
         // What a capability keeps with the session asks the runtime's session store, once the runtime is built.
         AtomicReference<AgentRuntime> built = new AtomicReference<>();
         Supplier<SessionStore> sessions = () -> built.get().service(SessionStore.class);
@@ -180,9 +186,7 @@ public class RuntimeEngineAutoConfiguration {
                 // The application's JSON, as its customizers say; Spring's ObjectMapper is this one.
                 .plugin(new JacksonPlugin(json.orderedStream().toList()))
                 .plugin(provides("scope", registry -> {
-                    // A plugin's setting is the application's property of that name under mindconnect.
-                    registry.provide(SettingSource.class,
-                            () -> key -> Optional.ofNullable(env.getProperty("mindconnect." + key)));
+                    registry.provide(SettingSource.class, () -> settings);
                     registry.provide(ToolActivation.class, () -> activation);
                     // The model of what the runtime does on its own account: a title, a summary.
                     Optional.ofNullable(blankToNull(env.getProperty("mindconnect.agent.stateless.llm-config-name")))
@@ -235,9 +239,31 @@ public class RuntimeEngineAutoConfiguration {
         Namespace startup = new Namespace(env.getProperty("mindconnect.namespace", "local"));
         AgentRuntime runtime = StartupScope.call(scope, startup, builder::build);
         built.set(runtime);
+        if (SessionMessages.of(settings) == SessionMessages.OWN) {
+            moveSessionMessages(runtime, scope, startup);
+        }
         log.info("Agent runtime built: persistence {}, namespace {}", persistence,
                 scope instanceof ThreadBoundScopeSupplier ? "per call" : startup.value());
         return runtime;
+    }
+
+    /**
+     * Moves the sessions' messages out of the conversations, in every namespace
+     * the first time it is used after start — a namespace bound for the first
+     * time waits for its move — or at once where there is one namespace only.
+     */
+    private static void moveSessionMessages(AgentRuntime runtime, ScopeSupplier scope, Namespace startup) {
+        SessionMessageMigration migration = runtime.service(SessionMessageMigration.class);
+        Consumer<Namespace> move = namespace -> {
+            SessionMessageMigration.Report report = migration.run();
+            log.info("Session messages of namespace {}: {} sessions moved, {} moved before",
+                    namespace.value(), report.migrated().size(), report.skipped().size());
+        };
+        if (scope instanceof ThreadBoundScopeSupplier bound) {
+            bound.onBind(new NamespaceFirstUse("Moving session messages", move));
+        } else {
+            StartupScope.run(scope, startup, () -> move.accept(startup));
+        }
     }
 
     /** The tools bind their providers once the context is up — not while it is still refreshing. */

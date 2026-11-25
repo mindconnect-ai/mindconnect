@@ -70,6 +70,13 @@ public final class FileSessionMessageRepository implements SessionMessageReposit
     }
 
     @Override
+    public void restore(SessionId session, List<StoredMessage> messages) {
+        for (StoredMessage message : messages) {
+            log.put(session, new Entry(message.sequence(), message.storedAt(), converter.toJson(message.message())));
+        }
+    }
+
+    @Override
     public Optional<StoredMessage> update(SessionId session, String messageId, UnaryOperator<TurnMessage> change) {
         return log.update(session, messageId, entry -> new Entry(entry.sequence(), entry.storedAt(),
                         converter.toJson(change.apply(converter.fromJson(entry.message())))))
