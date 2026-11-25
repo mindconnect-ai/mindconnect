@@ -36,7 +36,6 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
-import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,12 +71,6 @@ public class ChatUiController {
     private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
     private final TodoListService todoListService;
     private final ObjectMapper objectMapper;
-    /**
-     * The mapper the cards pretty-print tool arguments with and the composer's
-     * patches are built with: Jackson's defaults, as these components have
-     * always had, not the shared mapper's settings.
-     */
-    private final ObjectMapper componentJson;
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
@@ -118,7 +111,6 @@ public class ChatUiController {
         this.sessionManagement = sessionManagement;
         this.todoListService = todoListService;
         this.objectMapper = objectMapper;
-        this.componentJson = runtime.service(JsonMapperFactory.class).create();
         this.traceRepository = traceRepository;
         this.activeStreams = activeStreams;
         this.sessionStreams = sessionStreams;
@@ -1311,7 +1303,7 @@ public class ChatUiController {
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
                         buildSubAgentCards(SessionOwnership.idOf(session), toolCallId, running, in, out),
-                componentJson)
+                objectMapper)
                 .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
                         llmConfigRepository, ChatAgent.model(agent)))
                 .withOwnSettings(ownSettings(session))
@@ -1397,7 +1389,7 @@ public class ChatUiController {
                                                                     String toolName, Map<String, Object> arguments) {
         String argsJson;
         try {
-            argsJson = componentJson
+            argsJson = objectMapper
                     .writerWithDefaultPrettyPrinter()
                     .writeValueAsString(arguments);
         } catch (Exception e) {
@@ -1457,7 +1449,7 @@ public class ChatUiController {
                 var childComp = new ai.mindconnect.chatui.ui.component.MessageListComponent(
                         SessionOwnership.idOf(child), childAgent, childHistory, null,
                         (tcId, r, in, out) -> buildSubAgentCards(SessionOwnership.idOf(child), tcId, r, in, out),
-                        componentJson);
+                        objectMapper);
 
                 var childList = TaskCardComponent.subAgentChildList(SessionOwnership.idOf(child).value());
                 for (TaskCardComponent t : childComp.allHistoricTaskCards()) {
@@ -2261,7 +2253,7 @@ public class ChatUiController {
         String node = "task-" + key;
         liveTasks.put(key, new LiveTask(node, toolName, false, arguments, parentTaskId));
         openTaskNodeId[0] = null;
-        var card = TaskCardComponent.runningTool(node, toolName, arguments, componentJson);
+        var card = TaskCardComponent.runningTool(node, toolName, arguments, objectMapper);
         publishPatch(bus, appendCard(liveView, scope, card));
         openTaskNodeId[0] = node;
     }
@@ -2280,9 +2272,9 @@ public class ChatUiController {
         lt.done = true;
         var card = failed
                 ? TaskCardComponent.failedTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs,
-                        fullResultUrl, componentJson)
+                        fullResultUrl, objectMapper)
                 : TaskCardComponent.doneTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs,
-                        fullResultUrl, componentJson);
+                        fullResultUrl, objectMapper);
         publishPatch(bus, liveView.streamTaskUpdate(card));
         if (lt.nodeId.equals(openTaskNodeId[0])) openTaskNodeId[0] = null;
     }
@@ -2315,7 +2307,7 @@ public class ChatUiController {
                         TaskCardComponent.subAgentAnswer(tid, reason)));
             } else {
                 publishPatch(bus, liveView.streamTaskUpdate(
-                        TaskCardComponent.failedTool(lt.nodeId, lt.name, lt.input, reason, durationMs, null, componentJson)));
+                        TaskCardComponent.failedTool(lt.nodeId, lt.name, lt.input, reason, durationMs, null, objectMapper)));
             }
         }
     }
