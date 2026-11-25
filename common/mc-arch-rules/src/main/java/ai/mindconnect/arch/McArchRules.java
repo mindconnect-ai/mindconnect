@@ -52,7 +52,7 @@ public final class McArchRules {
 
     private static final String PROJECT_PACKAGE = "ai.mindconnect.";
 
-    private static final String JSON_MAPPER_FACTORY = "ai.mindconnect.json.JsonMapperFactory";
+    private static final String JSON_MAPPER_FACTORY = "ai.mindconnect.jackson.JsonMapperFactory";
     private static final String OBJECT_MAPPER = "com.fasterxml.jackson.databind.ObjectMapper";
     private static final String JSON_MAPPER = "com.fasterxml.jackson.databind.json.JsonMapper";
 

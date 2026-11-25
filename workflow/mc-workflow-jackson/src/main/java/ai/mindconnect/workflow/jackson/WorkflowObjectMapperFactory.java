@@ -1,6 +1,6 @@
 package ai.mindconnect.workflow.jackson;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.StepData;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;

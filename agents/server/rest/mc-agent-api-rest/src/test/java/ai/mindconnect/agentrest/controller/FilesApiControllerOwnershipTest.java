@@ -6,7 +6,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

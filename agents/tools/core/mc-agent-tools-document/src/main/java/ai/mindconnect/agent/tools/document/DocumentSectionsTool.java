@@ -5,7 +5,7 @@ import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.DocumentModel;
 import ai.mindconnect.agent.tools.document.DocumentReader;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;

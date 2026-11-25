@@ -12,7 +12,7 @@ import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalAgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.springframework.beans.factory.annotation.Value;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;

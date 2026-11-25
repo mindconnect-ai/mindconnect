@@ -1,6 +1,6 @@
 package ai.mindconnect.webscraper;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.webscraper.jsoup.JsoupWebScraper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

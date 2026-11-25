@@ -8,7 +8,7 @@ import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

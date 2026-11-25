@@ -35,7 +35,7 @@ import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import okhttp3.OkHttpClient;
 
 /**

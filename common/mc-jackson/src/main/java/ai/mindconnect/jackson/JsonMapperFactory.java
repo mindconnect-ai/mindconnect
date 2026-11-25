@@ -1,4 +1,4 @@
-package ai.mindconnect.json;
+package ai.mindconnect.jackson;
 
 import java.util.ArrayList;
 import java.util.List;

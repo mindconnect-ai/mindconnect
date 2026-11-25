@@ -1,6 +1,6 @@
 package ai.mindconnect.mcp.gateway.admin.ui;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpTarget;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

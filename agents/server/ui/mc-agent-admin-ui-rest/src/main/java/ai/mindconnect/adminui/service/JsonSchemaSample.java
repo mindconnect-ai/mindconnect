@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;

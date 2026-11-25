@@ -10,7 +10,7 @@ import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;

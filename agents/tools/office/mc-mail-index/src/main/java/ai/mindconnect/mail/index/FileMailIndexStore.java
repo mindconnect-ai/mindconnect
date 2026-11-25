@@ -1,7 +1,7 @@
 package ai.mindconnect.mail.index;
 
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mail.Location;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;

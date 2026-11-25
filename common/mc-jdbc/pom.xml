@@ -25,7 +25,7 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-json</artifactId>
+            <artifactId>mc-jackson</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

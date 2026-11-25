@@ -1,6 +1,6 @@
 package ai.mindconnect.taskqueue.jdbc;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.taskqueue.TaskFailure;
 import ai.mindconnect.taskqueue.TaskNotification;
 import ai.mindconnect.taskqueue.TaskQueueException;

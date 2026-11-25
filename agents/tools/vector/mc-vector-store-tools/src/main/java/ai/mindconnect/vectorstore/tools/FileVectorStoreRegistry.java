@@ -2,7 +2,7 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.filerepo.FileWrites;
 import ai.mindconnect.filerepo.PathLocks;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

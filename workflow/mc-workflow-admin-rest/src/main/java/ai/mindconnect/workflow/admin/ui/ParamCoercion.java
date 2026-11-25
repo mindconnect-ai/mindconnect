@@ -1,6 +1,6 @@
 package ai.mindconnect.workflow.admin.ui;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.schema.Schema;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

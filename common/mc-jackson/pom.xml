@@ -11,8 +11,8 @@
         <relativePath>../../mc-java-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>mc-json</artifactId>
-    <name>mc-json</name>
+    <artifactId>mc-jackson</artifactId>
+    <name>mc-jackson</name>
     <packaging>jar</packaging>
     <description>
         Where every Jackson ObjectMapper comes from: Jackson's defaults and every

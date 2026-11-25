@@ -3,7 +3,7 @@ package ai.mindconnect.agent.tools.workflow.project;
 import ai.mindconnect.agent.tools.workflow.step.AgentCallData;
 import ai.mindconnect.agent.tools.workflow.step.SandboxCodeData;
 import ai.mindconnect.agent.tools.workflow.step.ToolCallData;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.schema.Schema;
 import ai.mindconnect.workflow.domain.AssignVariablesData;
 import ai.mindconnect.workflow.domain.BaseStepContainerData;

@@ -1,4 +1,4 @@
-package ai.mindconnect.json;
+package ai.mindconnect.jackson;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;

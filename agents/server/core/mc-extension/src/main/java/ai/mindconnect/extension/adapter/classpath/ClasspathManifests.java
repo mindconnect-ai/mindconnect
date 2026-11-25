@@ -3,7 +3,7 @@ package ai.mindconnect.extension.adapter.classpath;
 import ai.mindconnect.extension.domain.Extension;
 import ai.mindconnect.extension.domain.ExtensionManifest;
 import ai.mindconnect.extension.domain.ExtensionRegistry;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;

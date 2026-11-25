@@ -1,4 +1,4 @@
-package ai.mindconnect.json;
+package ai.mindconnect.jackson;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,6 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpTool;
 import com.fasterxml.jackson.core.type.TypeReference;

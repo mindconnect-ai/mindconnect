@@ -14,7 +14,7 @@ import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 /**
  * The demo's plugin — found through

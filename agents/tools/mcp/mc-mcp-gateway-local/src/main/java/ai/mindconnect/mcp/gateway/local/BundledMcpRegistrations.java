@@ -2,7 +2,7 @@ package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.initialdata.FileCopyInitialDataInstaller;
 import ai.mindconnect.initialdata.ImportInitialDataInstaller;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;

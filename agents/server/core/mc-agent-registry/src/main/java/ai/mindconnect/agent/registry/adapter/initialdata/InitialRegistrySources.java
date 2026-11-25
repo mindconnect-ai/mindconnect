@@ -4,7 +4,7 @@ import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.domain.RegistrySourceId;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.initialdata.ImportInitialDataInstaller;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

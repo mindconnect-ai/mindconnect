@@ -1,6 +1,6 @@
 package ai.mindconnect.workflow.admin.run;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.StepData;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.edit.WorkflowMutator;

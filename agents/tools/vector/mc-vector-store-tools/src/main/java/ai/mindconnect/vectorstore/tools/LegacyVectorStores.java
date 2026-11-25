@@ -3,7 +3,7 @@ package ai.mindconnect.vectorstore.tools;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
 import ai.mindconnect.vectorstore.embedding.EntityRef;

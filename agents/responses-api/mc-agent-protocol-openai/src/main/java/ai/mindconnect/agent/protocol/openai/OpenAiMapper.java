@@ -11,7 +11,7 @@ import ai.mindconnect.agent.protocol.item.ContentPart;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.protocol.item.Role;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;

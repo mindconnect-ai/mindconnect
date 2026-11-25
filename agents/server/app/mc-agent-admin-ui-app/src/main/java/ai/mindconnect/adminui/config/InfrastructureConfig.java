@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.config;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

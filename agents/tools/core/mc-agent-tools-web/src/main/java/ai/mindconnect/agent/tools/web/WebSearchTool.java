@@ -2,7 +2,7 @@ package ai.mindconnect.agent.tools.web;
 
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.RelevantExcerpts;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;

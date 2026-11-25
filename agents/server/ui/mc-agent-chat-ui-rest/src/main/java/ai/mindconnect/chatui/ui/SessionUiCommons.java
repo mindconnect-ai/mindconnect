@@ -1,6 +1,6 @@
 package ai.mindconnect.chatui.ui;
 
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.ZoneId;

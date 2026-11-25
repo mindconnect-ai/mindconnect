@@ -18,7 +18,7 @@
         How the ids of the agents stand in JSON, package ai.mindconnect.agent.jackson:
         IdJsonModule writes AgentId, SessionId, UserId, AgentToolId and Namespace as
         their plain value and reads them back. It announces itself through the
-        ServiceLoader, so every mapper of mc-json has it, and the contracts it
+        ServiceLoader, so every mapper of mc-jackson has it, and the contracts it
         serves need no Jackson of their own.
     </description>
 
@@ -42,7 +42,7 @@
 
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-json</artifactId>
+            <artifactId>mc-jackson</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

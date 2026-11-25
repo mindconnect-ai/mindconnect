@@ -27,7 +27,7 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-json</artifactId>
+            <artifactId>mc-jackson</artifactId>
         </dependency>
         <!-- Core workflow engine — the only required dependency -->
         <dependency>

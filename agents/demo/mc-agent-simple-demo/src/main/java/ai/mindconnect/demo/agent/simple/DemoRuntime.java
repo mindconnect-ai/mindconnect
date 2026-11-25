@@ -40,7 +40,7 @@ import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.tools.todo.TodoPlugin;
 import ai.mindconnect.agent.tools.usermemory.UserMemoryPlugin;
 import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.plugin.Plugin;

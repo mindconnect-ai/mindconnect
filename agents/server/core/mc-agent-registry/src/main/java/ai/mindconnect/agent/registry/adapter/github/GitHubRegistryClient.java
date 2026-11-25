@@ -5,7 +5,7 @@ import ai.mindconnect.agent.registry.domain.RegistryIndex;
 import ai.mindconnect.agent.registry.domain.RegistryPackage;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.port.out.RegistryClient;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;

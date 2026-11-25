@@ -26,7 +26,7 @@ import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.sdk.AgentRuntimeBuilder;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 

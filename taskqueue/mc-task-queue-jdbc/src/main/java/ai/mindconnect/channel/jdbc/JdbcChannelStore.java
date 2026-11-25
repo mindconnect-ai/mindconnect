@@ -2,7 +2,7 @@ package ai.mindconnect.channel.jdbc;
 
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelStore;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

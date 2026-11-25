@@ -25,7 +25,7 @@
         <module>mc-agents-parent</module>
         <!-- shared modules pulled in so this area builds standalone -->
         <module>../common/mc-common</module>
-        <module>../common/mc-json</module>
+        <module>../common/mc-jackson</module>
         <module>../common/mc-jdbc</module>
         <module>../common/mc-file-repo</module>
         <module>../common/mc-plugin</module>

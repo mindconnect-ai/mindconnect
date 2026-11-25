@@ -6,7 +6,7 @@ import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolCallScope;
-import ai.mindconnect.json.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
