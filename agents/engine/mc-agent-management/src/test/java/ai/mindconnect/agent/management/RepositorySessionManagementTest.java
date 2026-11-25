@@ -337,6 +337,9 @@ class RepositorySessionManagementTest {
         lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null, new TurnStreamEvent.TextDelta("x")));
         lifecycle.onEvent(SessionEvent.of(below, TurnId.of("t2"), TurnId.of("t1"),
                 new SessionStreamEvent.Waiting()));
+        lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null, new SessionStreamEvent.Resumed()));
+        // The model being asked again says nothing new: the session is busy already.
+        lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null, new TurnStreamEvent.AskingLlm()));
         lifecycle.onEvent(SessionEvent.of(below, TurnId.of("t2"), TurnId.of("t1"),
                 new SessionStreamEvent.Done(TurnStatus.COMPLETED, "", null)));
         lifecycle.onEvent(SessionEvent.of(id, TurnId.of("t1"), null,
@@ -344,7 +347,7 @@ class RepositorySessionManagementTest {
         lifecycle.onEvent(new SessionEvent("session.title", id, null, null, Map.of("title", "Owls at night")));
         telling.delete(id);
 
-        for (int i = 0; i < 200 && ada.size() < 7; i++) {
+        for (int i = 0; i < 200 && ada.size() < 8; i++) {
             Thread.sleep(10);
         }
         assertThat(ada).containsExactly(
@@ -352,6 +355,7 @@ class RepositorySessionManagementTest {
                 new SessionLifecycleEvent.Renamed(id, "Owls"),
                 new SessionLifecycleEvent.StatusChanged(id, ManagedSession.Status.BUSY),
                 new SessionLifecycleEvent.StatusChanged(id, ManagedSession.Status.WAITING),
+                new SessionLifecycleEvent.StatusChanged(id, ManagedSession.Status.BUSY),
                 new SessionLifecycleEvent.StatusChanged(id, ManagedSession.Status.IDLE),
                 new SessionLifecycleEvent.Renamed(id, "Owls at night"),
                 new SessionLifecycleEvent.Deleted(id));

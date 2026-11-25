@@ -41,6 +41,7 @@ class StreamEventTest {
                 new Told<>(EventType.INPUT_REQUESTED, new TurnInterruptionEvent.InputRequested("i2", "user_input", "c2",
                         "ask_user", Map.of("question", "Which one?"))),
                 new Told<>(EventType.WAITING, new SessionStreamEvent.Waiting()),
+                new Told<>(EventType.RESUMED, new SessionStreamEvent.Resumed()),
                 new Told<>(EventType.TURN_USAGE, new TurnStreamEvent.TurnUsage(1200, 340)),
                 new Told<>(EventType.DONE, new SessionStreamEvent.Done(TurnStatus.INCOMPLETE, "", "MAX_ROUNDS")),
                 new Told<>(EventType.ERROR, new SessionStreamEvent.Error(TurnStatus.FAILED, "The model did not answer")),

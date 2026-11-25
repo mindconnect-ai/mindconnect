@@ -199,12 +199,17 @@ class EngineWithCapabilitiesTest {
         assertThat(interrupted.status()).isEqualTo(TurnStatus.INTERRUPTED);
         Interruption interruption = interrupted.interruptions().get(0);
         assertThat(interruption.kind()).isEqualTo(Interruption.TOOL_APPROVAL);
+        List<SessionEvent> heard = new CopyOnWriteArrayList<>();
+        sessions.stream(session.id(), false, heard::add);
 
         turns.resume(turnId, List.of(InterruptionAnswer.approve(interruption.id())));
         Turn ended = awaitRest(turnId);
 
         assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
         assertThat(toolResults(turnId)).containsExactly("ran bash");
+        // That the turn goes on is told with the answer, before the tool has run and the model is asked again.
+        assertThat(heard).extracting(SessionEvent::kind)
+                .containsSubsequence("resumed", "tool_call_result", "asking_llm", "done");
     }
 
     @Test

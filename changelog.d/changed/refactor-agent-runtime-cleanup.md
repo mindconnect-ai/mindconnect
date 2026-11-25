@@ -39,4 +39,6 @@
   A question a turn stops for is a `TurnInterruptionEvent` (`ApprovalRequested`, `InputRequested`),
   told by whoever runs the tools. `AskingLlm` is told just before every call of the model: a turn
   that is woken and only goes on waiting no longer says so. On a session's stream a piece of the
-  answer is of the kind `text_delta`; the REST frame is still `token`.
+  answer is of the kind `text_delta`; the REST frame is still `token`. An answer to a question a
+  turn stood still for is told as `resumed`, and the session is `BUSY` from then on — also while the
+  tool that was approved is still running.

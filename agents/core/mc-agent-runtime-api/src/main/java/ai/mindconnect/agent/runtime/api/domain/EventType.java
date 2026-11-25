@@ -64,6 +64,9 @@ public record EventType<T extends StreamEvent>(String kind, Function<Map<String,
     public static final EventType<SessionStreamEvent.Waiting> WAITING = new EventType<>("waiting",
             details -> new SessionStreamEvent.Waiting());
 
+    public static final EventType<SessionStreamEvent.Resumed> RESUMED = new EventType<>("resumed",
+            details -> new SessionStreamEvent.Resumed());
+
     public static final EventType<SessionStreamEvent.Done> DONE = new EventType<>("done",
             details -> new SessionStreamEvent.Done(status(details), text(details, "text"),
                     text(details, "incompleteReason")));
@@ -82,7 +85,7 @@ public record EventType<T extends StreamEvent>(String kind, Function<Map<String,
     /** The runtime's own kinds: the loop's, then what the runtime adds. */
     public static final List<EventType<?>> TYPES = List.of(ASKING_LLM, TEXT_DELTA, THINKING, TOOL_CALL_STARTED,
             TOOL_CALL_RESULT, TOOL_CALL_FAILED, MESSAGE, TURN_USAGE, APPROVAL_REQUESTED, INPUT_REQUESTED, WAITING,
-            DONE, ERROR, SUB_AGENT_STARTED, SUB_AGENT_DONE);
+            RESUMED, DONE, ERROR, SUB_AGENT_STARTED, SUB_AGENT_DONE);
 
     T read(Map<String, Object> details) {
         return reader.apply(details);

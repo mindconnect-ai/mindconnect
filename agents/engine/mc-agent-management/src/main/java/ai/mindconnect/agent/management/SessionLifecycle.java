@@ -1,7 +1,9 @@
 package ai.mindconnect.agent.management;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import ai.mindconnect.agent.SessionId;
@@ -41,6 +43,8 @@ public final class SessionLifecycle implements SessionEventListener {
     private final SessionRepository sessions;
     private final Function<SessionId, Optional<Turn>> runningTurn;
     private final ChannelRegistry channels = new ChannelRegistry().withIdleEviction(IDLE);
+    /** The status last told of each session that is not idle, by its user and id. */
+    private final Map<String, ManagedSession.Status> statusTold = new ConcurrentHashMap<>();
 
     /** @param runningTurn the turn of a session that has not ended, if there is one */
     public SessionLifecycle(SessionRepository sessions, Function<SessionId, Optional<Turn>> runningTurn) {
@@ -75,6 +79,7 @@ public final class SessionLifecycle implements SessionEventListener {
         switch (event.known()) {
             case TurnStreamEvent.AskingLlm asking -> status(event, ManagedSession.Status.BUSY);
             case SessionStreamEvent.Waiting waiting -> status(event, ManagedSession.Status.WAITING);
+            case SessionStreamEvent.Resumed resumed -> status(event, ManagedSession.Status.BUSY);
             case SessionStreamEvent.Done done -> ended(event);
             case SessionStreamEvent.Error error -> ended(event);
             case SessionStreamEvent.Other other when TITLE_FOUND.equals(event.kind()) ->
@@ -94,8 +99,16 @@ public final class SessionLifecycle implements SessionEventListener {
 
     /** Whichever session of the tree it happened in, it is the session the user sees that changes. */
     private void status(SessionEvent event, ManagedSession.Status status) {
-        topOf(event.sessionId()).ifPresent(session -> tell(session.userId(),
-                new SessionLifecycleEvent.StatusChanged(session.id(), status)));
+        topOf(event.sessionId()).ifPresent(session -> {
+            // Several things say the same of a session — an answer, then the model being asked again:
+            // a user is told when the status changes, not each time it is confirmed.
+            String told = session.userId() + "/" + session.id().value();
+            ManagedSession.Status before = status == ManagedSession.Status.IDLE
+                    ? statusTold.remove(told) : statusTold.put(told, status);
+            if (before != status) {
+                tell(session.userId(), new SessionLifecycleEvent.StatusChanged(session.id(), status));
+            }
+        });
     }
 
     /** The session at the top of the tree this one is in. */

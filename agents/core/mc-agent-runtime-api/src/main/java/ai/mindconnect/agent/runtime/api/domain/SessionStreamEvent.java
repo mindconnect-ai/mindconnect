@@ -31,6 +31,21 @@ public interface SessionStreamEvent extends StreamEvent {
     }
 
     /**
+     * The turn goes on: something it stood still for has been answered. What
+     * the answer set in motion — a tool that runs now — may take its time
+     * before the model is asked again.
+     */
+    record Resumed() implements SessionStreamEvent {
+        @Override public String kind() {
+            return "resumed";
+        }
+
+        @Override public Map<String, Object> toDetails() {
+            return Map.of();
+        }
+    }
+
+    /**
      * The turn came to its end.
      *
      * @param text             the answer; empty for a turn that ended without one

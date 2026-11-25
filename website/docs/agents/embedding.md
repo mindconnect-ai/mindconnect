@@ -150,6 +150,7 @@ names its `kind()` and writes its values itself (`toDetails()`).
 | `tool_call_started`, `tool_call_result`, `tool_call_failed` | a tool call and how it came out |
 | `approval_requested`, `input_requested` | the turn stops to ask — a tool call that needs an approval, or anything else |
 | `waiting` | the turn has asked everything of this stop and stands still |
+| `resumed` | something the turn stood still for has been answered: it goes on |
 | `turn_usage` | what the turn has cost |
 | `done`, `error` | the turn came to its end, or broke off |
 | `sub_agent_started`, `sub_agent_done` | a turn another turn started begins and ends |

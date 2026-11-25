@@ -72,6 +72,11 @@ final class SessionEventTranslator {
                         : "The turn " + (status == TurnStatus.CANCELLED ? "was cancelled" : "failed")));
     }
 
+    /** Something the turn stood still for has been answered: it goes on, though no worker of it is awake yet. */
+    static SessionEvent resumed(Session session, Turn turn) {
+        return SessionEvent.of(session.id(), turn.id(), turn.parent(), new SessionStreamEvent.Resumed());
+    }
+
     /** The turn came back with something to ask: one event for each thing it asks, then that it waits. */
     void interrupted(List<Interruption> interruptions) {
         for (Interruption asked : interruptions) {

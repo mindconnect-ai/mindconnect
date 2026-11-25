@@ -9,7 +9,6 @@ import ai.mindconnect.agent.loop.domain.ToolCalls;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
-import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
@@ -128,6 +127,12 @@ public final class DefaultTurnService implements TurnService {
             // To the task of the turn that asked — a sub-agent's when the
             // call is one of its; the turns above it are woken as it ends.
             queue.notify(answered.get(i).turnId().value(), TurnWorker.interruptionAnswer(answers.get(i)));
+        }
+        // Told here: what was answered runs now, and no worker of the turn is awake to say so.
+        if (!answered.isEmpty()) {
+            sessionStore.find(turn.sessionId()).ifPresent(session ->
+                    queue.get(turn.id().value()).ifPresent(task -> events.publish(session,
+                            turns.withTurnsAbove(task), SessionEventTranslator.resumed(session, turn))));
         }
     }
 
