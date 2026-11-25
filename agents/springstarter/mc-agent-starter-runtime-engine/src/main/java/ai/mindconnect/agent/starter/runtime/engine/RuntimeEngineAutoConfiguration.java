@@ -29,6 +29,7 @@ import org.springframework.core.env.Environment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
@@ -134,6 +135,17 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 public class RuntimeEngineAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RuntimeEngineAutoConfiguration.class);
+
+    /**
+     * How the ids stand in JSON, for the mapper Spring Boot builds itself: it
+     * registers the Jackson modules that are beans. A mapper of
+     * {@code JsonMapperFactory} finds the module through the ServiceLoader.
+     */
+    @Bean
+    @ConditionalOnMissingBean(IdJsonModule.class)
+    IdJsonModule idJsonModule() {
+        return new IdJsonModule();
+    }
 
     /**
      * The scope the runtime works in, for an application without the

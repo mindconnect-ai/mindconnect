@@ -33,6 +33,7 @@
         <module>../taskqueue/mc-task-queue-jdbc</module>
         <module>core/mc-agent-domain</module>
         <module>core/mc-agent-scope</module>
+        <module>core/mc-agent-jackson</module>
         <module>vectorstore/mc-vector-store</module>
         <module>vectorstore/mc-vector-store-pgvector</module>
         <module>tools/vector/mc-vector-store-tools</module>
