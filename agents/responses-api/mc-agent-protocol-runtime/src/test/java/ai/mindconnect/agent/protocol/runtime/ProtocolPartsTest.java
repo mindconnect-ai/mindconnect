@@ -1,14 +1,12 @@
 package ai.mindconnect.agent.protocol.runtime;
 
+import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.protocol.item.ContentPart;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.Role;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
-import ai.mindconnect.message.domain.ParticipantType;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -30,11 +28,14 @@ class ProtocolPartsTest {
     }
 
     @Test
-    void aStoredMessageReadsBackWithItsMediaAsFileIdSources() {
-        Message m = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER, MessageType.CHAT, List.of(
-                new ai.mindconnect.message.domain.ContentPart.Text("what is this?"),
-                new ai.mindconnect.message.domain.ContentPart.Image("f-1", "photo.png", "image/png", 240),
-                new ai.mindconnect.message.domain.ContentPart.File("f-2", "spec.pdf", "application/pdf", 1024)), 1);
+    void aMessageOfASessionReadsBackPartForPart() {
+        TurnMessage m = TurnMessage.user(List.of(
+                new ai.mindconnect.agent.loop.domain.ContentPart.Text("what is this?"),
+                new ai.mindconnect.agent.loop.domain.ContentPart.Image(
+                        new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId("f-1"),
+                        ai.mindconnect.agent.loop.domain.ContentPart.Image.Detail.AUTO, "photo.png"),
+                new ai.mindconnect.agent.loop.domain.ContentPart.Document(
+                        new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId("f-2"), "spec.pdf")));
 
         ConversationItem.Message item = ProtocolParts.message(Role.USER, m);
 
@@ -46,12 +47,12 @@ class ProtocolPartsTest {
     }
 
     @Test
-    void aTextMessageIsOneTextPart_theCompressedStubWhenThereIsOne() {
-        Message m = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.AGENT, MessageType.CHAT, "long", 1);
+    void aTextMessageIsOneTextPart_theNoteShownInItsPlaceWhenThereIsOne() {
+        TurnMessage m = TurnMessage.assistant("long");
 
         assertThat(ProtocolParts.message(Role.ASSISTANT, m).content())
                 .containsExactly(new ContentPart.Text("long"));
-        assertThat(ProtocolParts.message(Role.ASSISTANT, m.withCompressed("[stub]", 1)).content())
+        assertThat(ProtocolParts.message(Role.ASSISTANT, m.with(SessionStore.COMPRESSED, "[stub]")).content())
                 .containsExactly(new ContentPart.Text("[stub]"));
     }
 }

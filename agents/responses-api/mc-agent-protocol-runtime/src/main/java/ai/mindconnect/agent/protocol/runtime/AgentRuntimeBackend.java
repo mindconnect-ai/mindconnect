@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.protocol.runtime;
 
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import java.io.ByteArrayInputStream;
 import ai.mindconnect.agent.loop.domain.TurnInterruptionEvent;
 import java.util.ArrayList;
@@ -17,6 +19,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
@@ -46,14 +49,9 @@ import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.filestore.FileStore;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.ParticipantType;
-import ai.mindconnect.message.port.out.MessageRepository;
 
 /**
  * The agent protocol on the runtime: a session is a managed session on a
@@ -70,8 +68,6 @@ import ai.mindconnect.message.port.out.MessageRepository;
  * new response.
  */
 public final class AgentRuntimeBackend {
-
-    private static final PageRequest EVERYTHING = new PageRequest(0, 1000);
 
     private final AgentRuntime runtime;
     private final Supplier<UserId> caller;
@@ -157,10 +153,9 @@ public final class AgentRuntimeBackend {
         return sessionManagement().agentOf(session.id()).map(AgentDefinition::name).orElse("unknown");
     }
 
-    /** The conversation the session's messages are kept in. */
-    private String conversationOf(ManagedSession session) {
-        return runtime.sessions().find(session.id()).map(RepositorySessionStore::conversationOf)
-                .map(ConversationId::value).orElse(session.id().value());
+    /** The protocol's conversation of a session: the session itself, under its id. */
+    private static String conversationOf(ManagedSession session) {
+        return session.id().value();
     }
 
     private Session toProtocol(ManagedSession session) {
@@ -481,29 +476,45 @@ public final class AgentRuntimeBackend {
 
         @Override
         public List<ConversationItemRecord> items(String conversationId, long afterSeq, int limit) {
-            return ownedSession(conversationId).map(session -> runtime.service(MessageRepository.class)
-                            .findByConversation(ConversationId.of(conversationOf(session)), EVERYTHING).stream()
-                            .filter(m -> m.sequenceNum() > afterSeq)
+            // Writes the tool calls of an item; nothing else here writes JSON.
+            com.fasterxml.jackson.databind.ObjectMapper json = runtime.service(JsonMapperFactory.class).create();
+            return ownedSession(conversationId).map(session -> sessionManagement().messages(session.id()).stream()
+                            .filter(m -> m.sequence() > afterSeq)
                             .limit(limit)
-                            .map(this::toItem)
+                            .map(m -> toItem(m, json))
                             .toList())
                     .orElse(List.of());
         }
 
-        /** Lossy mapping from the stored messages — precise item storage is concept 9's native store. */
-        private ConversationItemRecord toItem(Message m) {
-            String content = m.compressed() && m.compressedContent() != null
-                    ? m.compressedContent() : m.content();
+        /** Lossy mapping from a session's messages — precise item storage is concept 9's native store. */
+        private ConversationItemRecord toItem(ManagedMessage stored, com.fasterxml.jackson.databind.ObjectMapper json) {
+            TurnMessage m = stored.message();
+            String shown = m.metadata().get(SessionStore.COMPRESSED) instanceof String note ? note : m.text();
             ConversationItem item = switch (m.type()) {
-                case CHAT -> ProtocolParts.message(m.senderType() == ParticipantType.USER
-                        ? ai.mindconnect.agent.protocol.item.Role.USER
-                        : ai.mindconnect.agent.protocol.item.Role.ASSISTANT, m);
-                case TOOL_CALL -> new ConversationItem.FunctionCall(
-                        m.id().value(), "tool_calls", Map.of("_raw", content));
-                case TOOL_RESULT -> new ConversationItem.FunctionCallOutput(m.id().value(), content, false);
-                default -> ConversationItem.Message.assistant(content);
+                case USER -> ProtocolParts.message(ai.mindconnect.agent.protocol.item.Role.USER, m);
+                case ASSISTANT -> ProtocolParts.message(ai.mindconnect.agent.protocol.item.Role.ASSISTANT, m);
+                case TOOL_CALL -> new ConversationItem.FunctionCall(stored.id(), "tool_calls",
+                        Map.of("_raw", toolCallsJson(m, json)));
+                case TOOL_RESULT -> new ConversationItem.FunctionCallOutput(stored.id(), shown, false);
+                default -> ConversationItem.Message.assistant(shown);
             };
-            return new ConversationItemRecord(m.id().value(), m.sequenceNum(), item);
+            return new ConversationItemRecord(stored.id(), stored.sequence(), item);
+        }
+
+        /** The calls as the item has always carried them: {@code {"toolCalls":[{id, name, arguments}]}}. */
+        private String toolCallsJson(TurnMessage m, com.fasterxml.jackson.databind.ObjectMapper json) {
+            List<Map<String, Object>> calls = m.toolCalls().stream().map(call -> {
+                Map<String, Object> entry = new java.util.LinkedHashMap<>();
+                entry.put("id", call.callId());
+                entry.put("name", call.name());
+                entry.put("arguments", call.arguments());
+                return entry;
+            }).toList();
+            try {
+                return json.writeValueAsString(Map.of("toolCalls", calls));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                throw new IllegalStateException("Tool calls of message " + m.id() + " cannot be written", e);
+            }
         }
     };
 }
