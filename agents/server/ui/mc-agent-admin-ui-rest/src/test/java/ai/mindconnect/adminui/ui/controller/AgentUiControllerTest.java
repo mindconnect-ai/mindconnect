@@ -16,6 +16,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
@@ -60,13 +61,14 @@ class AgentUiControllerTest {
         var agentRepository = new InMemoryAgentRepository(namespace);
         var sessionRepository = new InMemorySessionRepository(namespace);
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
+        var store = new RepositorySessionStore(sessionRepository, messages, new JsonMapperFactory(List.of()));
         agents = new RepositoryAgentManagement(agentRepository);
         sessions = new RepositorySessionManagement(sessionRepository, messages, agentRepository,
                 SessionDirectoryPolicy.unrestricted(), List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessionRepository, session -> java.util.Optional.empty()));
+                new ai.mindconnect.agent.management.SessionLifecycle(sessionRepository, session -> java.util.Optional.empty()),
+                store);
         scout = agents.create(ManagedAgent.of(SCOUT));
-        new RepositorySessionStore(sessionRepository, messages)
-                .create(new Session(ALICES, UserId.of("alice"), null, SCOUT, Map.of(), NOW));
+        store.create(new Session(ALICES, UserId.of("alice"), null, SCOUT, Map.of(), NOW));
 
         PluginRegistry registry = new DefaultPluginRegistry();
         registry.provide(AgentManagement.class, () -> agents);
@@ -76,7 +78,8 @@ class AgentUiControllerTest {
         AgentRuntime runtime = new AgentRuntime(registry, () -> { });
         controller = new AgentUiController(runtime, null, json,
                 beans.getBeanProvider(ai.mindconnect.agent.skill.port.out.SkillRepository.class),
-                new AgentDetailView(runtime, beans.getBeanProvider(MemoryAdminUiController.class)));
+                new AgentDetailView(runtime, beans.getBeanProvider(MemoryAdminUiController.class),
+                        new JsonMapperFactory(List.of())));
     }
 
     @Test
