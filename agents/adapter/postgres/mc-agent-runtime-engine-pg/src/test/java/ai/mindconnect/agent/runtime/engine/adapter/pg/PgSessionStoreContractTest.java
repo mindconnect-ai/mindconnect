@@ -99,4 +99,15 @@ class PgSessionStoreContractTest extends SessionStoreContract {
         assertThat(messages.findBySession(id)).extracting(StoredMessage::sequence).containsExactly(3L, 5L, 6L);
         assertThat(sessions.findAll()).extracting(Session::id).containsExactly(id);
     }
+
+    @Test
+    void a_nul_character_postgres_cannot_keep_is_stored_as_the_replacement_character() {
+        SessionStore store = store();
+        SessionId id = SessionId.of("s1");
+        store.create(new Session(id, UserId.of("ada"), null, null, Map.of(), Instant.parse("2026-11-25T10:00:00Z")));
+
+        store.append(id, List.of(TurnMessage.toolResult("c1", "read_file", "PK\u0000\u0003", false)));
+
+        assertThat(store.messages(id)).singleElement().extracting(TurnMessage::text).isEqualTo("PK\uFFFD\u0003");
+    }
 }

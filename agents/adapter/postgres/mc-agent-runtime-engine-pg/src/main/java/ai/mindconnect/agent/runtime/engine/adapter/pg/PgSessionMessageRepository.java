@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,6 +19,7 @@ import ai.mindconnect.agent.loop.domain.TurnMessageConverter;
 import ai.mindconnect.agent.runtime.api.domain.StoredMessage;
 import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jdbc.Jsonb;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;
 
@@ -109,7 +111,7 @@ public final class PgSessionMessageRepository implements SessionMessageRepositor
                 tx.update("INSERT INTO mc_session_message (namespace, session_id, seq, id, stored_at, doc) "
                                 + "VALUES (?, ?, ?, ?, ?, ?)",
                         namespace, session.value(), entry.sequence(), identified.id(), now,
-                        tx.json().jsonb(converter.toJson(identified)));
+                        document(tx, identified));
                 stored.add(entry);
             }
             return stored;
@@ -135,7 +137,7 @@ public final class PgSessionMessageRepository implements SessionMessageRepositor
                                 + "VALUES (?, ?, ?, ?, ?, ?)",
                         namespace, session.value(), message.sequence(), message.message().id(),
                         message.storedAt().truncatedTo(ChronoUnit.MICROS),
-                        tx.json().jsonb(converter.toJson(message.message())));
+                        document(tx, message.message()));
             }
         });
     }
@@ -152,7 +154,7 @@ public final class PgSessionMessageRepository implements SessionMessageRepositor
                 StoredMessage changed = new StoredMessage(change.apply(found.message()), found.sequence(),
                         found.storedAt());
                 tx.update("UPDATE mc_session_message SET doc = ? WHERE namespace = ? AND session_id = ? AND seq = ?",
-                        tx.json().jsonb(converter.toJson(changed.message())), namespace, session.value(),
+                        document(tx, changed.message()), namespace, session.value(),
                         found.sequence());
                 return changed;
             });
@@ -170,6 +172,29 @@ public final class PgSessionMessageRepository implements SessionMessageRepositor
     public void deleteBySession(SessionId session) {
         sql.update("DELETE FROM mc_session_message WHERE namespace = ? AND session_id = ?",
                 scope.namespace().value(), session.value());
+    }
+
+    /**
+     * The message as the document of its row. Postgres keeps no NUL character
+     * in {@code jsonb}; a tool result that read a binary file can carry one,
+     * so it is stored as U+FFFD instead of refusing the whole message.
+     */
+    private Jsonb document(Sql tx, TurnMessage message) {
+        return tx.json().jsonb(withoutNul(converter.toJson(message)));
+    }
+
+    private static Object withoutNul(Object value) {
+        return switch (value) {
+            case String text -> text.indexOf('\u0000') < 0 ? text : text.replace('\u0000', '\uFFFD');
+            case Map<?, ?> map -> {
+                Map<Object, Object> copy = new LinkedHashMap<>();
+                map.forEach((key, entry) -> copy.put(key, withoutNul(entry)));
+                yield copy;
+            }
+            case List<?> list -> list.stream().map(PgSessionMessageRepository::withoutNul).toList();
+            case null -> null;
+            default -> value;
+        };
     }
 
     private StoredMessage stored(Row row) throws java.sql.SQLException {
