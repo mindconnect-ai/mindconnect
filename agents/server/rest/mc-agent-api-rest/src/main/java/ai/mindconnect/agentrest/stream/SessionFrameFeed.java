@@ -2,9 +2,11 @@ package ai.mindconnect.agentrest.stream;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
@@ -20,12 +22,10 @@ import ai.mindconnect.agent.runtime.api.port.in.TurnService;
  */
 public final class SessionFrameFeed implements SessionEventListener {
 
-    /** A turn whose frames go to its session's stream. */
-    private record Following(TurnFrameTranslator frames, Subscription subscription) { }
-
     private final SessionFrameChannels sessionFrames;
     private final Supplier<TurnService> turns;
-    private final Map<TurnId, Following> following = new ConcurrentHashMap<>();
+    /** The turns whose frames go to their session's stream, with what follows them. */
+    private final Map<TurnId, Subscription> following = new ConcurrentHashMap<>();
 
     /** @param turns asked on the first event: the runtime is still being put together when this is */
     public SessionFrameFeed(SessionFrameChannels sessionFrames, Supplier<TurnService> turns) {
@@ -35,33 +35,24 @@ public final class SessionFrameFeed implements SessionEventListener {
 
     @Override
     public void onEvent(SessionEvent event) {
-        switch (event) {
-            case SessionEvent.TurnStarted started -> started(started);
-            case SessionEvent.TurnInterrupted interrupted -> {
-                Following turn = following.get(interrupted.turnId());
-                if (turn != null) {
-                    turn.frames().interrupted(interrupted.interruptions());
-                }
-            }
-            case SessionEvent.TurnFinished finished -> {
-                Following turn = following.remove(finished.turnId());
-                if (turn != null) {
-                    turn.subscription().close();
-                }
-            }
-            default -> { }
-        }
-    }
-
-    private void started(SessionEvent.TurnStarted started) {
-        TurnId turnId = started.turnId();
-        boolean submitted = turns.get().find(turnId).map(turn -> turn.parent() == null).orElse(false);
-        if (!submitted || following.containsKey(turnId)) {
+        // A turn that was submitted begins: its frames, and those of the turns it starts, are its session's.
+        boolean begins = event.is(StreamEvent.ASKING_LLM) && !event.ofSubAgent()
+                && !event.as(StreamEvent.ASKING_LLM).orElseThrow().resumed();
+        if (!begins || following.containsKey(event.turnId())) {
             return;
         }
-        TurnFrameTranslator frames = new TurnFrameTranslator(turnId, turns.get(),
-                sessionFrames.publisherFor(started.sessionId().value(), turnId.value()));
+        TurnId turnId = event.turnId();
+        TurnFrameTranslator translator = new TurnFrameTranslator(turnId);
+        Consumer<TurnFrame> frames = sessionFrames.publisherFor(event.sessionId().value(), turnId.value());
         // A listener that comes late is told what it missed: nothing the turn said so far is lost.
-        following.put(turnId, new Following(frames, turns.get().subscribe(turnId, frames::onEvent)));
+        following.put(turnId, turns.get().subscribe(turnId, said -> {
+            translator.frame(said).ifPresent(frames);
+            if (turnId.equals(said.turnId()) && (said.is(StreamEvent.DONE) || said.is(StreamEvent.ERROR))) {
+                Subscription over = following.remove(turnId);
+                if (over != null) {
+                    over.close();
+                }
+            }
+        }));
     }
 }

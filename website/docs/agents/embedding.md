@@ -109,37 +109,58 @@ for (Interruption open : waiting.interruptions()) {
 
 The same turn goes on from there — until it completes or asks again — so the
 question may be answered from anywhere, much later. A question a sub-agent
-raises reaches the turn you submitted. `runtime.sessions().subscribe(…)` tells
-the moment a turn starts to wait (`SessionEvent.TurnInterrupted`).
+raises reaches the turn you submitted. The session's stream tells the moment
+a turn starts to wait: an `approval_requested` for each tool call that asks,
+then `waiting`.
 
-### Following sessions
+### Following a session
 
-Sessions are followed on two channels, subscribed to apart:
+A session has one stream. It tells all of what happens in it — the answer as
+it is written, the tool calls, a question a turn stops for, how a turn ends —
+and, when asked, of the sessions of its sub-agents too:
 
 ```java
-// Lifecycle — a list of sessions: which of the user's are busy, which wait for an answer.
-runtime.sessions().lifecycle(userId, event -> { … });
-runtime.sessions().lifecycle(sessionId, true, event -> { … });   // one session, with those under it
-runtime.sessions().lifecycleOfAll(event -> { … });               // every session of the namespace
-
-// Stream — the session on screen, as it happens, with its sub-agents' sessions.
-runtime.sessions().stream(sessionId, true, event -> { … });
+runtime.sessions().stream(sessionId, true, event -> {
+    switch (event.known()) {
+        case StreamEvent.Token token -> print(token.text());
+        case StreamEvent.ToolCallStarted call -> show(call.toolName(), call.arguments());
+        case StreamEvent.ApprovalRequested asked -> ask(asked);
+        case StreamEvent.Done done -> finish(done.text());
+        default -> { }
+    }
+});
 ```
 
-| Channel | Events | How many |
-|---------|--------|----------|
-| lifecycle (`SessionEvent.Lifecycle`) | `TurnStarted`, `TurnInterrupted`, `TurnFinished`, and what capabilities say about a session (`Notice`) | a handful per turn |
-| stream (`SessionEvent.Stream`) | every message, every tool call, and what each turn reports as it runs (`TurnReported`), fragments of the answer included | thousands per turn |
+An event is a `SessionEvent`: a `kind`, the session and the turn it is from,
+the turn that started that one (`parentTurnId`, set for what a sub-agent
+does), and `details` — plain values, so the event is the same on a channel,
+in a buffer and on the wire. `event.known()` gives the runtime's own kinds in
+their typed form (`StreamEvent`), `event.as(StreamEvent.TOKEN)` one of them.
 
-The stream is offered for one session only: nobody draws the fragments of
-every session of a user. A page that shows a session subscribes to both.
+| Kind | Tells |
+|------|-------|
+| `asking_llm` | the model is asked: the turn begins, or goes on after it waited |
+| `token`, `thinking` | a piece of the answer, a piece of the model's reasoning |
+| `tool_call_started`, `tool_call_result`, `tool_call_failed` | a tool call and how it came out |
+| `approval_requested`, `input_requested` | the turn stops to ask — a tool call that needs an approval, or anything else |
+| `waiting` | the turn has asked everything of this stop and stands still |
+| `turn_usage` | what the turn has cost |
+| `done`, `error` | the turn came to its end, or broke off |
+| `sub_agent_started`, `sub_agent_done` | a turn another turn started begins and ends |
+| `message` | a whole message is in the conversation |
 
-Both hear what happens from now on. A client that opens while a turn runs
-asks `runtime.turns().runningTurn(sessionId)`: the turn that has not ended,
-with its status. Over REST a session carries that as `turnId` and
+A plugin tells of something of its own with an event of its own kind, through
+`SessionEventPublisher` — `session.title`, `review.started`. It reaches the
+same stream; a client that does not know the kind passes it by
+(`StreamEvent.Other`).
+
+The stream tells what happens from now on. A client that opens while a turn
+runs asks `runtime.turns().runningTurn(sessionId)`: the turn that has not
+ended, with its status. Over REST a session carries that as `turnId` and
 `turnStatus`. Whoever submitted a turn and follows that one turn to its end
-subscribes to the turn (`runtime.turns().subscribe(turnId, …)`): its events
-from the first, also for a listener that comes late.
+subscribes to the turn (`runtime.turns().subscribe(turnId, …)`): the same
+events, of that turn and the turns it starts, from the first — also for a
+listener that comes late.
 
 Events are told inside the process that runs the turn. With a task queue
 shared by several nodes, a listener on another node hears nothing;

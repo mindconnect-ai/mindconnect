@@ -42,8 +42,9 @@ public class ChatOpening {
                 new SessionDirectories(workingDirectory,
                         additionalDirectories == null ? List.of() : additionalDirectories));
         // What the user's other pages hear of it: their session lists grow by one.
-        runtime.service(SessionEventPublisher.class).publish(new SessionEvent.Notice(session.id(), null,
-                UserEventFrame.SESSION_STARTED, java.util.Map.of("agentId", agent.value(), "type", session.type())));
+        runtime.service(SessionEventPublisher.class).publish(new SessionEvent(
+                UserEventFrame.SESSION_STARTED, session.id(), null, null,
+                java.util.Map.of("agentId", agent.value(), "type", session.type())));
         return session;
     }
 }

@@ -7,8 +7,9 @@ import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
  * session. An implementation that throws loses its event and costs the
  * session nothing.
  *
- * <p>A caller subscribes one with {@link SessionService#subscribe} for the
- * sessions it follows. A plugin contributes one to hear every session.
+ * <p>A caller subscribes one with {@link SessionService#stream} for a
+ * session or with {@link TurnService#subscribe} for a turn. A plugin
+ * contributes one to hear every session.
  */
 @FunctionalInterface
 public interface SessionEventListener {

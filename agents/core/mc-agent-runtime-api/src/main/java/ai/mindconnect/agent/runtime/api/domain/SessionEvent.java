@@ -1,101 +1,64 @@
 package ai.mindconnect.agent.runtime.api.domain;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+
 import ai.mindconnect.agent.SessionId;
 
-import java.util.List;
-import java.util.Map;
-
-import ai.mindconnect.agent.loop.domain.TurnEvent;
-import ai.mindconnect.agent.loop.domain.TurnMessage;
-
 /**
- * What happens in a session, in two families a listener subscribes to
- * apart: the {@link Lifecycle} of its turns — few events, enough to follow
- * many sessions at once — and the {@link Stream} of everything a turn writes,
- * for whoever shows one session as it happens.
+ * Something that happened in a session, in the one form it has everywhere:
+ * on the engine's channel, in a buffer, on the wire. A kind and the values
+ * that belong to it — so an event survives being sent, a plugin's event is
+ * no different from the runtime's own, and a client that does not know a
+ * kind passes it by.
  *
- * <p>Every event names its session and, where it belongs to one, its turn, so a listener that hears
- * several sessions — all of a user's, or a session with the sessions under
- * it — can tell them apart.
+ * <p>Nobody reads the details by hand: {@link #as} gives one kind in its
+ * typed form, {@link #known} every kind the runtime has itself
+ * ({@link StreamEvent}).
+ *
+ * @param kind         what happened, e.g. {@code token}; a plugin names its
+ *                     own with a dot, e.g. {@code review.started}
+ * @param sessionId    the session it happened in — a sub-agent's own for
+ *                     what a sub-agent does
+ * @param turnId       the turn it belongs to; {@code null} when it belongs
+ *                     to the session and no turn
+ * @param parentTurnId the turn that started this one; {@code null} for a
+ *                     turn that was submitted
+ * @param details      what belongs to the kind, in values that survive
+ *                     being sent: strings, numbers, booleans, lists and maps
  */
-public sealed interface SessionEvent {
+public record SessionEvent(String kind, SessionId sessionId, TurnId turnId, TurnId parentTurnId,
+                           Map<String, Object> details) {
 
-    SessionId sessionId();
-
-    TurnId turnId();
-
-    /**
-     * Turns beginning, asking and ending, and what capabilities say about a
-     * session: which session is busy, which waits for an answer. A handful
-     * of events per turn.
-     */
-    sealed interface Lifecycle extends SessionEvent { }
-
-    /**
-     * Messages, tool calls and what a turn reports as it runs, fragments of
-     * the answer included: thousands of events per turn.
-     */
-    sealed interface Stream extends SessionEvent { }
-
-    /**
-     * What a turn of the session reports, as the agent loop says it: the
-     * fragments of the answer and of the reasoning, every message as it is
-     * written, the outcome. The other events are the digest of these.
-     */
-    record TurnReported(SessionId sessionId, TurnId turnId, TurnEvent event) implements Stream { }
-
-    /** A turn began to run. */
-    record TurnStarted(SessionId sessionId, TurnId turnId, String agentName) implements Lifecycle { }
-
-    /**
-     * A turn stopped because it has to ask, and has come back: nothing more
-     * happens in it until it is resumed with answers.
-     *
-     * @param interruptions what this turn asks
-     */
-    record TurnInterrupted(SessionId sessionId, TurnId turnId, List<Interruption> interruptions)
-            implements Lifecycle {
-
-        public TurnInterrupted {
-            interruptions = List.copyOf(interruptions);
-        }
+    public SessionEvent {
+        // Not Map.copyOf: a detail may be absent, and a turn's answer may be empty.
+        details = Collections.unmodifiableMap(new LinkedHashMap<>(details));
     }
 
-    /** A turn is over — completed, incomplete, cancelled or failed. */
-    record TurnFinished(SessionId sessionId, TurnId turnId, TurnStatus status) implements Lifecycle { }
+    public static <T> SessionEvent of(EventType<T> type, SessionId sessionId, TurnId turnId, TurnId parentTurnId,
+                                      T payload) {
+        return new SessionEvent(type.kind(), sessionId, turnId, parentTurnId, type.write(payload));
+    }
 
-    /** The agent has begun to answer. The answer follows as a {@link MessageFinished}. */
-    record MessageStarted(SessionId sessionId, TurnId turnId) implements Stream { }
+    /** Whether the event is of this kind. */
+    public boolean is(EventType<?> type) {
+        return type.kind().equals(kind);
+    }
 
-    /** A message is in the conversation — what the user said, or what the agent answered. */
-    record MessageFinished(SessionId sessionId, TurnId turnId, TurnMessage message) implements Stream { }
+    /** The event in its typed form; empty when it is of another kind. */
+    public <T> Optional<T> as(EventType<T> type) {
+        return is(type) ? Optional.of(type.read(details)) : Optional.empty();
+    }
 
-    /** A tool call the model asked for was taken up. */
-    record ToolCallStarted(SessionId sessionId, TurnId turnId, String callId, String toolName)
-            implements Stream { }
+    /** The event as one of the runtime's own kinds; {@link StreamEvent.Other} for any other. */
+    public StreamEvent known() {
+        return StreamEvent.of(this);
+    }
 
-    /** A tool call has its result; {@code failed} says whether the model was told it went wrong. */
-    record ToolCallFinished(SessionId sessionId, TurnId turnId, String callId, String toolName, boolean failed)
-            implements Stream { }
-
-    /**
-     * Something a capability has to say about a session: a title was found,
-     * the history was summarised. Open on purpose — a new capability must
-     * not need a new kind of event in the API, and a listener that does not
-     * know a kind passes it by.
-     *
-     * @param turnId  the turn it happened in, or {@code null} when it
-     *                belongs to the session and no turn
-     * @param kind    what happened, named by the capability, e.g.
-     *                {@code session.title}
-     * @param details what belongs to the kind, in values that survive being
-     *                sent: strings, numbers, booleans, lists and maps
-     */
-    record Notice(SessionId sessionId, TurnId turnId, String kind, Map<String, Object> details)
-            implements Lifecycle {
-
-        public Notice {
-            details = Map.copyOf(details);
-        }
+    /** Whether the event belongs to a turn another turn started — what a sub-agent does. */
+    public boolean ofSubAgent() {
+        return parentTurnId != null;
     }
 }

@@ -37,6 +37,7 @@ import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.ToolCall;
@@ -302,7 +303,7 @@ class EngineWithCapabilitiesTest {
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Hi"));
         awaitRest(turnId);
 
-        assertThat(heard).hasAtLeastOneElementOfType(ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnStarted.class)
+        assertThat(heard).anyMatch(event -> event.is(StreamEvent.ASKING_LLM))
                 .allMatch(event -> event.sessionId().equals(session.id()));
     }
 
@@ -310,40 +311,21 @@ class EngineWithCapabilitiesTest {
     void whoever_follows_a_session_hears_what_its_turns_report() throws InterruptedException {
         List<ai.mindconnect.agent.runtime.api.domain.SessionEvent> heard =
                 new java.util.concurrent.CopyOnWriteArrayList<>();
-        registry.get(ai.mindconnect.agent.runtime.api.port.in.SessionService.class).lifecycle(session.id(), false, heard::add);
         registry.get(ai.mindconnect.agent.runtime.api.port.in.SessionService.class).stream(session.id(), false, heard::add);
         model.script.add(call("c1", "bash", Map.of()));
 
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Run it"));
         awaitRest(turnId);
 
-        assertThat(heard).filteredOn(ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnReported.class::isInstance)
-                .extracting(event -> ((ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnReported) event)
-                        .event().getClass().getSimpleName())
-                .contains("TurnStarted", "MessageAppended", "TurnWaiting");
+        // The one stream tells all of it: the turn begins, calls a tool and stops to ask.
+        assertThat(heard).extracting(SessionEvent::kind)
+                .containsSubsequence("asking_llm", "message", "tool_call_started", "approval_requested");
+        assertThat(heard).filteredOn(event -> event.is(StreamEvent.TOOL_CALL_STARTED)).singleElement()
+                .satisfies(event -> assertThat(event.as(StreamEvent.TOOL_CALL_STARTED).orElseThrow())
+                        .isEqualTo(new StreamEvent.ToolCallStarted("c1", "bash", Map.of(), 0)));
         // A turn that waits has not finished.
-        assertThat(heard).noneMatch(
-                ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnFinished.class::isInstance);
+        assertThat(heard).noneMatch(event -> event.is(StreamEvent.DONE) || event.is(StreamEvent.ERROR));
         turns.cancel(turnId);
-    }
-
-    @Test
-    void whoever_follows_a_users_sessions_hears_turns_begin_and_end_and_none_of_the_stream() throws InterruptedException {
-        List<SessionEvent> overview = new CopyOnWriteArrayList<>();
-        List<SessionEvent> everySession = new CopyOnWriteArrayList<>();
-        List<SessionEvent> someoneElse = new CopyOnWriteArrayList<>();
-        sessions.lifecycle(session.userId(), overview::add);
-        sessions.lifecycleOfAll(everySession::add);
-        sessions.lifecycle(UserId.of("someone-else"), someoneElse::add);
-        model.script.add(TurnMessage.assistant("Hello."));
-
-        awaitRest(turns.submit(TurnRequest.text(session.id(), "Hi")));
-
-        assertThat(overview).extracting(event -> event.getClass().getSimpleName())
-                .contains("TurnStarted", "TurnFinished")
-                .doesNotContain("TurnReported", "MessageStarted", "MessageFinished");
-        assertThat(everySession).hasSameSizeAs(overview);
-        assertThat(someoneElse).isEmpty();
     }
 
     @Test
@@ -351,22 +333,18 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("Hello."));
         TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Hi"));
         awaitRest(turnId);
-        List<Turn> finished = new java.util.concurrent.CopyOnWriteArrayList<>();
+        List<SessionEvent> heard = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-        turns.subscribe(turnId, new ai.mindconnect.agent.runtime.api.port.in.TurnListener() {
-            @Override
-            public void onEvent(ai.mindconnect.agent.loop.domain.TurnEvent event) { }
+        turns.subscribe(turnId, heard::add);
 
-            @Override
-            public void onFinished(Turn turn) {
-                finished.add(turn);
-            }
-        });
-
-        for (int i = 0; i < 200 && finished.isEmpty(); i++) {
+        for (int i = 0; i < 200 && heard.stream().noneMatch(event -> event.is(StreamEvent.DONE)); i++) {
             Thread.sleep(10);
         }
-        assertThat(finished).extracting(Turn::status).containsExactly(TurnStatus.COMPLETED);
+        // The end comes once and last, whatever of the turn the channel still keeps.
+        assertThat(heard).filteredOn(event -> event.is(StreamEvent.DONE)).singleElement()
+                .satisfies(event -> assertThat(event.as(StreamEvent.DONE).orElseThrow())
+                        .isEqualTo(new StreamEvent.Done(TurnStatus.COMPLETED, "Hello.", null)));
+        assertThat(heard.get(heard.size() - 1).kind()).isEqualTo("done");
     }
 
     @Test
@@ -462,27 +440,25 @@ class EngineWithCapabilitiesTest {
     @Test
     void a_session_gets_a_title_in_the_background_and_its_listeners_hear_of_it() throws InterruptedException {
         List<SessionEvent> heard = new CopyOnWriteArrayList<>();
-        sessions.lifecycle(session.id(), false, heard::add);
         sessions.stream(session.id(), false, heard::add);
         model.script.add(TurnMessage.assistant("Hello."));
         model.script.add(TurnMessage.assistant("A greeting"));
 
         awaitRest(turns.submit(TurnRequest.text(session.id(), "Hi")));
         long deadline = System.currentTimeMillis() + 5_000;
-        while (heard.stream().noneMatch(SessionEvent.Notice.class::isInstance)
+        while (heard.stream().noneMatch(event -> event.kind().equals("session.title"))
                 && System.currentTimeMillis() < deadline) {
             Thread.sleep(10);
         }
 
-        assertThat(heard).filteredOn(SessionEvent.Notice.class::isInstance).singleElement()
-                .isEqualTo(new SessionEvent.Notice(session.id(), null, "session.title",
+        assertThat(heard).filteredOn(event -> event.kind().equals("session.title")).singleElement()
+                .isEqualTo(new SessionEvent("session.title", session.id(), null, null,
                         Map.of("title", "A greeting")));
         assertThat(sessions.find(session.id()).orElseThrow().metadata()).containsEntry("title", "A greeting");
         // Asked of the session agent's own model: the assembly names none for such tasks.
         assertThat(model.requests.get(model.requests.size() - 1).settings()).isEqualTo(LEAD.modelSettings());
-        assertThat(heard).filteredOn(event -> !(event instanceof SessionEvent.TurnReported))
-                .first().isInstanceOf(SessionEvent.TurnStarted.class);
-        assertThat(heard).anyMatch(SessionEvent.TurnFinished.class::isInstance);
+        assertThat(heard).first().matches(event -> event.is(StreamEvent.ASKING_LLM));
+        assertThat(heard).anyMatch(event -> event.is(StreamEvent.DONE));
     }
 
     @Test
@@ -551,7 +527,6 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("`PASS`"));
         model.script.add(TurnMessage.assistant("Buy. This is not investment advice."));
         List<SessionEvent> heard = new CopyOnWriteArrayList<>();
-        sessions.lifecycle(session.id(), false, heard::add);
         sessions.stream(session.id(), false, heard::add);
 
         Turn ended = awaitRest(turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), advisor).id(), "What now?")));
@@ -565,8 +540,7 @@ class EngineWithCapabilitiesTest {
         assertThat(review.tools()).isEmpty();
         assertThat(review.messages().get(0).text()).contains("<agent_response>\nBuy.\n</agent_response>");
         // Whoever follows the session hears each reviewer begin and what it decided; a missing one says nothing.
-        assertThat(heard).filteredOn(SessionEvent.Notice.class::isInstance)
-                .extracting(event -> ((SessionEvent.Notice) event).kind() + " " + ((SessionEvent.Notice) event).details())
+        assertThat(heard).extracting(event -> event.kind() + " " + event.details())
                 .filteredOn(line -> line.startsWith("review."))
                 .containsExactly(
                         "review.started {reviewer=lenient}",

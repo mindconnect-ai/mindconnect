@@ -14,11 +14,10 @@ import ai.mindconnect.chatui.ui.component.ChatAgent;
 import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.chatui.ui.page.ChatPage;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
@@ -422,32 +421,23 @@ public class ChatUiController {
         SessionId chat = sessionId;
         java.util.concurrent.CompletableFuture<String> answer = new java.util.concurrent.CompletableFuture<>();
         // Followed before the turn exists: a session's events are not replayed.
-        // Both of the session's channels: the page draws what is written, and has to hear a turn die.
         java.util.function.Consumer<SessionEvent> heard = event -> {
             live.onEvent(event);
-            if (!event.sessionId().equals(chat)) {
+            if (!event.sessionId().equals(chat) || event.ofSubAgent()) {
                 return;
             }
-            if (event instanceof SessionEvent.TurnReported reported
-                    && reported.event() instanceof TurnEvent.TurnEnded ended
-                    && ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
-                answer.complete(ended.outcome().text() == null ? "" : ended.outcome().text());
-            } else if (event instanceof SessionEvent.TurnFinished finished) {
-                // A turn that dies does not say so itself; its session does.
-                switch (finished.status()) {
-                    case FAILED -> answer.completeExceptionally(new IllegalStateException("The turn failed"));
-                    case CANCELLED -> answer.completeExceptionally(
-                            new java.util.concurrent.CancellationException("The turn was cancelled"));
-                    default -> { }
-                }
+            switch (event.known()) {
+                case StreamEvent.Done done -> answer.complete(done.text() == null ? "" : done.text());
+                // A turn that dies does not end itself; its stream says how it broke off.
+                case StreamEvent.Error error -> answer.completeExceptionally(
+                        error.status() == ai.mindconnect.agent.runtime.api.domain.TurnStatus.CANCELLED
+                                ? new java.util.concurrent.CancellationException("The turn was cancelled")
+                                : new IllegalStateException("The turn failed"));
+                default -> { }
             }
         };
-        var lifecycle = runtimeSessions.lifecycle(chat, true, heard::accept);
         var stream = runtimeSessions.stream(chat, true, heard::accept);
-        Runnable unfollow = () -> {
-            lifecycle.close();
-            stream.close();
-        };
+        Runnable unfollow = stream::close;
         answer.whenComplete((text, failure) -> unfollow.run());
         try {
             sessionTurns.submit(chat, input);
@@ -1387,16 +1377,22 @@ public class ChatUiController {
 
     /** The card that asks for the approval of one tool call. */
     private static ai.mindconnect.ui.model.UiList.Item approvalCard(SessionId sessionId, Interruption interruption) {
+        return approvalCard(sessionId, interruption.call().callId(), interruption.call().toolName(),
+                interruption.call().arguments());
+    }
+
+    private static ai.mindconnect.ui.model.UiList.Item approvalCard(SessionId sessionId, String callId,
+                                                                    String toolName, Map<String, Object> arguments) {
         String argsJson;
         try {
             argsJson = ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER
                     .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(interruption.call().arguments());
+                    .writeValueAsString(arguments);
         } catch (Exception e) {
-            argsJson = String.valueOf(interruption.call().arguments());
+            argsJson = String.valueOf(arguments);
         }
         return ai.mindconnect.chatui.ui.component.ApprovalCardComponent.approvalCard(
-                sessionId, interruption.call().callId(), interruption.call().toolName(), argsJson,
+                sessionId, callId, toolName, argsJson,
                 ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT.format(java.time.Instant.now()));
     }
 
@@ -1811,18 +1807,18 @@ public class ChatUiController {
         // lost entry left a card running for good, and iterating while another thread
         // wrote threw inside the handler.
         final Object liveLock = new Object();
-        Consumer<TurnEvent> onEvent = event -> {
+        Consumer<StreamEvent> onEvent = event -> {
             synchronized (liveLock) {
                 // A thought ends with whatever it led to: anything that is not
                 // more thinking closes the open card of this scope.
                 LiveThinking thinking = thinkingFor(thinkings, sessionId, null);
-                if (!(event instanceof TurnEvent.ReasoningDelta)) {
-                    closeThinking(thinking, liveView, bus, event instanceof TurnEvent.TextDelta);
+                if (!(event instanceof StreamEvent.Thinking)) {
+                    closeThinking(thinking, liveView, bus, event instanceof StreamEvent.Token);
                 }
                 switch (event) {
-                    case TurnEvent.ReasoningDelta reasoning ->
+                    case StreamEvent.Thinking reasoning ->
                         onThinking(thinking, null, reasoning.text(), liveView, bus);
-                    case TurnEvent.TextDelta text -> {
+                    case StreamEvent.Token text -> {
                         cumulativeText.append(text.text());
                         if (!pendingAppended[0]) {
                             // First token: drop the typing bubble and append
@@ -1840,7 +1836,7 @@ public class ChatUiController {
                         sessionStreams.rememberText(channelId,
                                 publishPatch(bus, liveView.streamToken(pendingId, cumulativeText.toString())));
                     }
-                    case TurnEvent.MessageAppended appended -> {
+                    case StreamEvent.MessageWritten appended -> {
                         if (appended.message().type() == TurnMessage.Type.TOOL_CALL) {
                             // The model's round is on the record now: the message that carries
                             // this call carries the thought before it too — also one that led to
@@ -1857,23 +1853,23 @@ public class ChatUiController {
             }
         };
         // A sub-agent's session began a turn: its card, under the sub-agent that called it.
-        Consumer<SessionEvent.TurnStarted> onSubAgentStarted = started -> {
+        java.util.function.BiConsumer<SessionId, String> onSubAgentStarted = (subSession, agentName) -> {
             synchronized (liveLock) {
-                java.util.UUID taskId = taskOf(started.sessionId());
+                java.util.UUID taskId = taskOf(subSession);
                 if (liveTasks.containsKey("sub-" + taskId)) {
                     return;
                 }
-                log.info("sub-agent started: {}", started.agentName());
+                log.info("sub-agent started: {}", agentName);
                 // One the chat's own turn called has no card above it.
-                java.util.UUID caller = runtimeSessions.find(started.sessionId())
+                java.util.UUID caller = runtimeSessions.find(subSession)
                         .map(ai.mindconnect.agent.runtime.api.domain.Session::parentId)
                         .map(ChatUiController::taskOf).orElse(null);
                 startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
                         liveTasks.containsKey("sub-" + caller) ? caller : null,
-                        taskId, started.agentName(), started.sessionId(), "");
+                        taskId, agentName, subSession, "");
             }
         };
-        java.util.function.BiConsumer<SessionId, TurnEvent> onSubAgentEvent =
+        java.util.function.BiConsumer<SessionId, StreamEvent> onSubAgentEvent =
                 (subSession, event) -> {
             synchronized (liveLock) {
                 closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
@@ -1887,20 +1883,19 @@ public class ChatUiController {
                 // at the top level: anything but more thinking closes its card.
                 String scope = scopeOf(taskId, taskToSession);
                 LiveThinking thinking = thinkingFor(thinkings, sessionId, scope);
-                if (!(event instanceof TurnEvent.ReasoningDelta)) {
+                if (!(event instanceof StreamEvent.Thinking)) {
                     closeThinking(thinking, liveView, bus, false);
                 }
                 switch (event) {
-                    case TurnEvent.ReasoningDelta reasoning ->
+                    case StreamEvent.Thinking reasoning ->
                         onThinking(thinking, scope, reasoning.text(), liveView, bus);
-                    case TurnEvent.MessageAppended appended ->
+                    case StreamEvent.MessageWritten appended ->
                         drawToolMessage(appended.message(), taskId, liveView, liveTasks, openTaskNodeId, bus,
                                 taskToSession);
-                    case TurnEvent.TurnEnded ended
-                            when ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS -> {
+                    case StreamEvent.SubAgentDone ended -> {
                         log.info("sub-agent done: {}", agentName);
                         finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession, taskId,
-                                agentName, ended.outcome().text() == null ? "" : ended.outcome().text(), null);
+                                agentName, ended.finalText() == null ? "" : ended.finalText(), null);
                     }
                     default -> { }
                 }
@@ -1909,7 +1904,7 @@ public class ChatUiController {
         // Reviewers run after the answer is on screen. Without a card the chat
         // just sits there, which makes a finished-looking turn feel stuck.
         List<TaskCardComponent> reviewerVerdicts = new ArrayList<>();
-        Consumer<SessionEvent.Notice> onReview = notice -> {
+        Consumer<SessionEvent> onReview = notice -> {
             String reviewer = String.valueOf(notice.details().get(ResponseReviewPlugin.REVIEWER));
             String node = "task-reviewer-" + sessionId.value() + "-" + turnKey + "-" + reviewer;
             synchronized (liveLock) {
@@ -1925,29 +1920,28 @@ public class ChatUiController {
                 }
             }
         };
-        Consumer<List<Interruption>> asked = interruptions -> {
+        Consumer<StreamEvent.ApprovalRequested> asked = approval -> {
             synchronized (liveLock) {
                 closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
-                // Durable already; this is the live mirror: push the card into the
-                // open stream, one per tool call that waits for an approval.
-                for (Interruption interruption : interruptions) {
-                    if (!Interruption.TOOL_APPROVAL.equals(interruption.kind())) continue;
-                    var card = approvalCard(sessionId, interruption);
-                    publishPatch(bus, liveView.appendApprovalCard(card));
-                }
+                // Durable already; this is the live mirror: push the card of the
+                // tool call that waits for an approval into the open stream.
+                publishPatch(bus, liveView.appendApprovalCard(
+                        approvalCard(sessionId, approval.callId(), approval.toolName(), approval.arguments())));
             }
         };
         SessionId chat = sessionId;
         java.util.concurrent.CompletableFuture<String> answer = turnStarter.apply(event -> {
             boolean own = event.sessionId().equals(chat);
-            switch (event) {
-                case SessionEvent.TurnStarted started when !own -> onSubAgentStarted.accept(started);
-                case SessionEvent.TurnInterrupted interrupted -> asked.accept(interrupted.interruptions());
-                case SessionEvent.TurnReported reported when own -> onEvent.accept(reported.event());
-                case SessionEvent.TurnReported reported ->
-                    onSubAgentEvent.accept(reported.sessionId(), reported.event());
-                case SessionEvent.Notice notice when own -> onReview.accept(notice);
-                default -> { }
+            switch (event.known()) {
+                // Whoever asks, the card stands in this chat.
+                case StreamEvent.ApprovalRequested approval -> asked.accept(approval);
+                case StreamEvent.SubAgentStarted started when !own ->
+                    onSubAgentStarted.accept(event.sessionId(), started.agentName());
+                case StreamEvent.Other other when own -> onReview.accept(event);
+                // What a capability says about a sub-agent's session is not drawn here.
+                case StreamEvent.Other other -> { }
+                case StreamEvent told when own -> onEvent.accept(told);
+                case StreamEvent told -> onSubAgentEvent.accept(event.sessionId(), told);
             }
         });
 

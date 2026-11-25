@@ -6,6 +6,7 @@ import java.util.Map;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.sdk.AgentRuntime;
@@ -70,10 +71,10 @@ public class AgentDelegationMain {
 
     /** Makes the delegation visible: which agent runs, which tools it calls. */
     private static void printEvent(SessionEvent event) {
-        if (event instanceof SessionEvent.TurnStarted started) {
-            System.out.println("  [" + started.agentName() + "] turn started");
-        } else if (event instanceof SessionEvent.ToolCallStarted call) {
-            System.out.println("  tool call: " + call.toolName());
+        switch (event.known()) {
+            case StreamEvent.SubAgentStarted started -> System.out.println("  [" + started.agentName() + "] turn started");
+            case StreamEvent.ToolCallStarted call -> System.out.println("  tool call: " + call.toolName());
+            default -> { }
         }
     }
 }

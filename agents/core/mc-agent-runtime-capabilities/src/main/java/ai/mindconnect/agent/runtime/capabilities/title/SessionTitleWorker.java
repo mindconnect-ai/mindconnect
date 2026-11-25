@@ -81,6 +81,6 @@ final class SessionTitleWorker implements BackgroundWorker {
         }
         sessions.get().update(sessionId, stored -> stored.withMetadata(TITLE, title));
         // A list of sessions on screen wants the title when it is there, not at the next reload.
-        events.get().publish(new SessionEvent.Notice(sessionId, null, TITLE_FOUND, Map.of(TITLE, title)));
+        events.get().publish(new SessionEvent(TITLE_FOUND, sessionId, null, null, Map.of(TITLE, title)));
     }
 }

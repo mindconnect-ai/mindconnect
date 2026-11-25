@@ -10,13 +10,10 @@ import ai.mindconnect.agentrest.stream.SessionFrameChannels;
 import ai.mindconnect.agentrest.stream.StreamAttachment;
 import ai.mindconnect.agentrest.stream.TurnFrame;
 import ai.mindconnect.agentrest.stream.TurnFrameTranslator;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
-import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.Turn;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
-import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.channel.Channel;
 import org.springframework.stereotype.Service;
@@ -58,50 +55,45 @@ public class TurnFrameStream {
      * @return whether a turn was started
      */
     public boolean stream(SessionId sessionId, Supplier<Optional<TurnId>> start, boolean untilAsked, Sink sink) {
-        CompletableFuture<TurnFrameTranslator> frames = new CompletableFuture<>();
+        CompletableFuture<TurnId> turn = new CompletableFuture<>();
         CompletableFuture<Void> over = new CompletableFuture<>();
-        // Followed before the turn goes on: that it asks is told by its session, and only once.
-        Subscription asking = runtime.sessions().lifecycle(sessionId, true, event -> {
-            if (event instanceof SessionEvent.TurnInterrupted interrupted && !over.isDone()) {
-                frames.join().interrupted(interrupted.interruptions());
-                sink.asked(interrupted.turnId());
-                if (untilAsked) {
-                    over.complete(null);
+        // Followed before the turn goes on, and from now: a turn that is continued has said things
+        // before, and those were streamed to whoever asked then.
+        Subscription following = runtime.sessions().stream(sessionId, true, event -> {
+            TurnId turnId = turn.join();
+            if (over.isDone() || turnId == null) {
+                return;
+            }
+            new TurnFrameTranslator(turnId).frame(event).ifPresent(sink::frame);
+            if (event.is(StreamEvent.WAITING)) {
+                sink.asked(event.turnId());
+                if (untilAsked && over.complete(null)) {
                     sink.ended(null);
                 }
-            }
-        });
-        over.whenComplete((done, failure) -> asking.close());
-        Optional<TurnId> started;
-        try {
-            started = start.get();
-        } catch (RuntimeException e) {
-            over.complete(null);
-            throw e;
-        }
-        if (started.isEmpty()) {
-            over.complete(null);
-            return false;
-        }
-        TurnFrameTranslator translator = new TurnFrameTranslator(started.get(), runtime.turns(), sink::frame);
-        frames.complete(translator);
-        Subscription following = runtime.turns().subscribe(started.get(), new TurnListener() {
-            @Override
-            public void onEvent(TurnEvent event) {
-                if (!over.isDone()) {
-                    translator.onEvent(event);
-                }
-            }
-
-            @Override
-            public void onFinished(Turn turn) {
+            } else if (turnId.equals(event.turnId()) && event.is(StreamEvent.DONE)) {
                 if (over.complete(null)) {
-                    sink.ended(errorOf(turn));
+                    sink.ended(null);
+                }
+            } else if (turnId.equals(event.turnId()) && event.is(StreamEvent.ERROR)) {
+                if (over.complete(null)) {
+                    sink.ended(event.as(StreamEvent.ERROR).orElseThrow().message());
                 }
             }
         });
         over.whenComplete((done, failure) -> following.close());
-        return true;
+        Optional<TurnId> started;
+        try {
+            started = start.get();
+        } catch (RuntimeException e) {
+            turn.complete(null);
+            over.complete(null);
+            throw e;
+        }
+        turn.complete(started.orElse(null));
+        if (started.isEmpty()) {
+            over.complete(null);
+        }
+        return started.isPresent();
     }
 
     /**
@@ -115,15 +107,5 @@ public class TurnFrameStream {
         String liveTurnId = runtime.turns().runningTurn(sessionId).map(turn -> turn.id().value()).orElse(null);
         return new StreamAttachment(sessionFrames.subscribe(id, afterSeq, consumer), liveTurnId, firstBuffered,
                 latest);
-    }
-
-    /** A turn the loop ended reports its end in its frames; one that died or was cut off has only this. */
-    private static String errorOf(Turn turn) {
-        if (turn.outcome() != null) {
-            return null;
-        }
-        return turn.error() != null ? turn.error()
-                : "The turn " + (turn.status() == ai.mindconnect.agent.runtime.api.domain.TurnStatus.CANCELLED
-                        ? "was cancelled" : "failed");
     }
 }

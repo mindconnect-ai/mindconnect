@@ -2,7 +2,6 @@ package ai.mindconnect.extension.demo;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
@@ -11,8 +10,6 @@ import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.api.port.in.Subscription;
-import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.ui.model.UiPage;
 import org.slf4j.Logger;
@@ -180,16 +177,6 @@ public class DungeonController {
         TurnId turnId = runtime.turns().submit(TurnRequest.text(
                 ai.mindconnect.agent.SessionId.of(sessionId), message));
         java.util.concurrent.CompletableFuture<Turn> ended = new java.util.concurrent.CompletableFuture<>();
-        Subscription following = runtime.turns().subscribe(turnId, new TurnListener() {
-            @Override
-            public void onEvent(TurnEvent event) {
-            }
-
-            @Override
-            public void onFinished(Turn turn) {
-                ended.complete(turn);
-            }
-        });
         try {
             long deadline = System.nanoTime() + ANSWER_WAIT.toNanos();
             while (!ended.isDone()) {
@@ -215,8 +202,6 @@ public class DungeonController {
             Thread.currentThread().interrupt();
             runtime.turns().cancel(turnId);
             throw new IllegalStateException("interrupted", e);
-        } finally {
-            following.close();
         }
     }
 

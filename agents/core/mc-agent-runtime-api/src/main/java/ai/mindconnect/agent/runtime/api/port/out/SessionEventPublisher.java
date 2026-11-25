@@ -5,7 +5,7 @@ import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 /**
  * Lets a capability say something to whoever follows a session. The engine
  * tells of turns, messages and tool calls itself; this is for what only a
- * capability knows, as a {@link SessionEvent.Notice}.
+ * capability knows, as an event of a kind of its own.
  */
 public interface SessionEventPublisher {
 

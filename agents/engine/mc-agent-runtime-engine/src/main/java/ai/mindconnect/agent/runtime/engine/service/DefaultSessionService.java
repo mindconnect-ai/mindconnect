@@ -11,9 +11,7 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.in.SessionLifecycleListener;
-import ai.mindconnect.agent.runtime.api.port.in.SessionStreamListener;
+import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
@@ -64,22 +62,7 @@ public final class DefaultSessionService implements SessionService {
     }
 
     @Override
-    public Subscription lifecycle(SessionId sessionId, boolean childSessions, SessionLifecycleListener listener) {
-        return events.lifecycle(sessionId, childSessions, listener);
-    }
-
-    @Override
-    public Subscription lifecycle(UserId userId, SessionLifecycleListener listener) {
-        return events.lifecycle(session -> userId.equals(session.userId()), listener);
-    }
-
-    @Override
-    public Subscription lifecycleOfAll(SessionLifecycleListener listener) {
-        return events.lifecycle(session -> true, listener);
-    }
-
-    @Override
-    public Subscription stream(SessionId sessionId, boolean childSessions, SessionStreamListener listener) {
+    public Subscription stream(SessionId sessionId, boolean childSessions, SessionEventListener listener) {
         return events.stream(sessionId, childSessions, listener);
     }
 

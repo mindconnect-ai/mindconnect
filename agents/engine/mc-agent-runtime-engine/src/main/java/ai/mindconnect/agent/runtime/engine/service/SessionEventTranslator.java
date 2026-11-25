@@ -4,128 +4,135 @@ import java.util.List;
 
 import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.loop.domain.TurnOutcome;
+import ai.mindconnect.agent.runtime.api.domain.EventType;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 
 /**
- * Turns what the agent loop reports about one turn into what a session
- * reports: the loop speaks of deltas and appended messages, a session of
- * messages and tool calls that begin and end. One object per execution of
- * a turn — what it remembers, that an answer has begun, does not outlast
- * the model call it belongs to.
+ * Turns what the agent loop reports about one turn into the events of its
+ * session's stream: the loop speaks of deltas and appended messages, a
+ * session of an answer being written, tool calls with their results, a
+ * question, an end. One object per execution of a turn.
+ *
+ * <p>The loop's own events stay here: what leaves is a {@link SessionEvent}
+ * of one of the kinds of {@link StreamEvent}.
  */
 final class SessionEventTranslator {
 
     private final SessionEventHub hub;
-    private final SessionStore sessions;
     private final Session session;
     private final Turn turn;
-    /** The turn and the turns it runs under, nearest first. */
+    /** The turn and the tasks it runs under, nearest first. */
     private final List<TurnId> turns;
-    /** Whether the agent's answer in the making has been announced. */
-    private boolean answering;
 
-    SessionEventTranslator(SessionEventHub hub, SessionStore sessions, Session session, Turn turn,
-                           List<TurnId> turns) {
+    SessionEventTranslator(SessionEventHub hub, Session session, Turn turn, List<TurnId> turns) {
         this.hub = hub;
-        this.sessions = sessions;
         this.session = session;
         this.turn = turn;
         this.turns = List.copyOf(turns);
     }
 
-    /** One event of the loop: as it is, and as the events of the session it amounts to. */
+    /** One event of the loop, as the events of the session it amounts to. */
     void translate(TurnEvent event) {
-        TurnId turnId = turn.id();
-        publish(new SessionEvent.TurnReported(session.id(), turnId, event));
         switch (event) {
-            case TurnEvent.TurnStarted started ->
-                    publish(new SessionEvent.TurnStarted(session.id(), turnId, turn.agent().name()));
-            case TurnEvent.TextDelta delta -> announceAnswer();
+            case TurnEvent.TurnStarted started -> {
+                if (turn.parent() != null) {
+                    publish(StreamEvent.SUB_AGENT_STARTED, new StreamEvent.SubAgentStarted(turn.agent().name()));
+                }
+                publish(StreamEvent.ASKING_LLM, new StreamEvent.AskingLlm(false));
+            }
+            case TurnEvent.TurnResumed resumed -> publish(StreamEvent.ASKING_LLM, new StreamEvent.AskingLlm(true));
+            case TurnEvent.TextDelta delta -> publish(StreamEvent.TOKEN, new StreamEvent.Token(delta.text()));
+            case TurnEvent.ReasoningDelta reasoning ->
+                    publish(StreamEvent.THINKING, new StreamEvent.Thinking(reasoning.text()));
             case TurnEvent.MessageAppended appended -> translate(appended.message());
             case TurnEvent.TurnEnded ended -> {
-                // A turn that waits for its tools has not ended.
-                if (statusOf(ended).isFinal()) {
-                    publish(new SessionEvent.TurnFinished(session.id(), turnId, statusOf(ended)));
+                // A turn that waits for its tools has not ended; one that has is told of by ended().
+                if (ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
+                    publish(StreamEvent.TURN_USAGE, new StreamEvent.TurnUsage(
+                            ended.outcome().usage().inputTokens(), ended.outcome().usage().outputTokens()));
                 }
             }
-            // A turn that goes on after a wait, the model's reasoning and a
-            // plain wait for tools are nothing a session reports.
-            case TurnEvent.TurnResumed resumed -> { }
-            case TurnEvent.ReasoningDelta reasoning -> { }
+            // A plain wait for tools is nothing a session reports.
             case TurnEvent.TurnWaiting waiting -> { }
         }
+    }
+
+    /** The turn came to its end, and its task says so: what whoever follows it is told last. */
+    void ended(TurnStatus status, TurnOutcome outcome) {
+        String text = outcome.text() == null ? "" : outcome.text();
+        if (turn.parent() != null) {
+            publish(StreamEvent.SUB_AGENT_DONE, new StreamEvent.SubAgentDone(turn.agent().name(), text));
+        }
+        publish(StreamEvent.DONE, new StreamEvent.Done(status, text,
+                outcome.incompleteReason() == null ? null : outcome.incompleteReason().name()));
     }
 
     /**
      * The turn is over although the loop never said so — it failed, or a
      * cancel cut it off in the middle of a model call.
      */
-    void finished(TurnStatus status) {
-        publish(new SessionEvent.TurnFinished(session.id(), turn.id(), status));
+    void brokeOff(TurnStatus status, String message) {
+        hub.publish(session, turns, brokenOff(session, turn, status, message));
     }
 
-    /** The turn came back with something to ask. */
+    /** As {@link #brokeOff}, for a turn no worker is left to speak for. */
+    static SessionEvent brokenOff(Session session, Turn turn, TurnStatus status, String message) {
+        return SessionEvent.of(StreamEvent.ERROR, session.id(), turn.id(), turn.parent(),
+                new StreamEvent.Error(status, message != null ? message
+                        : "The turn " + (status == TurnStatus.CANCELLED ? "was cancelled" : "failed")));
+    }
+
+    /** The turn came back with something to ask: one event for each thing it asks, then that it waits. */
     void interrupted(List<Interruption> interruptions) {
-        publish(new SessionEvent.TurnInterrupted(session.id(), turn.id(), interruptions));
+        for (Interruption asked : interruptions) {
+            boolean forCall = asked.call() != null;
+            if (Interruption.TOOL_APPROVAL.equals(asked.kind()) && forCall) {
+                publish(StreamEvent.APPROVAL_REQUESTED, new StreamEvent.ApprovalRequested(asked.id(),
+                        asked.call().callId(), asked.call().toolName(), asked.call().arguments(),
+                        asked.call().sessionId()));
+            } else {
+                publish(StreamEvent.INPUT_REQUESTED, new StreamEvent.InputRequested(asked.id(), asked.kind(),
+                        forCall ? asked.call().callId() : null, forCall ? asked.call().toolName() : null,
+                        asked.details()));
+            }
+        }
+        publish(StreamEvent.WAITING, new StreamEvent.Waiting());
     }
 
     private void translate(TurnMessage message) {
-        TurnId turnId = turn.id();
         switch (message.type()) {
-            case USER -> publish(new SessionEvent.MessageFinished(session.id(), turnId, message));
-            case ASSISTANT -> {
-                // A model that does not stream says nothing before it is
-                // done; the answer still begins before it ends.
-                announceAnswer();
-                answering = false;
-                publish(new SessionEvent.MessageFinished(session.id(), turnId, message));
+            case TOOL_CALL -> {
+                List<TurnMessage.ToolCall> calls = message.toolCalls();
+                for (int i = 0; i < calls.size(); i++) {
+                    TurnMessage.ToolCall call = calls.get(i);
+                    publish(StreamEvent.TOOL_CALL_STARTED,
+                            new StreamEvent.ToolCallStarted(call.callId(), call.name(), call.arguments(), i));
+                }
             }
-            // The request itself is no event: each call it asks for is
-            // announced when it is taken up.
-            case TOOL_CALL -> answering = false;
-            case TOOL_DISPATCHED -> {
+            case TOOL_RESULT -> {
                 String callId = String.valueOf(message.metadata().get("callId"));
-                publish(new SessionEvent.ToolCallStarted(session.id(), turnId, callId, toolNameOf(callId)));
+                String toolName = String.valueOf(message.metadata().getOrDefault("toolName", "tool"));
+                if (Boolean.TRUE.equals(message.metadata().get("failed"))) {
+                    publish(StreamEvent.TOOL_CALL_FAILED,
+                            new StreamEvent.ToolCallFailed(callId, toolName, message.text()));
+                } else {
+                    publish(StreamEvent.TOOL_CALL_RESULT,
+                            new StreamEvent.ToolCallResult(callId, toolName, message.text()));
+                }
             }
-            case TOOL_RESULT -> publish(new SessionEvent.ToolCallFinished(session.id(), turnId,
-                    String.valueOf(message.metadata().get("callId")),
-                    String.valueOf(message.metadata().get("toolName")),
-                    Boolean.TRUE.equals(message.metadata().get("failed"))));
+            default -> { }
         }
+        publish(StreamEvent.MESSAGE, new StreamEvent.MessageWritten(message));
     }
 
-    private void announceAnswer() {
-        if (!answering) {
-            answering = true;
-            publish(new SessionEvent.MessageStarted(session.id(), turn.id()));
-        }
-    }
-
-    /** The dispatch marker names only the call; which tool it is stands in the request the model made. */
-    private String toolNameOf(String callId) {
-        return sessions.messages(session.id(), turn.id()).stream()
-                .flatMap(message -> message.toolCalls().stream())
-                .filter(call -> call.callId().equals(callId))
-                .map(TurnMessage.ToolCall::name)
-                .findFirst().orElse("");
-    }
-
-    private void publish(SessionEvent event) {
-        hub.publish(session, turns, event);
-    }
-
-    private static TurnStatus statusOf(TurnEvent.TurnEnded ended) {
-        return switch (ended.outcome().status()) {
-            case COMPLETED -> TurnStatus.COMPLETED;
-            case INCOMPLETE -> TurnStatus.INCOMPLETE;
-            case CANCELLED -> TurnStatus.CANCELLED;
-            case WAITING_FOR_TOOLS -> TurnStatus.WAITING;
-        };
+    private <T> void publish(EventType<T> type, T payload) {
+        hub.publish(session, turns, SessionEvent.of(type, session.id(), turn.id(), turn.parent(), payload));
     }
 }

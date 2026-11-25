@@ -1,117 +1,67 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.cli.agentclient.StreamEvent;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
-import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.loop.domain.TurnOutcome;
-import ai.mindconnect.agent.runtime.api.domain.Turn;
-import ai.mindconnect.agent.runtime.api.domain.TurnId;
-import ai.mindconnect.agent.runtime.api.port.in.TurnService;
-
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
+
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.TurnId;
 
 /**
- * What one turn of the runtime does, as the stream events the CLI draws: the
- * turn's own, and under it those of the sub-agents it starts. A sub-agent
- * shows one level below the turn, however deep it is nested — the same the
- * server's stream tells a remote CLI.
+ * An event of a turn of the runtime as the stream event the CLI draws — one,
+ * or none for what the CLI does not show. What a sub-agent does shows one
+ * level below the turn, however deep it is nested — the same the server's
+ * stream tells a remote CLI. Nothing is remembered between two events.
  */
 final class TurnStreamEvents {
 
     private final TurnId turnId;
-    private final TurnService turns;
-    private final Consumer<StreamEvent> events;
-    /** The sub-agents seen so far, by the id of their turn. */
-    private final Map<String, SubAgent> subAgents = new ConcurrentHashMap<>();
 
-    private record SubAgent(UUID taskId, String agentName, ai.mindconnect.agent.SessionId sessionId) { }
-
-    TurnStreamEvents(TurnId turnId, TurnService turns, Consumer<StreamEvent> events) {
+    /** @param turnId the turn the CLI draws; every other turn's events are a sub-agent's */
+    TurnStreamEvents(TurnId turnId) {
         this.turnId = turnId;
-        this.turns = turns;
-        this.events = events;
     }
 
-    void onEvent(TurnEvent event) {
-        String from = requestId(event);
-        if (turnId.value().equals(from)) {
-            ownEvent(event);
-        } else {
-            subAgentEvent(from, event);
-        }
-    }
-
-    private void ownEvent(TurnEvent event) {
-        if (event instanceof TurnEvent.TurnEnded ended) {
-            if (ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
-                events.accept(new StreamEvent.TurnUsage(
-                        ended.outcome().usage().inputTokens(), ended.outcome().usage().outputTokens()));
-                events.accept(new StreamEvent.Done());
-            }
-            return;
-        }
-        said(event).ifPresent(events);
-    }
-
-    private void subAgentEvent(String from, TurnEvent event) {
-        SubAgent subAgent = subAgents.computeIfAbsent(from, id -> {
-            Optional<Turn> turn = turns.find(TurnId.of(id));
-            SubAgent seen = new SubAgent(UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)),
-                    turn.map(found -> found.agent().name()).orElse("agent"),
-                    turn.map(found -> found.sessionId()).orElse(null));
-            events.accept(new StreamEvent.SubAgentStarted(seen.taskId(), seen.agentName(), 1, seen.sessionId(), null));
-            return seen;
-        });
-        if (event instanceof TurnEvent.TurnEnded ended) {
-            if (ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
-                events.accept(new StreamEvent.SubAgentDone(subAgent.taskId(), subAgent.agentName(),
-                        subAgent.sessionId(), ended.outcome().text() == null ? "" : ended.outcome().text()));
-            }
-            return;
-        }
-        said(event).ifPresent(inner -> events.accept(new StreamEvent.SubAgentEvent(subAgent.taskId(), inner)));
-    }
-
-    private static Optional<StreamEvent> said(TurnEvent event) {
-        return switch (event) {
-            case TurnEvent.TurnStarted started -> Optional.of(new StreamEvent.AskingLlm());
-            case TurnEvent.TurnResumed resumed -> Optional.of(new StreamEvent.AskingLlm());
-            case TurnEvent.TextDelta text -> Optional.of(new StreamEvent.Token(text.text()));
-            case TurnEvent.MessageAppended appended -> toolEvent(appended.message());
-            default -> Optional.empty();
-        };
-    }
-
-    private static Optional<StreamEvent> toolEvent(TurnMessage message) {
-        return switch (message.type()) {
-            // One line per call; a message with several calls announces the first,
+    Optional<StreamEvent> drawn(SessionEvent event) {
+        boolean own = turnId.equals(event.turnId());
+        UUID task = event.turnId() == null ? null
+                : UUID.nameUUIDFromBytes(event.turnId().value().getBytes(StandardCharsets.UTF_8));
+        return switch (event.known()) {
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.AskingLlm asking ->
+                    shown(own, task, new StreamEvent.AskingLlm());
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.Token token ->
+                    shown(own, task, new StreamEvent.Token(token.text()));
+            // One line per request; a request for several calls announces the first,
             // the rest show with their results.
-            case TOOL_CALL -> message.toolCalls().stream().findFirst()
-                    .map(call -> new StreamEvent.ToolCallStarted(call.name(), call.arguments()));
-            case TOOL_RESULT -> {
-                String toolName = String.valueOf(message.metadata().getOrDefault("toolName", "tool"));
-                yield Optional.of(Boolean.TRUE.equals(message.metadata().get("failed"))
-                        ? new StreamEvent.ToolCallFailed(toolName, message.text(), 0)
-                        : new StreamEvent.ToolCallResult(toolName, message.text(), 0));
-            }
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.ToolCallStarted call -> call.index() > 0
+                    ? Optional.empty()
+                    : shown(own, task, new StreamEvent.ToolCallStarted(call.toolName(), call.arguments()));
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.ToolCallResult result ->
+                    shown(own, task, new StreamEvent.ToolCallResult(result.toolName(), result.result(), 0));
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.ToolCallFailed failed ->
+                    shown(own, task, new StreamEvent.ToolCallFailed(failed.toolName(), failed.error(), 0));
+            // Whoever asks, the question is drawn with the turn: its user answers it.
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.ApprovalRequested asked ->
+                    Optional.of(new StreamEvent.ApprovalRequested(asked.requestId(), asked.callId(),
+                            asked.toolName(), asked.arguments(), asked.originSessionId(), null));
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.TurnUsage usage -> own
+                    ? Optional.of(new StreamEvent.TurnUsage(usage.inputTokens(), usage.outputTokens()))
+                    : Optional.empty();
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.Done done ->
+                    own ? Optional.of(new StreamEvent.Done()) : Optional.empty();
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.SubAgentStarted started -> own
+                    ? Optional.empty()
+                    : Optional.of(new StreamEvent.SubAgentStarted(task, started.agentName(), 1,
+                            event.sessionId(), null));
+            case ai.mindconnect.agent.runtime.api.domain.StreamEvent.SubAgentDone ended -> own
+                    ? Optional.empty()
+                    : Optional.of(new StreamEvent.SubAgentDone(task, ended.agentName(), event.sessionId(),
+                            ended.finalText()));
             default -> Optional.empty();
         };
     }
 
-    private static String requestId(TurnEvent event) {
-        return switch (event) {
-            case TurnEvent.TurnStarted started -> started.requestId();
-            case TurnEvent.TurnResumed resumed -> resumed.requestId();
-            case TurnEvent.MessageAppended appended -> appended.requestId();
-            case TurnEvent.TextDelta text -> text.requestId();
-            case TurnEvent.ReasoningDelta reasoning -> reasoning.requestId();
-            case TurnEvent.TurnWaiting waiting -> waiting.requestId();
-            case TurnEvent.TurnEnded ended -> ended.requestId();
-        };
+    private static Optional<StreamEvent> shown(boolean own, UUID task, StreamEvent event) {
+        return Optional.of(own ? event : new StreamEvent.SubAgentEvent(task, event));
     }
 }

@@ -1,8 +1,9 @@
 package ai.mindconnect.agent.protocol.runtime;
 
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.loop.domain.TurnOutcome;
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.protocol.IncompleteReason;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseError;
@@ -113,17 +114,23 @@ public final class ResponseAssembler {
     private static final Set<String> DELEGATION_TOOLS = Set.of("run_agent", "run_agents");
 
     /** An event of the response's own turn. */
-    public synchronized void accept(TurnEvent event) {
+    public synchronized void accept(SessionEvent event) {
         if (status.terminal()) return;
-        switch (event) {
-            case TurnEvent.TextDelta text -> onToken(text.text());
-            case TurnEvent.ReasoningDelta reasoning -> onThinking(reasoning.text());
-            case TurnEvent.MessageAppended appended -> onMessage(appended.message());
-            case TurnEvent.TurnEnded ended -> onEnded(ended.outcome());
-            // Status only: nothing of them is an item.
-            case TurnEvent.TurnStarted started -> { }
-            case TurnEvent.TurnResumed resumed -> { }
-            case TurnEvent.TurnWaiting waiting -> { }
+        switch (event.known()) {
+            case StreamEvent.Token token -> onToken(token.text());
+            case StreamEvent.Thinking thinking -> onThinking(thinking.text());
+            case StreamEvent.MessageWritten written -> onMessage(written.message());
+            case StreamEvent.TurnUsage spent -> usage = new Usage(spent.inputTokens(), spent.outputTokens());
+            case StreamEvent.Done done -> onEnded(done);
+            case StreamEvent.Error error -> {
+                if (error.status() == TurnStatus.CANCELLED) {
+                    cancelled();
+                } else {
+                    fail(error.message());
+                }
+            }
+            // Status only, or told another way: nothing of them is an item.
+            default -> { }
         }
     }
 
@@ -181,15 +188,12 @@ public final class ResponseAssembler {
         textBuffer.append(text);
     }
 
-    private void onEnded(TurnOutcome outcome) {
-        usage = new Usage(outcome.usage().inputTokens(), outcome.usage().outputTokens());
-        switch (outcome.status()) {
-            case COMPLETED -> onDone();
+    private void onEnded(StreamEvent.Done done) {
+        switch (done.status()) {
             case CANCELLED -> cancelled();
-            case INCOMPLETE -> incomplete(outcome.incompleteReason() == TurnOutcome.IncompleteReason.MAX_OUTPUT_TOKENS
+            case INCOMPLETE -> incomplete("MAX_OUTPUT_TOKENS".equals(done.incompleteReason())
                     ? IncompleteReason.MAX_OUTPUT_TOKENS : IncompleteReason.MAX_ROUNDS);
-            // The turn is parked on its tools and goes on by itself: not an end of the response.
-            case WAITING_FOR_TOOLS -> { }
+            default -> onDone();
         }
     }
 

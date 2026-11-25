@@ -97,7 +97,7 @@ final class TurnWorker implements TaskWorker {
                 turn.agent().maxRounds());
         ctx.onCancel(() -> loop.cancel(turnId.value()));
         SessionEventTranslator sessionEvents =
-                new SessionEventTranslator(events, sessions, session, turn, turns.withTurnsAbove(ctx.task()));
+                new SessionEventTranslator(events, session, turn, turns.withTurnsAbove(ctx.task()));
         TurnContext context = new TurnContext(turnId.value(), turn.sessionId().value(),
                 new StoredTurnJournal(sessions, turn.sessionId(), ctx::cancelRequested),
                 sessionEvents::translate, List::of, List.of(new AnswerHookAdvisor(hooks, agentContext)));
@@ -115,7 +115,7 @@ final class TurnWorker implements TaskWorker {
             // dies under it ends too, and whoever follows the session must
             // hear that — as a cancel when one closed the model call.
             TurnStatus status = ctx.cancelRequested() ? TurnStatus.CANCELLED : TurnStatus.FAILED;
-            sessionEvents.finished(status);
+            sessionEvents.brokeOff(status, e.getMessage());
             ended(agentContext, turn, status, null, e.getMessage());
             throw e;
         }
@@ -128,15 +128,16 @@ final class TurnWorker implements TaskWorker {
             return park(ctx, decisions, outcome);
         }
         ctx.updateState(TurnTaskMapper.finishedState(statusOf(outcome), outcome));
+        // Told once the task says so itself: whoever hears of the end and asks finds the turn ended.
+        sessionEvents.ended(statusOf(outcome), outcome);
         ended(agentContext, turn, statusOf(outcome), outcome, null);
         return TaskOutcome.done(outcome.text());
     }
 
-    /** Lets whoever listens know the turn is over. The turn has ended by then; nothing here can change that. */
+    /** Lets the plugins know the turn is over. The turn has ended by then; nothing here can change that. */
     private void ended(AgentContext context, Turn turn, TurnStatus status, TurnOutcome outcome, String error) {
         Turn ended = new Turn(turn.id(), turn.parent(), turn.sessionId(), turn.agent(), status,
                 List.of(), outcome, error);
-        events.ended(context.session(), ended);
         hooks.run(RuntimeHook.TURN_END, context, asked -> ended);
     }
 

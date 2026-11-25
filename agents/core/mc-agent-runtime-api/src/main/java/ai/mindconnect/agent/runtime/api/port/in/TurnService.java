@@ -66,17 +66,19 @@ public interface TurnService {
     void resume(TurnId turnId, List<InterruptionAnswer> answers);
 
     /**
-     * Follows the turn until the subscription is closed or the turn is over.
-     * A listener that comes late is first told what the runtime still keeps
-     * of the turn, so subscribing right after {@link #submit} loses nothing;
-     * one that comes long after may hear only the rest. That the turn is
-     * over it is told in any case, and last. What the turn said is in the
-     * session whenever it is asked for.
+     * Follows the turn, and the turns it starts, until the subscription is
+     * closed or the turn is over: the events of its session's stream that
+     * belong to it. A listener that comes late is first told what the
+     * runtime still keeps of the turn, so subscribing right after
+     * {@link #submit} loses nothing; one that comes long after may hear only
+     * the rest. That the turn is over it is told in any case, and last, as
+     * the turn's own {@code done} or {@code error}. What the turn said is in
+     * the session whenever it is asked for.
      *
      * <p>The listener is told on a thread of its own, in the order things
      * happened: a listener that is slow holds up nobody but itself.
      */
-    Subscription subscribe(TurnId turnId, TurnListener listener);
+    Subscription subscribe(TurnId turnId, SessionEventListener listener);
 
     /** Tells the turn to stop; it ends cancelled at the next point it can. */
     void cancel(TurnId turnId);

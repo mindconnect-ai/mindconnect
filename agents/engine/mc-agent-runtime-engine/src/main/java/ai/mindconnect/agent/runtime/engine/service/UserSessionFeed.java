@@ -23,8 +23,7 @@ public interface UserSessionFeed {
      * @param namespace        the namespace the session is in
      * @param underAnotherTurn whether the event belongs to a turn another turn started — a sub-agent's
      */
-    record Entry(long seq, String namespace, Session session, boolean underAnotherTurn,
-                 SessionEvent.Lifecycle event) { }
+    record Entry(long seq, String namespace, Session session, boolean underAnotherTurn, SessionEvent event) { }
 
     /** Tells what is still kept after {@code afterSeq}, then what happens from now on. */
     Subscription follow(UserId user, long afterSeq, Consumer<Entry> listener);

@@ -10,3 +10,12 @@
   and `afterSeq` are as before. `session_titled` is sent again when a session gets its title.
   `approval_answered` is no longer listed: nothing sent it. `UserStreamPlugin` is gone — an embedding
   that installed it drops the line.
+- **Agents — a session has one stream, and its events have one form.** `SessionService.stream` tells all
+  of what happens in a session: the answer as it is written, tool calls, a question a turn stops for,
+  how a turn ends. An event is a `SessionEvent` with a `kind` and plain `details`; the runtime's own
+  kinds carry the names the REST frames have (`token`, `tool_call_started`, `approval_requested`,
+  `done`, …) and read in a typed form with `event.known()` (`StreamEvent`). A plugin publishes an event
+  of a kind of its own instead of a `Notice`. Gone from the API: `SessionService.lifecycle(…)` and
+  `lifecycleOfAll`, `TurnListener` with `onFinished`, `SessionLifecycleListener`,
+  `SessionStreamListener`, and the agent loop's `TurnEvent` as what a listener is told.
+  `TurnService.subscribe` takes a `SessionEventListener`; a turn's end is its own `done` or `error`.

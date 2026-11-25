@@ -1,133 +1,73 @@
 package ai.mindconnect.agentrest.stream;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
-import ai.mindconnect.agent.loop.domain.TurnEvent;
-import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.loop.domain.TurnOutcome;
-import ai.mindconnect.agent.loop.port.out.TurnEventListener;
-import ai.mindconnect.agent.runtime.api.domain.Interruption;
-import ai.mindconnect.agent.runtime.api.domain.Turn;
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
-import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 
 /**
- * What a turn of the runtime reports, as the frames a client streams.
+ * An event of a turn as the frame a client streams — one frame, or none for
+ * what a client is not shown. Nothing is remembered between two events: the
+ * event says itself which turn it is from.
  *
- * <p>The events of a sub-agent's turn arrive on its caller's turn. A client
- * shows them as a tree, so each is wrapped as an event of that sub-agent,
- * announced when its first event is seen. Every sub-agent is shown one level
- * below the turn: the events do not say how deep it is.
+ * <p>A client shows the turns a turn starts as a tree, so what a sub-agent
+ * does is wrapped as an event of that sub-agent, under the task it runs as.
+ * Every sub-agent is shown one level below the turn.
  */
-public final class TurnFrameTranslator implements TurnEventListener {
+public final class TurnFrameTranslator {
 
     private final TurnId turnId;
-    private final TurnService turns;
-    private final Consumer<TurnFrame> frames;
-    private final Map<String, SubAgent> subAgents = new ConcurrentHashMap<>();
 
-    private record SubAgent(String taskId, String agentName, String sessionId) { }
-
-    public TurnFrameTranslator(TurnId turnId, TurnService turns, Consumer<TurnFrame> frames) {
+    /** @param turnId the turn the frames are of; every other turn's events are a sub-agent's */
+    public TurnFrameTranslator(TurnId turnId) {
         this.turnId = turnId;
-        this.turns = turns;
-        this.frames = frames;
     }
 
-    @Override
-    public void onEvent(TurnEvent event) {
-        String from = requestId(event);
-        if (turnId.value().equals(from)) {
-            ownEvent(event);
-        } else {
-            subAgentEvent(from, event);
-        }
-    }
-
-    /** The turn has to ask before it can go on: one frame per tool call that waits for an approval. */
-    public void interrupted(List<Interruption> interruptions) {
-        interruptions.stream()
-                .filter(interruption -> Interruption.TOOL_APPROVAL.equals(interruption.kind()))
-                .forEach(interruption -> frames.accept(TurnFrame.approvalRequested(interruption.id(),
-                        interruption.call().callId(), interruption.call().toolName(),
-                        interruption.call().arguments(), interruption.call().sessionId().value())));
-    }
-
-    private void ownEvent(TurnEvent event) {
-        if (event instanceof TurnEvent.TurnEnded ended) {
-            if (ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
-                frames.accept(TurnFrame.turnUsage(
-                        ended.outcome().usage().inputTokens(), ended.outcome().usage().outputTokens()));
-                frames.accept(TurnFrame.done());
-            }
-            return;
-        }
-        said(event).ifPresent(frames);
-    }
-
-    private void subAgentEvent(String from, TurnEvent event) {
-        SubAgent subAgent = subAgents.computeIfAbsent(from, id -> {
-            Optional<Turn> turn = turns.find(TurnId.of(id));
-            SubAgent seen = new SubAgent(
-                    UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)).toString(),
-                    turn.map(found -> found.agent().name()).orElse("agent"),
-                    turn.map(found -> found.sessionId().value()).orElse(null));
-            frames.accept(TurnFrame.subAgentStarted(seen.taskId(), seen.agentName(), 1, seen.sessionId()));
-            return seen;
-        });
-        if (event instanceof TurnEvent.TurnEnded ended) {
-            if (ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
-                frames.accept(TurnFrame.subAgentDone(subAgent.taskId(), subAgent.agentName(), subAgent.sessionId(),
-                        ended.outcome().text() == null ? "" : ended.outcome().text()));
-            }
-            return;
-        }
-        said(event).ifPresent(inner -> frames.accept(TurnFrame.subAgentEvent(subAgent.taskId(), inner)));
-    }
-
-    /** What an event says to a client, whoever's turn it comes from; empty for what a client is not shown. */
-    private static Optional<TurnFrame> said(TurnEvent event) {
-        return switch (event) {
-            case TurnEvent.TurnStarted started -> Optional.of(TurnFrame.askingLlm());
-            case TurnEvent.TurnResumed resumed -> Optional.of(TurnFrame.askingLlm());
-            case TurnEvent.TextDelta text -> Optional.of(TurnFrame.token(text.text()));
-            case TurnEvent.ReasoningDelta reasoning -> Optional.of(TurnFrame.thinking(reasoning.text()));
-            case TurnEvent.MessageAppended appended -> toolFrame(appended.message());
-            default -> Optional.empty();
-        };
-    }
-
-    private static Optional<TurnFrame> toolFrame(TurnMessage message) {
-        return switch (message.type()) {
-            // A client draws one card per call; a message with several calls announces the first,
+    public Optional<TurnFrame> frame(SessionEvent event) {
+        boolean own = turnId.equals(event.turnId());
+        String task = event.turnId() == null ? null : taskId(event.turnId());
+        String session = event.sessionId().value();
+        return switch (event.known()) {
+            case StreamEvent.AskingLlm asking -> shown(own, task, TurnFrame.askingLlm());
+            case StreamEvent.Token token -> shown(own, task, TurnFrame.token(token.text()));
+            case StreamEvent.Thinking thinking -> shown(own, task, TurnFrame.thinking(thinking.text()));
+            // A client draws one card per request; a request for several calls announces the first,
             // the rest show with their results.
-            case TOOL_CALL -> message.toolCalls().stream().findFirst()
-                    .map(call -> TurnFrame.toolCallStarted(call.name(), call.arguments()));
-            case TOOL_RESULT -> {
-                String toolName = String.valueOf(message.metadata().getOrDefault("toolName", "tool"));
-                yield Optional.of(Boolean.TRUE.equals(message.metadata().get("failed"))
-                        ? TurnFrame.toolCallFailed(toolName, message.text(), 0)
-                        : TurnFrame.toolCallResult(toolName, message.text(), 0));
-            }
-            default -> Optional.empty();
+            case StreamEvent.ToolCallStarted call -> call.index() > 0 ? Optional.empty()
+                    : shown(own, task, TurnFrame.toolCallStarted(call.toolName(), call.arguments()));
+            case StreamEvent.ToolCallResult result ->
+                    shown(own, task, TurnFrame.toolCallResult(result.toolName(), result.result(), 0));
+            case StreamEvent.ToolCallFailed failed ->
+                    shown(own, task, TurnFrame.toolCallFailed(failed.toolName(), failed.error(), 0));
+            // Whoever asks, the question is the turn's: the card stands in the chat of the turn.
+            case StreamEvent.ApprovalRequested asked -> Optional.of(TurnFrame.approvalRequested(asked.requestId(),
+                    asked.callId(), asked.toolName(), asked.arguments(),
+                    asked.originSessionId() == null ? session : asked.originSessionId().value()));
+            case StreamEvent.TurnUsage usage -> own
+                    ? Optional.of(TurnFrame.turnUsage(usage.inputTokens(), usage.outputTokens())) : Optional.empty();
+            case StreamEvent.Done done -> own ? Optional.of(TurnFrame.done()) : Optional.empty();
+            case StreamEvent.SubAgentStarted started -> own ? Optional.empty()
+                    : Optional.of(TurnFrame.subAgentStarted(task, started.agentName(), 1, session));
+            case StreamEvent.SubAgentDone ended -> own ? Optional.empty()
+                    : Optional.of(TurnFrame.subAgentDone(task, ended.agentName(), session, ended.finalText()));
+            // How a turn broke off is told where its stream ends; the rest is nothing a client streams.
+            case StreamEvent.Error error -> Optional.empty();
+            case StreamEvent.InputRequested asked -> Optional.empty();
+            case StreamEvent.Waiting waiting -> Optional.empty();
+            case StreamEvent.MessageWritten written -> Optional.empty();
+            case StreamEvent.Other other -> Optional.empty();
         };
     }
 
-    private static String requestId(TurnEvent event) {
-        return switch (event) {
-            case TurnEvent.TurnStarted started -> started.requestId();
-            case TurnEvent.TurnResumed resumed -> resumed.requestId();
-            case TurnEvent.MessageAppended appended -> appended.requestId();
-            case TurnEvent.TextDelta text -> text.requestId();
-            case TurnEvent.ReasoningDelta reasoning -> reasoning.requestId();
-            case TurnEvent.TurnWaiting waiting -> waiting.requestId();
-            case TurnEvent.TurnEnded ended -> ended.requestId();
-        };
+    private static Optional<TurnFrame> shown(boolean own, String task, TurnFrame frame) {
+        return Optional.of(own ? frame : TurnFrame.subAgentEvent(task, frame));
+    }
+
+    /** The task a sub-agent's turn is shown as: the same for every event of that turn. */
+    private static String taskId(TurnId turnId) {
+        return UUID.nameUUIDFromBytes(turnId.value().getBytes(StandardCharsets.UTF_8)).toString();
     }
 }

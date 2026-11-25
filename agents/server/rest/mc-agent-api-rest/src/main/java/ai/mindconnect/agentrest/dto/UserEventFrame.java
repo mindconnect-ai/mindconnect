@@ -2,8 +2,8 @@ package ai.mindconnect.agentrest.dto;
 
 import java.util.List;
 
-import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
 
@@ -48,23 +48,26 @@ public record UserEventFrame(long seq, String type, String sessionId, String tur
     public static List<UserEventFrame> of(UserSessionFeed.Entry entry) {
         long seq = entry.seq();
         String session = str(entry.event().sessionId());
-        return switch (entry.event()) {
-            case SessionEvent.TurnStarted e when !entry.underAnotherTurn() -> List.of(new UserEventFrame(seq,
-                    "turn_started", session, e.turnId().value(), null, null, null, null, null, null, null));
-            case SessionEvent.TurnFinished e when !entry.underAnotherTurn() -> List.of(new UserEventFrame(seq,
-                    "turn_finished", session, e.turnId().value(), outcome(e.status()),
+        SessionEvent event = entry.event();
+        return switch (event.known()) {
+            case StreamEvent.AskingLlm asking when !entry.underAnotherTurn() && !asking.resumed() ->
+                    List.of(new UserEventFrame(seq, "turn_started", session, event.turnId().value(),
+                            null, null, null, null, null, null, null));
+            case StreamEvent.Done done when !entry.underAnotherTurn() -> List.of(new UserEventFrame(seq,
+                    "turn_finished", session, event.turnId().value(), outcome(done.status()),
                     null, null, null, null, null, null));
-            case SessionEvent.TurnInterrupted e when !entry.underAnotherTurn() -> e.interruptions().stream()
-                    .filter(open -> Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null)
-                    .map(open -> new UserEventFrame(seq, "approval_requested", session,
-                            null, null, open.call().callId(), open.call().toolName(), null, null, null, null))
-                    .toList();
-            case SessionEvent.Notice e when SESSION_STARTED.equals(e.kind()) -> List.of(new UserEventFrame(seq,
+            case StreamEvent.Error error when !entry.underAnotherTurn() -> List.of(new UserEventFrame(seq,
+                    "turn_finished", session, event.turnId().value(), outcome(error.status()),
+                    null, null, null, null, null, null));
+            case StreamEvent.ApprovalRequested asked when !entry.underAnotherTurn() -> List.of(new UserEventFrame(seq,
+                    "approval_requested", session, null, null, asked.callId(), asked.toolName(),
+                    null, null, null, null));
+            case StreamEvent.Other other when SESSION_STARTED.equals(event.kind()) -> List.of(new UserEventFrame(seq,
                     "session_started", session, null, null, null, null, null, null,
-                    text(e.details().get("agentId")), text(e.details().get("type"))));
-            case SessionEvent.Notice e when SESSION_TITLED.equals(e.kind()) -> List.of(new UserEventFrame(seq,
+                    text(event.details().get("agentId")), text(event.details().get("type"))));
+            case StreamEvent.Other other when SESSION_TITLED.equals(event.kind()) -> List.of(new UserEventFrame(seq,
                     "session_titled", session, null, null, null, null, null,
-                    text(e.details().get("title")), null, null));
+                    text(event.details().get("title")), null, null));
             default -> List.of();
         };
     }

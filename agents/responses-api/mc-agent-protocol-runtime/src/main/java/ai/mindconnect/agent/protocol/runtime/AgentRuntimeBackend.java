@@ -40,11 +40,11 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.common.PageRequest;
@@ -207,18 +207,18 @@ public final class AgentRuntimeBackend {
             // Settled: the response has ended, or the turn stopped to ask.
             CompletableFuture<Void> settled = new CompletableFuture<>();
 
-            // Followed before the turn goes on: that it asks is told by its session, and only once.
-            ai.mindconnect.agent.runtime.api.port.in.Subscription asking =
-                    runtime.sessions().lifecycle(session.id(), true, event -> {
-                        if (event instanceof SessionEvent.TurnInterrupted interrupted && !settled.isDone()) {
-                            assembler.waitingForApproval(interrupted.interruptions().stream()
-                                    .filter(open -> Interruption.TOOL_APPROVAL.equals(open.kind())
-                                            && open.call() != null)
-                                    .map(AgentRuntimeBackend::toApprovalRequest).toList());
-                            settled.complete(null);
+            CompletableFuture<TurnId> turn = new CompletableFuture<>();
+            List<ConversationItem.ApprovalRequest> asked = new java.util.concurrent.CopyOnWriteArrayList<>();
+            // Followed before the turn goes on, and from now: a turn that is continued has said things
+            // before, and those are in the response that was answered then.
+            ai.mindconnect.agent.runtime.api.port.in.Subscription following =
+                    runtime.sessions().stream(session.id(), true, event -> {
+                        TurnId own = turn.join();
+                        if (own != null && !settled.isDone()) {
+                            heard(assembler, own, event, asked, settled);
                         }
                     });
-            settled.whenComplete((done, failure) -> asking.close());
+            settled.whenComplete((done, failure) -> following.close());
 
             TurnId turnId;
             try {
@@ -227,6 +227,7 @@ public final class AgentRuntimeBackend {
                         ? answered(session, answer)
                         : submitted(session, prepareInput(request));
             } catch (RuntimeException e) {
+                turn.complete(null);
                 settled.complete(null);
                 throw e;
             }
@@ -234,28 +235,7 @@ public final class AgentRuntimeBackend {
             assemblers.put(responseId, assembler);
             turnOf.put(responseId, turnId);
             assembler.addMetadata("mc.turnId", turnId.value());
-
-            ai.mindconnect.agent.runtime.api.port.in.Subscription following =
-                    runtime.turns().subscribe(turnId, new TurnListener() {
-                        @Override
-                        public void onEvent(TurnEvent event) {
-                            if (!settled.isDone()) {
-                                heard(assembler, turnId, event);
-                            }
-                        }
-
-                        @Override
-                        public void onFinished(Turn turn) {
-                            finished(assembler, turn);
-                            settled.complete(null);
-                        }
-                    });
-            settled.whenComplete((done, failure) -> following.close());
-            // A turn that was over before anyone listened is told from how it stands.
-            runtime.turns().find(turnId).filter(turn -> turn.status().isFinal()).ifPresent(turn -> {
-                finished(assembler, turn);
-                settled.complete(null);
-            });
+            turn.complete(turnId);
 
             if (!request.background()) {
                 settled.join();   // the outcome is in the assembler once this settled
@@ -286,30 +266,32 @@ public final class AgentRuntimeBackend {
         }
 
         /** What the turn, or a turn of an agent it called, reports. */
-        private void heard(ResponseAssembler assembler, TurnId turnId, TurnEvent event) {
-            if (turnId.value().equals(event.requestId())) {
+        private void heard(ResponseAssembler assembler, TurnId turnId, SessionEvent event,
+                           List<ConversationItem.ApprovalRequest> asked, CompletableFuture<Void> settled) {
+            // Whoever of the turns asks, the response is what waits: it ends with every question of the stop.
+            if (event.is(StreamEvent.APPROVAL_REQUESTED)) {
+                asked.add(toApprovalRequest(event.as(StreamEvent.APPROVAL_REQUESTED).orElseThrow()));
+                return;
+            }
+            if (event.is(StreamEvent.WAITING)) {
+                assembler.waitingForApproval(List.copyOf(asked));
+                settled.complete(null);
+                return;
+            }
+            if (turnId.equals(event.turnId())) {
                 assembler.accept(event);
+                if (event.is(StreamEvent.DONE) || event.is(StreamEvent.ERROR)) {
+                    settled.complete(null);
+                }
                 return;
             }
             // Of a called agent's turn only that it runs and how it ended: the rest is its own business.
-            Optional<Turn> below = runtime.turns().find(TurnId.of(event.requestId()));
-            assembler.subAgentStarted(event.requestId(),
-                    below.map(turn -> turn.agent().name()).orElse("agent"),
-                    below.map(turn -> turn.sessionId().value()).orElse(null));
-            if (event instanceof TurnEvent.TurnEnded ended
-                    && ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
-                assembler.subAgentEnded(event.requestId(), ended.outcome().text());
-            }
-        }
-
-        /** The turn is over: whatever its own events did not already say, its status does. */
-        private void finished(ResponseAssembler assembler, Turn turn) {
-            if (turn.status() == TurnStatus.CANCELLED) {
-                assembler.cancelled();
-            } else if (turn.outcome() != null) {
-                assembler.accept(new TurnEvent.TurnEnded(turn.id().value(), turn.outcome()));
-            } else {
-                assembler.fail(turn.error() != null ? turn.error() : "The turn failed");
+            switch (event.known()) {
+                case StreamEvent.SubAgentStarted started -> assembler.subAgentStarted(event.turnId().value(),
+                        started.agentName(), event.sessionId().value());
+                case StreamEvent.SubAgentDone ended ->
+                        assembler.subAgentEnded(event.turnId().value(), ended.finalText());
+                default -> { }
             }
         }
 
@@ -431,11 +413,11 @@ public final class AgentRuntimeBackend {
     };
 
     /** The question a tool call waits on, as the item a client answers. */
-    static ConversationItem.ApprovalRequest toApprovalRequest(Interruption open) {
-        return new ConversationItem.ApprovalRequest(open.call().callId(),
+    static ConversationItem.ApprovalRequest toApprovalRequest(StreamEvent.ApprovalRequested open) {
+        return new ConversationItem.ApprovalRequest(open.callId(),
                 ConversationItem.ApprovalRequest.TOOL_APPROVAL,
-                Map.of("callId", open.call().callId(), "name", open.call().toolName(),
-                        "arguments", open.call().arguments()),
+                Map.of("callId", open.callId(), "name", open.toolName(),
+                        "arguments", open.arguments()),
                 null);
     }
 

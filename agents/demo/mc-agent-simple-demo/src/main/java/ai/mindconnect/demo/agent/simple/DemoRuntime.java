@@ -18,7 +18,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.management.ManagementPlugin;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
@@ -28,14 +27,12 @@ import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.management.format.AgentJson;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.api.domain.Turn;
-import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
-import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.infrastructure.InMemoryStorePlugin;
 import ai.mindconnect.agent.runtime.infrastructure.LlmPlugin;
 import ai.mindconnect.agent.runtime.infrastructure.ToolRegistryPlugin;
@@ -125,33 +122,28 @@ final class DemoRuntime {
                 .orElseThrow(() -> new IllegalArgumentException("No agent named " + agentName));
         SessionId session = runtime.service(SessionManagement.class).open(UserId.of(user), null,
                 new SessionAgent.Ref(agent.id()), null, SessionDirectories.NONE).id();
-        Subscription lifecycle = runtime.sessions().lifecycle(session, true, events::accept);
-        Subscription heard = runtime.sessions().stream(session, true, events::accept);
-        TurnId turnId = runtime.turns().submit(TurnRequest.text(session, question));
-        CompletableFuture<Turn> ended = new CompletableFuture<>();
-        Subscription following = runtime.turns().subscribe(turnId, new TurnListener() {
-            @Override
-            public void onEvent(TurnEvent event) {
+        CompletableFuture<String> answer = new CompletableFuture<>();
+        // The session's one stream tells all of it: what the turn and its sub-agents do, and how the turn ends.
+        Subscription following = runtime.sessions().stream(session, true, event -> {
+            events.accept(event);
+            if (!event.sessionId().equals(session) || event.ofSubAgent()) {
+                return;
             }
-
-            @Override
-            public void onFinished(Turn turn) {
-                ended.complete(turn);
+            switch (event.known()) {
+                case StreamEvent.Done done when done.status() == TurnStatus.COMPLETED -> answer.complete(done.text());
+                case StreamEvent.Done done ->
+                        answer.completeExceptionally(new IllegalStateException("The turn ended " + done.status()));
+                case StreamEvent.Error error -> answer.completeExceptionally(new IllegalStateException(error.message()));
+                default -> { }
             }
         });
-        // A turn that ended before anyone listened is asked how it stands.
-        runtime.turns().find(turnId).filter(turn -> turn.status().isFinal()).ifPresent(ended::complete);
+        runtime.turns().submit(TurnRequest.text(session, question));
         try {
-            Turn turn = ended.join();
-            if (turn.status() != TurnStatus.COMPLETED || turn.outcome() == null) {
-                throw new IllegalStateException(turn.error() != null ? turn.error()
-                        : "The turn ended " + turn.status());
-            }
-            return turn.outcome().text();
+            return answer.join();
+        } catch (java.util.concurrent.CompletionException e) {
+            throw e.getCause() instanceof RuntimeException failure ? failure : e;
         } finally {
             following.close();
-            heard.close();
-            lifecycle.close();
         }
     }
 

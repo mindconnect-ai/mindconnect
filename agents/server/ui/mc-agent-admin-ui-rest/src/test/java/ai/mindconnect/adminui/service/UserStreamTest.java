@@ -2,6 +2,7 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.engine.service.UserSessionFeed;
@@ -49,7 +50,7 @@ class UserStreamTest {
         private final java.util.Map<UserId, java.util.function.Consumer<Entry>> listeners =
                 new java.util.concurrent.ConcurrentHashMap<>();
 
-        void tell(UserId user, SessionEvent.Lifecycle event) {
+        void tell(UserId user, SessionEvent event) {
             Session session = new Session(event.sessionId(), user, null, null, java.util.Map.of(),
                     java.time.Instant.now());
             listeners.get(user).accept(new Entry(1, "test", session, false, event));
@@ -198,7 +199,8 @@ class UserStreamTest {
         stream.attach(bob, "bob");
 
         TurnId turn = TurnId.of(ChatTurnId.random().value());
-        userSessions.tell(UserId.of("alice"), new SessionEvent.TurnStarted(ALICE_SESSION, turn, "helper"));
+        userSessions.tell(UserId.of("alice"), SessionEvent.of(StreamEvent.ASKING_LLM, ALICE_SESSION, turn, null,
+                new StreamEvent.AskingLlm(false)));
         assertThat(alice.userArrived.await(5, TimeUnit.SECONDS)).isTrue();
 
         String frame = alice.frames.stream().filter(f -> f.contains("event:user")).findFirst().orElseThrow();

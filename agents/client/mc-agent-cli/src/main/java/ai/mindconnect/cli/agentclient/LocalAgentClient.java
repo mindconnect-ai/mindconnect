@@ -1,9 +1,7 @@
 package ai.mindconnect.cli.agentclient;
 
 import ai.mindconnect.cli.agentclient.StreamEvent;
-import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
@@ -14,14 +12,12 @@ import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
-import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
@@ -145,50 +141,37 @@ public class LocalAgentClient implements AgentClient {
                 new IllegalStateException("Session " + sessionId.value() + " has no agent"));
         runtime.sessions().changeAgent(sessionId, agent);
 
-        CompletableFuture<Turn> over = new CompletableFuture<>();
-        CompletableFuture<TurnId> started = new CompletableFuture<>();
-        // Followed before the turn starts: that it asks is told by its session, and only once.
-        var asking = runtime.sessions().lifecycle(sessionId, true, event -> {
-            if (event instanceof SessionEvent.TurnInterrupted interrupted && !over.isDone()) {
-                for (Interruption open : interrupted.interruptions()) {
-                    if (Interruption.TOOL_APPROVAL.equals(open.kind()) && open.call() != null) {
-                        eventHandler.accept(new StreamEvent.ApprovalRequested(open.id(), open.call().callId(),
-                                open.call().toolName(), open.call().arguments(),
-                                open.call().sessionId(), null));
-                    }
-                }
-                // The turn waits: whoever draws the question answers it through answerApproval.
-            }
-        });
         TurnId turnId = runtime.turns().submit(TurnRequest.text(sessionId, userMessage));
-        started.complete(turnId);
-        TurnStreamEvents translator = new TurnStreamEvents(turnId, runtime.turns(), eventHandler);
-        var following = runtime.turns().subscribe(turnId, new TurnListener() {
-            @Override
-            public void onEvent(TurnEvent event) {
-                if (!over.isDone()) {
-                    translator.onEvent(event);
+        CompletableFuture<String> answer = new CompletableFuture<>();
+        TurnStreamEvents translator = new TurnStreamEvents(turnId);
+        // The turn's own stream tells all of it: what it and its sub-agents do, that it asks, how it ends.
+        // A turn that asks waits: whoever draws the question answers it through answerApproval.
+        var following = runtime.turns().subscribe(turnId, event -> {
+            if (answer.isDone()) {
+                return;
+            }
+            translator.drawn(event).ifPresent(eventHandler);
+            if (!turnId.equals(event.turnId())) {
+                return;
+            }
+            event.as(ai.mindconnect.agent.runtime.api.domain.StreamEvent.DONE).ifPresent(done -> {
+                if (done.status() == TurnStatus.CANCELLED) {
+                    answer.completeExceptionally(new CancellationException("The turn was cancelled"));
+                } else {
+                    answer.complete(done.text() == null ? "" : done.text());
                 }
-            }
-
-            @Override
-            public void onFinished(Turn turn) {
-                over.complete(turn);
-            }
+            });
+            event.as(ai.mindconnect.agent.runtime.api.domain.StreamEvent.ERROR).ifPresent(error ->
+                    answer.completeExceptionally(error.status() == TurnStatus.CANCELLED
+                            ? new CancellationException("The turn was cancelled")
+                            : new RuntimeException(error.message())));
         });
         try {
-            Turn turn = over.join();
-            if (turn.status() == TurnStatus.CANCELLED) {
-                throw new CancellationException("The turn was cancelled");
-            }
-            TurnOutcome outcome = turn.outcome();
-            if (outcome == null) {
-                throw new RuntimeException(turn.error() != null ? turn.error() : "The turn failed");
-            }
-            return outcome.text() == null ? "" : outcome.text();
+            return answer.join();
+        } catch (java.util.concurrent.CompletionException e) {
+            throw e.getCause() instanceof RuntimeException failure ? failure : e;
         } finally {
             following.close();
-            asking.close();
         }
     }
 

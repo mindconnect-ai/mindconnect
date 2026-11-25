@@ -17,7 +17,7 @@ import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
-import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
+import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.scope.ScopeSupplier;
@@ -132,7 +132,7 @@ public final class DefaultTurnService implements TurnService {
     }
 
     @Override
-    public Subscription subscribe(TurnId turnId, TurnListener listener) {
+    public Subscription subscribe(TurnId turnId, SessionEventListener listener) {
         // A turn nobody knows from here says nothing, and nothing is there to wait for.
         return turns.turn(turnId)
                 .map(turn -> events.follow(turnId, turn.sessionId(), () -> turns.turn(turnId), listener))
@@ -149,8 +149,7 @@ public final class DefaultTurnService implements TurnService {
             closeOpenCalls(turn);
             sessionStore.find(turn.sessionId()).ifPresent(session -> {
                 queue.get(turn.id().value()).ifPresent(task -> events.publish(session, turns.withTurnsAbove(task),
-                        new SessionEvent.TurnFinished(turn.sessionId(), turn.id(), TurnStatus.CANCELLED)));
-                turns.turn(turn.id()).ifPresent(ended -> events.ended(session, ended));
+                        SessionEventTranslator.brokenOff(session, turn, TurnStatus.CANCELLED, null)));
             });
         }
     }

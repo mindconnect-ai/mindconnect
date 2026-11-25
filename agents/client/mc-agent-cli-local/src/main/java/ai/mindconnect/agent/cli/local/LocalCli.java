@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import ai.mindconnect.agent.loop.domain.TurnEvent;
+import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -58,10 +58,13 @@ public final class LocalCli {
         TurnId turnId = runtime.turns().submit(TurnRequest.text(session.id(), text));
         AtomicBoolean streamed = new AtomicBoolean();
         try (Subscription following = runtime.turns().subscribe(turnId, event -> {
-            if (event instanceof TurnEvent.TextDelta delta) {
-                streamed.set(true);
-                out.print(delta.text());
-                out.flush();
+            // The turn's own answer as it is written; what a sub-agent writes is not the answer.
+            if (turnId.equals(event.turnId())) {
+                event.as(StreamEvent.TOKEN).ifPresent(token -> {
+                    streamed.set(true);
+                    out.print(token.text());
+                    out.flush();
+                });
             }
         })) {
             Turn turn = awaitRest(turnId);

@@ -47,7 +47,7 @@ public final class ResponseReviewPlugin implements Plugin {
     public static final String REVIEWERS = "responseReviewers";
 
     /**
-     * The {@link SessionEvent.Notice} that a reviewer has begun: the answer
+     * The {@link SessionEvent} that a reviewer has begun: the answer
      * is written, and whoever shows the turn would otherwise show nothing
      * while it is read. Its details name the {@link #REVIEWER}.
      */
@@ -151,7 +151,7 @@ public final class ResponseReviewPlugin implements Plugin {
     private static void notify(PluginRegistry registry, AgentContext context, String kind,
                                Map<String, Object> details) {
         registry.find(SessionEventPublisher.class).ifPresent(events -> events.publish(
-                new SessionEvent.Notice(context.session().id(), context.turnId(), kind, details)));
+                new SessionEvent(kind, context.session().id(), context.turnId(), null, details)));
     }
 
     private static int lastIndexOfUser(List<TurnMessage> said) {
