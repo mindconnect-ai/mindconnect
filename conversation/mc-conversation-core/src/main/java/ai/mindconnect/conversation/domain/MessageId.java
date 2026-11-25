@@ -1,16 +1,13 @@
 package ai.mindconnect.conversation.domain;
 
-import ai.mindconnect.agent.EntityId;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
-/**
- * Identifies one message. See {@link EntityId}.
- */
-public record MessageId(@JsonValue String value) implements EntityId {
+/** Identifies a message within its conversation. In JSON an id is its value. */
+public record MessageId(@JsonValue String value) {
 
     public MessageId {
-        EntityId.check(value);
+        IdFormat.checked(value);
     }
 
     @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
@@ -20,7 +17,7 @@ public record MessageId(@JsonValue String value) implements EntityId {
 
     /** A fresh, unique id. */
     public static MessageId random() {
-        return new MessageId(EntityId.randomValue());
+        return new MessageId(IdFormat.random());
     }
 
     @Override

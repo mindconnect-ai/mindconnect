@@ -1,94 +1,86 @@
 package ai.mindconnect.conversation.adapter.memory;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongFunction;
+import java.util.function.UnaryOperator;
+
 import ai.mindconnect.agent.scope.NamespaceMap;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.conversation.domain.ConversationId;
-import ai.mindconnect.conversation.domain.MessageId;
-
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.conversation.domain.ConversationId;
 import ai.mindconnect.conversation.domain.Message;
+import ai.mindconnect.conversation.domain.MessageId;
 import ai.mindconnect.conversation.port.out.MessageRepository;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.IntFunction;
+/** Messages that last as long as the process: for tests and an installation that keeps nothing. */
+public final class InMemoryMessageRepository implements MessageRepository {
 
-/** In-memory {@link MessageRepository} — process-lifetime storage, no persistence. */
-public class InMemoryMessageRepository implements MessageRepository {
+    /** A conversation's messages and the last place given. */
+    private static final class Thread {
+        private final List<Message> messages = new ArrayList<>();
+        private long lastPlace;
+    }
 
     private final ScopeSupplier scope;
-    private final NamespaceMap<List<Message>> store;
+    private final NamespaceMap<Map<ConversationId, Thread>> store = new NamespaceMap<>(ConcurrentHashMap::new);
 
     public InMemoryMessageRepository(ScopeSupplier scope) {
         this.scope = scope;
-        this.store = new NamespaceMap<>(CopyOnWriteArrayList::new);
     }
 
-    /**
-     * Upsert, not append: {@code save} is also how an existing message is
-     * updated (compressed, token count, duration). Adding blindly would leave
-     * two rows with the same id and a history that shows the message twice.
-     */
-    @Override
-    public Message save(Message message) {
-        store.of(scope.namespace()).removeIf(existing -> existing.id().equals(message.id()));
-        store.of(scope.namespace()).add(message);
-        return message;
-    }
-
-    /** Serialized with {@link #append}, so a change is applied to the message as it is stored. */
-    @Override
-    public synchronized Optional<Message> update(ConversationId conversation, MessageId id,
-                                                 java.util.function.UnaryOperator<Message> change) {
-        Optional<Message> current = findById(conversation, id);
-        if (current.isEmpty()) return Optional.empty();
-        Message changed = java.util.Objects.requireNonNull(change.apply(current.get()),
-                "update: the change returned null");
-        if (changed != current.get()) save(changed);
-        return Optional.of(changed);
+    private Optional<Thread> thread(ConversationId conversation) {
+        return Optional.ofNullable(store.of(scope.namespace()).get(conversation));
     }
 
     @Override
-    public List<Message> findByConversation(ConversationId conversationId, PageRequest page) {
-        return store.of(scope.namespace()).stream()
-                .filter(m -> m.conversationId().equals(conversationId))
-                .sorted(Comparator.comparingInt(Message::sequenceNum))
-                .skip((long) page.page() * page.size())
-                .limit(page.size())
-                .toList();
+    public Message append(ConversationId conversation, LongFunction<Message> create) {
+        Thread thread = store.of(scope.namespace()).computeIfAbsent(conversation, id -> new Thread());
+        synchronized (thread) {
+            Message message = Objects.requireNonNull(create.apply(++thread.lastPlace), "append: no message");
+            thread.messages.add(message);
+            return message;
+        }
+    }
+
+    @Override
+    public Optional<Message> update(ConversationId conversation, MessageId id, UnaryOperator<Message> change) {
+        return thread(conversation).flatMap(thread -> {
+            synchronized (thread) {
+                for (int i = 0; i < thread.messages.size(); i++) {
+                    if (thread.messages.get(i).id().equals(id)) {
+                        Message changed = Objects.requireNonNull(change.apply(thread.messages.get(i)),
+                                "update: the change returned null");
+                        thread.messages.set(i, changed);
+                        return Optional.of(changed);
+                    }
+                }
+                return Optional.empty();
+            }
+        });
+    }
+
+    @Override
+    public List<Message> findByConversation(ConversationId conversation, PageRequest page) {
+        return thread(conversation).map(thread -> {
+            synchronized (thread) {
+                return thread.messages.stream().skip(page.offset()).limit(page.size()).toList();
+            }
+        }).orElse(List.of());
     }
 
     @Override
     public Optional<Message> findById(ConversationId conversation, MessageId id) {
-        return store.of(scope.namespace()).stream()
-                .filter(m -> m.conversationId().equals(conversation) && m.id().equals(id))
-                .findFirst();
-    }
-
-    /**
-     * One appender at a time, so two of them cannot read the same highest
-     * number. The list itself is thread-safe; handing out a number is not,
-     * and that is what needs guarding.
-     */
-    @Override
-    public synchronized Message append(ConversationId conversationId, IntFunction<Message> create) {
-        int next = store.of(scope.namespace()).stream()
-                .filter(m -> m.conversationId().equals(conversationId))
-                .mapToInt(Message::sequenceNum)
-                .max().orElse(0) + 1;
-        return save(create.apply(next));
+        return findByConversation(conversation, new PageRequest(0, Integer.MAX_VALUE)).stream()
+                .filter(message -> message.id().equals(id)).findFirst();
     }
 
     @Override
-    public void deleteBySequenceRange(ConversationId conversationId, int fromSeq, int toSeq) {
-        store.of(scope.namespace()).removeIf(m -> m.conversationId().equals(conversationId)
-                && m.sequenceNum() >= fromSeq && m.sequenceNum() <= toSeq);
-    }
-
-    @Override
-    public void deleteByConversation(ConversationId conversationId) {
-        store.of(scope.namespace()).removeIf(m -> m.conversationId().equals(conversationId));
+    public void deleteByConversation(ConversationId conversation) {
+        store.of(scope.namespace()).remove(conversation);
     }
 }

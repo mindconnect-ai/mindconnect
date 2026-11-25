@@ -1,116 +1,60 @@
 package ai.mindconnect.conversation.adapter.file;
 
-import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.conversation.domain.ConversationId;
-
-import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.conversation.domain.Conversation;
-import ai.mindconnect.conversation.port.out.ConversationRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.conversation.domain.Conversation;
+import ai.mindconnect.conversation.domain.ConversationId;
+import ai.mindconnect.conversation.port.out.ConversationRepository;
+import ai.mindconnect.filerepo.Documents;
+import ai.mindconnect.filerepo.FileRepo;
+
 /**
- * Stores conversations under:
- *   {base}/conversations/{conversationId}/conversation.json
- *
- * Co-locating with messages (stored by FileMessageRepository in the same dir)
- * makes it easy to find everything for a conversation in one folder.
+ * Conversations under {@code {base}/{namespace}/conversation-threads/{id}/conversation.json},
+ * their messages beside them. Not under {@code conversations/}: there the
+ * runtime kept its sessions as conversations before, and those stay as they
+ * were written.
  */
-public class FileConversationRepository implements ConversationRepository {
+public final class FileConversationRepository implements ConversationRepository {
 
-    private static final Logger log = LoggerFactory.getLogger(FileConversationRepository.class);
-    static final String FILE_NAME = "conversation.json";
+    static final String THREADS = "conversation-threads";
+    private static final String FILE_NAME = "conversation.json";
 
-    private final Path messageStorageDir;
-    private final ScopeSupplier scope;
-    private final ObjectMapper objectMapper;
+    private final Documents<ConversationId, Conversation> conversations;
 
-    public FileConversationRepository(Path messageStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
-        this.messageStorageDir = messageStorageDir.toAbsolutePath();
-        this.scope = scope;
-        this.objectMapper = objectMapper;
-        log.info("ConversationRepository storage: {}", this.messageStorageDir.resolve("<namespace>").resolve("conversations"));
-    }
-
-    /** The conversations directory of the namespace the current call works in. */
-    private Path conversationsDir() {
-        return messageStorageDir.resolve(scope.namespace().value()).resolve("conversations");
+    public FileConversationRepository(Path base, ObjectMapper json, ScopeSupplier scope) {
+        this.conversations = Documents.of(Conversation.class)
+                .path((ConversationId id) -> THREADS + "/" + id.value() + "/" + FILE_NAME)
+                .build(() -> FileRepo.open(base, scope.namespace().value()), json);
     }
 
     @Override
     public Conversation save(Conversation conversation) {
-        Path file = fileFor(conversation.id());
-        try {
-            Files.createDirectories(file.getParent());
-            AtomicFiles.write(file, out -> objectMapper.writeValue(out, conversation));
-            return conversation;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return conversations.put(conversation.id(), conversation);
     }
 
     @Override
     public Optional<Conversation> findById(ConversationId id) {
-        Path file = fileFor(id);
-        if (!Files.exists(file)) return Optional.empty();
-        Conversation conversation = read(file);
-        // The directory is flat: a file of another tenant with the same value is not this conversation.
-        return conversation.id().equals(id) ? Optional.of(conversation) : Optional.empty();
-    }
-
-    /** A conversation written before the namespace was recorded takes the one asked for. */
-    private Conversation read(Path file) {
-        try {
-            return objectMapper.readerFor(Conversation.class)
-                    .readValue(file.toFile());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return conversations.find(id);
     }
 
     @Override
     public List<Conversation> findAll(PageRequest page) {
-        if (!Files.exists(conversationsDir())) return List.of();
-        try (var stream = Files.list(conversationsDir())) {
-            return stream
-                    .filter(Files::isDirectory)
-                    .map(d -> d.resolve(FILE_NAME))
-                    .filter(Files::exists)
-                    .map(f -> read(f))
-                    .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
-                    .skip(page.offset())
-                    .limit(page.size())
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return conversations.findAll(THREADS, FILE_NAME).stream()
+                .sorted(Comparator.comparing(Conversation::createdAt).reversed())
+                .skip(page.offset())
+                .limit(page.size())
+                .toList();
     }
 
     @Override
     public void deleteById(ConversationId id) {
-        if (findById(id).isEmpty()) return;   // absent, or another tenant's file of the same value
-        // The directory is the conversation's own (messages and traces are co-located in it):
-        // whatever is still in there belongs to nobody once the conversation is gone.
-        Path dir = fileFor(id).getParent();
-        try (var paths = Files.walk(dir)) {
-            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
-                Files.deleteIfExists(path);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not delete conversation " + id.value(), e);
-        }
-    }
-
-    private Path fileFor(ConversationId id) {
-        return conversationsDir().resolve(id.value()).resolve(FILE_NAME);
+        conversations.delete(id);
     }
 }

@@ -7,16 +7,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * One piece of a {@link Message}: its text, or an image or file the user sent
- * with it. Media is <em>referenced</em> — by the id the file store gave it —
- * never carried as bytes: a conversation record stays small, and the bytes
- * are read by whoever renders the part (the LLM mapper, the chat UI) through
- * the store, at the moment they are needed.
+ * One piece of a {@link Message}: its text, or an image or file sent with it.
+ * Media is <em>referenced</em> — by the id the file store gave it — never
+ * carried as bytes: a conversation record stays small, and the bytes are read
+ * by whoever shows the part, at the moment they are needed.
  *
- * <p>The kinds are closed on purpose. A message's text is what every existing
- * reader sees ({@link Message#content()} mirrors it); the media kinds are what
- * a vision- or document-capable model gets to see in addition. Audio is not a
- * kind yet — it arrives with the speech work, as its own record here.
+ * <p>The kinds are closed on purpose. Audio is not a kind yet — it arrives
+ * with the speech work, as its own record here.
  *
  * <p>Serialised with a {@code kind} discriminator so the file store, Postgres
  * and the REST API all read a part back as what it was.
@@ -60,9 +57,8 @@ public sealed interface ContentPart permits ContentPart.Text, ContentPart.Media 
     }
 
     /**
-     * The text of the parts, joined in order — what {@link Message#content()}
-     * holds for a message made of parts. Media parts contribute nothing; a
-     * message that is only an image has empty text.
+     * The text of the parts, joined in order — {@link Message#text()}. Media
+     * parts contribute nothing; a message that is only an image has empty text.
      */
     static String textOf(List<ContentPart> parts) {
         if (parts == null) return "";

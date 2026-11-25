@@ -8,32 +8,29 @@ import ai.mindconnect.conversation.domain.Conversation;
 import ai.mindconnect.conversation.domain.ConversationId;
 import ai.mindconnect.conversation.port.out.ConversationRepository;
 
-import javax.sql.DataSource;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
  * {@link ConversationRepository} on Postgres. One row of
- * {@code mc_conversation} per conversation, keyed by {@code (namespace, id)}:
- * the document, plus the creation time that {@link #findAll} sorts by —
- * newest first, exactly as the file store lists them. Every statement matches
- * the namespace the scope names for the current call.
+ * {@code mc_conversation_thread} per conversation, keyed by
+ * {@code (namespace, id)}: the document with its participants, plus the
+ * creation time that {@link #findAll} sorts by — newest first, as the file
+ * store lists them. Every statement matches the namespace the scope names for
+ * the current call. Not {@code mc_conversation}: there the runtime kept its
+ * sessions as conversations before, and those rows stay as they were written.
  */
 public final class PgConversationRepository implements ConversationRepository {
 
     private final DocumentTable<Conversation> conversations;
     private final ScopeSupplier scope;
 
-    public PgConversationRepository(DataSource dataSource, ScopeSupplier scope) {
-        this(Sql.of(dataSource), scope);
-    }
-
-    /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
+    /** On a {@link Sql} shared with the other stores, and with it the application's JSON mapper. */
     public PgConversationRepository(Sql sql, ScopeSupplier scope) {
         this.scope = Objects.requireNonNull(scope, "scope");
         this.conversations = DocumentTable.of(Conversation.class)
-                .table("mc_conversation")
+                .table("mc_conversation_thread")
                 .partitionKey("namespace", "TEXT", c -> scope.namespace().value())
                 .id("id", "TEXT", c -> c.id().value())
                 .column("created_at", "TIMESTAMPTZ", Conversation::createdAt)

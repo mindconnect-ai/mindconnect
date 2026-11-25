@@ -1,246 +1,170 @@
 package ai.mindconnect.conversation.service;
 
-import ai.mindconnect.common.DomainException;
-import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.conversation.domain.ConversationId;
-import ai.mindconnect.conversation.domain.MessageId;
-import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.conversation.domain.ContentPart;
-import ai.mindconnect.conversation.domain.Conversation;
-import ai.mindconnect.conversation.domain.ConversationType;
-import ai.mindconnect.conversation.domain.Message;
-import ai.mindconnect.conversation.domain.MessageType;
-import ai.mindconnect.conversation.domain.ParticipantType;
-import ai.mindconnect.conversation.domain.Participant;
-import ai.mindconnect.conversation.port.out.ConversationRepository;
-import ai.mindconnect.conversation.port.out.MessageRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.LongFunction;
+import java.util.function.UnaryOperator;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.Test;
 
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.conversation.domain.ContentPart;
+import ai.mindconnect.conversation.domain.Conversation;
+import ai.mindconnect.conversation.domain.ConversationId;
+import ai.mindconnect.conversation.domain.ConversationStatus;
+import ai.mindconnect.conversation.domain.Message;
+import ai.mindconnect.conversation.domain.MessageId;
+import ai.mindconnect.conversation.domain.Participant;
+import ai.mindconnect.conversation.domain.ParticipantType;
+import ai.mindconnect.conversation.port.out.ConversationChannel;
+import ai.mindconnect.conversation.port.out.ConversationRepository;
+import ai.mindconnect.conversation.port.out.MessageRepository;
+
+/** A customer, the support and an assistant in one conversation, on its own page and in a channel. */
 class ConversationServiceTest {
 
-    private ConversationService service;
-    private InMemoryConversationRepository conversationRepo;
-    private InMemoryMessageRepository messageRepo;
+    private static final Clock NOW = Clock.fixed(Instant.parse("2026-11-25T12:00:00Z"), ZoneOffset.UTC);
+    private static final PageRequest ALL = new PageRequest(0, 100);
 
-    @BeforeEach
-    void setUp() {
-        conversationRepo = new InMemoryConversationRepository();
-        messageRepo = new InMemoryMessageRepository();
-        service = new ConversationService(conversationRepo, messageRepo);
-    }
+    private final Map<ConversationId, Conversation> conversations = new HashMap<>();
+    private final Map<ConversationId, List<Message>> messages = new HashMap<>();
+    private final List<Message> delivered = new ArrayList<>();
 
-    @Test
-    void createConversation_savesAndReturnsConversation() {
-        ConversationId conversation = ConversationId.random();
-        List<Participant> participants = List.of(
-                Participant.user(conversation, UserId.of("user-1"), "Alice"),
-                Participant.agent(conversation, AgentId.of("agent-1"), "Bot")
-        );
-
-        Conversation result = service.createConversation(conversation, "Support Chat", ConversationType.SUPPORT, participants);
-
-        assertThat(result.id()).isNotNull();
-        assertThat(result.topic()).isEqualTo("Support Chat");
-        assertThat(result.participants()).hasSize(2);
-    }
-
-    @Test
-    void addMessage_ToConversation_appendsToConversation() {
-        Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.SUPPORT, List.of());
-
-        String senderId = "user-1";
-        Message msg = service.addMessageToConversation(conv.id(), senderId, ParticipantType.USER, MessageType.CHAT, "Hello!", null);
-
-        assertThat(msg.content()).isEqualTo("Hello!");
-        assertThat(msg.sequenceNum()).isEqualTo(1);
-        assertThat(msg.conversationId()).isEqualTo(conv.id());
-    }
-
-    @Test
-    void addMessage_ToConversation_incrementsSequence() {
-        Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.SUPPORT, List.of());
-        String sender = "user-1";
-
-        service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "msg 1", null);
-        Message msg2 = service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "msg 2", null);
-
-        assertThat(msg2.sequenceNum()).isEqualTo(2);
-    }
-
-    @Test
-    void addMessage_withParts_derivesContentFromTheTextParts() {
-        Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.SUPPORT, List.of());
-        List<ContentPart> parts = List.of(
-                new ContentPart.Text("What is in this picture?"),
-                new ContentPart.Image("f-1", "photo.png", "image/png", 240_000L));
-
-        Message msg = service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER,
-                MessageType.CHAT, parts, null, 0, Map.of());
-
-        assertThat(msg.content()).isEqualTo("What is in this picture?");
-        assertThat(msg.parts()).containsExactlyElementsOf(parts);
-        assertThat(msg.partsOrText()).containsExactlyElementsOf(parts);
-        assertThat(msg.sequenceNum()).isEqualTo(1);
-        assertThat(messageRepo.store).containsExactly(msg);
-    }
-
-    @Test
-    void addMessage_withText_hasNoPartsButReadsAsOneTextPart() {
-        Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.SUPPORT, List.of());
-
-        Message msg = service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER,
-                MessageType.CHAT, "Hello!", null);
-
-        assertThat(msg.parts()).isNull();
-        assertThat(msg.partsOrText()).containsExactly(new ContentPart.Text("Hello!"));
-    }
-
-    @Test
-    void addMessage_withParts_appendsAfterExistingMessages() {
-        Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.SUPPORT, List.of());
-        String sender = "user-1";
-        service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "first", null);
-
-        Message msg = service.addMessageToConversation(conv.id(), sender, ParticipantType.USER,
-                MessageType.CHAT, ContentPart.text("second"), null, null, Map.of());
-
-        assertThat(msg.sequenceNum()).isEqualTo(2);
-        assertThat(msg.content()).isEqualTo("second");
-    }
-
-    @Test
-    void addMessage_ToConversation_throwsWhenConversationNotFound() {
-        assertThatThrownBy(() -> service.addMessageToConversation(ConversationId.random(), "user-1", ParticipantType.USER, MessageType.CHAT, "x", null))
-                .isInstanceOf(DomainException.class);
-    }
-
-    @Test
-    void loadHistory_returnsMessagesInOrder() {
-        Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.SUPPORT, List.of());
-        String sender = "user-1";
-        service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "first", null);
-        service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "second", null);
-
-        List<Message> history = service.loadHistory(conv.id(), new PageRequest(0, 10));
-
-        assertThat(history).hasSize(2);
-        assertThat(history.get(0).content()).isEqualTo("first");
-        assertThat(history.get(1).content()).isEqualTo("second");
-    }
-
-    // --- minimal in-memory test doubles ---
-
-    @Test
-    void deleteConversation_removesTheConversationAndAllItsMessages() {
-        Conversation conv = service.createConversation(ConversationId.random(), "topic",
-                ConversationType.SUPPORT, List.of());
-        Conversation other = service.createConversation(ConversationId.random(), "other",
-                ConversationType.SUPPORT, List.of());
-        service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "one", null);
-        service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "two", null);
-        service.addMessageToConversation(other.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "keep", null);
-
-        service.deleteConversation(conv.id());
-
-        assertThat(service.findById(conv.id())).isEmpty();
-        assertThat(messageRepo.findByConversation(conv.id(), new PageRequest(0, 10))).isEmpty();
-        assertThat(messageRepo.findByConversation(other.id(), new PageRequest(0, 10))).hasSize(1);
-    }
-
-    @Test
-    void deleteConversation_ofAnUnknownIdIsANoOp() {
-        service.deleteConversation(ConversationId.random());
-    }
-
-    static class InMemoryConversationRepository implements ConversationRepository {
-        final Map<ConversationId, Conversation> store = new HashMap<>();
+    private final ConversationChannel whatsapp = new ConversationChannel() {
+        @Override
+        public String name() {
+            return "whatsapp";
+        }
 
         @Override
-        public Conversation save(Conversation c) { store.put(c.id(), c); return c; }
+        public void deliver(Conversation conversation, Message message) {
+            delivered.add(message);
+        }
+    };
+
+    private final ConversationService service = new ConversationService(new ConversationRepository() {
+        @Override
+        public Conversation save(Conversation conversation) {
+            conversations.put(conversation.id(), conversation);
+            return conversation;
+        }
 
         @Override
-        public Optional<Conversation> findById(ConversationId id) { return Optional.ofNullable(store.get(id)); }
+        public Optional<Conversation> findById(ConversationId id) {
+            return Optional.ofNullable(conversations.get(id));
+        }
 
         @Override
         public List<Conversation> findAll(PageRequest page) {
-            return store.values().stream()
-                    .skip((long) page.page() * page.size()).limit(page.size()).toList();
+            return List.copyOf(conversations.values());
         }
 
         @Override
-        public void deleteById(ConversationId id) { store.remove(id); }
+        public void deleteById(ConversationId id) {
+            conversations.remove(id);
+        }
+    }, new MessageRepository() {
+        @Override
+        public Message append(ConversationId conversation, LongFunction<Message> create) {
+            List<Message> held = messages.computeIfAbsent(conversation, id -> new ArrayList<>());
+            Message message = create.apply(held.size() + 1);
+            held.add(message);
+            return message;
+        }
+
+        @Override
+        public Optional<Message> update(ConversationId conversation, MessageId id, UnaryOperator<Message> change) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<Message> findByConversation(ConversationId conversation, PageRequest page) {
+            return List.copyOf(messages.getOrDefault(conversation, List.of()));
+        }
+
+        @Override
+        public Optional<Message> findById(ConversationId conversation, MessageId id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void deleteByConversation(ConversationId conversation) {
+            messages.remove(conversation);
+        }
+    }, List.of(whatsapp), NOW);
+
+    @Test
+    void people_and_a_bot_write_in_one_conversation_and_the_history_says_who_wrote_what() {
+        Conversation opened = service.open("Order 4711", null, Map.of());
+        Participant customer = service.join(opened.id(), ParticipantType.PERSON, "u-1", "Ada",
+                Map.of("role", "customer"));
+        Participant assistant = service.join(opened.id(), ParticipantType.BOT, "helper", "Assistant", Map.of());
+
+        service.post(opened.id(), customer.id(), ContentPart.text("Where is my order?"), Map.of());
+        service.post(opened.id(), assistant.id(), ContentPart.text("It ships today."),
+                Map.of("agent.sessionId", "s-1", "agent.turnId", "t-1"));
+
+        List<Message> history = service.history(opened.id(), ALL);
+        assertThat(history).extracting(Message::sequence).containsExactly(1L, 2L);
+        assertThat(history).extracting(Message::from).containsExactly(customer.id(), assistant.id());
+        assertThat(history).extracting(Message::text).containsExactly("Where is my order?", "It ships today.");
+        assertThat(history.get(1).metadata()).containsEntry("agent.sessionId", "s-1");
+        assertThat(service.find(opened.id()).orElseThrow().participants())
+                .extracting(Participant::type).containsExactly(ParticipantType.PERSON, ParticipantType.BOT);
     }
 
-    static class InMemoryMessageRepository implements MessageRepository {
-        final List<Message> store = new ArrayList<>();
+    @Test
+    void what_is_written_here_goes_out_through_the_channel_and_what_came_in_does_not_go_back() {
+        Conversation opened = service.open("Support", "whatsapp", Map.of("whatsapp.chatId", "4917"));
+        Participant customer = service.join(opened.id(), ParticipantType.PERSON, "+49170", "Ada", Map.of());
+        Participant support = service.join(opened.id(), ParticipantType.PERSON, "bob", "Bob", Map.of("role", "support"));
 
-        @Override
-        public Message save(Message m) { store.add(m); return m; }
+        service.receive(opened.id(), customer.id(), ContentPart.text("Hello?"), Map.of());
+        Message answer = service.post(opened.id(), support.id(), ContentPart.text("Hi Ada"), Map.of());
 
-        @Override
-        public synchronized java.util.Optional<Message> update(ConversationId conversation, MessageId id,
-                                                             java.util.function.UnaryOperator<Message> change) {
-            for (int i = 0; i < store.size(); i++) {
-                Message m = store.get(i);
-                if (m.conversationId().equals(conversation) && m.id().equals(id)) {
-                    Message changed = change.apply(m);
-                    store.set(i, changed);
-                    return java.util.Optional.of(changed);
-                }
-            }
-            return java.util.Optional.empty();
-        }
+        assertThat(delivered).containsExactly(answer);
+    }
 
-        @Override
-        public List<Message> findByConversation(ConversationId id, PageRequest page) {
-            return store.stream()
-                    .filter(m -> m.conversationId().equals(id))
-                    .sorted((a, b) -> Integer.compare(a.sequenceNum(), b.sequenceNum()))
-                    .skip((long) page.page() * page.size()).limit(page.size()).toList();
-        }
+    @Test
+    void a_participant_who_left_or_never_joined_cannot_write() {
+        Conversation opened = service.open("Group", null, Map.of());
+        Participant ada = service.join(opened.id(), ParticipantType.PERSON, "u-1", "Ada", Map.of());
+        service.leave(opened.id(), ada.id());
 
-        @Override
-        public java.util.Optional<Message> findById(ConversationId conversation, MessageId id) {
-            return store.stream()
-                    .filter(m -> m.conversationId().equals(conversation) && m.id().equals(id))
-                    .findFirst();
-        }
+        assertThatThrownBy(() -> service.post(opened.id(), ada.id(), ContentPart.text("still here?"), Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.post(ConversationId.random(), ada.id(), ContentPart.text("?"), Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(service.find(opened.id()).orElseThrow().participant(ada.id()).orElseThrow().leftAt())
+                .isEqualTo(NOW.instant());
+    }
 
-        @Override
-        public synchronized Message append(ConversationId id, java.util.function.IntFunction<Message> create) {
-            int next = store.stream()
-                    .filter(m -> m.conversationId().equals(id))
-                    .mapToInt(Message::sequenceNum)
-                    .max().orElse(0) + 1;
-            return save(create.apply(next));
-        }
+    @Test
+    void a_conversation_opens_only_in_a_channel_there_is() {
+        assertThatThrownBy(() -> service.open("Team chat", "teams", Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
-        @Override
-        public void deleteBySequenceRange(ConversationId conversationId, int fromSeq, int toSeq) {
-            store.removeIf(m -> m.conversationId().equals(conversationId)
-                    && m.sequenceNum() >= fromSeq && m.sequenceNum() <= toSeq);
-        }
+    @Test
+    void closing_keeps_the_conversation_and_deleting_takes_its_messages_with_it() {
+        Conversation opened = service.open("Short", null, Map.of());
+        Participant ada = service.join(opened.id(), ParticipantType.PERSON, "u-1", "Ada", Map.of());
+        service.post(opened.id(), ada.id(), ContentPart.text("bye"), Map.of());
 
-        @Override
-        public void deleteByConversation(ConversationId conversationId) {
-            store.removeIf(m -> m.conversationId().equals(conversationId));
-        }
+        service.close(opened.id());
+        assertThat(service.find(opened.id()).orElseThrow().status()).isEqualTo(ConversationStatus.CLOSED);
+
+        service.delete(opened.id());
+        assertThat(service.find(opened.id())).isEmpty();
+        assertThat(service.history(opened.id(), ALL)).isEmpty();
     }
 }

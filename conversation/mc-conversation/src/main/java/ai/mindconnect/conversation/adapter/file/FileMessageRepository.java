@@ -1,52 +1,44 @@
 package ai.mindconnect.conversation.adapter.file;
 
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.LongFunction;
+import java.util.function.UnaryOperator;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.filerepo.FileRepo;
-import ai.mindconnect.filerepo.RecordLog;
 import ai.mindconnect.conversation.domain.ConversationId;
 import ai.mindconnect.conversation.domain.Message;
 import ai.mindconnect.conversation.domain.MessageId;
 import ai.mindconnect.conversation.port.out.MessageRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Optional;
-import java.util.function.IntFunction;
-import java.util.function.UnaryOperator;
+import ai.mindconnect.filerepo.FileRepo;
+import ai.mindconnect.filerepo.RecordLog;
 
 /**
- * Stores messages under:
- *   {base}/{namespace}/conversations/{conversationId}/messages/{seq}_{messageId}.json
- *
- * <p>Co-located with the conversation.json written by FileConversationRepository.
- * The directory is a {@link RecordLog}: the next sequence number comes from its
- * in-memory index under the conversation's write lock, so appending lists
- * nothing and two appends never share a number — not even after the newest
- * messages were deleted. A history page reads only its own messages, and
- * finding a message by id opens one file.
+ * Messages under {@code {base}/{namespace}/conversation-threads/{id}/messages/},
+ * one file per message named by its place and id. The record log hands out
+ * the next place under the conversation's lock, so two appends never share
+ * one, and a place is not given again — also after a restart.
  */
-public class FileMessageRepository implements MessageRepository {
-
-    private static final Logger log = LoggerFactory.getLogger(FileMessageRepository.class);
+public final class FileMessageRepository implements MessageRepository {
 
     private final RecordLog<ConversationId, Message> messages;
 
-    public FileMessageRepository(Path messageStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
+    public FileMessageRepository(Path base, ObjectMapper json, ScopeSupplier scope) {
         this.messages = RecordLog.of(Message.class)
-                .dir((ConversationId conversation) -> "conversations/" + conversation.value() + "/messages")
-                .key(Message::sequenceNum)
-                .id(m -> m.id().value())
-                .build(() -> FileRepo.open(messageStorageDir, scope.namespace().value()), objectMapper);
-        log.info("MessageRepository storage: {}", messageStorageDir.resolve("<namespace>").resolve("conversations"));
+                .dir((ConversationId conversation) ->
+                        FileConversationRepository.THREADS + "/" + conversation.value() + "/messages")
+                .key(Message::sequence)
+                .id(message -> message.id().value())
+                .build(() -> FileRepo.open(base, scope.namespace().value()), json);
     }
 
     @Override
-    public Message save(Message message) {
-        return messages.put(message.conversationId(), message);
+    public Message append(ConversationId conversation, LongFunction<Message> create) {
+        return messages.append(conversation, create);
     }
 
     @Override
@@ -62,16 +54,6 @@ public class FileMessageRepository implements MessageRepository {
     @Override
     public Optional<Message> findById(ConversationId conversation, MessageId id) {
         return messages.find(conversation, id.value());
-    }
-
-    @Override
-    public Message append(ConversationId conversation, IntFunction<Message> create) {
-        return messages.append(conversation, seq -> create.apply(Math.toIntExact(seq)));
-    }
-
-    @Override
-    public void deleteBySequenceRange(ConversationId conversation, int fromSeq, int toSeq) {
-        messages.deleteKeyRange(conversation, fromSeq, toSeq);
     }
 
     @Override

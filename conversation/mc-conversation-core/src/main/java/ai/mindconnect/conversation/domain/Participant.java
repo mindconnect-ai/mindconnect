@@ -1,14 +1,14 @@
 package ai.mindconnect.conversation.domain;
 
-import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.UserId;
-
 import java.time.Instant;
+import java.util.Map;
 
 /**
- * Someone taking part in a conversation. {@code refId} is the raw value of
- * the participant's own id — a user's {@code UserId} or an agent's
- * {@code AgentId} value, which {@link #type()} tells apart.
+ * Someone or something that takes part in a conversation.
+ *
+ * @param refId    who it is where it comes from: a user's or agent's id, a phone number, an id in Teams
+ * @param metadata what else is known about it, such as its {@code role}
+ * @param leftAt   when it left; null while it takes part
  */
 public record Participant(
         ParticipantId id,
@@ -16,17 +16,21 @@ public record Participant(
         ParticipantType type,
         String refId,
         String displayName,
-        Instant joinedAt
+        Map<String, Object> metadata,
+        Instant joinedAt,
+        Instant leftAt
 ) {
 
-    public static Participant user(ConversationId conversationId, UserId userId, String displayName) {
-        return new Participant(ParticipantId.random(), conversationId,
-                ParticipantType.USER, userId.value(), displayName, Instant.now());
+    public Participant {
+        metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
     }
 
-    public static Participant agent(ConversationId conversationId, AgentId agentId, String displayName) {
-        return new Participant(ParticipantId.random(), conversationId,
-                ParticipantType.AGENT, agentId.value(), displayName, Instant.now());
+    /** Whether it still takes part. */
+    public boolean present() {
+        return leftAt == null;
     }
 
+    public Participant leaving(Instant at) {
+        return new Participant(id, conversationId, type, refId, displayName, metadata, joinedAt, at);
+    }
 }

@@ -9,3 +9,12 @@
   `mc-message-repository-core`, `mc-message-repository` and
   `mc-message-repository-pg`), package `ai.mindconnect.conversation` (was
   `ai.mindconnect.message`). The tables and folders it writes stay as they are.
+- A conversation is a thread of participants — `PERSON`, `BOT` or `SYSTEM` —
+  and their messages: a message has its place, the participant it is `from`,
+  content parts and metadata (an agent's message carries `agent.sessionId` and
+  `agent.turnId`). `MessageType`, `ConversationType`, turns, compression, token
+  counts and durations are gone from it; `ConversationManager` opens, joins,
+  posts, receives, closes and deletes, and `ConversationChannel` is the SPI for
+  channels such as WhatsApp or Teams. Conversations are kept in
+  `mc_conversation_thread`/`mc_conversation_entry` and under
+  `conversation-threads/`; the area no longer depends on agent ids.

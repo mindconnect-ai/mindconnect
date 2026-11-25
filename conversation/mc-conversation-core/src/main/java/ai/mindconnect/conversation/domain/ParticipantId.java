@@ -1,16 +1,13 @@
 package ai.mindconnect.conversation.domain;
 
-import ai.mindconnect.agent.EntityId;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
-/**
- * Identifies one participant of a conversation. See {@link EntityId}.
- */
-public record ParticipantId(@JsonValue String value) implements EntityId {
+/** Identifies a participant within its conversation. In JSON an id is its value. */
+public record ParticipantId(@JsonValue String value) {
 
     public ParticipantId {
-        EntityId.check(value);
+        IdFormat.checked(value);
     }
 
     @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
@@ -20,7 +17,7 @@ public record ParticipantId(@JsonValue String value) implements EntityId {
 
     /** A fresh, unique id. */
     public static ParticipantId random() {
-        return new ParticipantId(EntityId.randomValue());
+        return new ParticipantId(IdFormat.random());
     }
 
     @Override

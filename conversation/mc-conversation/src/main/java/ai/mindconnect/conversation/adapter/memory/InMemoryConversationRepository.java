@@ -1,27 +1,26 @@
 package ai.mindconnect.conversation.adapter.memory;
 
-import ai.mindconnect.agent.scope.NamespaceMap;
-import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.conversation.domain.ConversationId;
-
-import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.conversation.domain.Conversation;
-import ai.mindconnect.conversation.port.out.ConversationRepository;
-
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** In-memory {@link ConversationRepository} — process-lifetime storage, no persistence. */
-public class InMemoryConversationRepository implements ConversationRepository {
+import ai.mindconnect.agent.scope.NamespaceMap;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.conversation.domain.Conversation;
+import ai.mindconnect.conversation.domain.ConversationId;
+import ai.mindconnect.conversation.port.out.ConversationRepository;
+
+/** Conversations that last as long as the process: for tests and an installation that keeps nothing. */
+public final class InMemoryConversationRepository implements ConversationRepository {
 
     private final ScopeSupplier scope;
-    private final NamespaceMap<Map<ConversationId, Conversation>> store;
+    private final NamespaceMap<Map<ConversationId, Conversation>> store = new NamespaceMap<>(ConcurrentHashMap::new);
 
     public InMemoryConversationRepository(ScopeSupplier scope) {
         this.scope = scope;
-        this.store = new NamespaceMap<>(ConcurrentHashMap::new);
     }
 
     @Override
@@ -38,7 +37,8 @@ public class InMemoryConversationRepository implements ConversationRepository {
     @Override
     public List<Conversation> findAll(PageRequest page) {
         return store.of(scope.namespace()).values().stream()
-                .skip((long) page.page() * page.size())
+                .sorted(Comparator.comparing(Conversation::createdAt).reversed())
+                .skip(page.offset())
                 .limit(page.size())
                 .toList();
     }

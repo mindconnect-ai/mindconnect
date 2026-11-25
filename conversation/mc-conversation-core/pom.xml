@@ -26,11 +26,6 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-domain</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-common</artifactId>
             <version>${project.version}</version>
         </dependency>

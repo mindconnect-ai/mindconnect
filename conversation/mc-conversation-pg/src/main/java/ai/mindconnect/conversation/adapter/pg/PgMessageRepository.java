@@ -1,87 +1,81 @@
 package ai.mindconnect.conversation.adapter.pg;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.function.LongFunction;
+import java.util.function.UnaryOperator;
+
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.jdbc.DocumentTable;
-import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.conversation.domain.ConversationId;
 import ai.mindconnect.conversation.domain.Message;
 import ai.mindconnect.conversation.domain.MessageId;
 import ai.mindconnect.conversation.port.out.MessageRepository;
-
-import javax.sql.DataSource;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.IntFunction;
-import java.util.function.UnaryOperator;
+import ai.mindconnect.jdbc.DocumentTable;
+import ai.mindconnect.jdbc.Sql;
 
 /**
- * {@link MessageRepository} on Postgres. One row of {@code mc_message} per
- * message, keyed by {@code (namespace, id)} so a re-save (the compressed flag,
- * a token count) replaces the row; the conversation id and the sequence
- * number sit beside the document because every read walks a conversation
- * in sequence order and the range delete cuts by it. Every statement matches
- * the namespace the scope names for the current call.
- *
- * <p>No foreign key to the conversation: the file store never required the
- * conversation to exist first, and callers rely on that.
+ * {@link MessageRepository} on Postgres: one row of {@code mc_conversation_entry}
+ * per message, keyed by {@code (namespace, id)}, its conversation and place
+ * beside the document. Not {@code mc_message}: there the runtime kept its
+ * sessions' messages before, and those rows stay as they were written.
  */
 public final class PgMessageRepository implements MessageRepository {
 
     /**
-     * One row per conversation holding the last number handed out. The
-     * upsert below takes that row's lock, so two appenders queue up on it
-     * and leave with different numbers; without it both would read the
-     * same highest {@code seq} and write it twice. The row seeds itself
-     * from the messages already stored, so a conversation whose messages
-     * were saved without {@link #append} carries on where it left off.
+     * One row per conversation holding the last place given. The upsert takes
+     * the row's lock, so two appends to one conversation queue up on it and
+     * leave with different places, and a place is not given again.
      */
-    private static final String SEQUENCE_TABLE = """
-            CREATE TABLE IF NOT EXISTS mc_message_seq (
-                namespace       TEXT NOT NULL,
-                conversation_id TEXT NOT NULL,
-                last_seq        INTEGER NOT NULL,
+    private static final String PLACE_TABLE = """
+            CREATE TABLE IF NOT EXISTS mc_conversation_entry_seq (
+                namespace       TEXT   NOT NULL,
+                conversation_id TEXT   NOT NULL,
+                last_seq        BIGINT NOT NULL,
                 PRIMARY KEY (namespace, conversation_id)
             )""";
 
-    private static final String NEXT_SEQUENCE = """
-            INSERT INTO mc_message_seq (namespace, conversation_id, last_seq)
-            VALUES (?, ?, (SELECT coalesce(max(seq), 0) + 1 FROM mc_message WHERE namespace = ? AND conversation_id = ?))
-            ON CONFLICT (namespace, conversation_id) DO UPDATE SET last_seq = mc_message_seq.last_seq + 1
+    private static final String NEXT_PLACE = """
+            INSERT INTO mc_conversation_entry_seq (namespace, conversation_id, last_seq) VALUES (?, ?, 1)
+            ON CONFLICT (namespace, conversation_id) DO UPDATE SET last_seq = mc_conversation_entry_seq.last_seq + 1
             RETURNING last_seq""";
 
     private final DocumentTable<Message> messages;
     private final Sql sql;
     private final ScopeSupplier scope;
 
-    public PgMessageRepository(DataSource dataSource, ScopeSupplier scope) {
-        this(Sql.of(dataSource), scope);
-    }
-
-    /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
     public PgMessageRepository(Sql sql, ScopeSupplier scope) {
         this.sql = sql;
-        this.scope = Objects.requireNonNull(scope, "scope");
+        this.scope = scope;
         this.messages = DocumentTable.of(Message.class)
-                .table("mc_message")
+                .table("mc_conversation_entry")
                 .partitionKey("namespace", "TEXT", m -> scope.namespace().value())
                 .id("id", "TEXT", m -> m.id().value())
                 .requiredColumn("conversation_id", "TEXT", m -> m.conversationId().value())
-                .requiredColumn("seq", "INTEGER", Message::sequenceNum)
+                .requiredColumn("seq", "BIGINT", Message::sequence)
                 .index("namespace", "conversation_id", "seq")
                 .build(sql);
     }
 
+    /** Creates the tables where they are missing. */
     public PgMessageRepository initSchema() {
         messages.createSchema();
-        sql.execute(SEQUENCE_TABLE);
+        sql.execute(PLACE_TABLE);
         return this;
     }
 
+    /** The place and the row in one transaction: a message is stored with its place, or not at all. */
     @Override
-    public Message save(Message message) {
-        return messages.save(message);
+    public Message append(ConversationId conversation, LongFunction<Message> create) {
+        return sql.inTransaction((Sql tx) -> {
+            long place = tx.scalar(NEXT_PLACE, Long.class, scope.namespace().value(), conversation.value());
+            Message message = create.apply(place);
+            tx.update("INSERT INTO mc_conversation_entry (namespace, id, conversation_id, seq, doc) "
+                            + "VALUES (?, ?, ?, ?, ?)",
+                    scope.namespace().value(), message.id().value(), conversation.value(), place,
+                    tx.json().jsonb(message));
+            return message;
+        });
     }
 
     /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
@@ -92,7 +86,7 @@ public final class PgMessageRepository implements MessageRepository {
 
     @Override
     public List<Message> findByConversation(ConversationId conversation, PageRequest page) {
-        return messages.find("WHERE namespace = ? AND conversation_id = ? ORDER BY seq, id LIMIT ? OFFSET ?",
+        return messages.find("WHERE namespace = ? AND conversation_id = ? ORDER BY seq LIMIT ? OFFSET ?",
                 scope.namespace().value(), conversation.value(), page.size(), page.offset());
     }
 
@@ -100,24 +94,6 @@ public final class PgMessageRepository implements MessageRepository {
     public Optional<Message> findById(ConversationId conversation, MessageId id) {
         return messages.findOne("WHERE namespace = ? AND conversation_id = ? AND id = ?",
                 scope.namespace().value(), conversation.value(), id.value());
-    }
-
-    /**
-     * The sequence number is handed out by the database in the same statement
-     * that records it, so two appends racing for the same conversation get two
-     * numbers — the file store's lock, in SQL.
-     */
-    @Override
-    public Message append(ConversationId conversation, IntFunction<Message> create) {
-        int next = sql.scalar(NEXT_SEQUENCE, Integer.class, scope.namespace().value(), conversation.value(),
-                scope.namespace().value(), conversation.value());
-        return messages.save(create.apply(next));
-    }
-
-    @Override
-    public void deleteBySequenceRange(ConversationId conversation, int fromSeq, int toSeq) {
-        messages.delete("WHERE namespace = ? AND conversation_id = ? AND seq BETWEEN ? AND ?",
-                scope.namespace().value(), conversation.value(), fromSeq, toSeq);
     }
 
     @Override
