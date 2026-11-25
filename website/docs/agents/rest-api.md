@@ -242,7 +242,9 @@ coordinates:
 Three rules make a client robust:
 
 **Remember `seq`.** It is what you hand back as `afterSeq` after a
-disconnect. Everything after it is replayed.
+disconnect. Everything after it is replayed. The numbers grow but have gaps:
+they count everything that happens in the session, and not all of it is a
+frame.
 
 **Check for a gap.** The buffer is finite. If `firstBufferedSeq` is greater
 than your `afterSeq + 1`, events were evicted before you came back — reload

@@ -1,6 +1,6 @@
 package ai.mindconnect.agentrest.stream;
 
-import ai.mindconnect.channel.Subscription;
+import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 
 /**
  * What attaching to a session's stream hands back.

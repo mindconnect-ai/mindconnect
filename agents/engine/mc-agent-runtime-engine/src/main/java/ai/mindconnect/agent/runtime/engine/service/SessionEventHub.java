@@ -94,6 +94,41 @@ public final class SessionEventHub implements SessionEventPublisher {
     }
 
     /**
+     * An event with its number on the stream of its session tree.
+     *
+     * @param submittedTurn the turn that was submitted, under which the event's own turn runs;
+     *                      {@code null} for an event of no turn
+     */
+    public record Numbered(long seq, TurnId submittedTurn, SessionEvent event) { }
+
+    /**
+     * Hears a session and every session under it from after {@code afterSeq}:
+     * what the stream still keeps is told first, then it goes on as it happens.
+     * For a caller that reconnects and names the last number it saw — the
+     * numbers are this process's own, which is why the API has none.
+     */
+    public Subscription replay(SessionId sessionId, long afterSeq, Consumer<Numbered> listener) {
+        return streamChannel(rootOf(sessionId)).subscribe(afterSeq,
+                carried -> carried instanceof Happened happened && isUnder(happened, sessionId, true),
+                asSubscriber(event -> {
+                    Happened happened = (Happened) event.value();
+                    List<TurnId> turns = happened.turns();
+                    listener.accept(new Numbered(event.seq(),
+                            turns.isEmpty() ? null : turns.get(turns.size() - 1), happened.event()));
+                }))::close;
+    }
+
+    /** The number of the newest event on the session's stream. */
+    public long lastSeq(SessionId sessionId) {
+        return streamChannel(rootOf(sessionId)).lastSeq();
+    }
+
+    /** The number of the oldest event the session's stream still keeps. */
+    public long earliestBufferedSeq(SessionId sessionId) {
+        return streamChannel(rootOf(sessionId)).earliestBufferedSeq();
+    }
+
+    /**
      * Follows one turn: the events of it and of the turns it starts, the
      * last of them its own end. A listener that comes late is told what the
      * channel still keeps of the turn; one that comes after the turn has

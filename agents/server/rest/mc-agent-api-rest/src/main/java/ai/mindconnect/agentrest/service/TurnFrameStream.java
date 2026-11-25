@@ -5,8 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import ai.mindconnect.agentrest.stream.SessionFrame;
-import ai.mindconnect.agentrest.stream.SessionFrameChannels;
+import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.stream.StreamAttachment;
 import ai.mindconnect.agentrest.stream.TurnFrame;
 import ai.mindconnect.agentrest.stream.TurnFrameTranslator;
@@ -14,14 +13,14 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
+import ai.mindconnect.agent.runtime.engine.service.SessionEventHub;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.channel.Channel;
 import org.springframework.stereotype.Service;
 
 /**
  * A turn of the runtime as the frames a client of the REST API streams: to
- * the caller that started or continued it, and from the session's buffered
- * stream to a client that reattaches.
+ * the caller that started or continued it, and from the stream the engine
+ * keeps of the session to a client that reattaches.
  */
 @Service
 public class TurnFrameStream {
@@ -39,11 +38,9 @@ public class TurnFrameStream {
     }
 
     private final AgentRuntime runtime;
-    private final SessionFrameChannels sessionFrames;
 
-    public TurnFrameStream(AgentRuntime runtime, SessionFrameChannels sessionFrames) {
+    public TurnFrameStream(AgentRuntime runtime) {
         this.runtime = runtime;
-        this.sessionFrames = sessionFrames;
     }
 
     /**
@@ -97,15 +94,23 @@ public class TurnFrameStream {
     }
 
     /**
-     * The session's stream from after {@code afterSeq} on: what was buffered
-     * since is replayed, then it goes on live, across turns.
+     * The session's stream from after {@code afterSeq} on: what the engine
+     * still keeps of it is replayed, then it goes on live, across turns. The
+     * numbers are the engine's, so a client sees them with gaps: not every
+     * event is a frame.
      */
-    public StreamAttachment attach(SessionId sessionId, long afterSeq, Consumer<Channel.Event<SessionFrame>> consumer) {
-        String id = sessionId.value();
-        long firstBuffered = sessionFrames.earliestBufferedSeq(id);
-        long latest = sessionFrames.lastSeq(id);
+    public StreamAttachment attach(SessionId sessionId, long afterSeq, Consumer<SessionStreamFrame> consumer) {
+        SessionEventHub events = runtime.service(SessionEventHub.class);
+        long firstBuffered = events.earliestBufferedSeq(sessionId);
+        long latest = events.lastSeq(sessionId);
         String liveTurnId = runtime.turns().runningTurn(sessionId).map(turn -> turn.id().value()).orElse(null);
-        return new StreamAttachment(sessionFrames.subscribe(id, afterSeq, consumer), liveTurnId, firstBuffered,
-                latest);
+        Subscription attached = events.replay(sessionId, afterSeq, numbered -> {
+            TurnId turnId = numbered.submittedTurn();
+            if (turnId != null) {
+                new TurnFrameTranslator(turnId).frame(numbered.event()).ifPresent(frame ->
+                        consumer.accept(new SessionStreamFrame(numbered.seq(), turnId.value(), 1, frame)));
+            }
+        });
+        return new StreamAttachment(attached, liveTurnId, firstBuffered, latest);
     }
 }

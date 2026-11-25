@@ -59,6 +59,7 @@ import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.store.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.service.EnginePlugin;
+import ai.mindconnect.agent.runtime.engine.service.SessionEventHub;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -345,6 +346,31 @@ class EngineWithCapabilitiesTest {
                 .satisfies(event -> assertThat(event.as(StreamEvent.DONE).orElseThrow())
                         .isEqualTo(new StreamEvent.Done(TurnStatus.COMPLETED, "Hello.", null)));
         assertThat(heard.get(heard.size() - 1).kind()).isEqualTo("done");
+    }
+
+    @Test
+    void whoever_reconnects_is_replayed_the_stream_after_the_number_it_names() throws InterruptedException {
+        model.script.add(call("c1", "run_agent", Map.of("name", "researcher", "message", "Find the capital of France.")));
+        model.script.add(TurnMessage.assistant("Paris."));
+        model.script.add(TurnMessage.assistant("The capital is Paris."));
+        TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Capital of France?"));
+        awaitRest(turnId);
+        SessionEventHub events = registry.get(SessionEventHub.class);
+        List<SessionEventHub.Numbered> all = new CopyOnWriteArrayList<>();
+        List<SessionEventHub.Numbered> rest = new CopyOnWriteArrayList<>();
+
+        events.replay(session.id(), 0, all::add);
+        Thread.sleep(50);
+        long seen = all.get(2).seq();
+        events.replay(session.id(), seen, rest::add);
+        Thread.sleep(50);
+
+        assertThat(all.get(all.size() - 1).seq()).isEqualTo(events.lastSeq(session.id()));
+        assertThat(all).extracting(SessionEventHub.Numbered::seq).isSorted();
+        assertThat(rest).containsExactlyElementsOf(all.subList(3, all.size()));
+        // What a sub-agent says is on the stream too, under the turn that was submitted.
+        assertThat(all).filteredOn(numbered -> numbered.event().ofSubAgent()).isNotEmpty()
+                .extracting(SessionEventHub.Numbered::submittedTurn).containsOnly(turnId);
     }
 
     @Test

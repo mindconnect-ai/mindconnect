@@ -24,3 +24,7 @@
   `lifecycleOfAll`, `TurnListener` with `onFinished`, `SessionLifecycleListener`,
   `SessionStreamListener`, and the agent loop's `TurnEvent` as what a listener is told.
   `TurnService.subscribe` takes a `SessionEventListener`; a turn's end is its own `done` or `error`.
+- **Agents — the session stream of the REST API is the engine's.** `GET /api/sessions/{id}/stream`
+  replays what the engine keeps of the session instead of a buffer of its own. The frames are the
+  same; their `seq` grows with gaps, because it counts every event of the session and not only the
+  ones a client is sent.

@@ -26,7 +26,6 @@ import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.dto.CreateAgentRequest;
 import ai.mindconnect.agentrest.dto.StartSessionRequest;
 import ai.mindconnect.agentrest.dto.AttachedFrame;
-import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agentrest.dto.IncompleteFrame;
 import ai.mindconnect.agentrest.stream.TurnFrame;
@@ -564,12 +563,10 @@ public class AgentApiController {
         // The replay runs on the channel's drain thread and could outrun the
         // attached frame below — the latch holds event frames until it is out.
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        var attachment = frameStream.attach(id, afterSeq, event -> {
+        var attachment = frameStream.attach(id, afterSeq, frame -> {
             try {
                 attachedSent.await();
-                emitter.send(SseEmitter.event().data(
-                        compactMapper.writeValueAsString(new SessionStreamFrame(
-                                event.seq(), event.value().turnId(), 1, event.value().frame())),
+                emitter.send(SseEmitter.event().data(compactMapper.writeValueAsString(frame),
                         MediaType.APPLICATION_JSON));
             } catch (Exception e) {
                 emitter.completeWithError(e);
