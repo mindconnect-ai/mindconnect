@@ -25,8 +25,9 @@ public class SnapshotSerializer {
 
     private final ObjectMapper mapper;
 
-    public SnapshotSerializer() {
-        this.mapper = JsonMapperFactory.create();
+    /** @param json the host's mapper factory, so a snapshot's JSON knows the host's modules */
+    public SnapshotSerializer(JsonMapperFactory json) {
+        this.mapper = json.create();
         this.mapper.enable(SerializationFeature.INDENT_OUTPUT);
     }
 

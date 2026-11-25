@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.loop.domain.LlmAnswer;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.Usage;
@@ -28,6 +29,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
 import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +50,7 @@ class LocalCliTest {
 
     @BeforeEach
     void start() {
-        runtime = new LocalRuntime(home).builder()
+        runtime = new LocalRuntime(home, new JsonMapperFactory(List.of(new IdJsonModule()))).builder()
                 .model(new ModelGateway() {
                     @Override
                     public synchronized LlmAnswer ask(ModelRequest request, TurnEventListener events) {
@@ -122,7 +124,7 @@ class LocalCliTest {
     }
 
     private void converse(String agent, String typed) {
-        Session session = runtime.sessions().open(new LocalRuntime(home).sessionIn(project, UserId.of("ada"), agent));
+        Session session = runtime.sessions().open(new LocalRuntime(home, new JsonMapperFactory(List.of(new IdJsonModule()))).sessionIn(project, UserId.of("ada"), agent));
         new LocalCli(runtime, session, new BufferedReader(new StringReader(typed)),
                 new PrintStream(printed, true, StandardCharsets.UTF_8)).converse();
     }

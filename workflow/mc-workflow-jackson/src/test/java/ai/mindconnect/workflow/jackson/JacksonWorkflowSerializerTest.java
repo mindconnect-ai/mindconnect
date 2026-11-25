@@ -1,5 +1,7 @@
 package ai.mindconnect.workflow.jackson;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 import ai.mindconnect.workflow.domain.AssignVariablesData;
 import ai.mindconnect.workflow.domain.VariableAssignment;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -16,7 +18,7 @@ import java.nio.file.Path;
  */
 public class JacksonWorkflowSerializerTest {
 
-    private final ObjectMapper mapper = WorkflowObjectMapperFactory.create();
+    private final ObjectMapper mapper = WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of()));
     private final JacksonWorkflowSerializer serializer = new JacksonWorkflowSerializer(mapper);
 
     // -----------------------------------------------------------------------

@@ -28,7 +28,7 @@ public class WebScraperMain {
         options.setRemoveHtml(true);
         options.setSaveToDirectory("/Users/dbe/Insync/deep_tc/gdrive/Business/Coderepo/mindconnect/mc-java/core/mc-webscraper/src/main/resources/export");
 
-        JsoupWebScraper scraper = new JsoupWebScraper();
+        JsoupWebScraper scraper = new JsoupWebScraper(new JsonMapperFactory(List.of()));
         var results = scraper.scrape(List.of(options));
 
 //        ObjectMapper mapper = JsonMapperFactory.create().enable(SerializationFeature.INDENT_OUTPUT);

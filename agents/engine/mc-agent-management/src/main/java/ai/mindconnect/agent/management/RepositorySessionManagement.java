@@ -52,11 +52,18 @@ public final class RepositorySessionManagement implements SessionManagement {
     private final SessionDirectoryPolicy directoryPolicy;
     private final List<SessionCleanup> cleanups;
     private final SessionLifecycle lifecycle;
+    private final RepositorySessionStore store;
 
-    /** @param lifecycle where a session's status is read from and its users are told what changes */
+    /**
+     * @param lifecycle where a session's status is read from and its users are told what changes
+     * @param store     the runtime's store on the same two repositories: a stored message is read
+     *                  as the turn message it was written from the way the runtime reads it
+     */
     public RepositorySessionManagement(SessionRepository sessions, MessageRepository messages,
                                        AgentRepository agents, SessionDirectoryPolicy directoryPolicy,
-                                       List<SessionCleanup> cleanups, SessionLifecycle lifecycle) {
+                                       List<SessionCleanup> cleanups, SessionLifecycle lifecycle,
+                                       RepositorySessionStore store) {
+        this.store = store;
         this.cleanups = List.copyOf(cleanups);
         this.lifecycle = lifecycle;
         this.sessions = sessions;
@@ -262,7 +269,7 @@ public final class RepositorySessionManagement implements SessionManagement {
     public List<ManagedMessage> messages(SessionId sessionId) {
         return messages.findByConversation(RepositorySessionStore.conversationOf(existing(sessionId)), EVERYTHING)
                 .stream()
-                .flatMap(stored -> RepositorySessionStore.turnMessageOf(stored).stream()
+                .flatMap(stored -> store.turnMessageOf(stored).stream()
                         .map(message -> new ManagedMessage(stored.id().value(), stored.sequenceNum(),
                                 stored.sentAt(), message, stored.durationMs(), stored.tokenCount())))
                 .toList();

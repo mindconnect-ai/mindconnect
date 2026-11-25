@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.admin.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpCatalogEntry;
 import ai.mindconnect.mcp.gateway.McpGateway;
@@ -42,11 +43,14 @@ public class McpGatewayUiController {
     private final McpGateway gateway;
     /** Null when this installation offers no catalog to browse. */
     private final McpCatalog catalog;
+    private final McpTargetForm targets;
 
-    public McpGatewayUiController(McpRegistryAdmin admin, McpGateway gateway, McpCatalog catalog) {
+    public McpGatewayUiController(McpRegistryAdmin admin, McpGateway gateway, McpCatalog catalog,
+                                  JsonMapperFactory json) {
         this.admin = admin;
         this.gateway = gateway;
         this.catalog = catalog;
+        this.targets = new McpTargetForm(json);
     }
 
     @GetMapping
@@ -91,9 +95,9 @@ public class McpGatewayUiController {
         McpCatalogEntry entry = found.get();
         McpServerDraft draft = new McpServerDraft(entry.id(), entry.title(), entry.description(),
                 true, ToolNamePrefixes.suggest(entry.id(), entry.toolNames()),
-                McpTargetForm.toJson(entry.target()));
+                targets.toJson(entry.target()));
         return UiPage.of(McpServerListView.BASE + "/new",
-                new McpServerFormView(draft, true, null, null, entry).render());
+                new McpServerFormView(draft, true, null, null, entry, targets).render());
     }
 
     private UiPage catalogPage(String query) {
@@ -106,15 +110,15 @@ public class McpGatewayUiController {
     @GetMapping({"/api/new", "/new"})
     public UiPage newServer() {
         return UiPage.of(McpServerListView.BASE + "/new",
-                new McpServerFormView(McpServerDraft.empty(), true, null, null, null).render());
+                new McpServerFormView(McpServerDraft.empty(targets), true, null, null, null, targets).render());
     }
 
     @GetMapping("/{id}")
     public UiPage edit(@PathVariable String id) {
         return serverIdOf(id).flatMap(admin::findById)
                 .map(registration -> UiPage.of(McpServerListView.BASE + "/" + id,
-                        new McpServerFormView(McpServerDraft.of(registration), false, null, null, null,
-                                admin.discovery(registration.id())).render()))
+                        new McpServerFormView(McpServerDraft.of(registration, targets), false, null, null, null,
+                                admin.discovery(registration.id()), targets).render()))
                 .orElseGet(this::list);
     }
 
@@ -180,7 +184,7 @@ public class McpGatewayUiController {
             McpServerDraft draft = form.draft();
             boolean isNew = form.isNew();
             return UiPage.of(McpServerListView.BASE + (isNew ? "/new" : "/" + draft.id()),
-                    new McpServerFormView(draft, isNew, null, e.getMessage(), null).render());
+                    new McpServerFormView(draft, isNew, null, e.getMessage(), null, targets).render());
         }
     }
 
@@ -277,7 +281,7 @@ public class McpGatewayUiController {
             if (prefix.isBlank()) {
                 throw new IllegalArgumentException("Tool name prefix is required.");
             }
-            McpTarget target = McpTargetForm.fromJson(str("target"));
+            McpTarget target = targets.fromJson(str("target"));
             return new McpServerRegistration(McpServerId.of(id), str("displayName"),
                     nullIfBlank(str("description")), bool("enabled"), prefix, target, null);
         }
@@ -286,7 +290,7 @@ public class McpGatewayUiController {
         UiPatch patch(McpProbeResult probe, String error) {
             McpServerDraft draft = draft();
             return UiPatch.of().patch(UiPatch.Operation.replace(McpServerFormView.STACK_ID,
-                    new McpServerFormView(draft, isNew(), probe, error, null).render()));
+                    new McpServerFormView(draft, isNew(), probe, error, null, targets).render()));
         }
 
         String str(String key) {

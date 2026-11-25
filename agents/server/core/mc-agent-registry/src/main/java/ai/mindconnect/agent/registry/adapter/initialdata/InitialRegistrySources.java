@@ -34,9 +34,6 @@ public class InitialRegistrySources {
     /** Where applications put their registries. */
     public static final String LOCATION = "classpath*:initial-data/registries/*.json";
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-
     private InitialRegistrySources() {
     }
 
@@ -46,17 +43,20 @@ public class InitialRegistrySources {
      *
      * @return the ids that were newly installed
      */
-    public static List<String> install(RegistrySourceRepository repository, String locationPattern) {
+    public static List<String> install(RegistrySourceRepository repository, String locationPattern,
+                                       JsonMapperFactory json) {
+        ObjectMapper mapper = json.create()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         return new ImportInitialDataInstaller(
                 id -> repository.findById(RegistrySourceId.of(id)).isPresent(),
                 (id, resource) -> {
-                    JsonNode tree = MAPPER.readTree(resource.getInputStream());
+                    JsonNode tree = mapper.readTree(resource.getInputStream());
                     if (!(tree instanceof ObjectNode object)) {
                         throw new IllegalArgumentException("A registry file has to be a JSON object");
                     }
                     object.put("id", id);
                     object.remove("version");
-                    repository.save(MAPPER.treeToValue(object, RegistrySource.class));
+                    repository.save(mapper.treeToValue(object, RegistrySource.class));
                 })
                 .install(locationPattern);
     }

@@ -1,6 +1,8 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.ApiToken;
 import ai.mindconnect.user.domain.ApiTokenId;
 import org.junit.jupiter.api.Test;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +27,7 @@ class FileApiTokenRepositoryTest {
 
     @Test
     void aTokenIsFoundByIdHashAndOwner() {
-        var repo = new FileApiTokenRepository(dir);
+        var repo = new FileApiTokenRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         ApiToken alices = token("alice", "hash-a");
         ApiToken bobs = token("bob", "hash-b");
         repo.save(alices);
@@ -39,7 +42,7 @@ class FileApiTokenRepositoryTest {
 
     @Test
     void recordingAUseUpdatesATokenButNeverBringsARevokedOneBack() {
-        var repo = new FileApiTokenRepository(dir);
+        var repo = new FileApiTokenRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         ApiToken alices = token("alice", "hash-a");
         repo.save(alices);
 

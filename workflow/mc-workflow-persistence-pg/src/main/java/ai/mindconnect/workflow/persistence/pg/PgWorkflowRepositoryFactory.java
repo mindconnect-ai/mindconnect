@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.pg;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
@@ -27,9 +28,10 @@ public class PgWorkflowRepositoryFactory implements WorkflowRepositoryFactory {
     private final Sql sql;
     private final Supplier<String> partition;
     private final Path importFrom;
+    private final JsonMapperFactory json;
 
-    public PgWorkflowRepositoryFactory(Sql sql, Supplier<String> partition) {
-        this(sql, partition, null);
+    public PgWorkflowRepositoryFactory(Sql sql, Supplier<String> partition, JsonMapperFactory json) {
+        this(sql, partition, null, json);
     }
 
     /**
@@ -37,18 +39,20 @@ public class PgWorkflowRepositoryFactory implements WorkflowRepositoryFactory {
      *                   {@code <partition>/workflows} is imported for each
      *                   partition found there that the tables have nothing for
      *                   yet; null for none
+     * @param json       the host's mapper factory, which both stores write their JSON with
      */
-    public PgWorkflowRepositoryFactory(Sql sql, Supplier<String> partition, Path importFrom) {
+    public PgWorkflowRepositoryFactory(Sql sql, Supplier<String> partition, Path importFrom, JsonMapperFactory json) {
         this.sql = sql;
         this.partition = partition;
         this.importFrom = importFrom;
+        this.json = json;
     }
 
     @Override
     public WorkflowDataRepository workflowDataRepository() {
-        PgWorkflowDataRepository store = new PgWorkflowDataRepository(sql, partition).initSchema();
+        PgWorkflowDataRepository store = new PgWorkflowDataRepository(sql, partition, json).initSchema();
         for (String found : partitionsToImport()) {
-            new PgWorkflowDataRepository(sql, () -> found)
+            new PgWorkflowDataRepository(sql, () -> found, json)
                     .importFiles(FileWorkflowDataRepository.directory(importFrom, found));
         }
         return store;
@@ -56,9 +60,9 @@ public class PgWorkflowRepositoryFactory implements WorkflowRepositoryFactory {
 
     @Override
     public WorkflowInstanceRepository workflowInstanceRepository() {
-        PgWorkflowInstanceRepository store = new PgWorkflowInstanceRepository(sql, partition).initSchema();
+        PgWorkflowInstanceRepository store = new PgWorkflowInstanceRepository(sql, partition, json).initSchema();
         for (String found : partitionsToImport()) {
-            new PgWorkflowInstanceRepository(sql, () -> found)
+            new PgWorkflowInstanceRepository(sql, () -> found, json)
                     .importFiles(FileWorkflowInstanceRepository.directory(importFrom, found));
         }
         return store;

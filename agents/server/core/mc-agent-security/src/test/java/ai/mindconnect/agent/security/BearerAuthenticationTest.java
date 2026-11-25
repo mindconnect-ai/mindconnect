@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.security;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.adapter.memory.InMemoryApiTokenRepository;
 import ai.mindconnect.user.adapter.memory.InMemoryUserRepository;
 import ai.mindconnect.user.domain.User;
@@ -114,7 +115,7 @@ class BearerAuthenticationTest {
             decodes[0]++;
             throw new IllegalStateException("the JWT decoder must not see this token");
         };
-        var api = new ApiAuthentication(tokens, recorder, failing);
+        var api = new ApiAuthentication(tokens, recorder, failing, new JsonMapperFactory(List.of()));
 
         assertThatThrownBy(() -> api.authenticationManager()
                 .authenticate(new BearerTokenAuthenticationToken("mct_forged")))
@@ -125,7 +126,7 @@ class BearerAuthenticationTest {
     @Test
     void anUnreachableIssuerRejectsTheJwtInsteadOfFailingTheRequest() {
         JwtDecoder decoder = ApiAuthentication.jwtDecoder("http://127.0.0.1:1/realms/nowhere", List.of());
-        var api = new ApiAuthentication(tokens, recorder, decoder);
+        var api = new ApiAuthentication(tokens, recorder, decoder, new JsonMapperFactory(List.of()));
 
         assertThatThrownBy(() -> api.authenticationManager()
                 .authenticate(new BearerTokenAuthenticationToken("eyJhbGciOiJSUzI1NiJ9.e30.sig")))

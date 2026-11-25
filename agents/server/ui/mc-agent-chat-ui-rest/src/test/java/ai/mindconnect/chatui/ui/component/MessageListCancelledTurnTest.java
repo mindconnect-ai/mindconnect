@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,7 +34,7 @@ class MessageListCancelledTurnTest {
         ManagedMessage answer = stored(5, TurnMessage.assistant("The command was cancelled."));
 
         String page = JSON.writeValueAsString(new MessageListComponent(
-                new SessionId("s-1"), AGENT, List.of(question, call, stub, followUp, answer), null).render());
+                new SessionId("s-1"), AGENT, List.of(question, call, stub, followUp, answer), null, new JsonMapperFactory(List.of()).create()).render());
 
         String cardId = "task-hist-" + stub.id();
         assertThat(page).contains(cardId);

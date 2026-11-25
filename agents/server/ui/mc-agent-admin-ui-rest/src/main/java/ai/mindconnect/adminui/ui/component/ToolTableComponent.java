@@ -25,18 +25,18 @@ import java.util.Map;
  */
 public final class ToolTableComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
-
     private final ManagedAgent agent;
     private final AgentToolId selectedToolId;
+    private final ObjectMapper mapper;
 
-    public ToolTableComponent(ManagedAgent agent) {
-        this(agent, null);
+    public ToolTableComponent(ManagedAgent agent, JsonMapperFactory json) {
+        this(agent, null, json);
     }
 
-    public ToolTableComponent(ManagedAgent agent, AgentToolId selectedToolId) {
+    public ToolTableComponent(ManagedAgent agent, AgentToolId selectedToolId, JsonMapperFactory json) {
         this.agent = agent;
         this.selectedToolId = selectedToolId;
+        this.mapper = json.create();
     }
 
     @Override
@@ -78,9 +78,9 @@ public final class ToolTableComponent implements UiComponent {
         return table;
     }
 
-    private static String overridesSummary(AgentTool t) {
+    private String overridesSummary(AgentTool t) {
         if (t.overrides() == null || t.overrides().isEmpty()) return "";
-        try { return MAPPER.writeValueAsString(t.overrides()); }
+        try { return mapper.writeValueAsString(t.overrides()); }
         catch (JsonProcessingException e) { return "…"; }
     }
 }

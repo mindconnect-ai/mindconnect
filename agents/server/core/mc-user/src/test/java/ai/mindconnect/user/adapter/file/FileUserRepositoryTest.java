@@ -1,6 +1,8 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,7 +26,7 @@ class FileUserRepositoryTest {
 
     @Test
     void aUserSurvivesTheRoundTripInTheSystemDirectory() {
-        var repo = new FileUserRepository(dir);
+        var repo = new FileUserRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         User alice = user("alice");
         repo.save(alice);
 
@@ -34,7 +37,7 @@ class FileUserRepositoryTest {
 
     @Test
     void theUsersVariablesSurviveTheRoundTrip_andAnOldRecordWithoutThemReadsAsEmpty() throws Exception {
-        var repo = new FileUserRepository(dir);
+        var repo = new FileUserRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         User alice = user("alice").withEnvironment(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
         repo.save(alice);
 
@@ -47,7 +50,7 @@ class FileUserRepositoryTest {
 
     @Test
     void theTimeZoneSurvivesTheRoundTrip_andAnOldRecordWithoutOneReadsAsNone() throws Exception {
-        var repo = new FileUserRepository(dir);
+        var repo = new FileUserRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         User alice = user("alice").withTimeZone("Europe/Zurich");
         repo.save(alice);
 
@@ -62,7 +65,7 @@ class FileUserRepositoryTest {
 
     @Test
     void idsThatAreNoFileNamesAndDifferOnlyInCaseStayApart() {
-        var repo = new FileUserRepository(dir);
+        var repo = new FileUserRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         repo.save(user("Alice"));
         repo.save(user("alice"));
         repo.save(user("alice.smith@example.com"));
@@ -77,7 +80,7 @@ class FileUserRepositoryTest {
 
     @Test
     void anUnreadableFileIsSkipped() throws Exception {
-        var repo = new FileUserRepository(dir);
+        var repo = new FileUserRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         repo.save(user("alice"));
         Files.writeString(dir.resolve("system/users/broken-000000000000.json"), "{not json");
 

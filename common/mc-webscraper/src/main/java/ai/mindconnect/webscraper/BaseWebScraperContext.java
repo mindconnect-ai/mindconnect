@@ -53,9 +53,9 @@ public class BaseWebScraperContext {
     private Set<String> visitedUrls = new LinkedHashSet<>();
     @JsonIgnore
     private SaveFunction saveFunction = null;
-    public BaseWebScraperContext(BaseWebScraperOptions options) {
+    public BaseWebScraperContext(BaseWebScraperOptions options, JsonMapperFactory json) {
         this.options = options;
-        this.objectMapper = JsonMapperFactory.create()
+        this.objectMapper = json.create()
                 .enable(SerializationFeature.INDENT_OUTPUT)
                 .registerModule(new JavaTimeModule());
         this.saveFunction = new DefaultSaveFunction(this.objectMapper);

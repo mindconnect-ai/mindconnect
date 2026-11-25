@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.admin.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
 import ai.mindconnect.mcp.gateway.McpTarget;
@@ -17,7 +18,7 @@ class McpServerDraftTest {
         McpServerDraft draft = McpServerDraft.of(new McpServerRegistration(
                 McpServerId.of("gmail"), "Gmail", "mail", true, "gmail",
                 new McpTarget.Docker("mcp/gmail:latest", List.of(), Map.of(), List.of(), List.of()),
-                null));
+                null), new McpTargetForm(new JsonMapperFactory(List.of())));
 
         assertThat(draft.id()).isEqualTo("gmail");
         assertThat(draft.displayName()).isEqualTo("Gmail");

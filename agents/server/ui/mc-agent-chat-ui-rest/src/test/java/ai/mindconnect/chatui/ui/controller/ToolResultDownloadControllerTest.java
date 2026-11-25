@@ -1,5 +1,7 @@
 package ai.mindconnect.chatui.ui.controller;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
@@ -53,11 +55,11 @@ class ToolResultDownloadControllerTest {
     void setUp() {
         var stored = new InMemorySessionRepository(ScopeSupplier.fixed(new Namespace("test")));
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
+        var store = new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule())));
         SessionManagement management = new RepositorySessionManagement(stored, messages,
                 new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
                 List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()));
-        var store = new RepositorySessionStore(stored, messages);
+                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()), store);
         store.create(new Session(ALICES, UserId.of("alice"), null,
                 new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5, Map.of()),
                 Map.of(), Instant.parse("2026-11-01T00:00:00Z")));

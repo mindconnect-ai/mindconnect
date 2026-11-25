@@ -2,7 +2,6 @@ package ai.mindconnect.workflow.admin.run;
 
 import ai.mindconnect.workflow.execution.StepExecutionInfo;
 import ai.mindconnect.workflow.execution.StepInstance;
-import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
@@ -25,12 +24,14 @@ public final class RunInstanceJson {
     /** Long values (an {@code env} map, a fat HTTP body) are cut for display. */
     private static final int MAX_VALUE_CHARS = 2_000;
 
-    private static final ObjectMapper MAPPER = WorkflowObjectMapperFactory.create();
-
     private RunInstanceJson() {}
 
-    /** The instance's own state, as pretty JSON. Never throws. */
-    public static String of(StepInstance<?> instance, Exception error) {
+    /**
+     * The instance's own state, as pretty JSON. Never throws.
+     *
+     * @param json the workflow store's mapper, so the definition reads as it sits on disk
+     */
+    public static String of(StepInstance<?> instance, Exception error, ObjectMapper json) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("class", instance.getClass().getName());
         out.put("type", instance.getConfig() == null ? null : instance.getConfig().getType());
@@ -58,7 +59,7 @@ public final class RunInstanceJson {
         out.put("config", instance.getConfig());
 
         try {
-            return MAPPER.writeValueAsString(out);
+            return json.writeValueAsString(out);
         } catch (Exception ex) {
             return "{ \"error\": \"Cannot render step instance: " + ex.getMessage() + "\" }";
         }

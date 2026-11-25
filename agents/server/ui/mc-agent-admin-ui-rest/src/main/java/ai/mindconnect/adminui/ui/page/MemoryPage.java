@@ -10,6 +10,7 @@ import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiSection;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Working-memory inspector page. Master-detail layout:
@@ -32,12 +33,14 @@ public final class MemoryPage extends AdminPage {
     private final String agentName;
     private final WorkingMemory memory;
     private final MemoryMasterListComponent master;
+    private final ObjectMapper json;
 
     /** @param agentName the agent the session runs as */
-    public MemoryPage(SessionId sessionId, String agentName, WorkingMemory memory) {
+    public MemoryPage(SessionId sessionId, String agentName, WorkingMemory memory, ObjectMapper json) {
         this.sessionId = sessionId;
         this.agentName = agentName;
         this.memory = memory;
+        this.json = json;
         this.master = new MemoryMasterListComponent(sessionId, memory);
     }
 
@@ -47,7 +50,7 @@ public final class MemoryPage extends AdminPage {
 
         UiList masterUi = master.render();
         var detail = new MemoryDetailSectionComponent(
-                memory, MemoryMasterListComponent.SYS_PROMPT_SEQ).render();
+                memory, MemoryMasterListComponent.SYS_PROMPT_SEQ, json).render();
 
         // CSS class on the wrapper targets a two-column grid layout in
         // index.html so master + detail sit side by side.
@@ -78,7 +81,7 @@ public final class MemoryPage extends AdminPage {
      * MemoryMasterListComponent#SYS_PROMPT_SEQ} renders the system prompt.
      */
     public UiPatch selectEntry(int seq) {
-        var detail = new MemoryDetailSectionComponent(memory, seq);
+        var detail = new MemoryDetailSectionComponent(memory, seq, json);
         return patch(UiPatch.Operation.replace(MemoryDetailSectionComponent.DETAIL_ID, detail.render()));
     }
 

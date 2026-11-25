@@ -7,6 +7,7 @@ import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.agent.registry.service.RegistryService;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class RegistryAutoConfigurationTest {
                 .withInitializer(context -> context.getBeanFactory()
                         .setConversionService(ApplicationConversionService.getSharedInstance()))
                 .withConfiguration(AutoConfigurations.of(RegistryAutoConfiguration.class))
+                .withBean(JsonMapperFactory.class, () -> new JsonMapperFactory(List.of()))
                 .withPropertyValues("mindconnect.data.base-dir=" + dir);
     }
 

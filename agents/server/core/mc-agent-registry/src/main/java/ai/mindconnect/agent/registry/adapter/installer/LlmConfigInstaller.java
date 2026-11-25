@@ -44,9 +44,9 @@ public class LlmConfigInstaller implements RegistryInstaller {
     private final LlmConfigRepository repository;
     private final ObjectMapper objectMapper;
 
-    public LlmConfigInstaller(LlmConfigRepository repository) {
+    public LlmConfigInstaller(LlmConfigRepository repository, JsonMapperFactory json) {
         this.repository = repository;
-        this.objectMapper = JsonMapperFactory.create()
+        this.objectMapper = json.create()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 

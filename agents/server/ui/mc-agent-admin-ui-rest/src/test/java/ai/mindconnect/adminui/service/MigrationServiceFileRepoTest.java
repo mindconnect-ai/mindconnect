@@ -6,6 +6,7 @@ import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -49,7 +51,7 @@ class MigrationServiceFileRepoTest {
         repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, json, ScopeSupplier.fixed(new Namespace("test"))), ENCRYPTION);
         service = new MigrationService(repo,
                 new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test")))), new InMemorySkillRepository(ScopeSupplier.local()), new InMemoryWorkflowDataRepository(),
-                json, encryption);
+                json, encryption, new JsonMapperFactory(List.of()));
     }
 
     private static LlmConfig stored(String model, String apiKey) {

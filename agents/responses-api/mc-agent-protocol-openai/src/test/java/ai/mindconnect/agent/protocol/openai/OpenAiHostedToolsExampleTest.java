@@ -9,6 +9,7 @@ import ai.mindconnect.agent.protocol.item.ContentPart;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.protocol.item.Role;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
@@ -41,7 +42,7 @@ class OpenAiHostedToolsExampleTest {
     }
 
     private final OpenAiResponsesBackend backend =
-            new OpenAiResponsesBackend(TestOpenAi.apiKey());
+            new OpenAiResponsesBackend(TestOpenAi.apiKey(), new JsonMapperFactory(List.of()));
 
     // ── 1. Hosted web search ────────────────────────────────────────────────
 

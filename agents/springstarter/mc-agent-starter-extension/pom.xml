@@ -23,6 +23,12 @@
     </description>
 
     <dependencies>
+        <!-- AgentRuntime: the extensions live in the runtime, the beans here hand them out -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-sdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-scope</artifactId>

@@ -30,28 +30,31 @@ public class CliRunner implements CommandLineRunner {
 
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
-    private static final com.fasterxml.jackson.databind.ObjectMapper PRETTY_MAPPER =
-            JsonMapperFactory.create()
-                    .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-                    .enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT)
-                    .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private final LocalClientFactory localFactory;
     private final RemoteClientFactory remoteFactory;
     private final InitialDataLoader initialDataLoader;
     private final CliStateStore stateStore;
     private final String userId;
+    private final com.fasterxml.jackson.databind.ObjectMapper prettyMapper;
+    private final com.fasterxml.jackson.databind.ObjectMapper plainMapper;
 
     public CliRunner(LocalClientFactory localFactory,
                      RemoteClientFactory remoteFactory,
                      InitialDataLoader initialDataLoader,
                      CliStateStore stateStore,
-                     @Value("${mindconnect.user.id:${user.name}}") String userId) {
+                     @Value("${mindconnect.user.id:${user.name}}") String userId,
+                     JsonMapperFactory json) {
         this.localFactory = localFactory;
         this.remoteFactory = remoteFactory;
         this.initialDataLoader = initialDataLoader;
         this.stateStore = stateStore;
         this.userId = userId;
+        this.prettyMapper = json.create()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT)
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        this.plainMapper = json.create();
     }
 
     @Override
@@ -1022,7 +1025,7 @@ public class CliRunner implements CommandLineRunner {
         record Entry(int seq, ai.mindconnect.message.domain.MessageId resultMessageId, String time, String toolName,
                      java.util.Map<String, Object> arguments, String result, Long durationMs) {}
         java.util.List<Entry> entries = new java.util.ArrayList<>();
-        com.fasterxml.jackson.databind.ObjectMapper mapper = JsonMapperFactory.create();
+        com.fasterxml.jackson.databind.ObjectMapper mapper = plainMapper;
         for (ai.mindconnect.message.domain.Message m : history) {
             if (m.type() != ai.mindconnect.message.domain.MessageType.TOOL_CALL) continue;
             try {
@@ -1205,7 +1208,7 @@ public class CliRunner implements CommandLineRunner {
             case TOOL_CALL: {
                 try {
                     com.fasterxml.jackson.databind.JsonNode node =
-                            JsonMapperFactory.create().readTree(content);
+                            plainMapper.readTree(content);
                     com.fasterxml.jackson.databind.JsonNode calls = node.get("toolCalls");
                     if (calls != null && calls.isArray() && calls.size() > 0) {
                         StringBuilder sb = new StringBuilder("→ ");
@@ -1247,10 +1250,10 @@ public class CliRunner implements CommandLineRunner {
      * or {@code null} on parse error / missing field. Cheap one-shot extraction
      * using Jackson — we don't need a typed POJO for these one-off lookups.
      */
-    private static String extractJsonField(String json, String field) {
+    private String extractJsonField(String json, String field) {
         try {
             com.fasterxml.jackson.databind.JsonNode node =
-                    JsonMapperFactory.create().readTree(json);
+                    plainMapper.readTree(json);
             com.fasterxml.jackson.databind.JsonNode v = node.get(field);
             return v != null && !v.isNull() ? v.asText() : null;
         } catch (Exception e) {
@@ -1362,7 +1365,7 @@ public class CliRunner implements CommandLineRunner {
             if (msg.metadata() != null && !msg.metadata().isEmpty()) {
                 meta.put("metadata", msg.metadata());
             }
-            System.out.println(PRETTY_MAPPER.writeValueAsString(meta));
+            System.out.println(prettyMapper.writeValueAsString(meta));
 
             // Content — printed raw so \n renders as real newlines.
             // If it parses as JSON, pretty-print the JSON; otherwise print the string as-is.
@@ -1393,18 +1396,18 @@ public class CliRunner implements CommandLineRunner {
     @SuppressWarnings("unchecked")
     private void printFieldValue(String value) {
         try {
-            Object parsed = PRETTY_MAPPER.readValue(value, Object.class);
+            Object parsed = prettyMapper.readValue(value, Object.class);
             if (parsed instanceof java.util.Map<?, ?> map && map.containsKey("result")) {
                 // TOOL_RESULT envelope — print without the result field, then result separately
                 java.util.Map<String, Object> envelope = new java.util.LinkedHashMap<>((java.util.Map<String, Object>) map);
                 String result = (String) envelope.remove("result");
                 if (!envelope.isEmpty()) {
-                    System.out.println(PRETTY_MAPPER.writeValueAsString(envelope));
+                    System.out.println(prettyMapper.writeValueAsString(envelope));
                 }
                 System.out.println("\n── result ──");
                 System.out.println(result != null ? result : "(null)");
             } else {
-                System.out.println(PRETTY_MAPPER.writeValueAsString(parsed));
+                System.out.println(prettyMapper.writeValueAsString(parsed));
             }
         } catch (Exception ignored) {
             // Plain string — print as-is so \n renders as real newlines

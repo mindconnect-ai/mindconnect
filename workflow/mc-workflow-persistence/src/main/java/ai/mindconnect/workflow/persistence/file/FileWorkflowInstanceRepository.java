@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.file;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.persist.WorkflowInstanceSnapshot;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 
@@ -35,9 +36,10 @@ public class FileWorkflowInstanceRepository implements WorkflowInstanceRepositor
      *                  {@code <baseDir>/<partition>/workflows/instances}
      * @param partition the directory level a call reads and writes, asked on
      *                  every call — one partition never sees the instances of another
+     * @param json      the host's mapper factory, so a snapshot's JSON knows the host's modules
      */
-    public FileWorkflowInstanceRepository(Path baseDir, Supplier<String> partition) {
-        this(baseDir, partition, new SnapshotSerializer());
+    public FileWorkflowInstanceRepository(Path baseDir, Supplier<String> partition, JsonMapperFactory json) {
+        this(baseDir, partition, new SnapshotSerializer(json));
     }
 
     public FileWorkflowInstanceRepository(Path baseDir, Supplier<String> partition, SnapshotSerializer serializer) {

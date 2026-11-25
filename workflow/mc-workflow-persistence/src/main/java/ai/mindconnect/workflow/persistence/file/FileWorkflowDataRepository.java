@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.file;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
@@ -38,9 +39,10 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
      *                  {@code <baseDir>/<partition>/workflows}
      * @param partition the directory level a call reads and writes, asked on
      *                  every call — one partition never sees the definitions of another
+     * @param json      the host's mapper factory, so a definition's JSON knows the host's modules
      */
-    public FileWorkflowDataRepository(Path baseDir, Supplier<String> partition) {
-        this(baseDir, partition, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
+    public FileWorkflowDataRepository(Path baseDir, Supplier<String> partition, JsonMapperFactory json) {
+        this(baseDir, partition, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create(json)));
     }
 
     public FileWorkflowDataRepository(Path baseDir, Supplier<String> partition, JacksonWorkflowSerializer serializer) {

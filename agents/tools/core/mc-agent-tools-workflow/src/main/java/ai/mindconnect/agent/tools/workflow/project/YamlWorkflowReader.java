@@ -16,7 +16,6 @@ import ai.mindconnect.workflow.domain.VariableAssignment;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -73,8 +72,6 @@ import java.util.regex.Pattern;
  */
 final class YamlWorkflowReader {
 
-    private static final ObjectMapper YAML = new YAMLMapper(new YAMLFactory());
-
     /** The step types, by the key that names them. */
     private static final List<String> TYPES = List.of("tool", "agent", "code", "set", "if", "foreach", "block");
 
@@ -102,29 +99,34 @@ final class YamlWorkflowReader {
 
     private final Path baseDir;
     private final Map<String, Integer> counters = new LinkedHashMap<>();
+    private final ObjectMapper json;
+    private final ObjectMapper yaml;
 
-    private YamlWorkflowReader(Path baseDir) {
+    private YamlWorkflowReader(Path baseDir, JsonMapperFactory json) {
         this.baseDir = baseDir;
+        this.json = json.create();
+        this.yaml = json.create(new YAMLFactory());
     }
 
     /** A workflow and what it says about itself. */
     record Read(WorkflowData workflow, String description) {}
 
     /** Reads {@code file}; {@code name} is the workflow's id. */
-    static Read read(String name, Path file) throws IOException {
-        return parse(name, Files.readString(file), file.toAbsolutePath().getParent());
+    static Read read(String name, Path file, JsonMapperFactory json) throws IOException {
+        return parse(name, Files.readString(file), file.toAbsolutePath().getParent(), json);
     }
 
     /**
      * Parses one workflow. {@code baseDir} is where {@code code: {file: …}}
      * looks; {@code null} when there is no file to look beside.
      */
-    static Read parse(String name, String yaml, Path baseDir) throws IOException {
-        Object root = YAML.readValue(yaml, Object.class);
+    static Read parse(String name, String yaml, Path baseDir, JsonMapperFactory json) throws IOException {
+        YamlWorkflowReader reader = new YamlWorkflowReader(baseDir, json);
+        Object root = reader.yaml.readValue(yaml, Object.class);
         if (!(root instanceof Map<?, ?> map)) {
             throw new WorkflowFormatException("a workflow is a mapping with 'steps'");
         }
-        return new YamlWorkflowReader(baseDir).workflow(name, map);
+        return reader.workflow(name, map);
     }
 
     private Read workflow(String id, Map<?, ?> map) {
@@ -427,9 +429,9 @@ final class YamlWorkflowReader {
         return s.isBlank() ? null : s;
     }
 
-    private static String json(Object value) {
+    private String json(Object value) {
         try {
-            return JsonMapperFactory.create().writeValueAsString(value);
+            return json.writeValueAsString(value);
         } catch (IOException e) {
             throw new WorkflowFormatException("a value cannot be written as JSON: " + e.getMessage());
         }

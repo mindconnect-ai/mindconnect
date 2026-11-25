@@ -3,6 +3,7 @@ package ai.mindconnect.workflow.jackson;
 import ai.mindconnect.workflow.execution.CompositeExpressionResolver;
 import ai.mindconnect.workflow.execution.WorkflowConfigurer;
 import ai.mindconnect.workflow.execution.WorkflowContextFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -29,18 +30,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * If no resolver is set at all, it installs the {@code JsonExpressionResolver}
  * directly.
  *
- * <p>This class has a public no-arg constructor so it can be discovered via
- * {@link java.util.ServiceLoader} when listed in
- * {@code META-INF/services/ai.mindconnect.workflow.api.execution.WorkflowConfigurer}.
+ * <p>It is not found by the {@link java.util.ServiceLoader}: it needs the
+ * installation's {@link JsonMapperFactory}, which a configurer the loader
+ * instantiates cannot be given. {@code SpiWorkflowContextFactory} applies it
+ * with the factory its caller hands in.
  */
 public class JsonWorkflowConfigurer implements WorkflowConfigurer {
 
-    /** Used by ServiceLoader. */
-    public JsonWorkflowConfigurer() {}
+    private final JsonMapperFactory json;
+
+    public JsonWorkflowConfigurer(JsonMapperFactory json) {
+        this.json = json;
+    }
 
     @Override
     public void configure(WorkflowContextFactory factory) {
-        ObjectMapper mapper = WorkflowObjectMapperFactory.create();
+        ObjectMapper mapper = WorkflowObjectMapperFactory.create(json);
         JsonExpressionResolver jsonResolver = new JsonExpressionResolver(mapper);
 
         CompositeExpressionResolver existing = factory.getExpressionResolver();

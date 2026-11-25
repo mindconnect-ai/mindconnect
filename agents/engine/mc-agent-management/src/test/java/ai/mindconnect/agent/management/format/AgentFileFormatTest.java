@@ -6,10 +6,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -24,7 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class AgentFileFormatTest {
 
     /** Its modules found as every mapper of the installation finds them: through the {@code ServiceLoader}. */
-    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules()
+    private final ObjectMapper json = new JsonMapperFactory(List.of(new IdJsonModule())).create().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final AgentJson files = new AgentJson(json);
 

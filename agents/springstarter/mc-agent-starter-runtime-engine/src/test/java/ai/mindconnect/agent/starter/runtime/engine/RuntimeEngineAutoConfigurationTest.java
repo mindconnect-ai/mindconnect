@@ -14,9 +14,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import ai.mindconnect.jackson.JsonMapperCustomizer;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
@@ -68,7 +68,7 @@ class RuntimeEngineAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(RuntimeEngineAutoConfiguration.class))
                 .withPropertyValues("mindconnect.data.base-dir=" + dataDirectory)
                 .withBean(ScopeSupplier.class, () -> SCOPE)
-                .withBean(ObjectMapper.class, () -> new ObjectMapper().registerModule(new JavaTimeModule()))
+                .withBean(JsonMapperCustomizer.class, () -> mapper -> mapper.addModule(new JavaTimeModule()))
                 // The application's own plugin comes after the starter's: its model is the one that answers.
                 .withBean(Plugin.class, () -> new Plugin() {
                     @Override
@@ -123,7 +123,7 @@ class RuntimeEngineAutoConfigurationTest {
                 .withPropertyValues("mindconnect.data.base-dir=" + dataDirectory)
                 .withPropertyValues(properties)
                 .withBean(ScopeSupplier.class, () -> SCOPE)
-                .withBean(ObjectMapper.class, () -> new ObjectMapper().registerModule(new JavaTimeModule()))
+                .withBean(JsonMapperCustomizer.class, () -> mapper -> mapper.addModule(new JavaTimeModule()))
                 .withBean(Plugin.class, () -> new Plugin() {
                     @Override
                     public String name() {

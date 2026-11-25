@@ -16,6 +16,7 @@ import ai.mindconnect.agent.tool.ToolBundles;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.DomainException;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
@@ -49,20 +50,22 @@ public class AgentToolUiController {
     private final ToolTestService toolTestService;
     private final AgentForm form;
     private final AgentDetailView detail;
+    private final JsonMapperFactory json;
 
     public AgentToolUiController(AgentRuntime runtime, ToolRegistry toolRegistry, ToolTestService toolTestService,
-                                 ObjectMapper objectMapper, AgentDetailView detail) {
+                                 ObjectMapper objectMapper, AgentDetailView detail, JsonMapperFactory json) {
         this.agents = runtime.service(AgentManagement.class);
         this.toolRegistry = toolRegistry;
         this.toolTestService = toolTestService;
         this.form = new AgentForm(objectMapper);
         this.detail = detail;
+        this.json = json;
     }
 
     @GetMapping("/{id}/tools/new")
     public ResponseEntity<UiPage> newToolForm(@PathVariable("id") String idValue) {
         return agents.find(AgentId.of(idValue))
-                .map(a -> ResponseEntity.ok(new ToolFormPage(a, null, toolRegistry).render()))
+                .map(a -> ResponseEntity.ok(new ToolFormPage(a, null, toolRegistry, json).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -121,7 +124,7 @@ public class AgentToolUiController {
         var a    = agentOpt.get();
         var tool = AgentSetting.tools(a).stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
         if (tool == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(new ToolDetailPage(a, tool, toolRegistry).render());
+        return ResponseEntity.ok(new ToolDetailPage(a, tool, toolRegistry, json).render());
     }
 
     @GetMapping("/{id}/tools/{toolId}/edit")
@@ -134,7 +137,7 @@ public class AgentToolUiController {
         var a    = agentOpt.get();
         var tool = AgentSetting.tools(a).stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
         if (tool == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(new ToolFormPage(a, tool, toolRegistry).render());
+        return ResponseEntity.ok(new ToolFormPage(a, tool, toolRegistry, json).render());
     }
 
     /**
@@ -186,7 +189,7 @@ public class AgentToolUiController {
     private UiPatch toolTestDialog(ManagedAgent agent, AgentTool tool,
                                    String previousJson,
                                    ToolTestService.Result result) {
-        var component = new ToolTestComponent(agent, tool, toolRegistry, previousJson, result);
+        var component = new ToolTestComponent(agent, tool, toolRegistry, previousJson, result, json);
         UiDialog dialog = UiDialog.of(component.title(), null, component.render());
         dialog.setId("tool-test-dialog");
         return UiPatch.of()

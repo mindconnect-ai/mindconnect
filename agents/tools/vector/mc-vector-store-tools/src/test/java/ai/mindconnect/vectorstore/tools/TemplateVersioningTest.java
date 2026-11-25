@@ -6,6 +6,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -15,7 +17,7 @@ class TemplateVersioningTest {
 
     @Test
     void aSaveAgainstAStaleVersionIsRefused(@TempDir Path dir) {
-        FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
+        FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"), new JsonMapperFactory(List.of()));
         VectorStoreTemplate template = new VectorStoreTemplate("knowledge", "embeddings", null, Map.of());
 
         VectorStoreTemplate first = registry.saveTemplate(template.withVersion(0L));

@@ -1,5 +1,6 @@
 package ai.mindconnect.taskqueue.jdbc;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ class JdbcSharedStateStoreTest {
         try (var c = ds.getConnection(); var s = c.createStatement()) {
             s.execute("DROP TABLE IF EXISTS mc_shared_state");
         }
-        shared = new JdbcSharedStateStore(ds).initSchema();
+        shared = new JdbcSharedStateStore(ds, new JsonMapperFactory(List.of())).initSchema();
     }
 
     @Test

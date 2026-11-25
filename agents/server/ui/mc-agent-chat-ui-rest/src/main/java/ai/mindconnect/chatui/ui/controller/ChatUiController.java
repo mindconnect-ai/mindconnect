@@ -36,6 +36,7 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,12 @@ public class ChatUiController {
     private final ai.mindconnect.agent.sdk.AgentRuntime runtime;
     private final TodoListService todoListService;
     private final ObjectMapper objectMapper;
+    /**
+     * The mapper the cards pretty-print tool arguments with and the composer's
+     * patches are built with: Jackson's defaults, as these components have
+     * always had, not the shared mapper's settings.
+     */
+    private final ObjectMapper componentJson;
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
@@ -111,6 +118,7 @@ public class ChatUiController {
         this.sessionManagement = sessionManagement;
         this.todoListService = todoListService;
         this.objectMapper = objectMapper;
+        this.componentJson = runtime.service(JsonMapperFactory.class).create();
         this.traceRepository = traceRepository;
         this.activeStreams = activeStreams;
         this.sessionStreams = sessionStreams;
@@ -1302,7 +1310,8 @@ public class ChatUiController {
         var handleOpt = activeStreams.findHandle(channelId);
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
-                        buildSubAgentCards(SessionOwnership.idOf(session), toolCallId, running, in, out))
+                        buildSubAgentCards(SessionOwnership.idOf(session), toolCallId, running, in, out),
+                componentJson)
                 .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
                         llmConfigRepository, ChatAgent.model(agent)))
                 .withOwnSettings(ownSettings(session))
@@ -1379,16 +1388,16 @@ public class ChatUiController {
     }
 
     /** The card that asks for the approval of one tool call. */
-    private static ai.mindconnect.ui.model.UiList.Item approvalCard(SessionId sessionId, Interruption interruption) {
+    private ai.mindconnect.ui.model.UiList.Item approvalCard(SessionId sessionId, Interruption interruption) {
         return approvalCard(sessionId, interruption.call().callId(), interruption.call().toolName(),
                 interruption.call().arguments());
     }
 
-    private static ai.mindconnect.ui.model.UiList.Item approvalCard(SessionId sessionId, String callId,
+    private ai.mindconnect.ui.model.UiList.Item approvalCard(SessionId sessionId, String callId,
                                                                     String toolName, Map<String, Object> arguments) {
         String argsJson;
         try {
-            argsJson = ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER
+            argsJson = componentJson
                     .writerWithDefaultPrettyPrinter()
                     .writeValueAsString(arguments);
         } catch (Exception e) {
@@ -1447,7 +1456,8 @@ public class ChatUiController {
                 // presence, computed inside that recursive call.
                 var childComp = new ai.mindconnect.chatui.ui.component.MessageListComponent(
                         SessionOwnership.idOf(child), childAgent, childHistory, null,
-                        (tcId, r, in, out) -> buildSubAgentCards(SessionOwnership.idOf(child), tcId, r, in, out));
+                        (tcId, r, in, out) -> buildSubAgentCards(SessionOwnership.idOf(child), tcId, r, in, out),
+                        componentJson);
 
                 var childList = TaskCardComponent.subAgentChildList(SessionOwnership.idOf(child).value());
                 for (TaskCardComponent t : childComp.allHistoricTaskCards()) {
@@ -2251,7 +2261,7 @@ public class ChatUiController {
         String node = "task-" + key;
         liveTasks.put(key, new LiveTask(node, toolName, false, arguments, parentTaskId));
         openTaskNodeId[0] = null;
-        var card = TaskCardComponent.runningTool(node, toolName, arguments);
+        var card = TaskCardComponent.runningTool(node, toolName, arguments, componentJson);
         publishPatch(bus, appendCard(liveView, scope, card));
         openTaskNodeId[0] = node;
     }
@@ -2270,9 +2280,9 @@ public class ChatUiController {
         lt.done = true;
         var card = failed
                 ? TaskCardComponent.failedTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs,
-                        fullResultUrl)
+                        fullResultUrl, componentJson)
                 : TaskCardComponent.doneTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs,
-                        fullResultUrl);
+                        fullResultUrl, componentJson);
         publishPatch(bus, liveView.streamTaskUpdate(card));
         if (lt.nodeId.equals(openTaskNodeId[0])) openTaskNodeId[0] = null;
     }
@@ -2305,7 +2315,7 @@ public class ChatUiController {
                         TaskCardComponent.subAgentAnswer(tid, reason)));
             } else {
                 publishPatch(bus, liveView.streamTaskUpdate(
-                        TaskCardComponent.failedTool(lt.nodeId, lt.name, lt.input, reason, durationMs, null)));
+                        TaskCardComponent.failedTool(lt.nodeId, lt.name, lt.input, reason, durationMs, null, componentJson)));
             }
         }
     }

@@ -56,7 +56,7 @@ public final class DemoPlugin implements Plugin {
             return DemoStore.onPostgres(sql.get(), scope(registry), type, kind, id);
         }
         return dataDir(registry)
-                .map(dir -> DemoStore.onFiles(dir, scope(registry), JSON, type, kind, id))
+                .map(dir -> DemoStore.onFiles(dir, scope(registry), json(registry), type, kind, id))
                 .orElseGet(() -> DemoStore.inMemory(id));
     }
 
@@ -67,7 +67,7 @@ public final class DemoPlugin implements Plugin {
             return new PgDiceRollRepository(sql.get(), scope(registry));
         }
         return dataDir(registry)
-                .<DiceRollRepository>map(dir -> new FileDiceRollRepository(dir, scope(registry)))
+                .<DiceRollRepository>map(dir -> new FileDiceRollRepository(dir, scope(registry), registry.get(JsonMapperFactory.class)))
                 .orElseGet(InMemoryDiceRollRepository::new);
     }
 
@@ -81,6 +81,8 @@ public final class DemoPlugin implements Plugin {
         return registry.find(ToolEnvironment.class).flatMap(env -> env.getString("dataBaseDir")).map(Path::of);
     }
 
-    private static final ObjectMapper JSON = JsonMapperFactory.create().registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private static ObjectMapper json(PluginRegistry registry) {
+        return registry.get(JsonMapperFactory.class).create().registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
 }

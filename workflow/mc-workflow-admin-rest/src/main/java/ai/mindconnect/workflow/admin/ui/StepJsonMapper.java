@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.StepData;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -17,9 +18,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public final class StepJsonMapper {
 
-    private static final ObjectMapper MAPPER = WorkflowObjectMapperFactory.create();
+    private final ObjectMapper mapper;
 
-    private StepJsonMapper() {}
+    /** @param json the host's mapper factory, which the workflow store's mapper is built from too */
+    public StepJsonMapper(JsonMapperFactory json) {
+        this.mapper = WorkflowObjectMapperFactory.create(json);
+    }
 
     /**
      * The step's properties as an ordered map — what the details dialog walks
@@ -27,24 +31,24 @@ public final class StepJsonMapper {
      * {@code @class} discriminator are in the map too; the caller skips what
      * it renders elsewhere.
      */
-    public static java.util.Map<String, Object> toMap(StepData step) {
-        return MAPPER.convertValue(step,
+    public java.util.Map<String, Object> toMap(StepData step) {
+        return mapper.convertValue(step,
                 new com.fasterxml.jackson.core.type.TypeReference<java.util.LinkedHashMap<String, Object>>() {});
     }
 
     /** Pretty-printed JSON for a single property value (a map or list). */
-    public static String prettyValue(Object value) {
+    public String prettyValue(Object value) {
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(value);
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(value);
         } catch (JsonProcessingException ex) {
             return String.valueOf(value);
         }
     }
 
     /** Pretty-printed JSON for {@code step}, including its children. */
-    public static String toJson(StepData step) {
+    public String toJson(StepData step) {
         try {
-            return MAPPER.writeValueAsString(step);
+            return mapper.writeValueAsString(step);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Cannot render step as JSON: " + ex.getOriginalMessage(), ex);
         }
@@ -55,12 +59,12 @@ public final class StepJsonMapper {
      * message fit to show the user — malformed JSON is expected input here,
      * not a server fault.
      */
-    public static StepData fromJson(String json) {
+    public StepData fromJson(String json) {
         if (json == null || json.isBlank()) {
             throw new InvalidStepJsonException("The JSON is empty.");
         }
         try {
-            return MAPPER.readValue(json, StepData.class);
+            return mapper.readValue(json, StepData.class);
         } catch (JsonProcessingException ex) {
             throw new InvalidStepJsonException(describe(ex));
         }

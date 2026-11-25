@@ -77,6 +77,7 @@ import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.agent.runtime.capabilities.guard.InputGuard;
 import ai.mindconnect.agent.runtime.capabilities.guard.OutputGuard;
+import ai.mindconnect.jackson.JacksonPlugin;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -133,6 +134,7 @@ class EngineWithCapabilitiesTest {
                 into.provide(ScopeSupplier.class, () -> ScopeSupplier.fixed(new Namespace("test")));
             }
         });
+        registry.install(new JacksonPlugin(List.of()));
         registry.install(new InMemorySessionStorePlugin());
         registry.install(new PebblePromptPlugin());
         registry.install(new Plugin() {
@@ -146,7 +148,7 @@ class EngineWithCapabilitiesTest {
                 into.provide(ModelGateway.class, () -> model);
             }
         });
-        registry.install(new EnginePlugin(queue, new InMemorySharedStateStore()));
+        registry.install(new EnginePlugin(() -> queue, new InMemorySharedStateStore()));
         registry.contribute(AgentResolver.class, AgentResolver.of(List.of(LEAD, RESEARCHER)));
         registry.contribute(SkillResolver.class, skills(
                 new SkillDefinition("citations", "How to cite sources.", "Cite like this.", List.of())));

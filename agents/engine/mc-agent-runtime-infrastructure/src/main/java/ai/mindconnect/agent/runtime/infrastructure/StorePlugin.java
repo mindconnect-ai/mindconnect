@@ -71,7 +71,8 @@ public abstract class StorePlugin implements Plugin {
         return "stores";
     }
 
-    protected abstract Stores stores(ScopeSupplier scope);
+    /** The stores, made once the plugins are installed: what they need is in {@code registry} by then. */
+    protected abstract Stores stores(PluginRegistry registry);
 
     /** Whether the place keeps the operator's tool settings; where it does not, no such repository is provided. */
     protected abstract boolean keepsToolSettings();
@@ -85,7 +86,7 @@ public abstract class StorePlugin implements Plugin {
             @Override
             public synchronized Stores get() {
                 if (made == null) {
-                    made = stores(registry.get(ScopeSupplier.class));
+                    made = stores(registry);
                 }
                 return made;
             }

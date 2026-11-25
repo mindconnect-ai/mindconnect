@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -119,7 +120,7 @@ class PgVectorStoreRegistryTest {
 
     @Test
     void theFilesAreImportedOnce_andStay(@TempDir Path dir) {
-        FileVectorStoreRegistry files = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
+        FileVectorStoreRegistry files = new FileVectorStoreRegistry(dir.resolve("vector-stores"), new JsonMapperFactory(List.of()));
         VectorStoreTemplate template = files.saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", "file-ingestion", Map.of()));
         VectorStoreInstance instance = files.registerInstance(VectorStoreInstance.fromTemplate(
                 "session-s1", template, VectorStoreInstance.Scope.SESSION, "s1", "alice"));

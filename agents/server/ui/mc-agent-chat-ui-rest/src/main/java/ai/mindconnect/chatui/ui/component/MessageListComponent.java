@@ -11,6 +11,7 @@ import ai.mindconnect.ui.model.UiPatch;
 
 import java.util.Comparator;
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.SessionId;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
@@ -76,6 +77,8 @@ public final class MessageListComponent implements UiComponent {
     private final List<ManagedMessage> history;
     private final WorkingMemory memory;
     private final SubAgentTreeProvider subAgentTree;
+    /** The mapper the tool cards of past turns pretty-print their arguments with. */
+    private final ObjectMapper json;
     /** Set when this session was spawned by a parent (sub-agent session) — drives the header link. */
     private SessionId parentSessionId;
     /** This conversation's title, when it has one — the header's subject. */
@@ -92,14 +95,15 @@ public final class MessageListComponent implements UiComponent {
 
 
     public MessageListComponent(SessionId sessionId, ManagedAgent agent,
-                                List<ManagedMessage> history, WorkingMemory memory) {
-        this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE);
+                                List<ManagedMessage> history, WorkingMemory memory, ObjectMapper json) {
+        this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE, json);
     }
 
     public MessageListComponent(SessionId sessionId, ManagedAgent agent,
                                 List<ManagedMessage> history, WorkingMemory memory,
-                                SubAgentTreeProvider subAgentTree) {
+                                SubAgentTreeProvider subAgentTree, ObjectMapper json) {
         this.sessionId = sessionId;
+        this.json = json;
         this.agent = agent;
         this.history = history;
         this.memory = memory;
@@ -502,6 +506,6 @@ public final class MessageListComponent implements UiComponent {
 
     /** Rebuilds the tool cards of a past turn. */
     private ToolCallHistory toolCallHistory() {
-        return new ToolCallHistory(sessionId, subAgentTree);
+        return new ToolCallHistory(sessionId, subAgentTree, json);
     }
 }

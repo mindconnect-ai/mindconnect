@@ -5,6 +5,7 @@ import ai.mindconnect.agent.registry.domain.ImportStatus;
 import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
@@ -40,7 +41,8 @@ class WorkflowRegistryInstallerTest {
     void setUp() {
         repository = new InMemoryWorkflowDataRepository();
         installer = new WorkflowRegistryInstaller(repository,
-                new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
+                new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of()))),
+                new JsonMapperFactory(List.of()));
     }
 
     @Test

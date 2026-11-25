@@ -61,11 +61,11 @@ public class RailsWebScraperConfigCreator {
         );
         System.out.println(linkList.stream().collect(Collectors.joining("\n")));
         RailsWebScraperConfig config = createForLinkListContext("rufnummern","summarize_article", linkList);
-        printAsJSON(config);
+        printAsJSON(config, new JsonMapperFactory(List.of()));
     }
 
-    private static void printAsJSON(RailsWebScraperConfig config) throws JsonProcessingException {
-        ObjectMapper mapper = JsonMapperFactory.create();
+    private static void printAsJSON(RailsWebScraperConfig config, JsonMapperFactory json) throws JsonProcessingException {
+        ObjectMapper mapper = json.create();
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
         System.out.println(mapper.writeValueAsString(config));
     }

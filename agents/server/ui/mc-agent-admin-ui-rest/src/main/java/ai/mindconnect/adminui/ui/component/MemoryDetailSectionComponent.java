@@ -9,8 +9,8 @@ import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiSection;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 
 /**
  * Detail pane of the working-memory inspector — two tabs:
@@ -39,10 +39,12 @@ public final class MemoryDetailSectionComponent implements UiComponent {
 
     private final WorkingMemory memory;
     private final int seq;
+    private final ObjectMapper json;
 
-    public MemoryDetailSectionComponent(WorkingMemory memory, int seq) {
+    public MemoryDetailSectionComponent(WorkingMemory memory, int seq, ObjectMapper json) {
         this.memory = memory;
         this.seq = seq;
+        this.json = json;
     }
 
     @Override
@@ -102,9 +104,9 @@ public final class MemoryDetailSectionComponent implements UiComponent {
                 .section(LLM_ID, "LLM View", llmNode);
     }
 
-    private static String json(Object value) {
+    private String json(Object value) {
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(value);
+            return json.writerWithDefaultPrettyPrinter().writeValueAsString(value);
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }

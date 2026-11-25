@@ -38,8 +38,8 @@ public final class ClasspathManifests {
     }
 
     /** The manifests on the given class loader's classpath, read with a mapper that ignores what it does not know. */
-    public static ExtensionRegistry load(ClassLoader classLoader) {
-        return load(classLoader, JsonMapperFactory.builder()
+    public static ExtensionRegistry load(ClassLoader classLoader, JsonMapperFactory json) {
+        return load(classLoader, json.builder()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build());
     }

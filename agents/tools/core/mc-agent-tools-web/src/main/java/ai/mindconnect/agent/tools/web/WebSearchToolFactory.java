@@ -5,6 +5,7 @@ import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,7 @@ public final class WebSearchToolFactory implements ToolFactory {
      */
     private final OkHttpClient httpClient = WebToolsHttpClient.get();
     private String apiKey;
+    private JsonMapperFactory json;
 
     @Override public String name() { return "web_search"; }
 
@@ -30,6 +32,7 @@ public final class WebSearchToolFactory implements ToolFactory {
 
     @Override public void bind(ToolEnvironment env) {
         this.apiKey = env.getString(TAVILY_API_KEY).orElse(null);
+        this.json = env.require(JsonMapperFactory.class);
     }
 
     @Override public boolean isAvailable() {
@@ -42,6 +45,6 @@ public final class WebSearchToolFactory implements ToolFactory {
     }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new WebSearchTool(apiKey, httpClient);
+        return new WebSearchTool(apiKey, httpClient, json);
     }
 }

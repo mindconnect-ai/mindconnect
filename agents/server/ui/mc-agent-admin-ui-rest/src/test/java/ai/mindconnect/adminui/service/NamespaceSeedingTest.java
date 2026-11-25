@@ -21,6 +21,7 @@ import ai.mindconnect.extension.domain.InstalledSeed;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
@@ -123,7 +124,7 @@ class NamespaceSeedingTest {
                 ns -> decisions.computeIfAbsent(ns, n -> new InMemoryExtensionActivationRepository()));
         ExtensionService extensions = new ExtensionService(new ExtensionRegistry(List.of(crmExtension())), activations);
 
-        NamespaceSeeder seeder = new NamespaceSeeder(new BundledSeeds(mapper, "classpath*:seed-test/"),
+        NamespaceSeeder seeder = new NamespaceSeeder(new BundledSeeds(mapper, "classpath*:seed-test/", new JsonMapperFactory(List.of())),
                 llm, agents, skills, workflows, installed, extensions) {
             @Override
             public Report installMissing(Namespace namespace) {

@@ -1,5 +1,7 @@
 package ai.mindconnect.chatui.service;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -43,14 +45,15 @@ class SessionOwnershipTest {
     private final SessionManagement management = new RepositorySessionManagement(stored, messages,
             new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
             List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()));
+                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> java.util.Optional.empty()),
+                new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule()))));
     private final SessionOwnership ownership = new SessionOwnership(runtimeOver(management));
 
     private final ManagedSession alices = opened("alice");
 
     private ManagedSession opened(String user) {
         var id = SessionId.of(java.util.UUID.randomUUID().toString());
-        new RepositorySessionStore(stored, messages).create(new Session(id,
+        new RepositorySessionStore(stored, messages, new JsonMapperFactory(List.of(new IdJsonModule()))).create(new Session(id,
                 ai.mindconnect.agent.UserId.of(user), null,
                 new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE, List.of(), 5, Map.of()),
                 Map.of(), Instant.parse("2026-11-01T00:00:00Z")));

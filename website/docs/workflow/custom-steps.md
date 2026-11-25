@@ -109,9 +109,9 @@ src/main/resources/META-INF/services/ai.mindconnect.workflow.execution.WorkflowC
 com.example.workflow.UppercaseConfigurer
 ```
 
-Now any app that builds its factory with `SpiWorkflowContextFactory.create()`
+Now any app that builds its factory with `SpiWorkflowContextFactory.create(json)`
 (from `mc-workflow-spi-lookup`) picks up your step automatically — same
-mechanism the JavaScript/Groovy/Jackson modules use. See
+mechanism the JavaScript/Groovy modules use. See
 [How it works → Auto-registration (SPI)](./how-it-works.md#auto-registration-spi).
 
 ## Use it

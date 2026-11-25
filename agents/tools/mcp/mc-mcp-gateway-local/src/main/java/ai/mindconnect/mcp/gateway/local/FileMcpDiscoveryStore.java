@@ -25,15 +25,17 @@ public final class FileMcpDiscoveryStore implements McpDiscoveryStore {
 
     private static final Logger log = LoggerFactory.getLogger(FileMcpDiscoveryStore.class);
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
-            .enable(SerializationFeature.INDENT_OUTPUT);
-
     private final Path storageDir;
     private final ScopeSupplier scope;
+    private final ObjectMapper mapper;
+    private final McpDiscoveryJson discoveries;
 
-    public FileMcpDiscoveryStore(Path storageDir, ScopeSupplier scope) {
+    public FileMcpDiscoveryStore(Path storageDir, ScopeSupplier scope, JsonMapperFactory json) {
         this.storageDir = storageDir.toAbsolutePath();
         this.scope = scope;
+        this.mapper = json.create()
+                .enable(SerializationFeature.INDENT_OUTPUT);
+        this.discoveries = new McpDiscoveryJson(json);
     }
 
     @Override
@@ -43,7 +45,7 @@ public final class FileMcpDiscoveryStore implements McpDiscoveryStore {
             return Optional.empty();
         }
         try {
-            return Optional.of(McpDiscoveryJson.read(MAPPER.readTree(file.toFile())));
+            return Optional.of(discoveries.read(mapper.readTree(file.toFile())));
         } catch (IOException | RuntimeException e) {
             log.warn("MCP discovery cache {} unreadable: {}", file, e.toString());
             return Optional.empty();
@@ -54,8 +56,8 @@ public final class FileMcpDiscoveryStore implements McpDiscoveryStore {
     public void save(McpServerId server, McpDiscovery discovery) {
         Path file = fileFor(server);
         try {
-            AtomicFiles.write(file, out -> MAPPER.writeValue(out,
-                    McpDiscoveryJson.write(discovery, JsonNodeFactory.instance)));
+            AtomicFiles.write(file, out -> mapper.writeValue(out,
+                    discoveries.write(discovery, JsonNodeFactory.instance)));
         } catch (IOException e) {
             // A cache that cannot be written is a slow start-up, not a failure.
             log.warn("cannot write MCP discovery cache {}: {}", file, e.toString());

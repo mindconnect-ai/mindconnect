@@ -7,6 +7,7 @@ import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.NamespaceService;
@@ -72,8 +73,8 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
                             SkillRepository skills, WorkflowDataRepository workflows,
                             InstalledSeedRepository installedSeeds, ExtensionService extensions,
                             ObjectMapper objectMapper, ObjectProvider<ScopeSupplier> scope,
-                            ObjectProvider<NamespaceService> namespaces) {
-        this(new NamespaceSeeder(new BundledSeeds(objectMapper), llmConfigs, agents, skills, workflows,
+                            ObjectProvider<NamespaceService> namespaces, JsonMapperFactory json) {
+        this(new NamespaceSeeder(new BundledSeeds(objectMapper, json), llmConfigs, agents, skills, workflows,
                 installedSeeds, extensions), scope, namespaces);
     }
 

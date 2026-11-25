@@ -5,6 +5,7 @@ import ai.mindconnect.adminui.ui.component.ToolFormComponent;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiPage;
 
 /**
@@ -17,15 +18,17 @@ public final class ToolFormPage extends AdminPage {
     private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
+    private final JsonMapperFactory json;
 
     /**
      * @param tool {@code null} for the new-tool form, a populated
      *             {@link AgentTool} for the edit form
      */
-    public ToolFormPage(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry) {
+    public ToolFormPage(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry, JsonMapperFactory json) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
+        this.json = json;
     }
 
     @Override
@@ -34,6 +37,6 @@ public final class ToolFormPage extends AdminPage {
                 ? "/admin/agents/" + agent.id().value() + "/tools/new"
                 : "/admin/agents/" + agent.id().value() + "/tools/" + tool.id().value() + "/edit";
         return UiPage.of(url,
-                new ToolFormComponent(agent, tool, toolRegistry).render());
+                new ToolFormComponent(agent, tool, toolRegistry, json).render());
     }
 }

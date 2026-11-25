@@ -25,21 +25,24 @@ import java.util.Map;
  */
 public final class ToolCatalogTestComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
-
     private final String toolName;
     private final ToolRegistry toolRegistry;
     private final String previousJson;
     private final ToolTestService.Result result;
+    private final JsonMapperFactory json;
+    private final ObjectMapper mapper;
 
     public ToolCatalogTestComponent(String toolName,
                                     ToolRegistry toolRegistry,
                                     String previousJson,
-                                    ToolTestService.Result result) {
+                                    ToolTestService.Result result,
+                                    JsonMapperFactory json) {
         this.toolName = toolName;
         this.toolRegistry = toolRegistry;
         this.previousJson = previousJson;
         this.result = result;
+        this.json = json;
+        this.mapper = json.create();
     }
 
     @Override
@@ -55,7 +58,7 @@ public final class ToolCatalogTestComponent implements UiComponent {
         // from a skeleton with the right fields rather than an empty object.
         String initialJson = previousJson != null && !previousJson.isBlank()
                 ? previousJson
-                : JsonSchemaSample.example(schemaMap);
+                : JsonSchemaSample.example(schemaMap, json);
 
         var form = UiForm.of(id(), null);
         if (schema != null) {
@@ -85,10 +88,10 @@ public final class ToolCatalogTestComponent implements UiComponent {
     }
 
     /** Pretty-prints a schema map for the read-only display, or null. */
-    private static String prettySchema(Map<String, Object> schemaMap) {
+    private String prettySchema(Map<String, Object> schemaMap) {
         if (schemaMap == null) return null;
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(schemaMap);
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(schemaMap);
         } catch (JsonProcessingException e) {
             return null;
         }

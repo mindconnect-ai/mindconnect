@@ -4,10 +4,12 @@ import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,7 +18,7 @@ class FileRegistrySourceRepositoryTest {
     @Test
     void a_saved_registry_reads_back_with_everything_it_was_given(@TempDir Path dir) {
         FileRegistrySourceRepository repository =
-                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
+                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT), new JsonMapperFactory(List.of()));
         RegistrySource source = new RegistrySource(RegistrySource.of("acme/agents").id(),
                 "Acme agents", "acme", "agents", "v2", "catalog/index.json", "ACME_TOKEN",
                 null, true, null);
@@ -36,7 +38,7 @@ class FileRegistrySourceRepositoryTest {
     @Test
     void a_disabled_registry_stays_configured_but_out_of_the_enabled_list(@TempDir Path dir) {
         FileRegistrySourceRepository repository =
-                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
+                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT), new JsonMapperFactory(List.of()));
         RegistrySource saved = repository.save(RegistrySource.of("acme/agents"));
 
         repository.save(saved.withEnabled(false));
@@ -48,7 +50,7 @@ class FileRegistrySourceRepositoryTest {
     @Test
     void deleting_one_leaves_the_store_empty(@TempDir Path dir) {
         FileRegistrySourceRepository repository =
-                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
+                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT), new JsonMapperFactory(List.of()));
         RegistrySource saved = repository.save(RegistrySource.of("acme/agents"));
 
         repository.deleteById(saved.id());

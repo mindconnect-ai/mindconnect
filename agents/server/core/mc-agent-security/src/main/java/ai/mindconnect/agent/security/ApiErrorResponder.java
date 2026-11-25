@@ -35,10 +35,14 @@ public class ApiErrorResponder implements AuthenticationEntryPoint, AccessDenied
             "A bearer token is required: a personal API token (mct_...) or an access token of the identity provider";
     static final String ACCESS_DENIED = "Access denied";
 
-    private static final ObjectMapper JSON = JsonMapperFactory.create();
+    private final ObjectMapper json;
 
     private final BearerTokenAuthenticationEntryPoint unauthorized = new BearerTokenAuthenticationEntryPoint();
     private final BearerTokenAccessDeniedHandler forbidden = new BearerTokenAccessDeniedHandler();
+
+    public ApiErrorResponder(JsonMapperFactory json) {
+        this.json = json.create();
+    }
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
@@ -58,7 +62,7 @@ public class ApiErrorResponder implements AuthenticationEntryPoint, AccessDenied
         write(response, ACCESS_DENIED);
     }
 
-    private static void write(HttpServletResponse response, String message) throws IOException {
+    private void write(HttpServletResponse response, String message) throws IOException {
         HttpStatus status = HttpStatus.resolve(response.getStatus());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", response.getStatus());
@@ -66,6 +70,6 @@ public class ApiErrorResponder implements AuthenticationEntryPoint, AccessDenied
         body.put("message", message);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(JSON.writeValueAsString(body));
+        response.getWriter().write(json.writeValueAsString(body));
     }
 }

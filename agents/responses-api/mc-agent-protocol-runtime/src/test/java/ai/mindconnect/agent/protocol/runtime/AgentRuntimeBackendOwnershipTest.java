@@ -32,6 +32,8 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 /**
  * A session, a response and a file are the caller's: for anybody else they
@@ -57,7 +59,7 @@ class AgentRuntimeBackendOwnershipTest {
         fixture.agent(new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.ofModel("any"),
                 List.of(), 5, Map.of()));
         fixture.says(TurnMessage.assistant("Hello."), TurnMessage.assistant("Hello again."));
-        files = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
+        files = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule())));
         backend = fixture.backend(caller::get).withFiles(files, (sessionId, stored) -> "attached");
     }
 

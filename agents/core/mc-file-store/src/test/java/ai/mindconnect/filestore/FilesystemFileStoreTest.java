@@ -4,6 +4,10 @@ package ai.mindconnect.filestore;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,8 +26,7 @@ class FilesystemFileStoreTest {
     Path dir;
 
     private FileStore store() {
-        return FileStoreBackend.byType("filesystem").orElseThrow()
-                .open(Map.of("baseDir", dir.toString()), ScopeSupplier.fixed(new Namespace("test")));
+        return new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule())));
     }
 
     @Test
@@ -60,8 +63,7 @@ class FilesystemFileStoreTest {
         FileStore store = store();
         StoredFile saved = store.save("a.txt", "text/plain",
                 new ByteArrayInputStream("a".getBytes(StandardCharsets.UTF_8)));
-        FileStore other = FileStoreBackend.byType("filesystem").orElseThrow()
-                .open(Map.of("baseDir", dir.toString()), ScopeSupplier.fixed(new Namespace("other")));
+        FileStore other = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("other")), new JsonMapperFactory(List.of(new IdJsonModule())));
         assertThat(other.find(saved.id())).isEmpty();
         assertThat(other.list()).isEmpty();
         assertThat(store.list()).containsExactly(saved);

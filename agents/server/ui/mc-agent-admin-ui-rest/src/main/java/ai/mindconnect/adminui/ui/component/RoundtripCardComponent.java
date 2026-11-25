@@ -9,12 +9,12 @@ import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiSection;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 import static ai.mindconnect.chatui.ui.SessionUiCommons.codeBlock;
 
 /**
@@ -39,10 +39,12 @@ public final class RoundtripCardComponent implements UiComponent {
 
     private final LlmCallTrace trace;
     private final Map<String, Message> resultsByCallId;
+    private final ObjectMapper json;
 
-    public RoundtripCardComponent(LlmCallTrace trace, Map<String, Message> resultsByCallId) {
+    public RoundtripCardComponent(LlmCallTrace trace, Map<String, Message> resultsByCallId, ObjectMapper json) {
         this.trace = trace;
         this.resultsByCallId = resultsByCallId;
+        this.json = json;
     }
 
     @Override
@@ -110,13 +112,13 @@ public final class RoundtripCardComponent implements UiComponent {
      * so the response tab can show each tool call together with its own
      * result block.
      */
-    public static Map<String, Message> indexToolResults(List<Message> history) {
+    public static Map<String, Message> indexToolResults(List<Message> history, ObjectMapper json) {
         Map<String, Message> out = new HashMap<>();
         if (history == null) return out;
         for (Message m : history) {
             if (m.type() != MessageType.TOOL_RESULT) continue;
             try {
-                JsonNode node = MAPPER.readTree(m.content());
+                JsonNode node = json.readTree(m.content());
                 String id = node.path("toolCallId").asText("");
                 if (!id.isBlank()) out.put(id, m);
             } catch (Exception ignored) { /* skip malformed entries */ }
@@ -156,7 +158,7 @@ public final class RoundtripCardComponent implements UiComponent {
                                 "`" + tc.name() + "` (id `" + tc.id() + "`)"));
                 String argsJson;
                 try {
-                    argsJson = MAPPER.writerWithDefaultPrettyPrinter()
+                    argsJson = json.writerWithDefaultPrettyPrinter()
                             .writeValueAsString(tc.arguments());
                 } catch (Exception e) {
                     argsJson = "{}";
@@ -192,7 +194,7 @@ public final class RoundtripCardComponent implements UiComponent {
         }
         String resultText;
         try {
-            JsonNode node = MAPPER.readTree(resultMsg.content());
+            JsonNode node = json.readTree(resultMsg.content());
             resultText = node.path("result").asText("");
         } catch (Exception e) {
             resultText = resultMsg.content() != null ? resultMsg.content() : "";

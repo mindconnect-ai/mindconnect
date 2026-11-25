@@ -2,6 +2,7 @@ package ai.mindconnect.agent.tools.workflow.project;
 
 import ai.mindconnect.agent.tools.workflow.step.SandboxCodeData;
 import ai.mindconnect.agent.tools.workflow.step.SandboxCodeStep;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.script.mini.MiniScriptEngineFactory;
 import ai.mindconnect.workflow.execution.CompositeExpressionResolver;
 import ai.mindconnect.workflow.execution.WorkflowContextFactory;
@@ -29,15 +30,15 @@ final class RestrictedWorkflowContext {
 
     private RestrictedWorkflowContext() {}
 
-    static WorkflowContextFactory create() {
-        WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
+    static WorkflowContextFactory create(JsonMapperFactory json) {
+        WorkflowContextFactory factory = SpiWorkflowContextFactory.create(json);
         ScriptExecutor scripts = new MiniOnlyScriptExecutor();
         scripts.register(MINI, MiniScriptEngineFactory.restricted());
         factory.setScriptExecutor(scripts);
         factory.setExpressionResolver(new CompositeExpressionResolver(factory.getStringVariableReplacer(),
                 new ScriptExpressionResolver(scripts),
-                new JsonExpressionResolver(WorkflowObjectMapperFactory.create())));
-        factory.getStepInstanceFactory().register(SandboxCodeData.class, SandboxCodeStep::new);
+                new JsonExpressionResolver(WorkflowObjectMapperFactory.create(json))));
+        factory.getStepInstanceFactory().register(SandboxCodeData.class, () -> new SandboxCodeStep(json));
         return factory;
     }
 

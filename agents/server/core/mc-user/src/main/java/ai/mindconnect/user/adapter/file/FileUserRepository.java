@@ -1,6 +1,7 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.port.out.UserRepository;
 
@@ -28,9 +29,9 @@ public class FileUserRepository implements UserRepository {
 
     private final FileDocuments<User> users;
 
-    public FileUserRepository(Path storageDir) {
+    public FileUserRepository(Path storageDir, JsonMapperFactory json) {
         Objects.requireNonNull(storageDir, "storageDir");
-        this.users = new FileDocuments<>(storageDir.resolve("system").resolve("users"), User.class);
+        this.users = new FileDocuments<>(storageDir.resolve("system").resolve("users"), User.class, json);
     }
 
     @Override

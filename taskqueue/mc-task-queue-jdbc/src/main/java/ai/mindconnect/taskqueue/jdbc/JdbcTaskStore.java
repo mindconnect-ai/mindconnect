@@ -1,5 +1,6 @@
 package ai.mindconnect.taskqueue.jdbc;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.taskqueue.LeaseLostException;
 import ai.mindconnect.taskqueue.TaskFailure;
 import ai.mindconnect.taskqueue.TaskNotification;
@@ -55,11 +56,13 @@ public final class JdbcTaskStore implements TaskStore {
     private final DataSource dataSource;
     private final String nodeId;
     private final Duration lease;
+    private final Json json;
 
-    public JdbcTaskStore(DataSource dataSource, String nodeId, Duration lease) {
+    public JdbcTaskStore(DataSource dataSource, String nodeId, Duration lease, JsonMapperFactory json) {
         this.dataSource = dataSource;
         this.nodeId = nodeId;
         this.lease = lease;
+        this.json = new Json(json);
     }
 
     /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */
@@ -315,7 +318,7 @@ public final class JdbcTaskStore implements TaskStore {
             try (PreparedStatement ps = c.prepareStatement(
                     "UPDATE mc_task SET state = ?::jsonb WHERE id = ? "
                     + "AND (status <> 'RUNNING' OR lease_owner IS NULL OR lease_owner = ?)")) {
-                ps.setString(1, Json.write(state));
+                ps.setString(1, json.write(state));
                 ps.setString(2, id);
                 ps.setString(3, nodeId);
                 if (ps.executeUpdate() == 0 && find(id).isPresent()) {
@@ -551,18 +554,18 @@ public final class JdbcTaskStore implements TaskStore {
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, record.type());
             ps.setString(2, record.status().name());
-            ps.setString(3, Json.write(record.payload()));
+            ps.setString(3, json.write(record.payload()));
             ps.setInt(4, record.priority());
             ps.setString(5, record.parentTaskId());
             ps.setInt(6, record.attempt());
             ps.setString(7, record.nodeId());
             ps.setBoolean(8, record.cancelRequested());
-            ps.setString(9, Json.write(record.waitingFor()));
-            ps.setString(10, Json.write(record.notifications()));
+            ps.setString(9, json.write(record.waitingFor()));
+            ps.setString(10, json.write(record.notifications()));
             ps.setBoolean(11, record.resumed());
-            ps.setString(12, Json.write(record.state()));
+            ps.setString(12, json.write(record.state()));
             ps.setString(13, record.result());
-            ps.setString(14, Json.write(record.failure()));
+            ps.setString(14, json.write(record.failure()));
             ps.setTimestamp(15, timestamp(record.runAfter()));
             ps.setInt(16, record.maxAttempts());
             ps.setTimestamp(17, timestamp(record.submittedAt()));
@@ -577,18 +580,18 @@ public final class JdbcTaskStore implements TaskStore {
         ps.setString(1, record.id());
         ps.setString(2, record.type());
         ps.setString(3, record.status().name());
-        ps.setString(4, Json.write(record.payload()));
+        ps.setString(4, json.write(record.payload()));
         ps.setInt(5, record.priority());
         ps.setString(6, record.parentTaskId());
         ps.setInt(7, record.attempt());
         ps.setString(8, record.nodeId());
         ps.setBoolean(9, record.cancelRequested());
-        ps.setString(10, Json.write(record.waitingFor()));
-        ps.setString(11, Json.write(record.notifications()));
+        ps.setString(10, json.write(record.waitingFor()));
+        ps.setString(11, json.write(record.notifications()));
         ps.setBoolean(12, record.resumed());
-        ps.setString(13, Json.write(record.state()));
+        ps.setString(13, json.write(record.state()));
         ps.setString(14, record.result());
-        ps.setString(15, Json.write(record.failure()));
+        ps.setString(15, json.write(record.failure()));
         ps.setTimestamp(16, timestamp(record.runAfter()));
         ps.setInt(17, record.maxAttempts());
         ps.setTimestamp(18, timestamp(record.submittedAt()));
@@ -604,23 +607,23 @@ public final class JdbcTaskStore implements TaskStore {
         }
     }
 
-    private static TaskRecord read(ResultSet rs) throws SQLException {
+    private TaskRecord read(ResultSet rs) throws SQLException {
         return new TaskRecord(
                 rs.getString("id"),
                 rs.getString("type"),
                 TaskStatus.valueOf(rs.getString("status")),
-                Json.readMap(rs.getString("payload")),
+                json.readMap(rs.getString("payload")),
                 rs.getInt("priority"),
                 rs.getString("parent_task_id"),
                 rs.getInt("attempt"),
                 rs.getString("node_id"),
                 rs.getBoolean("cancel_requested"),
-                Json.readStringSet(rs.getString("waiting_for")),
-                Json.readNotifications(rs.getString("notifications")),
+                json.readStringSet(rs.getString("waiting_for")),
+                json.readNotifications(rs.getString("notifications")),
                 rs.getBoolean("resumed"),
-                Json.readMap(rs.getString("state")),
+                json.readMap(rs.getString("state")),
                 rs.getString("result"),
-                Json.readFailure(rs.getString("failure")),
+                json.readFailure(rs.getString("failure")),
                 instant(rs.getTimestamp("run_after")),
                 rs.getInt("max_attempts"),
                 instant(rs.getTimestamp("submitted_at")),
@@ -638,7 +641,7 @@ public final class JdbcTaskStore implements TaskStore {
         T run(Connection c) throws SQLException;
     }
 
-    private static Optional<TaskRecord> selectOne(Connection c, String sql, Binder binder) throws SQLException {
+    private Optional<TaskRecord> selectOne(Connection c, String sql, Binder binder) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             binder.bind(ps);
             try (ResultSet rs = ps.executeQuery()) {
@@ -647,7 +650,7 @@ public final class JdbcTaskStore implements TaskStore {
         }
     }
 
-    private static List<TaskRecord> selectMany(Connection c, String sql, Binder binder) throws SQLException {
+    private List<TaskRecord> selectMany(Connection c, String sql, Binder binder) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             binder.bind(ps);
             try (ResultSet rs = ps.executeQuery()) {

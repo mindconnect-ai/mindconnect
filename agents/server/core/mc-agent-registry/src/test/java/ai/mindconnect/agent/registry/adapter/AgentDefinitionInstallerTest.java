@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.registry.adapter;
 
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.registry.adapter.installer.AgentDefinitionInstaller;
 import ai.mindconnect.agent.registry.domain.ImportMode;
 import ai.mindconnect.agent.registry.domain.ImportStatus;
@@ -16,6 +17,7 @@ import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +53,7 @@ class AgentDefinitionInstallerTest {
     @BeforeEach
     void setUp() {
         repository = new RepositoryAgentManagement(new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))));
-        installer = new AgentDefinitionInstaller(repository);
+        installer = new AgentDefinitionInstaller(repository, new JsonMapperFactory(List.of(new IdJsonModule())));
     }
 
     @Test

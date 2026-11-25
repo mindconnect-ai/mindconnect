@@ -26,23 +26,24 @@ import java.util.Set;
  */
 final class Json {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.builder()
-            .addModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .build();
+    private final ObjectMapper mapper;
 
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() { };
     private static final TypeReference<List<String>> STRINGS = new TypeReference<>() { };
     private static final TypeReference<List<TaskNotification>> NOTIFICATIONS = new TypeReference<>() { };
 
-    private Json() {
+    Json(JsonMapperFactory factory) {
+        this.mapper = factory.builder()
+                .addModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
     }
 
-    static String write(Object value) {
+    String write(Object value) {
         if (value == null) return null;
         try {
-            return MAPPER.writeValueAsString(value);
+            return mapper.writeValueAsString(value);
         } catch (Exception e) {
             // A payload that will not serialize is the "data only" rule being
             // broken; say so here rather than three hours later on another node.
@@ -50,39 +51,39 @@ final class Json {
         }
     }
 
-    static Map<String, Object> readMap(String json) {
+    Map<String, Object> readMap(String json) {
         return json == null ? Map.of() : read(json, MAP);
     }
 
-    static Set<String> readStringSet(String json) {
+    Set<String> readStringSet(String json) {
         return json == null ? Set.of() : new LinkedHashSet<>(read(json, STRINGS));
     }
 
-    static List<TaskNotification> readNotifications(String json) {
+    List<TaskNotification> readNotifications(String json) {
         return json == null ? List.of() : read(json, NOTIFICATIONS);
     }
 
-    static TaskFailure readFailure(String json) {
+    TaskFailure readFailure(String json) {
         if (json == null) return null;
         try {
-            return MAPPER.readValue(json, TaskFailure.class);
+            return mapper.readValue(json, TaskFailure.class);
         } catch (Exception e) {
             throw new TaskQueueException("Cannot read stored JSON: " + e.getMessage());
         }
     }
 
     /** A stored JSONB value back as the plain Java value it came from. */
-    static Object readValue(String json) {
+    Object readValue(String json) {
         try {
-            return MAPPER.readValue(json, Object.class);
+            return mapper.readValue(json, Object.class);
         } catch (Exception e) {
             throw new TaskQueueException("Cannot read stored JSON: " + e.getMessage());
         }
     }
 
-    private static <T> T read(String json, TypeReference<T> type) {
+    private <T> T read(String json, TypeReference<T> type) {
         try {
-            return MAPPER.readValue(json, type);
+            return mapper.readValue(json, type);
         } catch (Exception e) {
             throw new TaskQueueException("Cannot read stored JSON: " + e.getMessage());
         }

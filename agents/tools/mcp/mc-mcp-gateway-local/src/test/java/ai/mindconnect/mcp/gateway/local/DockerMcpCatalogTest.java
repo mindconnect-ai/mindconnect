@@ -3,6 +3,8 @@ package ai.mindconnect.mcp.gateway.local;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,7 +23,7 @@ class DockerMcpCatalogTest {
         // call on it, for some unrelated request, died of it.
         DockerMcpCatalog catalog = new DockerMcpCatalog(
                 "http://127.0.0.1:1/mcp/catalog.yaml",     // nothing listens on port 1
-                Duration.ofHours(6), Duration.ofMillis(500));
+                Duration.ofHours(6), Duration.ofMillis(500), new JsonMapperFactory(List.of()));
 
         assertThat(catalog.search("github", 10)).isEmpty();
         assertThat(Thread.currentThread().isInterrupted())
@@ -46,7 +48,7 @@ class DockerMcpCatalogTest {
                     tools:
                       - name: get_issue
                       - name: create_pull_request
-                """);
+                """, new JsonMapperFactory(List.of()));
 
         assertThat(entries).hasSize(1);
         var entry = entries.get(0);
@@ -66,13 +68,13 @@ class DockerMcpCatalogTest {
                 registry:
                   remote-only:
                     title: Somebody else runs this
-                """)).isEmpty();
+                """, new JsonMapperFactory(List.of()))).isEmpty();
     }
 
     @Test
     void a_failure_is_not_a_crash() {
         DockerMcpCatalog catalog = new DockerMcpCatalog(
-                "http://127.0.0.1:1/mcp/catalog.yaml", Duration.ofHours(6), Duration.ofMillis(500));
+                "http://127.0.0.1:1/mcp/catalog.yaml", Duration.ofHours(6), Duration.ofMillis(500), new JsonMapperFactory(List.of()));
 
         assertThat(catalog.search(null, 10)).isEmpty();
         assertThat(catalog.name()).isEqualTo("Docker MCP Catalog");

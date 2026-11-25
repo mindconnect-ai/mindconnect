@@ -4,6 +4,7 @@ import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
@@ -81,18 +82,19 @@ public final class DefaultVectorStores implements VectorStores {
     /**
      * What the host brings: its data directory, the application's database (null
      * on files), the built-in index definitions, why they are on files when they
-     * are, and how passwords of definitions are decrypted.
+     * are, how passwords of definitions are decrypted, and the mapper factory
+     * every store and index on files writes with.
      */
     record Host(Path baseDir, Sql runtimeSql, DataSource runtimeDb, Map<String, IndexDefinition> builtIn,
-                String fileReason, EncryptionHelper encryption) {}
+                String fileReason, EncryptionHelper encryption, JsonMapperFactory json) {}
 
     private record Opened(IndexDefinition definition, EmbeddingIndex index, String location) {}
 
     /** Registry and indexes on files, under {@code <baseDir>/<namespace>/}. */
     DefaultVectorStores(VectorStoreTemplate defaultTemplate, Path baseDir, LlmEmbeddings embeddings,
-                        LlmConfigRepository configs, ScopeSupplier scope) {
-        this(defaultTemplate, fileRegistries(baseDir), new LegacyVectorStores(baseDir, null),
-                new Host(baseDir, null, null, builtIn(FILE, null, null, null), "file persistence", null),
+                        LlmConfigRepository configs, ScopeSupplier scope, JsonMapperFactory json) {
+        this(defaultTemplate, fileRegistries(baseDir, json), new LegacyVectorStores(baseDir, null, json),
+                new Host(baseDir, null, null, builtIn(FILE, null, null, null), "file persistence", null, json),
                 embeddings, configs, scope);
     }
 
@@ -109,7 +111,7 @@ public final class DefaultVectorStores implements VectorStores {
     }
 
     /**
-     * Empty when the environment lacks the embedding services.
+     * Empty when the environment lacks the embedding services or the mapper factory.
      *
      * <p>A runtime that keeps its data in Postgres registers its {@link Sql} and
      * {@link DataSource}: the registry then lives in that database, and so do the
@@ -119,9 +121,11 @@ public final class DefaultVectorStores implements VectorStores {
     static Optional<VectorStores> fromEnvironment(ToolEnvironment env) {
         LlmEmbeddings embeddings = env.get(LlmEmbeddings.class).orElse(null);
         LlmConfigRepository configs = env.get(LlmConfigRepository.class).orElse(null);
-        if (embeddings == null || configs == null) {
-            log.warn("Vector tools disabled: LlmEmbeddings {}, LlmConfigRepository {}",
-                    embeddings == null ? "missing" : "ok", configs == null ? "missing" : "ok");
+        JsonMapperFactory json = env.get(JsonMapperFactory.class).orElse(null);
+        if (embeddings == null || configs == null || json == null) {
+            log.warn("Vector tools disabled: LlmEmbeddings {}, LlmConfigRepository {}, JsonMapperFactory {}",
+                    embeddings == null ? "missing" : "ok", configs == null ? "missing" : "ok",
+                    json == null ? "missing" : "ok");
             return Optional.empty();
         }
         Sql sql = env.get(Sql.class).orElse(null);
@@ -151,12 +155,12 @@ public final class DefaultVectorStores implements VectorStores {
             fileReason = "file persistence";
         }
         Function<Namespace, VectorStoreRegistry> registries = sql == null
-                ? fileRegistries(baseDir)
-                : new PostgresVectorStores(sql, baseDir)::open;
+                ? fileRegistries(baseDir, json)
+                : new PostgresVectorStores(sql, baseDir, json)::open;
         Host host = new Host(baseDir, sql, runtimeDb, builtIn, fileReason,
-                env.get(EncryptionHelper.class).orElse(null));
+                env.get(EncryptionHelper.class).orElse(null), json);
         return Optional.of(new DefaultVectorStores(defaultTemplate, registries,
-                new LegacyVectorStores(baseDir, runtimeDb), host, embeddings, configs,
+                new LegacyVectorStores(baseDir, runtimeDb, json), host, embeddings, configs,
                 // The host's scope, else the default namespace.
                 env.get(ScopeSupplier.class).orElseGet(ScopeSupplier::local)));
     }
@@ -171,8 +175,8 @@ public final class DefaultVectorStores implements VectorStores {
         return Map.copyOf(builtIn);
     }
 
-    private static Function<Namespace, VectorStoreRegistry> fileRegistries(Path baseDir) {
-        return ns -> new FileVectorStoreRegistry(baseDir.resolve(ns.value()).resolve("vector-stores"));
+    private static Function<Namespace, VectorStoreRegistry> fileRegistries(Path baseDir, JsonMapperFactory json) {
+        return ns -> new FileVectorStoreRegistry(baseDir.resolve(ns.value()).resolve("vector-stores"), json);
     }
 
     // ── registry & indexes per namespace ───────────────────────────────────
@@ -330,12 +334,13 @@ public final class DefaultVectorStores implements VectorStores {
                 Sql sql = definition.url() == null && host.runtimeSql() != null ? host.runtimeSql() : Sql.of(db);
                 String where = definition.url() != null ? withoutCredentials(definition.url())
                         : systemDatabase().orElse("the application's database");
-                return new Opened(definition, new PgEmbeddingIndex(sql, ScopeSupplier.fixed(namespace), definition.effectiveTable()),
+                return new Opened(definition, new PgEmbeddingIndex(sql, ScopeSupplier.fixed(namespace), definition.effectiveTable(),
+                        host.json()),
                         "Postgres (pgvector), " + where + " — table " + definition.effectiveTable());
             }
         }
         Path dir = fileDirectory(namespace, definition);
-        return new Opened(definition, FileEntryStore.index(dir),
+        return new Opened(definition, FileEntryStore.index(dir, host.json()),
                 "Files in " + dir + (fileReason == null ? "" : " — " + fileReason));
     }
 

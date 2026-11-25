@@ -1,7 +1,11 @@
 package ai.mindconnect.workflow.admin.app;
 
+import java.util.List;
+
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 
 /**
  * Standalone workflow admin. The embeddable {@code mc-workflow-admin-rest}
@@ -14,5 +18,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class WorkflowAdminApplication {
     public static void main(String[] args) {
         SpringApplication.run(WorkflowAdminApplication.class, args);
+    }
+
+    /** The standalone admin brings no Jackson modules of its own. */
+    @Bean
+    JsonMapperFactory jsonMapperFactory() {
+        return new JsonMapperFactory(List.of());
     }
 }

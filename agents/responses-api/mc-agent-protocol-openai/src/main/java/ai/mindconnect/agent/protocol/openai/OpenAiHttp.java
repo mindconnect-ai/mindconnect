@@ -24,13 +24,14 @@ final class OpenAiHttp {
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(30))
             .build();
-    private final ObjectMapper json = JsonMapperFactory.create();
+    private final ObjectMapper json;
     private final String baseUrl;
     private final String apiKey;
 
-    OpenAiHttp(String baseUrl, String apiKey) {
+    OpenAiHttp(String baseUrl, String apiKey, JsonMapperFactory json) {
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
+        this.json = json.create();
     }
 
     JsonNode get(String path) {

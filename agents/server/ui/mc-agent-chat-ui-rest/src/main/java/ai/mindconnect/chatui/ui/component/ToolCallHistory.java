@@ -2,7 +2,6 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
-import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -29,16 +28,17 @@ import java.util.List;
  */
 public final class ToolCallHistory {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
-
     private final MessageListComponent.SubAgentTreeProvider subAgentTree;
     /** Whose messages these are: a long result is downloaded from that session. */
     private final ai.mindconnect.agent.SessionId sessionId;
+    /** A call's arguments are pretty-printed with it, its result read with it. */
+    private final ObjectMapper json;
 
     public ToolCallHistory(ai.mindconnect.agent.SessionId sessionId,
-                           MessageListComponent.SubAgentTreeProvider subAgentTree) {
+                           MessageListComponent.SubAgentTreeProvider subAgentTree, ObjectMapper json) {
         this.sessionId = sessionId;
         this.subAgentTree = subAgentTree;
+        this.json = json;
     }
 
     /**
@@ -71,7 +71,7 @@ public final class ToolCallHistory {
                 for (TurnMessage.ToolCall call : m.message().toolCalls()) {
                     String id = call.callId() == null ? "" : call.callId();
                     nameByCallId.put(id, call.name() == null ? "tool" : call.name());
-                    argsByCallId.put(id, MAPPER.writerWithDefaultPrettyPrinter()
+                    argsByCallId.put(id, json.writerWithDefaultPrettyPrinter()
                             .writeValueAsString(call.arguments()));
                     if (!id.isEmpty()) byCallId.putIfAbsent(id, List.of());
                 }
@@ -162,7 +162,7 @@ public final class ToolCallHistory {
     private java.util.Optional<String> extractSubAgentName(String argsJson) {
         if (argsJson == null) return java.util.Optional.empty();
         try {
-            JsonNode node = MAPPER.readTree(argsJson);
+            JsonNode node = json.readTree(argsJson);
             List<String> names = new java.util.ArrayList<>();
             names.add(node.path("name").asText(""));
             node.path("tasks").forEach(task -> names.add(task.path("name").asText("")));

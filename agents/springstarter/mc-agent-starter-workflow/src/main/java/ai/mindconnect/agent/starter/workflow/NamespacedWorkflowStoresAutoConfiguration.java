@@ -4,6 +4,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
@@ -52,16 +53,16 @@ public class NamespacedWorkflowStoresAutoConfiguration {
     @ConditionalOnMissingBean(WorkflowDataRepository.class)
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     WorkflowDataRepository namespacedWorkflowDataRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                                  ScopeSupplier scope) {
-        return new FileWorkflowDataRepository(Path.of(baseDir), partition(scope));
+                                                  ScopeSupplier scope, JsonMapperFactory json) {
+        return new FileWorkflowDataRepository(Path.of(baseDir), partition(scope), json);
     }
 
     @Bean
     @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     WorkflowInstanceRepository namespacedWorkflowInstanceRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                                          ScopeSupplier scope) {
-        return new FileWorkflowInstanceRepository(Path.of(baseDir), partition(scope));
+                                                          ScopeSupplier scope, JsonMapperFactory json) {
+        return new FileWorkflowInstanceRepository(Path.of(baseDir), partition(scope), json);
     }
 
     @Configuration(proxyBeanMethods = false)
@@ -73,17 +74,21 @@ public class NamespacedWorkflowStoresAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean(WorkflowDataRepository.class)
         WorkflowDataRepository namespacedWorkflowDataRepository(DataSource dataSource, ScopeSupplier scope,
-                                                                @Value("${mindconnect.data.base-dir:data}") String baseDir) {
+                                                                @Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                                                JsonMapperFactory json) {
             return new ai.mindconnect.workflow.persistence.pg.PgWorkflowRepositoryFactory(
-                    ai.mindconnect.jdbc.Sql.of(dataSource), partition(scope), Path.of(baseDir)).workflowDataRepository();
+                    ai.mindconnect.jdbc.Sql.of(dataSource), partition(scope), Path.of(baseDir), json)
+                    .workflowDataRepository();
         }
 
         @Bean
         @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
         WorkflowInstanceRepository namespacedWorkflowInstanceRepository(DataSource dataSource, ScopeSupplier scope,
-                                                                        @Value("${mindconnect.data.base-dir:data}") String baseDir) {
+                                                                        @Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                                                        JsonMapperFactory json) {
             return new ai.mindconnect.workflow.persistence.pg.PgWorkflowRepositoryFactory(
-                    ai.mindconnect.jdbc.Sql.of(dataSource), partition(scope), Path.of(baseDir)).workflowInstanceRepository();
+                    ai.mindconnect.jdbc.Sql.of(dataSource), partition(scope), Path.of(baseDir), json)
+                    .workflowInstanceRepository();
         }
     }
 
@@ -104,9 +109,10 @@ public class NamespacedWorkflowStoresAutoConfiguration {
         @ConditionalOnMissingBean
         ai.mindconnect.workflow.admin.service.WorkflowAdminService workflowAdminService(
                 WorkflowDataRepository store, WorkflowInstanceRepository instances,
-                ObjectProvider<EnvVarResolver> environment) {
+                ObjectProvider<EnvVarResolver> environment, JsonMapperFactory json) {
             EnvVarResolver vars = environment.getIfAvailable(EnvVarResolver::system);
-            return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances, vars.shared()::asMap);
+            return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances,
+                    vars.shared()::asMap, json);
         }
 
         /**

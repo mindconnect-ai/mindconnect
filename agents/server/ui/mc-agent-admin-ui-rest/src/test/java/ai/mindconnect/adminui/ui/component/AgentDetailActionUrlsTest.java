@@ -4,6 +4,7 @@ import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -48,7 +49,7 @@ class AgentDetailActionUrlsTest {
 
     @Test
     void theDetailHeaderKeepsItsRoutes() throws Exception {
-        String out = json(new AgentDetailComponent(agent(), "u", NO_SESSIONS).render());
+        String out = json(new AgentDetailComponent(agent(), "u", NO_SESSIONS, new JsonMapperFactory(List.of())).render());
 
         assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/edit\"");
         assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "\"");
@@ -57,14 +58,14 @@ class AgentDetailActionUrlsTest {
 
     @Test
     void theToolTableKeepsItsRoutes() throws Exception {
-        String out = json(new ToolTableComponent(agent()).render());
+        String out = json(new ToolTableComponent(agent(), new JsonMapperFactory(List.of())).render());
 
         assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/tools/new\"");
     }
 
     @Test
     void aRowActionRendersThePlaceholderTheClientFillsIn() throws Exception {
-        String out = json(new ToolTableComponent(agent()).render());
+        String out = json(new ToolTableComponent(agent(), new JsonMapperFactory(List.of())).render());
 
         assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/tools/{id}\"");
         assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/tools/{id}/edit\"");

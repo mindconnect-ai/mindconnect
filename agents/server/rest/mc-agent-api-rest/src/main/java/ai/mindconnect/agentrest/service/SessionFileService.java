@@ -21,6 +21,7 @@ import ai.mindconnect.workflow.execution.WorkflowExecutorService;
 import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -354,7 +355,8 @@ public class SessionFileService {
                 var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                         new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                                 + "' not found"));
-                var executor = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+                var executor = new WorkflowExecutorService(SpiWorkflowContextFactory.create(
+                        runtime.service(JsonMapperFactory.class)))
                         .withEnvironment(environment.shared()::asMap);
                 WorkflowResult result;
                 // The workflow's tool steps run on behalf of this chat's user and

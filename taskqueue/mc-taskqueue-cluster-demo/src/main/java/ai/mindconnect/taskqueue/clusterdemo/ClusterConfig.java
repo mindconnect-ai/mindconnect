@@ -3,6 +3,7 @@ package ai.mindconnect.taskqueue.clusterdemo;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.PersistentChannels;
 import ai.mindconnect.channel.jdbc.JdbcChannelStore;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.taskqueue.LoggingTaskListener;
 import ai.mindconnect.taskqueue.MdcTaskAdvisor;
 import ai.mindconnect.taskqueue.SharedStateStore;
@@ -20,6 +21,7 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * The cluster wiring: everything the in-memory demo config provided, backed
@@ -56,19 +58,25 @@ public class ClusterConfig {
         return ds;
     }
 
+    /** The demo brings no Jackson modules of its own. */
     @Bean
-    public JdbcTaskStore taskStore(DataSource dataSource, ClusterProperties cluster) {
-        return new JdbcTaskStore(dataSource, cluster.nodeId(), cluster.lease()).initSchema();
+    public JsonMapperFactory jsonMapperFactory() {
+        return new JsonMapperFactory(List.of());
     }
 
     @Bean
-    public SharedStateStore sharedStateStore(DataSource dataSource) {
-        return new JdbcSharedStateStore(dataSource).initSchema();
+    public JdbcTaskStore taskStore(DataSource dataSource, ClusterProperties cluster, JsonMapperFactory json) {
+        return new JdbcTaskStore(dataSource, cluster.nodeId(), cluster.lease(), json).initSchema();
     }
 
     @Bean
-    public JdbcChannelStore<TaskEvent> channelStore(DataSource dataSource) {
-        return new JdbcChannelStore<>(dataSource, TaskEvent.class).initSchema();
+    public SharedStateStore sharedStateStore(DataSource dataSource, JsonMapperFactory json) {
+        return new JdbcSharedStateStore(dataSource, json).initSchema();
+    }
+
+    @Bean
+    public JdbcChannelStore<TaskEvent> channelStore(DataSource dataSource, JsonMapperFactory json) {
+        return new JdbcChannelStore<>(dataSource, TaskEvent.class, json).initSchema();
     }
 
     @Bean

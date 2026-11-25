@@ -30,16 +30,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public final class ToolDetailComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
-
     private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
+    private final ObjectMapper mapper;
 
-    public ToolDetailComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry) {
+    public ToolDetailComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry, JsonMapperFactory json) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
+        this.mapper = json.create();
     }
 
     @Override
@@ -51,7 +51,7 @@ public final class ToolDetailComponent implements UiComponent {
     public UiNode render() {
         String overridesJson = "";
         if (tool.overrides() != null && !tool.overrides().isEmpty()) {
-            try { overridesJson = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(tool.overrides()); }
+            try { overridesJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(tool.overrides()); }
             catch (JsonProcessingException ignored) {}
         }
 

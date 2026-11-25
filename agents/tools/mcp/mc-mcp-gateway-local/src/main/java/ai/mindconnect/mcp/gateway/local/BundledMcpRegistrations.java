@@ -15,8 +15,6 @@ import java.io.InputStream;
  */
 public final class BundledMcpRegistrations {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
-
     private BundledMcpRegistrations() {
     }
 
@@ -25,16 +23,17 @@ public final class BundledMcpRegistrations {
      * {@code repository}. Files are copied as they are; any other store gets them
      * read and saved.
      */
-    public static void seed(McpServerRepository repository, String initialData) {
+    public static void seed(McpServerRepository repository, String initialData, JsonMapperFactory json) {
         if (repository instanceof FileMcpServerRepository files) {
             new FileCopyInitialDataInstaller(files.directory()).install(initialData);
             return;
         }
+        ObjectMapper mapper = json.create();
         new ImportInitialDataInstaller(
                 id -> repository.findAll().stream().anyMatch(r -> r.id().value().equals(id)),
                 (id, resource) -> {
                     try (InputStream in = resource.getInputStream()) {
-                        repository.save(McpRegistrationJson.read(MAPPER.readTree(in), resource.getDescription()));
+                        repository.save(McpRegistrationJson.read(mapper.readTree(in), resource.getDescription()));
                     }
                 }).install(initialData);
     }

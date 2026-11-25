@@ -3,6 +3,7 @@ package ai.mindconnect.agent.tools.virtualenv;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -11,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -54,7 +56,7 @@ class VirtualEnvWorkspaceProviderIdleTest {
         final AtomicInteger acquires = new AtomicInteger();
 
         RunningClient() {
-            super(URI.create("http://virtual-env.invalid"), TokenSource.none(), Duration.ofSeconds(1));
+            super(URI.create("http://virtual-env.invalid"), TokenSource.none(), Duration.ofSeconds(1), new JsonMapperFactory(List.of()));
         }
 
         @Override

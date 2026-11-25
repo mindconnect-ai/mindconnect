@@ -14,6 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -90,13 +93,13 @@ class LegacyVectorStoresTest {
         Path file = dir.resolve(NS.value()).resolve("vector-stores").resolve(store + ".jsonl");
         Files.createDirectories(file.getParent());
         Files.writeString(file, lines);
-        return new FileVectorStoreRegistry(dir.resolve(NS.value()).resolve("vector-stores"));
+        return new FileVectorStoreRegistry(dir.resolve(NS.value()).resolve("vector-stores"), new JsonMapperFactory(List.of()));
     }
 
     @Test
     void anImportThatBreaksOffListsNothing_andTheNextStartImportsTheWholeStore() throws Exception {
         VectorStoreRegistry registry = legacyFile("kb", TWO_DOCUMENTS);
-        EmbeddingIndex index = FileEntryStore.index(dir.resolve("embeddings"));
+        EmbeddingIndex index = FileEntryStore.index(dir.resolve("embeddings"), new JsonMapperFactory(List.of(new IdJsonModule())));
         AtomicInteger writes = new AtomicInteger();
         EmbeddingIndex breaksOnTheSecond = (EmbeddingIndex) java.lang.reflect.Proxy.newProxyInstance(
                 EmbeddingIndex.class.getClassLoader(), new Class<?>[]{EmbeddingIndex.class}, (proxy, method, args) -> {
@@ -109,7 +112,7 @@ class LegacyVectorStoresTest {
                         throw e.getCause();
                     }
                 });
-        LegacyVectorStores legacy = new LegacyVectorStores(dir, null);
+        LegacyVectorStores legacy = new LegacyVectorStores(dir, null, new JsonMapperFactory(List.of()));
 
         legacy.importInto(NS, registry, i -> breaksOnTheSecond, template, i -> "fake-model");
         assertThat(registry.members("kb")).as("half a store is not listed").isEmpty();
@@ -126,9 +129,9 @@ class LegacyVectorStoresTest {
                 + "\"metadata\":{},\"embedding\":[0.0,0.0,0.0]}\n"
                 + "{\"id\":\"e:0\",\"fileId\":\"empty.md\",\"ordinal\":0,\"text\":\"\","
                 + "\"metadata\":{},\"embedding\":[1.0,0.0,0.0]}\n");
-        EmbeddingIndex index = FileEntryStore.index(dir.resolve("embeddings"));
+        EmbeddingIndex index = FileEntryStore.index(dir.resolve("embeddings"), new JsonMapperFactory(List.of(new IdJsonModule())));
 
-        new LegacyVectorStores(dir, null).importInto(NS, registry, i -> index, template, i -> "fake-model");
+        new LegacyVectorStores(dir, null, new JsonMapperFactory(List.of())).importInto(NS, registry, i -> index, template, i -> "fake-model");
 
         assertThat(registry.members("kb")).extracting(EntityRef::id).containsExactlyInAnyOrder("a.md", "b.md");
     }

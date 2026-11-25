@@ -31,6 +31,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/admin/api")
@@ -48,6 +50,8 @@ public class SessionUiController {
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
     private final ConversationManager conversations;
+    /** Writes the raw JSON the dialogs show: Jackson's defaults, as these components have always had. */
+    private final ObjectMapper json;
 
     public SessionUiController(AgentRuntime runtime,
                              TodoListService todoListService,
@@ -58,6 +62,7 @@ public class SessionUiController {
         this.todoListService = todoListService;
         this.traceRepository = traceRepository;
         this.conversations = conversations;
+        this.json = runtime.service(JsonMapperFactory.class).create();
     }
 
     /** The agent the session runs as, for a dialog's heading; a session without one is still shown. */
@@ -112,7 +117,7 @@ public class SessionUiController {
             if (memory == null) {
                 return ResponseEntity.status(503).body("Working memory unavailable for this session");
             }
-            var page = new MemoryPage(session.id(), agentNameOf(session), memory);
+            var page = new MemoryPage(session.id(), agentNameOf(session), memory, json);
             if (seq != null) return ResponseEntity.ok(page.selectEntry(seq));
             if (dialog) return sessionDialog(sessionId, "Working Memory", page.render());
             return ResponseEntity.ok(page.render());
@@ -140,7 +145,7 @@ public class SessionUiController {
         }
         return sessions.find(sessionId)
                 .<ResponseEntity<?>>map(session ->
-                        ResponseEntity.ok(new MemoryPage(session.id(), agentNameOf(session), memory).render()))
+                        ResponseEntity.ok(new MemoryPage(session.id(), agentNameOf(session), memory, json).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -246,7 +251,7 @@ public class SessionUiController {
                         history = List.of();
                     }
                     var card = new RoundtripCardComponent(trace,
-                            RoundtripCardComponent.indexToolResults(history));
+                            RoundtripCardComponent.indexToolResults(history, json), json);
                     var dlg = UiDialog.of(card.title(), null, card.render());
                     dlg.setId(TRACE_DIALOG_ID);
                     dlg.withCssClass("sui-dialog--wide");

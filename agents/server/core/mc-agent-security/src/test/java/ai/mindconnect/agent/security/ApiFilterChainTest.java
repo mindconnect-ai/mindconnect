@@ -5,6 +5,7 @@ import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
 import ai.mindconnect.agentrest.auth.CurrentUserWebConfig;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.adapter.memory.InMemoryApiTokenRepository;
 import ai.mindconnect.user.adapter.memory.InMemoryUserRepository;
 import ai.mindconnect.user.service.ApiTokenService;
@@ -206,7 +207,7 @@ class ApiFilterChainTest {
 
         @Bean
         ApiAuthentication apiAuthentication(ApiTokenService tokens, UserRecorder recorder, JwtDecoder decoder) {
-            return new ApiAuthentication(tokens, recorder, decoder);
+            return new ApiAuthentication(tokens, recorder, decoder, new JsonMapperFactory(List.of()));
         }
 
         @Bean

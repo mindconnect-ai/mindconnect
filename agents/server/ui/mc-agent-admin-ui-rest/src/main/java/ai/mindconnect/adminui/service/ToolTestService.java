@@ -33,13 +33,14 @@ import java.util.Map;
 public class ToolTestService {
 
     private static final Logger log = LoggerFactory.getLogger(ToolTestService.class);
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
     private static final String TEST_USER_ID = "admin-test";
 
     private final ToolRegistry toolRegistry;
+    private final ObjectMapper mapper;
 
-    public ToolTestService(ToolRegistry toolRegistry) {
+    public ToolTestService(ToolRegistry toolRegistry, JsonMapperFactory json) {
         this.toolRegistry = toolRegistry;
+        this.mapper = json.create();
     }
 
     /**
@@ -92,9 +93,9 @@ public class ToolTestService {
      * object — bare arrays / scalars are rejected to match the
      * {@code Tool.execute(Map)} contract.
      */
-    private static Map<String, Object> parseArgs(String json) throws Exception {
+    private Map<String, Object> parseArgs(String json) throws Exception {
         if (json == null || json.isBlank()) return Map.of();
-        var parsed = MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
+        var parsed = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
         return parsed == null ? Map.of() : parsed;
     }
 

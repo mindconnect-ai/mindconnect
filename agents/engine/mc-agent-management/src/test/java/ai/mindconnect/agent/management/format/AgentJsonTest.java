@@ -14,11 +14,13 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.tool.AgentToolBinding;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 /**
  * An agent file is the managed agent as it is stored; a file of the form
@@ -26,7 +28,7 @@ import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
  */
 class AgentJsonTest {
 
-    private final AgentJson files = new AgentJson(new ObjectMapper().registerModule(new JavaTimeModule()).findAndRegisterModules()
+    private final AgentJson files = new AgentJson(new JsonMapperFactory(List.of(new IdJsonModule())).create().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
 
     @Test

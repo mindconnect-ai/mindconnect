@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.config;
 
 import ai.mindconnect.agent.registry.workflow.WorkflowRegistryInstaller;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -15,8 +16,8 @@ import org.springframework.context.annotation.Configuration;
 public class RegistryWorkflowConfig {
 
     @Bean
-    WorkflowRegistryInstaller workflowRegistryInstaller(WorkflowDataRepository repository) {
+    WorkflowRegistryInstaller workflowRegistryInstaller(WorkflowDataRepository repository, JsonMapperFactory json) {
         return new WorkflowRegistryInstaller(repository,
-                new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
+                new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create(json)), json);
     }
 }

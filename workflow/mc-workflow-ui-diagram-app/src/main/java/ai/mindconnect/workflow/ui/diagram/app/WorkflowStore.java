@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.ui.diagram.app;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import jakarta.annotation.PostConstruct;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,7 +39,9 @@ public class WorkflowStore {
     private static final String PARTITION = "default";
 
     private final Map<String, WorkflowData> workflows = new LinkedHashMap<>();
-    private final FileWorkflowDataRepository fileRepo = new FileWorkflowDataRepository(DATA_DIR, () -> PARTITION);
+    private final FileWorkflowDataRepository fileRepo = new FileWorkflowDataRepository(DATA_DIR, () -> PARTITION,
+            // A workflow-only app without a runtime: no module of an installation to know.
+            new JsonMapperFactory(List.of()));
 
     @PostConstruct
     void load() {

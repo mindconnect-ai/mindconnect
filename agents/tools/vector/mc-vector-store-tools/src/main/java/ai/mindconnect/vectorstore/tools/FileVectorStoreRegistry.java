@@ -33,10 +33,6 @@ import java.util.Optional;
 public final class FileVectorStoreRegistry implements VectorStoreRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(FileVectorStoreRegistry.class);
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     private static final com.fasterxml.jackson.core.type.TypeReference<List<EntityRef>> REFS =
             new com.fasterxml.jackson.core.type.TypeReference<>() {};
 
@@ -44,12 +40,18 @@ public final class FileVectorStoreRegistry implements VectorStoreRegistry {
     private final Path instancesDir;
     private final Path membersDir;
     private final Path indexesDir;
+    private final ObjectMapper json;
 
-    public FileVectorStoreRegistry(Path root) {
+    /** @param json the runtime's mapper factory; the records keep the form they were always written in */
+    public FileVectorStoreRegistry(Path root, JsonMapperFactory json) {
         this.templatesDir = root.resolve("templates");
         this.instancesDir = root.resolve("instances");
         this.membersDir = root.resolve("members");
         this.indexesDir = root.resolve("indexes");
+        this.json = json.create()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
     // ── templates ──────────────────────────────────────────────────────────
@@ -207,12 +209,12 @@ public final class FileVectorStoreRegistry implements VectorStoreRegistry {
         return stores;
     }
 
-    private static List<EntityRef> readMembers(Path file) {
+    private List<EntityRef> readMembers(Path file) {
         if (!Files.exists(file)) {
             return List.of();
         }
         try {
-            return MAPPER.readValue(file.toFile(), REFS);
+            return json.readValue(file.toFile(), REFS);
         } catch (IOException e) {
             throw new UncheckedIOException("Unreadable member list " + file, e);
         }
@@ -228,7 +230,7 @@ public final class FileVectorStoreRegistry implements VectorStoreRegistry {
         try (var files = Files.list(dir)) {
             for (Path file : files.filter(f -> f.toString().endsWith(".json")).sorted().toList()) {
                 try {
-                    out.add(MAPPER.readValue(file.toFile(), type));
+                    out.add(json.readValue(file.toFile(), type));
                 } catch (IOException e) {
                     log.warn("Skipping unreadable {}: {}", file, e.getMessage());
                 }
@@ -245,7 +247,7 @@ public final class FileVectorStoreRegistry implements VectorStoreRegistry {
             return Optional.empty();
         }
         try {
-            return Optional.of(MAPPER.readValue(file.toFile(), type));
+            return Optional.of(json.readValue(file.toFile(), type));
         } catch (IOException e) {
             log.warn("Unreadable {}: {}", file, e.getMessage());
             return Optional.empty();
@@ -265,8 +267,8 @@ public final class FileVectorStoreRegistry implements VectorStoreRegistry {
         locked(file, () -> Files.deleteIfExists(file));
     }
 
-    private static void store(Path file, Object value) throws IOException {
-        FileWrites.write(file, out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out, value));
+    private void store(Path file, Object value) throws IOException {
+        FileWrites.write(file, out -> json.writerWithDefaultPrettyPrinter().writeValue(out, value));
     }
 
     private static <T> T locked(Path file, PathLocks.Action<T> action) {

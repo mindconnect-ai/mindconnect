@@ -23,15 +23,15 @@ import java.util.List;
  */
 final class FileDiceRollRepository implements DiceRollRepository {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create().registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-
     private final Path dataDir;
     private final ScopeSupplier scope;
+    private final ObjectMapper mapper;
 
-    FileDiceRollRepository(Path dataDir, ScopeSupplier scope) {
+    FileDiceRollRepository(Path dataDir, ScopeSupplier scope, JsonMapperFactory json) {
         this.dataDir = dataDir.toAbsolutePath();
         this.scope = scope;
+        this.mapper = json.create().registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     /** The rolls of the namespace the current call works in. */
@@ -44,7 +44,7 @@ final class FileDiceRollRepository implements DiceRollRepository {
         Path file = file();
         try {
             Files.createDirectories(file.getParent());
-            Files.writeString(file, MAPPER.writeValueAsString(roll) + System.lineSeparator(), StandardCharsets.UTF_8,
+            Files.writeString(file, mapper.writeValueAsString(roll) + System.lineSeparator(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot append to " + file, e);
@@ -59,7 +59,7 @@ final class FileDiceRollRepository implements DiceRollRepository {
         try {
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
                 if (line.isBlank()) continue;
-                DiceRoll roll = MAPPER.readValue(line, DiceRoll.class);
+                DiceRoll roll = mapper.readValue(line, DiceRoll.class);
                 if (!roll.at().isBefore(from)) rolls.add(roll);
             }
         } catch (IOException e) {

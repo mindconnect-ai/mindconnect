@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +25,7 @@ class ChatPageTypingBubbleTest {
 
     private final ai.mindconnect.agent.management.api.ManagedSession session =
             ai.mindconnect.chatui.ChatFixture.session("u", AGENT, null, List.of());
-    private final ChatPage page = new ChatPage(session, AGENT, List.of(), null);
+    private final ChatPage page = new ChatPage(session, AGENT, List.of(), null, new JsonMapperFactory(List.of()).create());
 
     private List<JsonNode> ops(Object patch) {
         var out = new ArrayList<JsonNode>();

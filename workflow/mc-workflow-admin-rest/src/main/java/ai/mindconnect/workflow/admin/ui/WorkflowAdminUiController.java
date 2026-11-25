@@ -114,8 +114,18 @@ public class WorkflowAdminUiController {
     /** What a run carries onto its worker thread: the host's, or nothing. */
     private final ai.mindconnect.workflow.admin.run.RunThreadContext runContext;
 
+    /** A step as the raw editor shows it, written as the workflow store writes it. */
+    private final StepJsonMapper steps;
+
+    /** The host's mapper factory: a restored run's context gets its JSON support from it. */
+    private final ai.mindconnect.jackson.JsonMapperFactory json;
+
+    /** Types the strings a run or resume form submits. */
+    private final ParamCoercion paramCoercion;
+
     public WorkflowAdminUiController(ai.mindconnect.workflow.admin.service.WorkflowAdminService service,
                                    com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+                                   ai.mindconnect.jackson.JsonMapperFactory json,
                                    @org.springframework.beans.factory.annotation.Value(
                                            "${mindconnect.workflow-admin.browse-dir:${mindconnect.tools.base-dir:}}")
                                    String browseDir,
@@ -123,6 +133,9 @@ public class WorkflowAdminUiController {
         this.runContext = runContext.getIfAvailable(() -> ai.mindconnect.workflow.admin.run.RunThreadContext.NONE);
         this.service = service;
         this.objectMapper = objectMapper;
+        this.steps = new StepJsonMapper(json);
+        this.json = json;
+        this.paramCoercion = new ParamCoercion(json);
         String dir = browseDir == null || browseDir.isBlank() ? System.getProperty("user.home") : browseDir;
         this.browseBase = java.nio.file.Path.of(dir).toAbsolutePath().normalize();
     }
@@ -327,7 +340,7 @@ public class WorkflowAdminUiController {
     /** Reopen a kept run — renders the trace stored on the instance exactly as when it ran. */
     @GetMapping("/{wf}/instance/{id}/view")
     public UiPage viewInstance(@PathVariable String wf, @PathVariable String id) {
-        return renderRun(wf, WorkflowRunService.traceReport(requireInstance(id)));
+        return renderRun(wf, service.traceReport(requireInstance(id)));
     }
 
     /** Delete a kept run — history and, when it was still halted, the resume state with it. */
@@ -368,14 +381,14 @@ public class WorkflowAdminUiController {
         // rows; code and nested values become blocks below.
         UiDetail detail = UiDetail.of("step-detail", null);
         List<UiNode> blocks = new ArrayList<>();
-        for (var entry : StepJsonMapper.toMap(step).entrySet()) {
+        for (var entry : steps.toMap(step).entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
             if (value == null || STEP_DETAIL_SKIP.contains(key)) continue;
             if (value instanceof java.util.Map<?, ?> map) {
-                if (!map.isEmpty()) addDetailBlock(blocks, key, StepJsonMapper.prettyValue(value));
+                if (!map.isEmpty()) addDetailBlock(blocks, key, steps.prettyValue(value));
             } else if (value instanceof List<?> list) {
-                if (!list.isEmpty()) addDetailBlock(blocks, key, StepJsonMapper.prettyValue(value));
+                if (!list.isEmpty()) addDetailBlock(blocks, key, steps.prettyValue(value));
             } else {
                 String text = String.valueOf(value);
                 if (text.isBlank()) continue;
@@ -431,7 +444,7 @@ public class WorkflowAdminUiController {
     public UiPatch stepJson(@PathVariable String wf, @PathVariable String ref) {
         WorkflowData data = require(wf);
         StepData step = requireStep(data, ref);
-        return openJsonDialog(wf, ref, step, StepJsonMapper.toJson(step));
+        return openJsonDialog(wf, ref, step, steps.toJson(step));
     }
 
     /**
@@ -448,7 +461,7 @@ public class WorkflowAdminUiController {
 
         StepData replacement;
         try {
-            replacement = StepJsonMapper.fromJson(json);
+            replacement = steps.fromJson(json);
         } catch (StepJsonMapper.InvalidStepJsonException ex) {
             // Keep the dialog open with the user's text intact — losing a hand-
             // written step to a stray comma would be a poor trade for a 500.
@@ -633,7 +646,7 @@ public class WorkflowAdminUiController {
         Map<String, String> fromRecord = new LinkedHashMap<>();
         List<WorkflowInstanceSnapshot> records = service.instancesOf(wf);
         if (!records.isEmpty()) {
-            WorkflowRunService.RunReport report = WorkflowRunService.traceReport(records.get(0));
+            WorkflowRunService.RunReport report = service.traceReport(records.get(0));
             if (report.scope() != null && report.scope().variables() != null) {
                 for (WorkflowRunService.VarSnapshot var : report.scope().variables()) {
                     if (params.getProperties().containsKey(var.name()) && var.value() != null) {
@@ -749,7 +762,7 @@ public class WorkflowAdminUiController {
         Map<String, String> remembered = new LinkedHashMap<>();
         params.forEach((k, v) -> { if (v != null) remembered.put(k, String.valueOf(v)); });
         lastRunInputs.put(wf, remembered);
-        Map<String, Object> typed = ParamCoercion.coerce(data.getParams(), params);
+        Map<String, Object> typed = paramCoercion.coerce(data.getParams(), params);
 
         String runId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         liveRuns.put(runId, new LiveRun(wf, data, typed, persist, null, "wf-run-live-" + runId));
@@ -1069,7 +1082,7 @@ public class WorkflowAdminUiController {
         lastRunInputs.put(wf, remembered);
         // The form submits strings; the params schema says which are really
         // arrays, numbers, booleans — coerce them before the engine sees them.
-        Map<String, Object> typed = ParamCoercion.coerce(data.getParams(), params);
+        Map<String, Object> typed = paramCoercion.coerce(data.getParams(), params);
 
         // The service persists the instance itself: always on a halt, and on a
         // finished run when the user ticked "keep" — the instance is the record.
@@ -1144,7 +1157,7 @@ public class WorkflowAdminUiController {
     private UiForm dynamicForm(String variable, WorkflowData data, WorkflowInstanceSnapshot snapshot) {
         ai.mindconnect.workflow.execution.WorkflowInstance instance =
                 ai.mindconnect.workflow.persist.WorkflowInstanceSnapshots.restore(
-                        data, snapshot, ai.mindconnect.workflow.spi.SpiWorkflowContextFactory.create().instantiate(data.getName()));
+                        data, snapshot, ai.mindconnect.workflow.spi.SpiWorkflowContextFactory.create(json).instantiate(data.getName()));
         Object value = instance.getVariableScope().getVariableValue(variable);
         if (value == null) {
             return null;
@@ -1173,7 +1186,7 @@ public class WorkflowAdminUiController {
         WorkflowInstanceSnapshot snapshot = requireHalted(instanceId);
         Schema expected = WorkflowInstanceSnapshots.pendingHalt(data, snapshot)
                 .map(HaltData::getResumeParams).orElse(null);
-        Map<String, Object> typed = ParamCoercion.coerce(expected, params);
+        Map<String, Object> typed = paramCoercion.coerce(expected, params);
 
         String runId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         liveRuns.put(runId, new LiveRun(wf, data, typed, true, snapshot, "wf-run-live-" + runId));
@@ -1190,7 +1203,7 @@ public class WorkflowAdminUiController {
         // Coerce against what the halt declared it waits for, same as a run's params.
         Schema expected = WorkflowInstanceSnapshots.pendingHalt(data, snapshot)
                 .map(HaltData::getResumeParams).orElse(null);
-        return resumeAndRender(wf, data, snapshot, ParamCoercion.coerce(expected, params));
+        return resumeAndRender(wf, data, snapshot, paramCoercion.coerce(expected, params));
     }
 
     private UiPage resumeAndRender(String wf, WorkflowData data,

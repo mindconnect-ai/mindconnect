@@ -2,6 +2,10 @@ package ai.mindconnect.agent.runtime.infrastructure.pg;
 
 import java.nio.file.Path;
 
+import javax.sql.DataSource;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
@@ -19,6 +23,8 @@ import ai.mindconnect.agent.trace.adapter.pg.PgLlmCallTraceRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.adapter.pg.PgFileStoreFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.jdbc.Json;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.adapter.pg.PgLlmRepositoryFactory;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -34,10 +40,14 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 /**
  * Everything in one Postgres database, a namespace column per table. Each
  * repository creates its tables when it is first asked for.
+ *
+ * <p>Provides the {@link Sql} every Postgres store of the installation works
+ * on — the runtime's and those of the plugins beside it — around the runtime's
+ * mapper, so a document in the database is the same JSON a file store writes.
  */
 public final class PostgresStorePlugin extends StorePlugin {
 
-    private final Sql sql;
+    private final DataSource dataSource;
     private final Path dataDir;
     private final int maxTracesPerSession;
     private final boolean files;
@@ -46,8 +56,8 @@ public final class PostgresStorePlugin extends StorePlugin {
      * @param dataDir where the few things that stay files go — a workflow's own files
      * @param files   whether uploads are kept in the database too, instead of the file store configured beside it
      */
-    public PostgresStorePlugin(Sql sql, Path dataDir, int maxTracesPerSession, boolean files) {
-        this.sql = sql;
+    public PostgresStorePlugin(DataSource dataSource, Path dataDir, int maxTracesPerSession, boolean files) {
+        this.dataSource = dataSource;
         this.dataDir = dataDir;
         this.maxTracesPerSession = maxTracesPerSession;
         this.files = files;
@@ -56,10 +66,10 @@ public final class PostgresStorePlugin extends StorePlugin {
     @Override
     public void install(PluginRegistry registry) {
         super.install(registry);
-        registry.provide(Sql.class, () -> sql);
+        registry.provide(Sql.class, () -> Sql.of(dataSource, new Json(registry.get(ObjectMapper.class))));
         if (files) {
-            registry.provide(FileStore.class,
-                    () -> new PgFileStoreFactory(sql, registry.get(ScopeSupplier.class)).fileStore());
+            registry.provide(FileStore.class, () -> new PgFileStoreFactory(registry.get(Sql.class),
+                    registry.get(ScopeSupplier.class)).fileStore());
         }
     }
 
@@ -69,11 +79,14 @@ public final class PostgresStorePlugin extends StorePlugin {
     }
 
     @Override
-    protected Stores stores(ScopeSupplier scope) {
+    protected Stores stores(PluginRegistry registry) {
+        ScopeSupplier scope = registry.get(ScopeSupplier.class);
+        Sql sql = registry.get(Sql.class);
         PgLlmRepositoryFactory llm = new PgLlmRepositoryFactory(sql, scope);
         PgMessageRepositoryFactory messages = new PgMessageRepositoryFactory(sql, scope);
         PgWorkflowRepositoryFactory workflows =
-                new PgWorkflowRepositoryFactory(sql, () -> scope.namespace().value(), dataDir);
+                new PgWorkflowRepositoryFactory(sql, () -> scope.namespace().value(), dataDir,
+                        registry.get(JsonMapperFactory.class));
         return new Stores() {
             @Override public LlmConfigRepository llmConfigs() { return llm.llmConfigRepository(); }
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }

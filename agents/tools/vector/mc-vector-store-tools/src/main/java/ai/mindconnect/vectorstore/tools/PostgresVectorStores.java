@@ -2,6 +2,7 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.vectorstore.pgvector.PgEmbeddingIndex;
 import org.slf4j.Logger;
@@ -44,10 +45,12 @@ final class PostgresVectorStores {
 
     private final Sql sql;
     private final Path baseDir;
+    private final JsonMapperFactory json;
 
-    PostgresVectorStores(Sql sql, Path baseDir) {
+    PostgresVectorStores(Sql sql, Path baseDir, JsonMapperFactory json) {
         this.sql = sql;
         this.baseDir = baseDir;
+        this.json = json;
     }
 
     /**
@@ -88,7 +91,7 @@ final class PostgresVectorStores {
         OPENING.lock();
         try {
             registry.initSchema();
-            registry.importFrom(new FileVectorStoreRegistry(baseDir.resolve(namespace.value()).resolve("vector-stores")));
+            registry.importFrom(new FileVectorStoreRegistry(baseDir.resolve(namespace.value()).resolve("vector-stores"), json));
         } finally {
             OPENING.unlock();
         }

@@ -1,7 +1,6 @@
 package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.jackson.JsonMapperFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,7 +20,6 @@ import java.util.Map;
  */
 public final class JsonSchemaSample {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
     private static final int MAX_DEPTH = 5;
 
     private JsonSchemaSample() {}
@@ -30,13 +28,13 @@ public final class JsonSchemaSample {
      * Returns a pretty-printed example JSON object for {@code schema}, or
      * {@code "{}\n"} when the schema is null/empty or has no properties.
      */
-    public static String example(Map<String, Object> schema) {
+    public static String example(Map<String, Object> schema, JsonMapperFactory json) {
         Object value = sample(schema, 0);
         if (!(value instanceof Map<?, ?> m) || m.isEmpty()) {
             return "{}\n";
         }
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(value) + "\n";
+            return json.create().writerWithDefaultPrettyPrinter().writeValueAsString(value) + "\n";
         } catch (Exception e) {
             return "{}\n";
         }

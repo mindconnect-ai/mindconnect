@@ -2,6 +2,7 @@ package ai.mindconnect.taskqueue.jdbc;
 
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.jdbc.JdbcChannelStore;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
@@ -71,7 +72,7 @@ class JdbcTaskStoreTest {
     }
 
     private JdbcTaskStore store(String nodeId, Duration lease) {
-        return new JdbcTaskStore(dataSource, nodeId, lease).initSchema();
+        return new JdbcTaskStore(dataSource, nodeId, lease, new JsonMapperFactory(List.of())).initSchema();
     }
 
     @AfterEach
@@ -209,7 +210,7 @@ class JdbcTaskStoreTest {
         // transition write while the row RUNS under node-1's lease — the
         // review found retry() flipping a re-claimed task back to QUEUED.
         var store1 = store("node-1", Duration.ofMinutes(1));
-        var store2 = new JdbcTaskStore(dataSource, "node-2", Duration.ofMinutes(1));
+        var store2 = new JdbcTaskStore(dataSource, "node-2", Duration.ofMinutes(1), new JsonMapperFactory(List.of()));
 
         store1.save(TaskRecord.queued("fenced-1", TaskSubmission.of("t", Map.of())));
         TaskRecord claimed = store1.claimNext(java.util.Set.of("t")).orElseThrow();
@@ -236,7 +237,7 @@ class JdbcTaskStoreTest {
 
     @Test
     void channelStoreAssignsOneSeqSpacePerChannel() {
-        var store = new JdbcChannelStore<>(dataSource, Map.class).initSchema();
+        var store = new JdbcChannelStore<>(dataSource, Map.class, new JsonMapperFactory(List.of())).initSchema();
 
         assertThat(store.append("tasks", Map.of("n", 1))).isEqualTo(1);
         assertThat(store.append("tasks", Map.of("n", 2))).isEqualTo(2);

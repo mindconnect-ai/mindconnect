@@ -21,18 +21,18 @@ record McpServerDraft(
         String targetJson
 ) {
 
-    static McpServerDraft empty() {
-        return new McpServerDraft("", "", "", true, "", McpTargetForm.toJson(null));
+    static McpServerDraft empty(McpTargetForm targets) {
+        return new McpServerDraft("", "", "", true, "", targets.toJson(null));
     }
 
-    static McpServerDraft of(McpServerRegistration registration) {
+    static McpServerDraft of(McpServerRegistration registration, McpTargetForm targets) {
         return new McpServerDraft(
                 registration.id().value(),   // a draft holds text, not the domain value
                 registration.displayName(),
                 registration.description(),
                 registration.enabled(),
                 registration.toolNamePrefix(),
-                McpTargetForm.toJson(registration.target()));
+                targets.toJson(registration.target()));
     }
 
     /** The same draft with an id filled in — used where the id comes from the URL. */

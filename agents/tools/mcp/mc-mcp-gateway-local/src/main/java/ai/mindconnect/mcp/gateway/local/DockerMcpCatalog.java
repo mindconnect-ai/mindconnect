@@ -5,7 +5,6 @@ import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpCatalogEntry;
 import ai.mindconnect.mcp.gateway.McpTarget;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,22 +43,22 @@ public final class DockerMcpCatalog implements McpCatalog {
 
     public static final String DEFAULT_URL = "https://desktop.docker.com/mcp/catalog/v2/catalog.yaml";
 
-    private static final ObjectMapper YAML = JsonMapperFactory.create(new YAMLFactory());
-
     private final URI url;
     private final Duration ttl;
     private final HttpClient http;
+    private final JsonMapperFactory json;
 
     private volatile List<McpCatalogEntry> cached = List.of();
     private volatile Instant fetchedAt = Instant.EPOCH;
 
-    public DockerMcpCatalog(String url, Duration ttl, Duration timeout) {
+    public DockerMcpCatalog(String url, Duration ttl, Duration timeout, JsonMapperFactory json) {
         this.url = URI.create(url == null || url.isBlank() ? DEFAULT_URL : url);
         this.ttl = ttl == null ? Duration.ofHours(6) : ttl;
         this.http = HttpClient.newBuilder()
                 .connectTimeout(timeout == null ? Duration.ofSeconds(10) : timeout)
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
+        this.json = json;
     }
 
     @Override
@@ -102,7 +101,7 @@ public final class DockerMcpCatalog implements McpCatalog {
                     log.warn("MCP catalog {} answered HTTP {}", url, response.statusCode());
                     return cached;
                 }
-                List<McpCatalogEntry> parsed = parse(response.body());
+                List<McpCatalogEntry> parsed = parse(response.body(), json);
                 cached = parsed;
                 fetchedAt = Instant.now();
                 log.info("MCP catalog: {} entries from {}", parsed.size(), url);
@@ -126,8 +125,8 @@ public final class DockerMcpCatalog implements McpCatalog {
     }
 
     /** Package-private for the test: the parser is the part with rules in it. */
-    static List<McpCatalogEntry> parse(String yaml) throws java.io.IOException {
-        JsonNode root = YAML.readTree(yaml);
+    static List<McpCatalogEntry> parse(String yaml, JsonMapperFactory json) throws java.io.IOException {
+        JsonNode root = json.create(new YAMLFactory()).readTree(yaml);
         JsonNode registry = root.path("registry").isObject() ? root.get("registry") : root;
         List<McpCatalogEntry> out = new ArrayList<>();
         registry.fields().forEachRemaining(field -> {

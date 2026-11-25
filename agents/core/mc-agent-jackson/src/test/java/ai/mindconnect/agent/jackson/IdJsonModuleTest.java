@@ -9,7 +9,11 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.jackson.JacksonPlugin;
 import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.plugin.DefaultPluginRegistry;
+import ai.mindconnect.plugin.PluginRegistry;
+import java.util.List;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,20 +21,29 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import org.junit.jupiter.api.Test;
 
 /**
- * The module as a mapper of the installation gets it: through the
- * ServiceLoader. How each id stands in JSON is held by the format tests of
+ * The module as a mapper of a runtime gets it: contributed by IdJsonPlugin.
+ * How each id stands in JSON is held by the format tests of
  * mc-agent-management; this checks that the module is what makes it so.
  */
 class IdJsonModuleTest {
 
-    private final ObjectMapper json = JsonMapperFactory.create();
+    private final ObjectMapper json = runtime().get(JsonMapperFactory.class).create();
+
+    /** The factory as a runtime has it: from the modules its plugins contribute. */
+    private static PluginRegistry runtime() {
+        PluginRegistry registry = new DefaultPluginRegistry();
+        registry.install(new JacksonPlugin(List.of()));
+        registry.install(new IdJsonPlugin());
+        registry.start();
+        return registry;
+    }
 
     record Holder(SessionId session, AgentId agent, UserId user) { }
 
     /** Moved here from mc-agent-domain's EntityIdTest, unchanged but for the mapper: the ids carry no Jackson now. */
     @Test
     void inJsonAnIdIsItsValue() throws Exception {
-        ObjectMapper mapper = JsonMapperFactory.create();
+        ObjectMapper mapper = json;
         Holder holder = new Holder(SessionId.of("s-1"), AgentId.of("web-researcher"), UserId.of("David"));
 
         String json = mapper.writeValueAsString(holder);
@@ -40,7 +53,7 @@ class IdJsonModuleTest {
     }
 
     @Test
-    void a_mapper_of_the_factory_has_the_module() {
+    void a_mapper_of_the_runtimes_factory_has_the_module() {
         assertThat(json.getRegisteredModuleIds()).contains("mindconnect-ids");
     }
 

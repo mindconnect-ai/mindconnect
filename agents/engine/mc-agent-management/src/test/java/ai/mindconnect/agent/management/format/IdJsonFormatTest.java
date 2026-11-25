@@ -9,8 +9,10 @@ import java.util.Map;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.tool.AgentToolId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
@@ -26,7 +28,7 @@ import org.junit.jupiter.api.Test;
 class IdJsonFormatTest {
 
     /** Its modules found as every mapper of the installation finds them: through the {@code ServiceLoader}. */
-    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper json = new JsonMapperFactory(List.of(new IdJsonModule())).create();
 
     record Everything(SessionId session, UserId user, AgentId agent, AgentToolId tool, Namespace namespace) { }
 

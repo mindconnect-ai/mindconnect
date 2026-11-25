@@ -4,6 +4,7 @@ import ai.mindconnect.adminui.service.MigrationService.FieldDiff;
 import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
@@ -14,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -47,7 +49,7 @@ class MigrationServiceApplyFieldTest {
                 new InMemorySkillRepository(ScopeSupplier.local()),
                 new InMemoryWorkflowDataRepository(),
                 new ObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
-                Optional.empty());
+                Optional.empty(), new JsonMapperFactory(List.of()));
     }
 
     private LlmConfig stored() {

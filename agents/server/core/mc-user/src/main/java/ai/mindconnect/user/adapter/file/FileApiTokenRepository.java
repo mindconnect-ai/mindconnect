@@ -1,6 +1,7 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.ApiToken;
 import ai.mindconnect.user.domain.ApiTokenId;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
@@ -25,9 +26,9 @@ public class FileApiTokenRepository implements ApiTokenRepository {
     private final FileDocuments<ApiToken> tokens;
     private final Object lock = new Object();
 
-    public FileApiTokenRepository(Path storageDir) {
+    public FileApiTokenRepository(Path storageDir, JsonMapperFactory json) {
         Objects.requireNonNull(storageDir, "storageDir");
-        this.tokens = new FileDocuments<>(storageDir.resolve("system").resolve("api-tokens"), ApiToken.class);
+        this.tokens = new FileDocuments<>(storageDir.resolve("system").resolve("api-tokens"), ApiToken.class, json);
     }
 
     @Override

@@ -4,6 +4,7 @@ import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.format.AgentJson;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.domain.SkillSource;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
@@ -44,12 +45,6 @@ public final class BundledSeeds {
     /** Where the seeds are: every jar's {@code initial-data/}. */
     public static final String CLASSPATH = "classpath*:initial-data/";
 
-    /**
-     * Workflows carry {@code @class} type info and legacy shapes a plain mapper
-     * cannot read — same mapper the workflow stores use.
-     */
-    static final ObjectMapper WORKFLOW_MAPPER = WorkflowObjectMapperFactory.create();
-
     /** The kinds of seed, with the slug the Migrations screen and the installed-seed records use. */
     public enum Kind {
         LLM_CONFIG("llm-config", "llm-configs/*.json"),
@@ -86,19 +81,25 @@ public final class BundledSeeds {
 
     private final ObjectMapper objectMapper;
     private final String location;
+    /**
+     * Workflows carry {@code @class} type info and legacy shapes a plain mapper
+     * cannot read — same mapper the workflow stores use.
+     */
+    private final ObjectMapper workflowMapper;
 
     /** The seeds of {@code initial-data/} on the classpath. */
-    public BundledSeeds(ObjectMapper objectMapper) {
-        this(objectMapper, CLASSPATH);
+    public BundledSeeds(ObjectMapper objectMapper, JsonMapperFactory json) {
+        this(objectMapper, CLASSPATH, json);
     }
 
     /**
      * @param location where the kind folders are, ending in {@code /} —
      *                 {@code classpath*:initial-data/}, or another root a test ships
      */
-    public BundledSeeds(ObjectMapper objectMapper, String location) {
+    public BundledSeeds(ObjectMapper objectMapper, String location, JsonMapperFactory json) {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
         this.location = location.endsWith("/") ? location : location + "/";
+        this.workflowMapper = WorkflowObjectMapperFactory.create(json);
     }
 
     /** Every seed of every kind, LLM configs first — agents refer to them. */
@@ -167,7 +168,7 @@ public final class BundledSeeds {
         for (Resource resource : scan(Kind.WORKFLOW)) {
             String id = fileId(resource);
             if (id == null) continue;
-            read(resource, WorkflowData.class, WORKFLOW_MAPPER)
+            read(resource, WorkflowData.class, workflowMapper)
                     .ifPresent(workflow -> seeds.add(new Seed<>(Kind.WORKFLOW, id, workflow)));
         }
         return seeds;
@@ -183,7 +184,7 @@ public final class BundledSeeds {
 
     public Optional<WorkflowData> workflow(String id) {
         for (Resource resource : scan(Kind.WORKFLOW)) {
-            if (id.equals(fileId(resource))) return read(resource, WorkflowData.class, WORKFLOW_MAPPER);
+            if (id.equals(fileId(resource))) return read(resource, WorkflowData.class, workflowMapper);
         }
         return Optional.empty();
     }

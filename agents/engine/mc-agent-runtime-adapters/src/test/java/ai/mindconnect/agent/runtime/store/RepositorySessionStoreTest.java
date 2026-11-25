@@ -36,6 +36,8 @@ import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
 import ai.mindconnect.message.port.out.MessageRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 /** The same store over both kinds of repository: what goes in comes back as it was. */
 class RepositorySessionStoreTest {
@@ -56,9 +58,9 @@ class RepositorySessionStoreTest {
         ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
         return Stream.of(
                 new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES),
-                        new InMemoryMessageRepository(scope)),
+                        new InMemoryMessageRepository(scope), new JsonMapperFactory(List.of(new IdJsonModule()))),
                 new RepositorySessionStore(new FileSessionRepository(directory, json, NAMESPACES),
-                        new FileMessageRepository(directory, json, scope)));
+                        new FileMessageRepository(directory, json, scope), new JsonMapperFactory(List.of(new IdJsonModule()))));
     }
 
     @ParameterizedTest
@@ -97,7 +99,8 @@ class RepositorySessionStoreTest {
     @Test
     void messages_are_stored_the_way_the_message_repository_has_always_held_a_conversation() {
         MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
-        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages);
+        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages,
+                new JsonMapperFactory(List.of(new IdJsonModule())));
         // A session that continues a conversation begun before it: the conversation's id is not its own.
         Session session = new Session(SessionId.of("s3"), UserId.of("ada"), null, null,
                 Map.of(RepositorySessionStore.CONVERSATION_ID, "c9"), Instant.EPOCH);
@@ -158,7 +161,8 @@ class RepositorySessionStoreTest {
     @Test
     void a_message_written_the_earlier_way_reads_with_its_media_and_the_call_its_result_answers() {
         InMemoryMessageRepository messages = new InMemoryMessageRepository(NAMESPACES);
-        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages);
+        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages,
+                new JsonMapperFactory(List.of(new IdJsonModule())));
         store.create(SESSION);
         ai.mindconnect.message.domain.ConversationId conversation = RepositorySessionStore.conversationOf(SESSION);
         messages.append(conversation, seq -> ai.mindconnect.message.domain.Message.of(conversation, "ada",

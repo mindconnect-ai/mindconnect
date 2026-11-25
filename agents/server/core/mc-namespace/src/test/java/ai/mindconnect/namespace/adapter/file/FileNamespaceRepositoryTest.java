@@ -3,9 +3,11 @@ package ai.mindconnect.namespace.adapter.file;
 import ai.mindconnect.namespace.domain.Email;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.domain.NamespaceRole;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,7 +26,7 @@ class FileNamespaceRepositoryTest {
     @TempDir
     Path dir;
 
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).findAndRegisterModules();
+    private final ObjectMapper mapper = new JsonMapperFactory(List.of(new IdJsonModule())).create().registerModule(new JavaTimeModule());
 
     private static final Email DAVID = Email.of("david@local");
     private static final Email ALICE = Email.of("alice@local");

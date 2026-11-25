@@ -13,13 +13,13 @@ import java.util.List;
 /**
  * {@link JsonMapper} implementation backed by Jackson's {@link ObjectMapper}.
  *
- * <p>Use {@link WorkflowObjectMapperFactory#create()} to obtain a correctly
+ * <p>Use {@link WorkflowObjectMapperFactory#create(ai.mindconnect.jackson.JsonMapperFactory)} to obtain a correctly
  * configured mapper (with {@code StepData} polymorphism set up via mixins),
  * then pass it to this class.
  *
  * <p>Example:
  * <pre>{@code
- * ObjectMapper mapper = WorkflowObjectMapperFactory.create();
+ * ObjectMapper mapper = WorkflowObjectMapperFactory.create(json);
  * JacksonJsonMapper jsonMapper = new JacksonJsonMapper(mapper);
  * }</pre>
  */

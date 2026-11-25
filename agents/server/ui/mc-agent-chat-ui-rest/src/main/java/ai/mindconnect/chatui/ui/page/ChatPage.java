@@ -15,6 +15,7 @@ import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiSection;
 
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The agent-session chat page. Composes three components into a
@@ -58,17 +59,19 @@ public final class ChatPage {
 
     private final MessageListComponent messages;
     private final ChatFormComponent    chatForm;
+    /** Writes the history's tool cards and the composer's patches; Jackson's defaults, not the shared mapper. */
+    private final ObjectMapper json;
 
     public ChatPage(ManagedSession session, ManagedAgent agent,
-                    List<ManagedMessage> history, WorkingMemory memory) {
-        this(session, agent, history, memory, false);
+                    List<ManagedMessage> history, WorkingMemory memory, ObjectMapper json) {
+        this(session, agent, history, memory, false, json);
     }
 
     public ChatPage(ManagedSession session, ManagedAgent agent,
                     List<ManagedMessage> history, WorkingMemory memory,
-                    boolean streaming) {
+                    boolean streaming, ObjectMapper json) {
         this(session, agent, history, memory, streaming,
-                MessageListComponent.SubAgentTreeProvider.NONE);
+                MessageListComponent.SubAgentTreeProvider.NONE, json);
     }
 
     /**
@@ -80,15 +83,17 @@ public final class ChatPage {
      *                     historic rendering (rebuilt from persisted child
      *                     sessions); {@link MessageListComponent.SubAgentTreeProvider#NONE}
      *                     for a flat fallback.
+     * @param json         the mapper the components write with
      */
     public ChatPage(ManagedSession session, ManagedAgent agent,
                     List<ManagedMessage> history, WorkingMemory memory,
                     boolean streaming,
-                    MessageListComponent.SubAgentTreeProvider subAgentTree) {
+                    MessageListComponent.SubAgentTreeProvider subAgentTree, ObjectMapper json) {
         this.session = session;
         this.agent = agent;
         this.sessionId = session.id();
-        this.messages = new MessageListComponent(sessionId, agent, history, memory, subAgentTree)
+        this.json = json;
+        this.messages = new MessageListComponent(sessionId, agent, history, memory, subAgentTree, json)
                 .withSessionTitle(session.title())
                 .withParentSession(session.parentId());
         this.chatForm = new ChatFormComponent(sessionId, ChatAgent.id(agent), streaming)
@@ -328,7 +333,7 @@ public final class ChatPage {
      * swaps to its streaming state (Send → Stop).
      */
     public UiPatch streamResume() {
-        return patch(chatForm.toStreaming());
+        return patch(chatForm.toStreaming(json));
     }
 
     /**
@@ -350,7 +355,7 @@ public final class ChatPage {
     public UiPatch streamStart(String userBubble, String typingId) {
         return patch(
                 messages.appendUserMessage(userBubble),
-                chatForm.toStreaming(),
+                chatForm.toStreaming(json),
                 appendTyping(typingId));
     }
 
@@ -436,7 +441,7 @@ public final class ChatPage {
      * name: a turn that ends without a single token still has it.
      */
     public UiPatch streamDone(String typingId) {
-        return patch(chatForm.toIdle(), messages.replaceAll(), removeTyping(typingId));
+        return patch(chatForm.toIdle(json), messages.replaceAll(), removeTyping(typingId));
     }
 
     /**
@@ -446,6 +451,6 @@ public final class ChatPage {
      * persisted history.
      */
     public UiPatch streamError(String message, String typingId) {
-        return patch(removeTyping(typingId), messages.appendErrorNotice(message), chatForm.toIdle());
+        return patch(removeTyping(typingId), messages.appendErrorNotice(message), chatForm.toIdle(json));
     }
 }

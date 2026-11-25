@@ -33,8 +33,8 @@ public class FileRegistrySourceRepository implements RegistrySourceRepository {
     private final Path storageDir;
     private final ScopeSupplier scope;
 
-    public FileRegistrySourceRepository(Path storageDir, ScopeSupplier scope) {
-        ObjectMapper objectMapper = JsonMapperFactory.create()
+    public FileRegistrySourceRepository(Path storageDir, ScopeSupplier scope, JsonMapperFactory json) {
+        ObjectMapper objectMapper = json.create()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.storageDir = storageDir;
         this.scope = scope;

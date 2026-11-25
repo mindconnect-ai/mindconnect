@@ -48,7 +48,11 @@ final class SessionMessageMapper {
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() { };
 
     private final TurnMessageConverter turnMessages = new TurnMessageConverter();
-    private final ObjectMapper json = JsonMapperFactory.create();
+    private final ObjectMapper json;
+
+    SessionMessageMapper(JsonMapperFactory json) {
+        this.json = json.create();
+    }
 
     /**
      * The conversation a session's messages are in: the one its metadata

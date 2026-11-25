@@ -5,7 +5,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
+import ai.mindconnect.agent.jackson.IdJsonPlugin;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.scope.Namespace;
@@ -50,6 +52,7 @@ import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import ai.mindconnect.taskqueue.memory.InMemorySharedStateStore;
 import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;
+import ai.mindconnect.jackson.JacksonPlugin;
 
 /**
  * Puts a runtime together. Without a word it is complete but for the model:
@@ -72,7 +75,7 @@ public final class AgentRuntimeBuilder {
     private PermissionEffect unruledTools = PermissionEffect.ALLOW;
     private ScopeSupplier scope = ScopeSupplier.fixed(new Namespace("default"));
     private ApprovalMemory approvals;
-    private TaskQueue taskQueue;
+    private Function<PluginRegistry, TaskQueue> taskQueue;
 
     AgentRuntimeBuilder() {
     }
@@ -145,6 +148,17 @@ public final class AgentRuntimeBuilder {
      * closes it with itself.
      */
     public AgentRuntimeBuilder taskQueue(TaskQueue queue) {
+        this.taskQueue = registry -> queue;
+        return this;
+    }
+
+    /**
+     * The host's queue, made from the runtime's services when it is first
+     * asked for — after every plugin is installed — for a queue whose store
+     * needs one of them, such as the mapper of a store that keeps its tasks
+     * as JSON. It is the host's to close, like a queue it brought.
+     */
+    public AgentRuntimeBuilder taskQueue(Function<PluginRegistry, TaskQueue> queue) {
         this.taskQueue = queue;
         return this;
     }
@@ -174,20 +188,24 @@ public final class AgentRuntimeBuilder {
     }
 
     public AgentRuntime build() {
-        TaskQueue queue = taskQueue != null ? taskQueue : new LocalTaskQueue(new InMemoryTaskStore());
+        LocalTaskQueue local = taskQueue != null ? null : new LocalTaskQueue(new InMemoryTaskStore());
+        Function<PluginRegistry, TaskQueue> queue = taskQueue != null ? taskQueue : into -> local;
         PluginRegistry registry = new DefaultPluginRegistry();
         ScopeSupplier scope = this.scope;
         List<Plugin> plugins = new ArrayList<>(List.of(
                 provides("host", into -> {
                     into.provide(ScopeSupplier.class, () -> scope);
-                    into.provide(TaskQueue.class, () -> queue);
+                    into.provide(TaskQueue.class, () -> queue.apply(into));
                 }),
+                // The mappers, made when first asked for: after every plugin has contributed its modules.
+                new JacksonPlugin(List.of()),
+                new IdJsonPlugin(),
                 sessionStore));
         if (model != null) {
             plugins.add(model);
         }
         plugins.addAll(List.of(
-                new EnginePlugin(queue, new InMemorySharedStateStore()),
+                new EnginePlugin(registry.supplier(TaskQueue.class), new InMemorySharedStateStore()),
                 new InMemorySourcePlugin(
                         new InMemoryAgentResolver(agents),
                         new InMemorySkillResolver(skills),
@@ -232,7 +250,7 @@ public final class AgentRuntimeBuilder {
             throw e;
         }
         // A queue the host brought is the host's to close.
-        return new AgentRuntime(registry, taskQueue != null ? () -> { } : ((LocalTaskQueue) queue)::close);
+        return new AgentRuntime(registry, local == null ? () -> { } : local::close);
     }
 
     private static Plugin provides(String name, Consumer<PluginRegistry> install) {

@@ -10,6 +10,7 @@ import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.JsonWorkflowConfigurer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import ai.mindconnect.workflow.swing.model.WorkflowEditorModel;
 import ai.mindconnect.workflow.swing.step.*;
@@ -55,14 +56,11 @@ public class WorkflowDesignerFrame extends JFrame {
     // -----------------------------------------------------------------------
 
     private final WorkflowEditorModel model = new WorkflowEditorModel();
-    private final JacksonWorkflowSerializer serializer =
-            new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create());
+    private final JacksonWorkflowSerializer serializer;
     private final PumlWorkflowSerializer pumlSerializer = new PumlWorkflowSerializer();
     private final PumlWorkflowParser     pumlParser     = new PumlWorkflowParser();
     /** Shared context factory — holds the ScriptExecutor with all registered languages. */
     private final DefaultWorkflowContextFactory contextFactory = new DefaultWorkflowContextFactory();
-    // Add json: expression support (json: {"key":"value"} → parsed Map/List/scalar)
-    { new JsonWorkflowConfigurer().configure(contextFactory); }
     /** Shared editor panel factory — creates the right StepEditorPanel for any StepData. */
     private final EditorPanelFactory editorPanelFactory =
             new EditorPanelFactory(contextFactory.getScriptExecutor().getRegisteredLanguages());
@@ -122,8 +120,11 @@ public class WorkflowDesignerFrame extends JFrame {
     // Constructor
     // -----------------------------------------------------------------------
 
-    public WorkflowDesignerFrame() {
+    public WorkflowDesignerFrame(JsonMapperFactory json) {
         super("Workflow Designer");
+        this.serializer = new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create(json));
+        // Add json: expression support (json: {"key":"value"} → parsed Map/List/scalar)
+        new JsonWorkflowConfigurer(json).configure(contextFactory);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent e) { confirmAndClose(); }

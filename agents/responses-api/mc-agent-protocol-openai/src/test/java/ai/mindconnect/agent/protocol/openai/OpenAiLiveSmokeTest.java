@@ -7,6 +7,7 @@ import ai.mindconnect.agent.protocol.api.ResponseRequest;
 import ai.mindconnect.agent.protocol.api.ToolDefinition;
 import ai.mindconnect.agent.protocol.client.ToolHandler;
 import ai.mindconnect.agent.protocol.client.ToolLoop;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
@@ -24,7 +25,7 @@ class OpenAiLiveSmokeTest {
     }
 
     private final OpenAiResponsesBackend backend =
-            new OpenAiResponsesBackend(TestOpenAi.apiKey())
+            new OpenAiResponsesBackend(TestOpenAi.apiKey(), new JsonMapperFactory(List.of()))
                     .register(PseudoAgent.of("echo", TestOpenAi.model(),
                             "Answer with one short sentence."));
 

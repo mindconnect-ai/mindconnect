@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,7 +24,7 @@ class TaskCardUpdateTest {
     @Test
     void aFinishedToolSwapsItsSummaryAndBodyNotTheListItem() throws Exception {
         var done = TaskCardComponent.doneTool("task-tool-top-0-bash", "bash",
-                Map.of("command", "ls"), "a.txt", 12, null);
+                Map.of("command", "ls"), "a.txt", 12, null, new JsonMapperFactory(List.of()).create());
 
         var ops = done.updateInPlace();
 
@@ -45,7 +47,7 @@ class TaskCardUpdateTest {
     /** The span a live update targets is on the card from the start. */
     @Test
     void theSummarySpanIsRenderedWithTheCard() throws Exception {
-        var running = TaskCardComponent.runningTool("task-tool-top-0-bash", "bash", Map.of());
+        var running = TaskCardComponent.runningTool("task-tool-top-0-bash", "bash", Map.of(), new JsonMapperFactory(List.of()).create());
 
         assertThat(json(running.render())).contains("\"collapseSummaryId\":\"task-tool-top-0-bash-summary\"");
     }

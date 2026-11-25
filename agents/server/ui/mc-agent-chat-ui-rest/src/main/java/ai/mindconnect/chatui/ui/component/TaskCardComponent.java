@@ -1,6 +1,5 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.chatui.ui.SessionUiCommons;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiLink;
@@ -9,6 +8,7 @@ import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiText;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -156,20 +156,20 @@ public final class TaskCardComponent implements UiComponent {
     // ── Factory helpers for tool-call cards ────────────────────────────────
 
     /** Card representing a tool call that has just started. */
-    public static TaskCardComponent runningTool(String nodeId, String toolName, Object arguments) {
+    public static TaskCardComponent runningTool(String nodeId, String toolName, Object arguments, ObjectMapper json) {
         return new TaskCardComponent(nodeId,
                 runningToolHeader(toolName),
-                taskCardBody(prettyJson(arguments), null),
+                taskCardBody(prettyJson(arguments, json), null),
                 true);
     }
 
     /** Card representing a tool call that finished successfully. */
     public static TaskCardComponent doneTool(String nodeId, String toolName,
                                              Object arguments, String result, long durationMs,
-                                             String fullResultUrl) {
+                                             String fullResultUrl, ObjectMapper json) {
         return new TaskCardComponent(nodeId,
                 doneToolHeader(toolName, durationMs),
-                taskCardBody(prettyJson(arguments), result, fullResultUrl),
+                taskCardBody(prettyJson(arguments, json), result, fullResultUrl),
                 false);
     }
 
@@ -198,10 +198,10 @@ public final class TaskCardComponent implements UiComponent {
     /** Card representing a tool call that failed. */
     public static TaskCardComponent failedTool(String nodeId, String toolName,
                                                Object arguments, String error, long durationMs,
-                                               String fullResultUrl) {
+                                               String fullResultUrl, ObjectMapper json) {
         return new TaskCardComponent(nodeId,
                 failedToolHeader(toolName, durationMs),
-                taskCardBody(prettyJson(arguments), error, fullResultUrl),
+                taskCardBody(prettyJson(arguments, json), error, fullResultUrl),
                 false);
     }
 
@@ -490,11 +490,11 @@ public final class TaskCardComponent implements UiComponent {
         return md.toString();
     }
 
-    /** Pretty-prints arguments map as JSON; falls back to toString on errors. */
-    public static String prettyJson(Object value) {
+    /** Pretty-prints arguments map as JSON with {@code json}; falls back to toString on errors. */
+    public static String prettyJson(Object value, ObjectMapper json) {
         if (value == null) return "";
         try {
-            return SessionUiCommons.MAPPER.writerWithDefaultPrettyPrinter()
+            return json.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(value);
         } catch (Exception e) {
             return String.valueOf(value);

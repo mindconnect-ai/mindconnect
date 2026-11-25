@@ -12,6 +12,7 @@ import java.util.List;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -44,23 +45,25 @@ public final class AgentDetailComponent implements UiComponent {
     private final SessionManagement sessions;
     private final String initialSection;
     private final String selectedRowId;
+    private final JsonMapperFactory json;
     /** The "Memory" tab — what this agent keeps about its users; null leaves it out. */
     private UiNode memoryTab;
 
     public AgentDetailComponent(ManagedAgent agent, String userId,
-                                 SessionManagement sessions) {
-        this(agent, userId, sessions, null, null);
+                                 SessionManagement sessions, JsonMapperFactory json) {
+        this(agent, userId, sessions, null, null, json);
     }
 
     public AgentDetailComponent(ManagedAgent agent, String userId,
                                  SessionManagement sessions,
-                                 String initialSection, String selectedRowId) {
+                                 String initialSection, String selectedRowId, JsonMapperFactory json) {
         this.agent = agent;
         this.definition = agent.definition();
         this.userId = userId;
         this.sessions = sessions;
         this.initialSection = initialSection;
         this.selectedRowId = selectedRowId;
+        this.json = json;
     }
 
     /** Adds the "Memory" tab; {@code null} leaves it out. */
@@ -84,7 +87,7 @@ public final class AgentDetailComponent implements UiComponent {
         SessionId selectedSessId = "sessions".equals(initialSection) && isIdValue(selectedRowId)
                 ? SessionId.of(selectedRowId) : null;
 
-        var toolTable    = new ToolTableComponent(agent, selectedToolId).render();
+        var toolTable    = new ToolTableComponent(agent, selectedToolId, json).render();
         var sessionTable = new SessionTableComponent(agent.id(), userId,
                 sessions, selectedSessId).render();
 

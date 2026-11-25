@@ -36,6 +36,15 @@
             <artifactId>mc-workflow</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- JSON expressions and definitions, applied with the caller's mapper factory -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+        </dependency>
 
         <!-- TEST: verify discovery with a real subset of modules on the classpath -->
         <dependency>

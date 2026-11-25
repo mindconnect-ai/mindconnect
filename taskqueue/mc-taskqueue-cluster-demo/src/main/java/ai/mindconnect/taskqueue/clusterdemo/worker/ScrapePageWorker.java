@@ -1,5 +1,6 @@
 package ai.mindconnect.taskqueue.clusterdemo.worker;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.taskqueue.SharedStateStore;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
@@ -42,9 +43,11 @@ public class ScrapePageWorker implements TaskWorker {
     public static final String TYPE = "scrape-page";
 
     private final SharedStateStore shared;
+    private final JsonMapperFactory json;
 
-    public ScrapePageWorker(SharedStateStore shared) {
+    public ScrapePageWorker(SharedStateStore shared, JsonMapperFactory json) {
         this.shared = shared;
+        this.json = json;
     }
 
     @Override
@@ -88,7 +91,7 @@ public class ScrapePageWorker implements TaskWorker {
         // JSON — this worker writes the Markdown file itself.
 
         var page = new ScrapedPage();
-        new JsoupSingleWebPageScraper(options, new JsoupWebScraperContext(options), page).executeScrape();
+        new JsoupSingleWebPageScraper(options, new JsoupWebScraperContext(options, json), page).executeScrape();
         if (page.getError() != null) {
             throw new IllegalStateException("scrape failed for " + url + ": " + page.getError());
         }

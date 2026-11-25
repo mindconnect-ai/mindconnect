@@ -18,11 +18,13 @@ import ai.mindconnect.agent.tools.usermemory.adapter.FileUserMemoryRepository;
 import ai.mindconnect.agent.tools.usermemory.UserMemoryRepository;
 import ai.mindconnect.agent.trace.adapter.FileLlmCallTraceRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.file.FileLlmRepositoryFactory;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.message.adapter.file.FileMessageRepositoryFactory;
 import ai.mindconnect.message.port.out.ConversationRepository;
+import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowRepositoryFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -32,13 +34,11 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 public final class FileStorePlugin extends StorePlugin {
 
     private final Path dataDir;
-    private final ObjectMapper json;
     private final int maxTracesPerSession;
 
     /** @param maxTracesPerSession how many LLM call traces a session keeps before the oldest go */
-    public FileStorePlugin(Path dataDir, ObjectMapper json, int maxTracesPerSession) {
+    public FileStorePlugin(Path dataDir, int maxTracesPerSession) {
         this.dataDir = dataDir;
-        this.json = json;
         this.maxTracesPerSession = maxTracesPerSession;
     }
 
@@ -48,11 +48,15 @@ public final class FileStorePlugin extends StorePlugin {
     }
 
     @Override
-    protected Stores stores(ScopeSupplier scope) {
+    protected Stores stores(PluginRegistry registry) {
+        ScopeSupplier scope = registry.get(ScopeSupplier.class);
+        // The host's mapper: the files are written as the host writes JSON.
+        ObjectMapper json = registry.get(ObjectMapper.class);
         FileLlmRepositoryFactory llm = new FileLlmRepositoryFactory(dataDir, json, scope);
         FileMessageRepositoryFactory messages = new FileMessageRepositoryFactory(dataDir, json, scope);
         FileWorkflowRepositoryFactory workflows =
-                new FileWorkflowRepositoryFactory(dataDir, () -> scope.namespace().value());
+                new FileWorkflowRepositoryFactory(dataDir, () -> scope.namespace().value(),
+                        registry.get(JsonMapperFactory.class));
         return new Stores() {
             @Override public LlmConfigRepository llmConfigs() { return llm.llmConfigRepository(); }
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }

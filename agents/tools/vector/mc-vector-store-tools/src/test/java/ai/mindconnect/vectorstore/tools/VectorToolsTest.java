@@ -20,6 +20,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -67,6 +69,7 @@ class VectorToolsTest {
         return new ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
+                if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) configs);
                 if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(new Namespace("test")));

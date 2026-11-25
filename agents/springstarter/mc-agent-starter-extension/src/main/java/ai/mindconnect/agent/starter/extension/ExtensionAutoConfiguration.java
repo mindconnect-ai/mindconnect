@@ -1,7 +1,5 @@
 package ai.mindconnect.agent.starter.extension;
 
-import ai.mindconnect.agent.scope.Namespace;
-import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.ToolFactory;
@@ -10,22 +8,15 @@ import ai.mindconnect.extension.adapter.classpath.ClasspathAudit;
 import ai.mindconnect.extension.adapter.classpath.ClasspathManifests;
 import ai.mindconnect.extension.adapter.classpath.ContributionChecker;
 import ai.mindconnect.extension.adapter.classpath.ExtensionAudit;
-import ai.mindconnect.extension.adapter.file.FileBrandActivationRepository;
-import ai.mindconnect.extension.adapter.file.FileExtensionActivationRepository;
-import ai.mindconnect.extension.adapter.file.FileInstalledSeedRepository;
-import ai.mindconnect.extension.adapter.pg.PgBrandActivationRepository;
-import ai.mindconnect.extension.adapter.pg.PgExtensionActivationRepository;
-import ai.mindconnect.extension.adapter.pg.PgInstalledSeedRepository;
 import ai.mindconnect.extension.domain.ExtensionRegistry;
 import ai.mindconnect.extension.port.out.BrandActivationRepository;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.extension.runtime.ExtensionPlugin;
+import ai.mindconnect.extension.runtime.FileExtensionPlugin;
+import ai.mindconnect.extension.runtime.pg.PgExtensionPlugin;
 import ai.mindconnect.extension.service.ExtensionService;
-import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.namespace.domain.NamespaceDefinition;
-import ai.mindconnect.namespace.service.NamespaceService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -34,12 +25,10 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -48,7 +37,9 @@ import java.util.stream.Collectors;
  * become the {@link ExtensionRegistry}, the audit names what the classpath
  * offers without one, a namespace's decisions live in the persistence the
  * installation runs on, and the {@link ExtensionService} answers everybody
- * who asks whether an extension is on.
+ * who asks whether an extension is on. Registry, stores and service live in
+ * the runtime, as an {@link ExtensionPlugin}, because the runtime asks the
+ * service while it resolves tools; the beans here hand them out.
  *
  * <p>{@code mindconnect.extensions.strict} decides what a problem means:
  * {@code false} (the default, while not every module has a manifest) logs it
@@ -66,21 +57,48 @@ public class ExtensionAutoConfiguration {
     /** The service interfaces the host loads from the classpath — what the audit looks at. */
     static final List<Class<?>> CLASSPATH_SPIS = List.of(ToolFactory.class, MultiToolProvider.class, Plugin.class);
 
+    /**
+     * The extensions on files, installed into the runtime: the runtime asks the
+     * service while it resolves tools, so it holds the manifests and the stores.
+     */
     @Bean
-    @ConditionalOnMissingBean
-    ExtensionRegistry extensionRegistry(@Value("${mindconnect.extensions.strict:false}") boolean strict) {
-        ExtensionRegistry registry = ClasspathManifests.load(Thread.currentThread().getContextClassLoader());
-        if (registry.hasProblems()) {
-            for (ExtensionRegistry.Problem problem : registry.problems()) {
-                log.warn("Extension problem: {}", problem);
-            }
-            if (strict) {
-                throw new IllegalStateException("Refusing to start with " + registry.problems().size()
-                        + " extension problem(s) (mindconnect.extensions.strict=true): " + registry.problems());
-            }
+    @ConditionalOnMissingBean(ExtensionPlugin.class)
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
+    FileExtensionPlugin fileExtensionPlugin(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                            @Value("${mindconnect.extensions.strict:false}") boolean strict,
+                                            @Value("${mindconnect.extensions.disabled:}") String disabled) {
+        return new FileExtensionPlugin(Path.of(baseDir), strict, disabledByOperator(disabled));
+    }
+
+    /** The extensions in Postgres, on the runtime's {@code Sql}. */
+    @Bean
+    @ConditionalOnMissingBean(ExtensionPlugin.class)
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
+    PgExtensionPlugin pgExtensionPlugin(@Value("${mindconnect.extensions.strict:false}") boolean strict,
+                                        @Value("${mindconnect.extensions.disabled:}") String disabled) {
+        return new PgExtensionPlugin(strict, disabledByOperator(disabled));
+    }
+
+    /** The extensions the operator switched off everywhere ({@code mindconnect.extensions.disabled}, comma-separated). */
+    private static Set<String> disabledByOperator(String disabled) {
+        Set<String> disabledByOperator = Arrays.stream(disabled.split(","))
+                .map(String::strip).filter(id -> !id.isEmpty()).collect(Collectors.toSet());
+        if (!disabledByOperator.isEmpty()) {
+            log.info("Extensions switched off by the operator: {}", disabledByOperator);
         }
-        log.info("Extensions: {} found on the classpath", registry.size());
-        return registry;
+        return disabledByOperator;
+    }
+
+    // ── the runtime's extensions, for the application's own beans ───────────
+
+    @Bean ExtensionRegistry extensionRegistry(AgentRuntime r) { return r.service(ExtensionRegistry.class); }
+    @Bean ExtensionService extensionService(AgentRuntime r) { return r.service(ExtensionService.class); }
+    @Bean ExtensionActivationRepository extensionActivationRepository(AgentRuntime r) {
+        return r.service(ExtensionActivationRepository.class);
+    }
+    @Bean InstalledSeedRepository installedSeedRepository(AgentRuntime r) { return r.service(InstalledSeedRepository.class); }
+    @Bean BrandActivationRepository brandActivationRepository(AgentRuntime r) {
+        return r.service(BrandActivationRepository.class);
     }
 
     @Bean
@@ -100,93 +118,6 @@ public class ExtensionAutoConfiguration {
         return new ExtensionAudit(unmanaged);
     }
 
-    /** A namespace's decisions under {@code <mindconnect.data.base-dir>/<namespace>/system/extensions}. */
-    @Bean
-    @ConditionalOnMissingBean(ExtensionActivationRepository.class)
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    ExtensionActivationRepository fileExtensionActivationRepository(
-            @Value("${mindconnect.data.base-dir:data}") String baseDir,
-            ObjectMapper objectMapper,
-            ObjectProvider<ScopeSupplier> scope) {
-        return new FileExtensionActivationRepository(Path.of(baseDir), objectMapper, scope.getIfAvailable(ScopeSupplier::local));
-    }
-
-    /**
-     * Which bundled records a namespace got once, in
-     * {@code <mindconnect.data.base-dir>/<namespace>/system/installed-seeds.json} —
-     * what the per-namespace seeding looks at so that a deleted record stays deleted.
-     */
-    @Bean
-    @ConditionalOnMissingBean(InstalledSeedRepository.class)
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    InstalledSeedRepository fileInstalledSeedRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                                         ObjectMapper objectMapper,
-                                                         ObjectProvider<ScopeSupplier> scope) {
-        return new FileInstalledSeedRepository(Path.of(baseDir), objectMapper, scope.getIfAvailable(ScopeSupplier::local));
-    }
-
-    /** The brands' decisions under {@code <mindconnect.data.base-dir>/system/extension-brands}. */
-    @Bean
-    @ConditionalOnMissingBean(BrandActivationRepository.class)
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    BrandActivationRepository fileBrandActivationRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                                            ObjectMapper objectMapper) {
-        return new FileBrandActivationRepository(Path.of(baseDir), objectMapper);
-    }
-
-    @Configuration(proxyBeanMethods = false)
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
-    static class Postgres {
-        /** One row per decision in {@code mc_extension_activation}, on the persistence starter's {@code Sql}. */
-        @Bean
-        @ConditionalOnMissingBean(ExtensionActivationRepository.class)
-        ExtensionActivationRepository pgExtensionActivationRepository(Sql mindconnectSql,
-                                                                      ObjectProvider<ScopeSupplier> scope) {
-            return new PgExtensionActivationRepository(mindconnectSql, scope.getIfAvailable(ScopeSupplier::local)).initSchema();
-        }
-
-        /** One row per bundled record a namespace got once, in {@code mc_installed_seed}. */
-        @Bean
-        @ConditionalOnMissingBean(InstalledSeedRepository.class)
-        InstalledSeedRepository pgInstalledSeedRepository(Sql mindconnectSql,
-                                                           ObjectProvider<ScopeSupplier> scope) {
-            return new PgInstalledSeedRepository(mindconnectSql, scope.getIfAvailable(ScopeSupplier::local)).initSchema();
-        }
-
-        /** One row per brand decision in {@code mc_extension_brand_activation}. */
-        @Bean
-        @ConditionalOnMissingBean(BrandActivationRepository.class)
-        BrandActivationRepository pgBrandActivationRepository(Sql mindconnectSql) {
-            return new PgBrandActivationRepository(mindconnectSql).initSchema();
-        }
-    }
-
-    /**
-     * The service, told the brand of the namespace at hand — from the
-     * namespace service, per call — and the extensions the operator switched
-     * off everywhere ({@code mindconnect.extensions.disabled}, comma-separated).
-     * Without a namespace service there are no brands.
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    ExtensionService extensionService(ExtensionRegistry registry, ExtensionActivationRepository activations,
-                                      BrandActivationRepository brands,
-                                      ObjectProvider<NamespaceService> namespaces,
-                                      ObjectProvider<ScopeSupplier> scope,
-                                      @Value("${mindconnect.extensions.disabled:}") String disabled) {
-        Set<String> disabledByOperator = Arrays.stream(disabled.split(","))
-                .map(String::strip).filter(id -> !id.isEmpty()).collect(Collectors.toSet());
-        if (!disabledByOperator.isEmpty()) {
-            log.info("Extensions switched off by the operator: {}", disabledByOperator);
-        }
-        return new ExtensionService(registry, activations, brands, () -> {
-            NamespaceService service = namespaces.getIfAvailable();
-            ScopeSupplier current = scope.getIfAvailable();
-            if (service == null || current == null) return Optional.empty();
-            return service.find(current.namespace()).map(NamespaceDefinition::brand).map(Namespace::value);
-        }, disabledByOperator);
-    }
-
     /**
      * Holds each manifest against the classpath for the Extensions screen.
      * The tool names come from the registry at the bottom of the stack — the
@@ -200,12 +131,5 @@ public class ExtensionAutoConfiguration {
             ToolRegistry registry = toolRegistry.getIfAvailable();
             return registry == null ? Set.of() : registry.source().knownToolNames();
         });
-    }
-
-    /** The runtime feature that lets a namespace's decisions reach the tool registry. */
-    @Bean
-    @ConditionalOnMissingBean
-    ExtensionPlugin extensionPlugin(ExtensionService extensions) {
-        return new ExtensionPlugin(extensions);
     }
 }

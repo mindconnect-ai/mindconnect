@@ -15,6 +15,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageId;
@@ -46,13 +47,13 @@ public final class RepositorySessionStore implements SessionStore {
 
     private final SessionRepository sessions;
     private final MessageRepository messages;
-    private static final SessionMessageMapper READER = new SessionMessageMapper();
+    private final SessionMessageMapper mapper;
 
-    private final SessionMessageMapper mapper = READER;
-
-    public RepositorySessionStore(SessionRepository sessions, MessageRepository messages) {
+    /** @param json where the mapper comes from that writes and reads a tool call's or result's content */
+    public RepositorySessionStore(SessionRepository sessions, MessageRepository messages, JsonMapperFactory json) {
         this.sessions = sessions;
         this.messages = messages;
+        this.mapper = new SessionMessageMapper(json);
     }
 
     /**
@@ -60,8 +61,8 @@ public final class RepositorySessionStore implements SessionStore {
      * one no turn wrote. For whoever reads a conversation beside the runtime
      * and wants it in the runtime's terms.
      */
-    public static Optional<TurnMessage> turnMessageOf(Message stored) {
-        return READER.turnMessage(stored);
+    public Optional<TurnMessage> turnMessageOf(Message stored) {
+        return mapper.turnMessage(stored);
     }
 
     @Override

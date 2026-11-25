@@ -34,15 +34,16 @@ import java.util.stream.Stream;
  */
 public final class FileEntryStore implements EntryStore {
 
-    private static final ObjectMapper JSON = JsonMapperFactory.create()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
     private static final java.util.Map<Path, MemoryEmbeddingIndex> INDEXES = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final Path dir;
+    private final ObjectMapper json;
 
-    public FileEntryStore(Path dir) {
+    /** @param json the runtime's mapper factory: the refs and their ids are written as every other store writes them */
+    public FileEntryStore(Path dir, JsonMapperFactory json) {
         this.dir = dir;
+        this.json = json.create()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
     /**
@@ -51,9 +52,9 @@ public final class FileEntryStore implements EntryStore {
      * (the upload path, each tool binding); a heap copy of its own for each
      * would not see what the others write.
      */
-    public static MemoryEmbeddingIndex index(Path dir) {
+    public static MemoryEmbeddingIndex index(Path dir, JsonMapperFactory json) {
         return INDEXES.computeIfAbsent(dir.toAbsolutePath().normalize(),
-                d -> new MemoryEmbeddingIndex(new FileEntryStore(d)));
+                d -> new MemoryEmbeddingIndex(new FileEntryStore(d, json)));
     }
 
     /** Forgets the heap copy of {@code dir} — its namespace was deleted, or a test starts afresh. */
@@ -70,7 +71,7 @@ public final class FileEntryStore implements EntryStore {
         List<Entry> all = new ArrayList<>();
         try (Stream<Path> files = Files.walk(entries, 2)) {
             for (Path file : files.filter(f -> f.toString().endsWith(".json")).toList()) {
-                all.add(JSON.readValue(file.toFile(), Entry.class));
+                all.add(json.readValue(file.toFile(), Entry.class));
             }
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the embedding index in " + dir, e);
@@ -81,7 +82,7 @@ public final class FileEntryStore implements EntryStore {
     @Override
     public void write(Entry entry) {
         try {
-            writeAtomically(file(entry.ref(), entry.embeddingModel()), JSON.writeValueAsBytes(entry));
+            writeAtomically(file(entry.ref(), entry.embeddingModel()), json.writeValueAsBytes(entry));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot write " + entry.ref() + " to the embedding index in " + dir, e);
         }
@@ -103,7 +104,7 @@ public final class FileEntryStore implements EntryStore {
             return List.of();
         }
         try {
-            return JSON.readValue(file.toFile(), new TypeReference<List<MetadataField>>() {});
+            return json.readValue(file.toFile(), new TypeReference<List<MetadataField>>() {});
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read " + file, e);
         }
@@ -112,7 +113,7 @@ public final class FileEntryStore implements EntryStore {
     @Override
     public void writeFields(List<MetadataField> fields) {
         try {
-            writeAtomically(dir.resolve("fields.json"), JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(fields));
+            writeAtomically(dir.resolve("fields.json"), json.writerWithDefaultPrettyPrinter().writeValueAsBytes(fields));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot write the declared fields to " + dir, e);
         }

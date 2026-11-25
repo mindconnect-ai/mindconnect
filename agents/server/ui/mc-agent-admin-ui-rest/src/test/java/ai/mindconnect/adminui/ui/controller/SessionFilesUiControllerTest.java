@@ -1,5 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
@@ -72,9 +74,10 @@ class SessionFilesUiControllerTest {
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
                 new InMemoryAgentRepository(ScopeSupplier.fixed(new Namespace("test"))), SessionDirectoryPolicy.unrestricted(),
                 List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()),
+                new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))));
         var id = ai.mindconnect.agent.SessionId.of("s1");
-        new RepositorySessionStore(sessions, messages).create(new Session(id,
+        new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))).create(new Session(id,
                 UserId.of("alice"), null, HELPER,
                 Map.of(ManagedSession.WORKING_DIRECTORY, root), Instant.parse("2026-11-01T00:00:00Z")));
         session = management.find(id).orElseThrow();

@@ -29,8 +29,8 @@ public class ApplicationConfig {
     }
 
 
-    public static ApplicationConfig load() throws IOException {
-        ObjectMapper mapper = JsonMapperFactory.create(new YAMLFactory());
+    public static ApplicationConfig load(JsonMapperFactory json) throws IOException {
+        ObjectMapper mapper = json.create(new YAMLFactory());
         return mapper.readValue(ApplicationConfig.class.getResourceAsStream("/application.yml"), ApplicationConfig.class);
     }
 }

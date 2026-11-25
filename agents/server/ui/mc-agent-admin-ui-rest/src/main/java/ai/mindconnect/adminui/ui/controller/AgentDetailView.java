@@ -7,6 +7,7 @@ import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,24 +27,26 @@ class AgentDetailView {
     private final SessionManagement sessions;
     /** The "Memory" tab — what the agent keeps about its users; optional like the memory itself. */
     private final ObjectProvider<MemoryAdminUiController> memoryUi;
+    private final JsonMapperFactory json;
 
-    AgentDetailView(AgentRuntime runtime, ObjectProvider<MemoryAdminUiController> memoryUi) {
+    AgentDetailView(AgentRuntime runtime, ObjectProvider<MemoryAdminUiController> memoryUi, JsonMapperFactory json) {
         this.agents = runtime.service(AgentManagement.class);
         this.sessions = runtime.service(SessionManagement.class);
         this.memoryUi = memoryUi;
+        this.json = json;
     }
 
     /** The screen of the agent with this id, opened on a section and a row of it; not found for no such agent. */
     ResponseEntity<UiPage> page(String agentId, String section, String row, OidcUser user) {
         return agents.find(AgentId.of(agentId))
                 .map(agent -> ResponseEntity.ok(new AgentDetailPage(agent, user.getPreferredUsername(), sessions,
-                        section, row).memoryTab(memoryTab(agent)).render()))
+                        section, row, json).memoryTab(memoryTab(agent)).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     /** The agent's screen for the parts that are patched in place: its tools, its sessions. */
     AgentDetailPage of(ManagedAgent agent, OidcUser user) {
-        return new AgentDetailPage(agent, user.getPreferredUsername(), sessions);
+        return new AgentDetailPage(agent, user.getPreferredUsername(), sessions, json);
     }
 
     private UiNode memoryTab(ManagedAgent agent) {

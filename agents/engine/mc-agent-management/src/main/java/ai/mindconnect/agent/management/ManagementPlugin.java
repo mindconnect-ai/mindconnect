@@ -11,6 +11,7 @@ import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -30,8 +31,7 @@ public final class ManagementPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
-        registry.provide(SessionStore.class, () -> new RepositorySessionStore(
-                registry.get(SessionRepository.class), registry.get(MessageRepository.class)));
+        registry.provide(SessionStore.class, () -> sessionStore(registry));
         registry.provide(AgentManagement.class,
                 () -> new RepositoryAgentManagement(registry.get(AgentRepository.class)));
         // Made on first use: the turn service is built once every plugin is installed.
@@ -42,11 +42,17 @@ public final class ManagementPlugin implements Plugin {
                 registry.get(SessionRepository.class), registry.get(MessageRepository.class),
                 registry.get(AgentRepository.class),
                 registry.find(SessionDirectoryPolicy.class).orElseGet(SessionDirectoryPolicy::unrestricted),
-                registry.all(SessionCleanup.class), registry.get(SessionLifecycle.class)));
+                registry.all(SessionCleanup.class), registry.get(SessionLifecycle.class),
+                sessionStore(registry)));
         // Hears every session, of whatever namespace: what a user is told is about their sessions everywhere.
         registry.contribute(SessionEventListener.class,
                 event -> registry.get(SessionLifecycle.class).onEvent(event));
         registry.contribute(AgentResolver.class, (agentName, session) ->
                 new ManagedAgentResolver(registry.get(AgentManagement.class)).resolve(agentName, session));
+    }
+
+    private static RepositorySessionStore sessionStore(PluginRegistry registry) {
+        return new RepositorySessionStore(registry.get(SessionRepository.class),
+                registry.get(MessageRepository.class), registry.get(JsonMapperFactory.class));
     }
 }

@@ -19,6 +19,7 @@ import ai.mindconnect.workflow.execution.WorkflowExecutorService;
 import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -70,13 +71,17 @@ public class VectorStoreService {
     private final Path uploadBase;
     /** Where a call works — every store call names the namespace. */
     private final ai.mindconnect.common.env.EnvVarResolver environment;
+    /** The host's mapper factory, for an ingest workflow's JSON support. */
+    private final JsonMapperFactory json;
 
     public VectorStoreService(ObjectProvider<VectorStores> storesProvider,
                               ObjectProvider<FileStore> fileStoreProvider,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}")
                               String toolsBaseDir,
-                              ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
+                              ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment,
+                              JsonMapperFactory json) {
+        this.json = json;
         this.storesProvider = storesProvider;
         this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStoreProvider = fileStoreProvider;
@@ -328,7 +333,7 @@ public class VectorStoreService {
             if (stored != null) {
                 params.put("file_id", stored.id().value());
             }
-            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(json))
                     .withEnvironment(environment.shared()::asMap)
                     .executeWorkflow(workflow, params);
             return safeName + ": " + summarize(result);

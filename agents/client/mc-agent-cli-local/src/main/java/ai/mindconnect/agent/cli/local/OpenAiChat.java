@@ -31,10 +31,12 @@ final class OpenAiChat {
 
     private final String apiKey;
     private final String model;
+    private final JsonMapperFactory json;
 
-    OpenAiChat(String apiKey, String model) {
+    OpenAiChat(String apiKey, String model, JsonMapperFactory json) {
         this.apiKey = apiKey;
         this.model = model;
+        this.json = json;
     }
 
     LlmChat chat() {
@@ -44,7 +46,7 @@ final class OpenAiChat {
         // No read timeout: a reasoning model sends its first byte after it has thought.
         OkHttpClient http = new OkHttpClient.Builder()
                 .readTimeout(Duration.ZERO).callTimeout(Duration.ofMinutes(10)).build();
-        ObjectMapper json = JsonMapperFactory.create().registerModule(new JavaTimeModule());
+        ObjectMapper json = this.json.create().registerModule(new JavaTimeModule());
         return new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(Map.of(
                 LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json, EncryptionHelper.noEncryption()))));
     }

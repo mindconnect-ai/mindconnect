@@ -16,8 +16,8 @@
     <packaging>jar</packaging>
     <description>
         Namespaces for a Spring Boot server: the ThreadBoundScope every store
-        routes by, the namespace repository (file or Postgres, following
-        mindconnect.persistence), the NamespaceService, and the two servlet
+        routes by, the namespaces' plugin of the runtime (file or Postgres, following
+        mindconnect.persistence) with the NamespaceService, and the two servlet
         filters that choose the namespace of a request — from a /ns/{namespace}/
         path prefix, an X-Mindconnect-Namespace header, or the namespace the
         user selected in the browser session — and bind it to the thread.
@@ -48,6 +48,12 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-security</artifactId>
+        </dependency>
+        <!-- AgentRuntime: the namespaces live in the runtime, the beans here hand them out -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-sdk</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

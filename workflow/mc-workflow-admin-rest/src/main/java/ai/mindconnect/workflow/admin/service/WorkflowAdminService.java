@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin.service;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.admin.run.WorkflowRunService;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.edit.StepNames;
@@ -28,16 +29,21 @@ public class WorkflowAdminService {
     private final WorkflowInstanceRepository instances;
     private final WorkflowRunService runService;
 
-    public WorkflowAdminService(WorkflowDataRepository store, WorkflowInstanceRepository instances) {
-        this(store, instances, null);
+    public WorkflowAdminService(WorkflowDataRepository store, WorkflowInstanceRepository instances,
+                                JsonMapperFactory json) {
+        this(store, instances, null, json);
     }
 
-    /** @param environment what a run's {@code env} variable holds; the process environment when null */
+    /**
+     * @param environment what a run's {@code env} variable holds; the process environment when null
+     * @param json        the host's mapper factory, which a run's trace is written with
+     */
     public WorkflowAdminService(WorkflowDataRepository store, WorkflowInstanceRepository instances,
-                                java.util.function.Supplier<java.util.Map<String, String>> environment) {
+                                java.util.function.Supplier<java.util.Map<String, String>> environment,
+                                JsonMapperFactory json) {
         this.store = store;
         this.instances = instances;
-        this.runService = new WorkflowRunService(instances, environment);
+        this.runService = new WorkflowRunService(instances, environment, json);
     }
 
     // ── Definitions ────────────────────────────────────────────────────────
@@ -115,6 +121,11 @@ public class WorkflowAdminService {
     }
 
     // ── Instances ──────────────────────────────────────────────────────────
+
+    /** The run a stored instance describes, rendered like the run that produced it. */
+    public WorkflowRunService.RunReport traceReport(WorkflowInstanceSnapshot snapshot) {
+        return runService.traceReport(snapshot);
+    }
 
     public List<WorkflowInstanceSnapshot> instancesOf(String workflowId) {
         return instances.findByWorkflow(workflowId);

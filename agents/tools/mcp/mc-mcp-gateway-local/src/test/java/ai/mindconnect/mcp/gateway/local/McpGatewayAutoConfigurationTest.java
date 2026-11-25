@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpCaller;
 import ai.mindconnect.mcp.gateway.McpGateway;
 import ai.mindconnect.mcp.gateway.McpProbeResult;
@@ -36,6 +37,7 @@ class McpGatewayAutoConfigurationTest {
     private ApplicationContextRunner runner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(McpGatewayAutoConfiguration.class))
+                .withBean(JsonMapperFactory.class, () -> new JsonMapperFactory(List.of()))
                 // A bare runner converts with Spring's default service, which
                 // does not know Duration; a real Boot application uses this
                 // one. Without it the test would fail on

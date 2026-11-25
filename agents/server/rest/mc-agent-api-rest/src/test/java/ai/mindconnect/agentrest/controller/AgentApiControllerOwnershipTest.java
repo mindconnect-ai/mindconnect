@@ -8,6 +8,8 @@ import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageStore;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,7 +68,7 @@ class AgentApiControllerOwnershipTest {
                 new ai.mindconnect.message.adapter.memory.InMemoryMessageRepository(
                         ScopeSupplier.fixed(new Namespace("test"))),
                 sessionTurns, frameStream, sessions.runtime(), compaction, opener,
-                new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))),
+                new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule()))),
                 new SessionAccess(sessions.runtime()), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }

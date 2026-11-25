@@ -1,8 +1,7 @@
 package ai.mindconnect.cli;
 
-import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.jackson.JsonMapperCustomizer;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import okhttp3.OkHttpClient;
@@ -15,10 +14,14 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class CliConfig {
 
+    /**
+     * How the CLI writes JSON; the runtime the starter builds in either mode makes the mapper —
+     * with the id module its plugins contribute, which the remote mode needs to read agents too.
+     */
     @Bean
-    ObjectMapper objectMapper() {
-        return JsonMapperFactory.create()
-                .registerModule(new JavaTimeModule())
+    JsonMapperCustomizer jsonMapperCustomizer() {
+        return mapper -> mapper
+                .addModule(new JavaTimeModule())
                 .enable(SerializationFeature.INDENT_OUTPUT)
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);

@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.store;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -19,7 +20,7 @@ public final class InMemorySessionStorePlugin implements Plugin {
         registry.provide(SessionStore.class, () -> {
             ScopeSupplier scope = registry.get(ScopeSupplier.class);
             return new RepositorySessionStore(new InMemorySessionRepository(scope),
-                    new InMemoryMessageRepository(scope));
+                    new InMemoryMessageRepository(scope), registry.get(JsonMapperFactory.class));
         });
     }
 }

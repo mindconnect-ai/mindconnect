@@ -11,6 +11,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 /**
  * One suite over both implementations of the port — the whole point of having a
@@ -24,7 +26,7 @@ class WorkflowDataRepositoryTest {
     static Stream<WorkflowDataRepository> implementations() {
         return Stream.of(
                 new InMemoryWorkflowDataRepository(),
-                new FileWorkflowDataRepository(tempDir.resolve("defs"), () -> "test"));
+                new FileWorkflowDataRepository(tempDir.resolve("defs"), () -> "test", new JsonMapperFactory(List.of())));
     }
 
     @ParameterizedTest

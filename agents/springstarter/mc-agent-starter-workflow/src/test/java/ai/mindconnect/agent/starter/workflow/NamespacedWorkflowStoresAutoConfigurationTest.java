@@ -15,6 +15,8 @@ import org.springframework.context.annotation.Configuration;
 import javax.sql.DataSource;
 import java.nio.file.Path;
 import java.sql.Connection;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -82,5 +84,6 @@ class NamespacedWorkflowStoresAutoConfigurationTest {
     static class Host {
         @Bean ScopeSupplier scope() { return ScopeSupplier.fixed(new Namespace("test")); }
         @Bean com.fasterxml.jackson.databind.ObjectMapper objectMapper() { return new com.fasterxml.jackson.databind.ObjectMapper(); }
+        @Bean JsonMapperFactory jsonMapperFactory() { return new JsonMapperFactory(List.of()); }
     }
 }

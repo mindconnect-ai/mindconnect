@@ -27,18 +27,18 @@ class FileDocuments<T> {
 
     private static final Logger log = LoggerFactory.getLogger(FileDocuments.class);
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .enable(SerializationFeature.INDENT_OUTPUT);
-
     private final Path dir;
     private final Class<T> type;
+    private final ObjectMapper mapper;
 
-    FileDocuments(Path dir, Class<T> type) {
+    FileDocuments(Path dir, Class<T> type, JsonMapperFactory json) {
         this.dir = dir;
         this.type = type;
+        this.mapper = json.create()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .enable(SerializationFeature.INDENT_OUTPUT);
     }
 
     Optional<T> read(String key) {
@@ -66,7 +66,7 @@ class FileDocuments<T> {
 
     void write(String key, T document) {
         try {
-            AtomicFiles.write(fileFor(key), out -> MAPPER.writeValue(out, document));
+            AtomicFiles.write(fileFor(key), out -> mapper.writeValue(out, document));
         } catch (IOException e) {
             throw new UncheckedIOException("Could not write " + fileFor(key), e);
         }
@@ -82,7 +82,7 @@ class FileDocuments<T> {
 
     private Optional<T> readFile(Path file) {
         try {
-            return Optional.of(MAPPER.readValue(file.toFile(), type));
+            return Optional.of(mapper.readValue(file.toFile(), type));
         } catch (IOException e) {
             log.warn("Skipping unreadable {}: {}", file, e.getMessage());
             return Optional.empty();

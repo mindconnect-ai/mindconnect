@@ -29,9 +29,11 @@ import java.util.Set;
 /** Translates between the protocol vocabulary and OpenAI's wire JSON. Stateless. */
 final class OpenAiMapper {
 
-    private static final ObjectMapper JSON = JsonMapperFactory.create();
+    private final ObjectMapper json;
 
-    private OpenAiMapper() { }
+    OpenAiMapper(JsonMapperFactory json) {
+        this.json = json.create();
+    }
 
     // ── protocol → OpenAI ───────────────────────────────────────────────────
 
@@ -107,7 +109,7 @@ final class OpenAiMapper {
      * tool calls (web_search_call, …) run inside OpenAI, their names never
      * match, so they never trigger {@code WAITING_FOR_TOOL_OUTPUT}.
      */
-    static Response response(JsonNode n, String sessionId, String agentName,
+    Response response(JsonNode n, String sessionId, String agentName,
                              Set<String> functionToolNames) {
         List<ConversationItemRecord> output = new ArrayList<>();
         int i = 0;
@@ -137,7 +139,7 @@ final class OpenAiMapper {
                 mapped.metadata(), mapped.createdAt(), mapped.completedAt());
     }
 
-    static ConversationItem outputItem(JsonNode n) {
+    ConversationItem outputItem(JsonNode n) {
         String type = n.path("type").asText();
         return switch (type) {
             case "message" -> new ConversationItem.Message(
@@ -155,7 +157,7 @@ final class OpenAiMapper {
         };
     }
 
-    static Optional<ResponseEvent> event(JsonNode n, String responseId) {
+    Optional<ResponseEvent> event(JsonNode n, String responseId) {
         long seq = n.path("sequence_number").asLong(0);
         return Optional.ofNullable(switch (n.path("type").asText()) {
             case "response.created" -> new ResponseEvent.Created(responseId, seq);
@@ -188,7 +190,7 @@ final class OpenAiMapper {
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    private static ConversationItemRecord entry(JsonNode n) {
+    private ConversationItemRecord entry(JsonNode n) {
         JsonNode itemNode = n.path("item");
         return new ConversationItemRecord(itemNode.path("id").asText("item"),
                 n.path("output_index").asLong(0) + 1, outputItem(itemNode));
@@ -214,9 +216,9 @@ final class OpenAiMapper {
         return List.copyOf(parts);
     }
 
-    private static Map<String, Object> parseArguments(String argsJson) {
+    private Map<String, Object> parseArguments(String argsJson) {
         try {
-            return JSON.readValue(argsJson, new TypeReference<Map<String, Object>>() { });
+            return json.readValue(argsJson, new TypeReference<Map<String, Object>>() { });
         } catch (Exception e) {
             return Map.of("_raw", argsJson);
         }

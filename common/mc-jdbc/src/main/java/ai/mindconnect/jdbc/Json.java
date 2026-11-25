@@ -1,5 +1,7 @@
 package ai.mindconnect.jdbc;
 
+import java.util.List;
+
 import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -26,7 +28,7 @@ public final class Json {
     }
 
     public static Json defaults() {
-        return new Json(JsonMapperFactory.builder()
+        return new Json(new JsonMapperFactory(List.of()).builder()
                 .addModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)

@@ -14,6 +14,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -193,7 +195,7 @@ class IndexDefinitionsTest {
                     @Override public List<ai.mindconnect.llm.domain.LlmConfig> findAll() { return List.of(); }
                     @Override public void save(ai.mindconnect.llm.domain.LlmConfig config) { }
                     @Override public void deleteById(ai.mindconnect.llm.domain.LlmConfigId id) { }
-                }, ScopeSupplier.fixed(NS));
+                }, ScopeSupplier.fixed(NS), new JsonMapperFactory(List.of(new IdJsonModule())));
         stores.registry().saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", null, Map.of()));
         VectorStore chat = stores.open("session-s1", "chat-uploads", VectorStoreInstance.Scope.SESSION, "s1", "alice");
         chat.put(FILE_1, null, "1", TEXT);
@@ -207,7 +209,7 @@ class IndexDefinitionsTest {
     void aStoreFromBeforeIndexesFollowsItsTemplatesName() {
         DefaultVectorStores stores = new DefaultVectorStores(
                 new VectorStoreTemplate("default", "embeddings", null, Map.of()), dir, null, null,
-                ScopeSupplier.fixed(NS));
+                ScopeSupplier.fixed(NS), new JsonMapperFactory(List.of(new IdJsonModule())));
         VectorStoreInstance chat = new VectorStoreInstance("session-s1", "chat-uploads", "embeddings", null, Map.of(),
                 VectorStoreInstance.Scope.SESSION, "s1", "alice", Instant.now());
         VectorStoreInstance kb = new VectorStoreInstance("kb", "default", "embeddings", null, Map.of(),

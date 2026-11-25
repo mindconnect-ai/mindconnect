@@ -6,12 +6,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelSettingsResolver;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.common.util.McEnv;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
@@ -42,9 +44,11 @@ public final class LocalCliApplication {
         }
         String model = McEnv.get("MC_MODEL", DEFAULT_MODEL);
         Path home = Path.of(System.getProperty("user.home"));
-        LocalRuntime local = new LocalRuntime(home);
+        // Built before the runtime, whose factory does not exist yet; the id module keeps the session files as they were.
+        JsonMapperFactory json = new JsonMapperFactory(List.of(new IdJsonModule()));
+        LocalRuntime local = new LocalRuntime(home, json);
         try (AgentRuntime runtime = local.builder()
-                .model(new OpenAiChat(apiKey, model).chat())
+                .model(new OpenAiChat(apiKey, model, json).chat())
                 .plugin(modelOfLastResort(model))
                 .build()) {
             Session session = runtime.sessions().open(local.sessionIn(

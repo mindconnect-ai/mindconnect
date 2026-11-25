@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
@@ -29,7 +30,9 @@ import org.springframework.core.env.Environment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JacksonPlugin;
+import ai.mindconnect.jackson.JsonMapperCustomizer;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.scope.ScopeSupplier;
@@ -128,6 +131,8 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
                 "ai.mindconnect.agent.starter.file.FilePersistenceAutoConfiguration",
                 "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig"},
         beforeName = {
+                // Spring Boot makes an ObjectMapper of its own unless there is one: the runtime's is.
+                "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration",
                 "ai.mindconnect.agent.starter.registry.RegistryAutoConfiguration",
                 "ai.mindconnect.agent.starter.workflow.NamespacedWorkflowStoresAutoConfiguration",
                 "ai.mindconnect.agent.starter.workflow.McAgentWorkflowStepsAutoConfiguration",
@@ -135,17 +140,6 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 public class RuntimeEngineAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RuntimeEngineAutoConfiguration.class);
-
-    /**
-     * How the ids stand in JSON, for the mapper Spring Boot builds itself: it
-     * registers the Jackson modules that are beans. A mapper of
-     * {@code JsonMapperFactory} finds the module through the ServiceLoader.
-     */
-    @Bean
-    @ConditionalOnMissingBean(IdJsonModule.class)
-    IdJsonModule idJsonModule() {
-        return new IdJsonModule();
-    }
 
     /**
      * The scope the runtime works in, for an application without the
@@ -159,29 +153,31 @@ public class RuntimeEngineAutoConfiguration {
 
     @Bean(destroyMethod = "close")
     @ConditionalOnMissingBean(AgentRuntime.class)
-    AgentRuntime agentRuntime(Environment env, ObjectMapper json, ApplicationContext context, ScopeSupplier scope,
-                              ObjectProvider<EnvVarResolver> envVarResolver, ObjectProvider<Sql> sql,
-                              ObjectProvider<DataSource> dataSource, ObjectProvider<TimeZones> zones,
-                              ObjectProvider<Plugin> more) {
+    AgentRuntime agentRuntime(Environment env, ApplicationContext context, ScopeSupplier scope,
+                              ObjectProvider<DataSource> dataSource, ObjectProvider<Plugin> more,
+                              ObjectProvider<JsonMapperCustomizer> json) {
         Path dataDir = Path.of(env.getProperty("mindconnect.data.base-dir", "data"));
         String persistence = env.getProperty("mindconnect.persistence", "file");
         int maxTraces = env.getProperty("mindconnect.agent.trace.max-per-session", Integer.class, 50);
         StorePlugin stores = switch (persistence) {
-            case "postgres" -> new PostgresStorePlugin(sql.getObject(), dataDir, maxTraces,
+            case "postgres" -> new PostgresStorePlugin(dataSource.getObject(), dataDir, maxTraces,
                     "postgres".equals(env.getProperty("mindconnect.file-store.backend", "postgres")));
             case "memory" -> new InMemoryStorePlugin(dataDir, maxTraces);
-            default -> new FileStorePlugin(dataDir, json, maxTraces);
+            default -> new FileStorePlugin(dataDir, maxTraces);
         };
-        LocalTaskQueue queue = taskQueue(env, dataSource);
-        TimeZones userZones = zones.getIfAvailable(TimeZones::system);
         // What a capability keeps with the session asks the runtime's session store, once the runtime is built.
         AtomicReference<AgentRuntime> built = new AtomicReference<>();
         Supplier<SessionStore> sessions = () -> built.get().service(SessionStore.class);
+        // The users' zones where a plugin keeps users, the JVM's for everybody where none does.
+        Supplier<TimeZones> zones = () -> built.get().find(TimeZones.class).orElseGet(TimeZones::system);
         ToolActivation activation = new SessionToolActivation(sessions);
 
         var builder = AgentRuntime.builder()
                 .scope(scope)
-                .taskQueue(queue)
+                // Made from the runtime's services: a store in the database writes its tasks with the runtime's mapper.
+                .taskQueue(registry -> taskQueue(env, dataSource, registry.get(JsonMapperFactory.class)))
+                // The application's JSON, as its customizers say; Spring's ObjectMapper is this one.
+                .plugin(new JacksonPlugin(json.orderedStream().toList()))
                 .plugin(provides("scope", registry -> {
                     registry.provide(ToolActivation.class, () -> activation);
                     // The model of what the runtime does on its own account: a title, a summary.
@@ -193,8 +189,9 @@ public class RuntimeEngineAutoConfiguration {
                 // another file store is named, and the store plugin's answer is the later one.
                 .plugin(new FilePlugin(env.getProperty("mindconnect.file-store.backend", "filesystem"), dataDir))
                 .plugin(stores)
+                // A resolver of the application's own wins; else the sources the plugins contribute.
                 .plugin(new LlmPlugin(blankToNull(env.getProperty("mindconnect.encryption.secret-key")),
-                        envVarResolver.getIfAvailable(EnvVarResolver::system), json))
+                        (EnvVarResolver) hostBean(context, EnvVarResolver.class).orElse(null)))
                 .plugin(new ToolRegistryPlugin(toolSettings(env, dataDir, persistence),
                         blankToNull(env.getProperty("mindconnect.tools.disabled")), type -> hostBean(context, type)))
                 .plugin(new DirectoryPlugin(dataDir, blankToNull(env.getProperty("mindconnect.users.home")),
@@ -220,7 +217,7 @@ public class RuntimeEngineAutoConfiguration {
                 .plugin(new TokenizerPlugin())
                 .plugin(new PermissionPlugin(PermissionEffect.DENY, new SessionApprovalMemory(sessions)))
                 .plugin(new MemoryPlugin(new SessionSummaryStore(sessions)))
-                .plugin(new PromptPlugin(Clock.systemUTC(), userZones::zoneOf));
+                .plugin(new PromptPlugin(Clock.systemUTC(), user -> zones.get().zoneOf(user)));
         // Off unless the installation says so: deleting a chat must not take files with it.
         if (env.getProperty("mindconnect.sessions.delete-directory", Boolean.class, false)) {
             builder.plugin(provides("session-directory-cleanup", registry -> registry.contribute(
@@ -267,12 +264,13 @@ public class RuntimeEngineAutoConfiguration {
      * The queue: in memory, finished tasks kept for the task monitor (retention
      * unset = keep) — unless {@code mindconnect.task-queue.*} says otherwise.
      */
-    private static LocalTaskQueue taskQueue(Environment env, ObjectProvider<DataSource> dataSource) {
+    private static LocalTaskQueue taskQueue(Environment env, ObjectProvider<DataSource> dataSource,
+                                            JsonMapperFactory json) {
         TaskStore store = "jdbc".equalsIgnoreCase(env.getProperty("mindconnect.task-queue.store", "memory"))
                 ? new JdbcTaskStore(dataSource.getObject(),
                         Optional.ofNullable(blankToNull(env.getProperty("mindconnect.task-queue.node-id")))
                                 .orElseGet(RuntimeEngineAutoConfiguration::defaultNodeId),
-                        env.getProperty("mindconnect.task-queue.lease", Duration.class, Duration.ofSeconds(30)))
+                        env.getProperty("mindconnect.task-queue.lease", Duration.class, Duration.ofSeconds(30)), json)
                         .initSchema()
                 : new InMemoryTaskStore();
         LocalTaskQueue queue = new LocalTaskQueue(store);
@@ -372,6 +370,15 @@ public class RuntimeEngineAutoConfiguration {
 
     // ── the runtime's services, for the application's own beans to inject ───
 
+    /** The runtime's mapper: built from the modules its plugins contribute, as the application's customizers say. */
+    @Bean ObjectMapper objectMapper(AgentRuntime r) { return r.service(ObjectMapper.class); }
+    @Bean JsonMapperFactory jsonMapperFactory(AgentRuntime r) { return r.service(JsonMapperFactory.class); }
+    /** Where a {@code ${VAR}} resolves: the users' own values, the namespace's, the process environment. */
+    @Bean @ConditionalOnMissingBean(EnvVarResolver.class)
+    EnvVarResolver envVarResolver(AgentRuntime r) { return r.service(EnvVarResolver.class); }
+    /** The database every Postgres store works on, around the runtime's mapper. */
+    @Bean @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
+    Sql mindconnectSql(AgentRuntime r) { return r.service(Sql.class); }
     @Bean SessionService runtimeSessionService(AgentRuntime r) { return r.sessions(); }
     @Bean TurnService runtimeTurnService(AgentRuntime r) { return r.turns(); }
     @Bean MemoryCompaction memoryCompaction(AgentRuntime r) { return r.service(MemoryCompaction.class); }

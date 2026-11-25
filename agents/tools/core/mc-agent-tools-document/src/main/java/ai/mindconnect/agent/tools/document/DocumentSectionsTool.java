@@ -24,28 +24,29 @@ import java.util.Map;
 public final class DocumentSectionsTool implements Tool {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentSectionsTool.class);
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final Path baseDir;
     private final FileRoots roots;
     private final WorkspaceFiles files;
     private final DocumentReader reader;
+    private final ObjectMapper json;
 
-    public DocumentSectionsTool(Path baseDir, DocumentReader reader) {
-        this(FileRoots.of(baseDir), reader);
+    public DocumentSectionsTool(Path baseDir, DocumentReader reader, JsonMapperFactory json) {
+        this(FileRoots.of(baseDir), reader, json);
     }
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
-    public DocumentSectionsTool(FileRoots roots, DocumentReader reader) {
-        this(WorkspaceFiles.local(roots), reader);
+    public DocumentSectionsTool(FileRoots roots, DocumentReader reader, JsonMapperFactory json) {
+        this(WorkspaceFiles.local(roots), reader, json);
     }
 
     /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
-    public DocumentSectionsTool(WorkspaceFiles files, DocumentReader reader) {
+    public DocumentSectionsTool(WorkspaceFiles files, DocumentReader reader, JsonMapperFactory json) {
         this.files = files;
         this.roots = files.roots();
         this.baseDir = roots.base();
         this.reader = reader;
+        this.json = json.create();
     }
 
     @Override
@@ -103,7 +104,7 @@ public final class DocumentSectionsTool implements Tool {
 
         try {
             DocumentModel model = reader.load(files, baseDir, target);
-            ObjectNode root = MAPPER.createObjectNode();
+            ObjectNode root = this.json.createObjectNode();
             root.put("path", model.relativePath());
             root.put("sectionCount", model.sections().size());
             ArrayNode sections = root.putArray("sections");
@@ -116,7 +117,7 @@ public final class DocumentSectionsTool implements Tool {
                     node.put("content", section.content());
                 }
             }
-            return MAPPER.writeValueAsString(root);
+            return this.json.writeValueAsString(root);
         } catch (Exception e) {
             log.warn("document_sections: failed to parse {}: {}", relative, e.getMessage());
             return "Error: could not parse document: " + e.getMessage();

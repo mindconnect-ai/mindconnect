@@ -16,6 +16,7 @@ import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDialog;
@@ -64,17 +65,20 @@ public class ToolCatalogUiController {
      * effective view no longer has.
      */
     private final ToolRegistry sourceRegistry;
+    private final JsonMapperFactory json;
 
     public ToolCatalogUiController(ToolRegistry toolRegistry,
                                  ToolTestService toolTestService,
                                  AdminLayoutFactory layoutFactory,
                                  ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
-                                 ObjectProvider<ToolRepository> toolRepository) {
+                                 ObjectProvider<ToolRepository> toolRepository,
+                                 JsonMapperFactory json) {
         this.toolRegistry = toolRegistry;
         this.toolTestService = toolTestService;
         this.layoutFactory = layoutFactory;
         this.mcpRegistryAdmin = mcpRegistryAdmin;
         this.toolRepository = toolRepository;
+        this.json = json;
         this.sourceRegistry = toolRegistry instanceof OverlayToolRegistry overlay
                 ? overlay.source()
                 : toolRegistry;
@@ -291,7 +295,7 @@ public class ToolCatalogUiController {
     private ai.mindconnect.ui.model.UiPatch toolTestDialog(String name, String previousJson,
                                                            ToolTestService.Result result) {
         var component = new ToolCatalogTestComponent(
-                name, toolRegistry, previousJson, result);
+                name, toolRegistry, previousJson, result, json);
         UiDialog dialog = UiDialog.of(component.title(), null, component.render());
         dialog.setId("tool-test-dialog");
         return ai.mindconnect.ui.model.UiPatch.of()

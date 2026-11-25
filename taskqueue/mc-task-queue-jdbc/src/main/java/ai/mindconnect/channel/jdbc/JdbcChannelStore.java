@@ -31,15 +31,16 @@ public final class JdbcChannelStore<E> implements ChannelStore<E> {
 
     private final DataSource dataSource;
     private final Class<E> type;
-    private final ObjectMapper mapper = JsonMapperFactory.builder()
-            .addModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .build();
+    private final ObjectMapper mapper;
 
-    public JdbcChannelStore(DataSource dataSource, Class<E> type) {
+    public JdbcChannelStore(DataSource dataSource, Class<E> type, JsonMapperFactory json) {
         this.dataSource = dataSource;
         this.type = type;
+        this.mapper = json.builder()
+                .addModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
     }
 
     /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */

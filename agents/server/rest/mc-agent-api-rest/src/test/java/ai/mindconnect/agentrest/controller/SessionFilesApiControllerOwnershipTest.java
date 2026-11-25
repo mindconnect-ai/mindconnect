@@ -9,6 +9,9 @@ import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
 import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,7 +47,7 @@ class SessionFilesApiControllerOwnershipTest {
 
     @BeforeEach
     void setUp() {
-        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
+        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule())));
         var controller = new SessionFilesApiController(store, null, new SessionAccess(sessions.runtime()));
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }

@@ -16,6 +16,7 @@ import ai.mindconnect.agent.tools.usermemory.adapter.InMemoryUserMemoryRepositor
 import ai.mindconnect.agent.tools.usermemory.UserMemoryRepository;
 import ai.mindconnect.agent.trace.adapter.InMemoryLlmCallTraceRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmRepositoryFactory;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
@@ -25,6 +26,7 @@ import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.workflow.persistence.memory.InMemoryWorkflowRepositoryFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
+import ai.mindconnect.plugin.PluginRegistry;
 
 /** Everything in memory, gone with the process: a test, a demo. */
 public final class InMemoryStorePlugin extends StorePlugin {
@@ -44,11 +46,13 @@ public final class InMemoryStorePlugin extends StorePlugin {
     }
 
     @Override
-    protected Stores stores(ScopeSupplier scope) {
+    protected Stores stores(PluginRegistry registry) {
+        ScopeSupplier scope = registry.get(ScopeSupplier.class);
         InMemoryLlmRepositoryFactory llm = new InMemoryLlmRepositoryFactory(scope);
         InMemoryMessageRepositoryFactory messages = new InMemoryMessageRepositoryFactory(scope);
         InMemoryWorkflowRepositoryFactory workflows =
-                new InMemoryWorkflowRepositoryFactory(sideDirectory, () -> scope.namespace().value());
+                new InMemoryWorkflowRepositoryFactory(sideDirectory, () -> scope.namespace().value(),
+                        registry.get(JsonMapperFactory.class));
         return new Stores() {
             @Override public LlmConfigRepository llmConfigs() { return llm.llmConfigRepository(); }
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }

@@ -48,10 +48,12 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
 
     private final AgentManagement agents;
     private final AgentJson files;
+    private final ObjectMapper plain;
 
-    public AgentDefinitionInstaller(AgentManagement agents) {
+    public AgentDefinitionInstaller(AgentManagement agents, JsonMapperFactory json) {
         this.agents = agents;
-        this.files = new AgentJson(JsonMapperFactory.create()
+        this.plain = json.create();
+        this.files = new AgentJson(json.create()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
@@ -125,8 +127,7 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
     }
 
     /** The file's text, named after its registry entry when it names no agent itself. */
-    private static String withName(String content, String entryName) throws Exception {
-        ObjectMapper plain = JsonMapperFactory.create();
+    private String withName(String content, String entryName) throws Exception {
         JsonNode agent = plain.readTree(content);
         if (!(agent instanceof ObjectNode fields)) {
             return content;

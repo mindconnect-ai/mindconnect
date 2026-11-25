@@ -33,6 +33,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-jdbc</artifactId>
         </dependency>
+        <!-- PgExtensionPlugin: the extensions' plugin, their stores in the database -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-extension</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.postgresql</groupId>

@@ -36,6 +36,12 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user</artifactId>
         </dependency>
+        <!-- AgentRuntime: the users live in the runtime, the beans here hand them out -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-sdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- The namespace starter's Postgres stores are conditional on this module's classes. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

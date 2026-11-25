@@ -5,8 +5,8 @@ import java.util.Map;
 
 /**
  * A file store from a {@link FileStoreBackend} found on the classpath, by
- * type name — {@code filesystem} from {@code mc-file-store}, or whatever a
- * further module registers — opened with the given settings, working in the
+ * type name — whatever a further module registers, such as {@code postgres} —
+ * opened with the given settings, working in the
  * namespace the scope names per call.
  */
 public class SpiFileStoreFactory implements FileStoreFactory {
@@ -25,7 +25,7 @@ public class SpiFileStoreFactory implements FileStoreFactory {
     public FileStore fileStore() {
         return FileStoreBackend.byType(type)
                 .orElseThrow(() -> new IllegalStateException("No file store backend of type '" + type
-                        + "' on the classpath — for 'filesystem' add mc-file-store"))
+                        + "' on the classpath"))
                 .open(config, scope);
     }
 }

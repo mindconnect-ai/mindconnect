@@ -6,6 +6,7 @@ import ai.mindconnect.agent.registry.domain.ImportStatus;
 import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -41,7 +42,7 @@ class LlmConfigInstallerTest {
     @BeforeEach
     void setUp() {
         repository = new FakeRepository();
-        installer = new LlmConfigInstaller(repository);
+        installer = new LlmConfigInstaller(repository, new JsonMapperFactory(List.of()));
     }
 
     @Test

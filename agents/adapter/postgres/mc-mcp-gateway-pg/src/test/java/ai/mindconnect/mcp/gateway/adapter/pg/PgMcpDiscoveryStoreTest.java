@@ -2,6 +2,7 @@ package ai.mindconnect.mcp.gateway.adapter.pg;
 
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Jsonb;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
@@ -28,8 +29,8 @@ class PgMcpDiscoveryStoreTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.freshMcpTables();
-        acme = new PgMcpDiscoveryStore(sql, ScopeSupplier.fixed(new Namespace("acme"))).initSchema();
-        other = new PgMcpDiscoveryStore(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
+        acme = new PgMcpDiscoveryStore(sql, ScopeSupplier.fixed(new Namespace("acme")), new JsonMapperFactory(List.of())).initSchema();
+        other = new PgMcpDiscoveryStore(sql, ScopeSupplier.fixed(new Namespace("other")), new JsonMapperFactory(List.of())).initSchema();
     }
 
     @Test

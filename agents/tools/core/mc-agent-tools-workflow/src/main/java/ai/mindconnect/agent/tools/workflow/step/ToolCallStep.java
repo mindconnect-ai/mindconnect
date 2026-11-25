@@ -1,10 +1,8 @@
 package ai.mindconnect.agent.tools.workflow.step;
 
 import ai.mindconnect.agent.tool.ToolCallScope;
-import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.execution.BaseStepInstance;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import ai.mindconnect.workflow.execution.JsonMapper;
 
 import java.util.Map;
 
@@ -15,8 +13,6 @@ import java.util.Map;
  * step result.
  */
 public class ToolCallStep extends BaseStepInstance<ToolCallData> {
-
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     @Override
     public void execute() {
@@ -117,8 +113,16 @@ public class ToolCallStep extends BaseStepInstance<ToolCallData> {
         if (json.isBlank()) {
             return Map.of();
         }
+        // The run's own JSON reader: a step made by the ServiceLoader has no mapper handed in.
+        JsonMapper reader = getWorkflowContext().getJsonMapper();
+        if (reader == null) {
+            throw new IllegalStateException("tool-call step '" + cfg.getName()
+                    + "': the workflow engine has no JSON support to read the arguments with");
+        }
         try {
-            return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
+            @SuppressWarnings("unchecked")
+            Map<String, Object> arguments = reader.parse(json, Map.class);
+            return arguments;
         } catch (Exception e) {
             throw new IllegalArgumentException(
                     "tool-call step '" + cfg.getName() + "': arguments are not a JSON object — "

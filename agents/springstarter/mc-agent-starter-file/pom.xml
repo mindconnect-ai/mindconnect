@@ -18,6 +18,12 @@
         builds every store from, and the installation-wide users and API tokens on files.</description>
 
     <dependencies>
+        <!-- AgentRuntime: the users live in the runtime, the beans here hand them out -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-sdk</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user</artifactId>

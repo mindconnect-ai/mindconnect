@@ -7,9 +7,11 @@ import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.workflow.domain.WorkflowData;
+import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,9 +59,6 @@ import java.util.Set;
 public class MigrationService {
 
     private static final Logger log = LoggerFactory.getLogger(MigrationService.class);
-
-    /** Workflows carry {@code @class} type info — diffed and merged with the workflow stores' mapper. */
-    private static final ObjectMapper WORKFLOW_MAPPER = BundledSeeds.WORKFLOW_MAPPER;
 
     /** Whether a stored record is absent (NEW) or present-but-different (CHANGED). */
     public enum Status { NEW, CHANGED }
@@ -115,6 +114,8 @@ public class MigrationService {
     private final ObjectMapper objectMapper;
     private final EncryptionHelper encryption;
     private final BundledSeeds seeds;
+    /** Workflows carry {@code @class} type info — diffed and merged with the workflow stores' mapper. */
+    private final ObjectMapper workflowMapper;
 
     /**
      * @param encryption decrypts stored {@code enc:} keys for the diff; without
@@ -125,14 +126,16 @@ public class MigrationService {
                             SkillRepository skillRepository,
                             WorkflowDataRepository workflowDataRepository,
                             ObjectMapper objectMapper,
-                            Optional<EncryptionHelper> encryption) {
+                            Optional<EncryptionHelper> encryption,
+                            JsonMapperFactory json) {
         this.llmConfigRepository = llmConfigRepository;
         this.agents = agents;
         this.skillRepository = skillRepository;
         this.workflowDataRepository = workflowDataRepository;
         this.objectMapper = objectMapper;
         this.encryption = encryption.orElseGet(EncryptionHelper::noEncryption);
-        this.seeds = new BundledSeeds(objectMapper);
+        this.seeds = new BundledSeeds(objectMapper, json);
+        this.workflowMapper = WorkflowObjectMapperFactory.create(json);
     }
 
     // ── Read: pending list ──────────────────────────────────────────────────────
@@ -191,7 +194,7 @@ public class MigrationService {
         for (BundledSeeds.Seed<WorkflowData> seed : seeds.workflows()) {
             String id = seed.name();
             Optional<WorkflowData> existing = workflowDataRepository.findById(id);
-            pendingFor(EntityType.WORKFLOW, id, existing.orElse(null), seed.record(), WORKFLOW_MAPPER)
+            pendingFor(EntityType.WORKFLOW, id, existing.orElse(null), seed.record(), workflowMapper)
                     .ifPresent(result::add);
         }
         return result;
@@ -317,7 +320,7 @@ public class MigrationService {
             case SKILL -> false; // only ever NEW: nothing stored to merge into
             case WORKFLOW -> bundledWorkflow(name)
                     .flatMap(incoming -> workflowDataRepository.findById(name)
-                            .flatMap(stored -> mergeField(stored, incoming, field, WorkflowData.class, WORKFLOW_MAPPER)))
+                            .flatMap(stored -> mergeField(stored, incoming, field, WorkflowData.class, workflowMapper)))
                     .map(merged -> { workflowDataRepository.save(name, merged); return true; })
                     .orElse(false);
         };

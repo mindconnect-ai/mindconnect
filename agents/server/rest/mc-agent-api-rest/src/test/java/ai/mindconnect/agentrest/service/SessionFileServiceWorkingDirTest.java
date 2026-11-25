@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -60,6 +62,7 @@ class SessionFileServiceWorkingDirTest {
         VectorStores stores = VectorStores.fromEnvironment(new ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
+                if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
                 if (type == LlmEmbeddings.class) return Optional.of((T) mock(LlmEmbeddings.class));
                 if (type == LlmConfigRepository.class) return Optional.of((T) mock(LlmConfigRepository.class));
                 if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(new Namespace("test")));

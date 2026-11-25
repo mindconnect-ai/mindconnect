@@ -1,5 +1,7 @@
 package ai.mindconnect.adminui.service;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.adminui.service.TaskMonitor.CancelResult;
 import ai.mindconnect.adminui.service.TaskMonitor.Snapshot;
 import ai.mindconnect.adminui.service.TaskMonitor.TaskView;
@@ -94,8 +96,9 @@ class TaskMonitorTest {
         var messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         SessionManagement management = new RepositorySessionManagement(sessions, messages,
                 new InMemoryAgentRepository(namespaces), SessionDirectoryPolicy.unrestricted(), List.of(),
-                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()));
-        new RepositorySessionStore(sessions, messages).create(new Session(
+                new ai.mindconnect.agent.management.SessionLifecycle(sessions, session -> java.util.Optional.empty()),
+                new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))));
+        new RepositorySessionStore(sessions, messages, new JsonMapperFactory(List.of(new IdJsonModule()))).create(new Session(
                 alices,
                 UserId.of("alice"), null,
                 new AgentDefinition("Scout", "A test agent", "prompt", ModelSettings.NONE, List.of(), 5, Map.of()),

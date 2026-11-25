@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.pg;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Jsonb;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.workflow.persist.WorkflowInstanceSnapshot;
@@ -52,12 +53,13 @@ public final class PgWorkflowInstanceRepository implements WorkflowInstanceRepos
     private final SnapshotSerializer serializer;
     private final Supplier<String> partition;
 
-    public PgWorkflowInstanceRepository(DataSource dataSource, Supplier<String> partition) {
-        this(Sql.of(dataSource), partition);
+    public PgWorkflowInstanceRepository(DataSource dataSource, Supplier<String> partition, JsonMapperFactory json) {
+        this(Sql.of(dataSource), partition, json);
     }
 
-    public PgWorkflowInstanceRepository(Sql sql, Supplier<String> partition) {
-        this(sql, partition, new SnapshotSerializer());
+    /** @param json the host's mapper factory, so a snapshot's JSON knows the host's modules */
+    public PgWorkflowInstanceRepository(Sql sql, Supplier<String> partition, JsonMapperFactory json) {
+        this(sql, partition, new SnapshotSerializer(json));
     }
 
     public PgWorkflowInstanceRepository(Sql sql, Supplier<String> partition, SnapshotSerializer serializer) {

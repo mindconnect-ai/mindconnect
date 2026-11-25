@@ -42,17 +42,17 @@ import java.util.Map;
  */
 public final class ToolFormComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
-
     private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
+    private final ObjectMapper mapper;
 
     /** Pass {@code null} for the new-tool form. */
-    public ToolFormComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry) {
+    public ToolFormComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry, JsonMapperFactory json) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
+        this.mapper = json.create();
     }
 
     @Override
@@ -101,7 +101,7 @@ public final class ToolFormComponent implements UiComponent {
         String overridesJson = "{}";
         if (!isNew && tool.overrides() != null && !tool.overrides().isEmpty()) {
             try {
-                overridesJson = MAPPER.writerWithDefaultPrettyPrinter()
+                overridesJson = mapper.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(tool.overrides());
             } catch (JsonProcessingException ignored) {}
         }

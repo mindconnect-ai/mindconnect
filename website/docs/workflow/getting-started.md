@@ -122,15 +122,17 @@ For example, Groovy:
 </dependency>
 ```
 
-Build the factory with `SpiWorkflowContextFactory.create()` — it discovers and
+Build the factory with `SpiWorkflowContextFactory.create(json)` — `json` being a
+`JsonMapperFactory`, `new JsonMapperFactory(List.of())` here — it discovers and
 applies the Groovy module automatically, so there is **no manual
 `configure(...)` call**. Then prefix the expression with `groovy:`:
 
 ```java
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
 
 // Picks up mc-workflow-code-groovy (and any other module) from the classpath
-var ctx = SpiWorkflowContextFactory.create();
+var ctx = SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of()));
 
 var square = new AssignVariablesData();
 square.setName("square");

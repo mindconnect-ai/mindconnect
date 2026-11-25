@@ -53,19 +53,21 @@ public final class LocalRuntime {
             30, Map.of());
 
     private final Path home;
+    private final JsonMapperFactory json;
 
-    public LocalRuntime(Path home) {
+    public LocalRuntime(Path home, JsonMapperFactory json) {
         this.home = home;
+        this.json = json;
     }
 
     /** A builder that lacks only the model. */
     public AgentRuntimeBuilder builder() {
-        ObjectMapper json = JsonMapperFactory.create().registerModule(new JavaTimeModule());
+        ObjectMapper json = this.json.create().registerModule(new JavaTimeModule());
         HarnessDirectories directories = new HarnessDirectories(home);
         ScopeSupplier scope = ScopeSupplier.fixed(new Namespace(NAMESPACE));
         Path data = home.resolve(".mc").resolve("data");
         SessionStore sessions = new RepositorySessionStore(new FileSessionRepository(data, json, scope),
-                new FileMessageRepository(data, json, scope));
+                new FileMessageRepository(data, json, scope), this.json);
         return AgentRuntime.builder()
                 .scope(scope)
                 .sessionStore(provides("session-store-file", registry ->

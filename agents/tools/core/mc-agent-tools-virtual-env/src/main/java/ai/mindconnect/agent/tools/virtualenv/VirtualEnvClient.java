@@ -48,15 +48,16 @@ public class VirtualEnvClient {
     private final TokenSource tokens;
     private final Duration requestTimeout;
     private final HttpClient http;
-    private final ObjectMapper json = JsonMapperFactory.create()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private final ObjectMapper json;
 
-    public VirtualEnvClient(URI baseUrl, TokenSource tokens, Duration requestTimeout) {
+    public VirtualEnvClient(URI baseUrl, TokenSource tokens, Duration requestTimeout, JsonMapperFactory json) {
         String url = baseUrl.toString();
         this.baseUrl = URI.create(url.endsWith("/") ? url.substring(0, url.length() - 1) : url);
         this.tokens = tokens;
         this.requestTimeout = requestTimeout;
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.json = json.create()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
     URI baseUrl() {

@@ -1,8 +1,10 @@
 package ai.mindconnect.workflow.spi;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.execution.DefaultWorkflowContextFactory;
 import ai.mindconnect.workflow.execution.WorkflowConfigurer;
 import ai.mindconnect.workflow.execution.WorkflowContextFactory;
+import ai.mindconnect.workflow.jackson.JsonWorkflowConfigurer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,20 +18,22 @@ import java.util.ServiceLoader;
  * <p>Each module that ships a
  * {@code META-INF/services/ai.mindconnect.workflow.api.execution.WorkflowConfigurer}
  * file is discovered and applied automatically.  No explicit wiring code is
- * needed — adding a module to the classpath is sufficient.
+ * needed — adding a module to the classpath is sufficient. The JSON support
+ * ({@link JsonWorkflowConfigurer}) is applied after them with the caller's
+ * {@link JsonMapperFactory}: the loader could not hand it one.
  *
  * <p>Usage:
  * <pre>{@code
  * // All step types and resolvers present on the classpath are registered:
- * WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
+ * WorkflowContextFactory factory = SpiWorkflowContextFactory.create(json);
  * WorkflowExecutorService service = new WorkflowExecutorService(factory);
  * }</pre>
  *
  * <p>To add custom configuration on top of SPI discovery, call
- * {@link #create()} and then modify the returned factory before building the
+ * {@link #create(JsonMapperFactory)} and then modify the returned factory before building the
  * executor service:
  * <pre>{@code
- * WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
+ * WorkflowContextFactory factory = SpiWorkflowContextFactory.create(json);
  * factory.setBaseDir("/data/workflows");
  * WorkflowExecutorService service = new WorkflowExecutorService(factory);
  * }</pre>
@@ -43,10 +47,11 @@ public final class SpiWorkflowContextFactory {
      * {@link WorkflowConfigurer} discoverable from the current thread's
      * context classloader.
      *
+     * @param json the installation's mapper factory, for the JSON support
      * @return a fully configured factory ready for use
      */
-    public static WorkflowContextFactory create() {
-        return create(Thread.currentThread().getContextClassLoader());
+    public static WorkflowContextFactory create(JsonMapperFactory json) {
+        return create(Thread.currentThread().getContextClassLoader(), json);
     }
 
     /**
@@ -54,20 +59,22 @@ public final class SpiWorkflowContextFactory {
      * {@link WorkflowConfigurer} discoverable from {@code classLoader}.
      *
      * @param classLoader the classloader to use for service discovery
+     * @param json        the installation's mapper factory, for the JSON support
      * @return a fully configured factory ready for use
      */
-    public static WorkflowContextFactory create(ClassLoader classLoader) {
+    public static WorkflowContextFactory create(ClassLoader classLoader, JsonMapperFactory json) {
         WorkflowContextFactory factory = new DefaultWorkflowContextFactory();
 
         ServiceLoader.load(WorkflowConfigurer.class, classLoader)
                 .forEach(configurer -> configurer.configure(factory));
+        new JsonWorkflowConfigurer(json).configure(factory);
 
         return factory;
     }
 
     /**
      * Returns the list of all {@link WorkflowConfigurer} instances that would
-     * be applied by {@link #create()}, without actually creating a factory.
+     * be found for {@link #create(JsonMapperFactory)}, without actually creating a factory.
      * Useful for diagnostics and testing.
      */
     public static List<WorkflowConfigurer> discoverConfigurers() {

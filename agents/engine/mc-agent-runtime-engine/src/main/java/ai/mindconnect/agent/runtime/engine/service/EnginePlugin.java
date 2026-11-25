@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.engine.service;
 
 import java.util.Set;
+import java.util.function.Supplier;
 
 import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
@@ -29,16 +30,18 @@ import ai.mindconnect.taskqueue.TaskQueue;
  */
 public final class EnginePlugin implements Plugin {
 
-    private final TaskQueue queue;
+    private final Supplier<TaskQueue> queue;
     private final SharedStateStore sharedState;
 
     /**
-     * @param queue       where turns and tool calls run; the plugin
-     *                    registers its workers on it and does not close it
+     * @param queue       where turns and tool calls run, asked for when the
+     *                    first service needs it — a queue whose store is built
+     *                    from the runtime's own services exists only then; the
+     *                    plugin registers its workers on it and does not close it
      * @param sharedState the queue's shared state: the order of a session's
      *                    turns has to hold for every process on the queue
      */
-    public EnginePlugin(TaskQueue queue, SharedStateStore sharedState) {
+    public EnginePlugin(Supplier<TaskQueue> queue, SharedStateStore sharedState) {
         this.queue = queue;
         this.sharedState = sharedState;
     }
@@ -62,12 +65,13 @@ public final class EnginePlugin implements Plugin {
         registry.provide(SessionService.class, () -> new DefaultSessionService(
                 registry.get(SessionStore.class), registry.get(SessionEventHub.class)));
         registry.provide(QueuedBackgroundWork.class,
-                () -> new QueuedBackgroundWork(queue,
+                () -> new QueuedBackgroundWork(queue.get(),
                         () -> registry.all(BackgroundWorker.class), registry.get(ScopeSupplier.class)));
         registry.provide(BackgroundWork.class, () -> registry.get(QueuedBackgroundWork.class));
         // Built once and on first use: by then every plugin is installed, and
         // building it is what puts the workers on the queue.
         registry.provide(TurnService.class, () -> {
+            TaskQueue queue = this.queue.get();
             SessionStore sessions = registry.get(SessionStore.class);
             HookRunner hooks = registry::run;
             ToolResolver tools = ToolResolver.firstOf(() -> registry.all(ToolResolver.class));

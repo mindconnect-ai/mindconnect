@@ -1,8 +1,13 @@
 package ai.mindconnect.agent.starter.file;
 
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
 import ai.mindconnect.user.domain.User;
+import ai.mindconnect.user.port.out.PreferenceRepository;
+import ai.mindconnect.user.runtime.FileUserPlugin;
+import ai.mindconnect.user.runtime.UserPlugin;
+import ai.mindconnect.user.service.UserService;
 import ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository;
 import ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository;
 import ai.mindconnect.credentials.adapter.file.FileConnectionRepository;
@@ -10,11 +15,7 @@ import ai.mindconnect.credentials.adapter.file.FileOAuthProviderRepository;
 import ai.mindconnect.credentials.port.out.OAuthProviderRepository;
 import ai.mindconnect.credentials.port.out.ConnectionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
-import ai.mindconnect.user.adapter.file.FileUserToolRepository;
 import ai.mindconnect.user.port.out.UserToolRepository;
-import ai.mindconnect.user.adapter.file.FileNotificationRepository;
-import ai.mindconnect.user.adapter.file.FileUserRepository;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
 import ai.mindconnect.user.port.out.NotificationRepository;
 import ai.mindconnect.user.port.out.UserRepository;
@@ -34,7 +35,8 @@ import java.nio.file.Path;
  * {@code mindconnect.data.base-dir} (default {@code data}), one directory
  * per namespace. The runtime's stores are built by the runtime starter from
  * {@code mindconnect.persistence}; this starter adds what is
- * installation-wide and not the runtime's — the users and their API tokens.
+ * installation-wide — the users and their API tokens, as a plugin of the
+ * runtime, and the credentials users attached.
  *
  * <p>It declares no scope: an application works in one namespace unless it also
  * has {@code mc-agent-starter-namespace}, which binds a scope per request and
@@ -50,32 +52,33 @@ public class FilePersistenceAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(FilePersistenceAutoConfiguration.class);
 
-    /** Installation-wide, not per namespace: a user is the same person in every namespace. */
+    /**
+     * The users, their API tokens, tools, notices and preferences, installed into the
+     * runtime: the runtime asks a user's zone and own variables, so it holds the stores.
+     * Installation-wide, not per namespace: a user is the same person in every namespace.
+     */
     @Bean
-    @ConditionalOnMissingBean(UserRepository.class)
-    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                  ObjectProvider<EncryptionHelper> encryption) {
-        UserRepository files = new FileUserRepository(Path.of(baseDir));
-        EncryptionHelper helper = encryption.getIfAvailable();
-        // A user's own variables are secrets — enc: at rest when there is a key, like LLM credentials.
-        if (helper == null) {
-            log.warn("No EncryptionHelper — users' own variables are stored unencrypted under {}", baseDir);
-            return files;
-        }
-        EncryptingUserRepository encrypting = new EncryptingUserRepository(files, helper);
-        logRewritten(encrypting.rewriteEarlierScheme(), "user record(s)");
-        return encrypting;
+    @ConditionalOnMissingBean(UserPlugin.class)
+    FileUserPlugin fileUserPlugin(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                  ObjectProvider<EncryptionHelper> encryption,
+                                  @Value("${mindconnect.time-zone:}") String installationZone) {
+        return new FileUserPlugin(Path.of(baseDir), encryption.getIfAvailable(), installationZone);
     }
+
+    // ── the runtime's users, for the application's own beans ────────────────
+
+    @Bean UserRepository userRepository(AgentRuntime r) { return r.service(UserRepository.class); }
+    @Bean ApiTokenRepository apiTokenRepository(AgentRuntime r) { return r.service(ApiTokenRepository.class); }
+    @Bean UserToolRepository userToolRepository(AgentRuntime r) { return r.service(UserToolRepository.class); }
+    @Bean NotificationRepository notificationRepository(AgentRuntime r) { return r.service(NotificationRepository.class); }
+    @Bean PreferenceRepository preferenceRepository(AgentRuntime r) { return r.service(PreferenceRepository.class); }
+    @Bean UserService userService(AgentRuntime r) { return r.service(UserService.class); }
+    /** The zone each user lives in, for the profile page as for the runtime's prompt and tools. */
+    @Bean TimeZones timeZones(AgentRuntime r) { return r.service(TimeZones.class); }
 
     /** Says what the start-up rewrite of earlier ciphertexts changed — nothing on every start after the first. */
     private static void logRewritten(int records, String what) {
         if (records > 0) log.info("{} {} rewritten from the earlier encryption scheme to AES-GCM", records, what);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(ApiTokenRepository.class)
-    ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new FileApiTokenRepository(Path.of(baseDir));
     }
 
     /**
@@ -94,13 +97,6 @@ public class FilePersistenceAutoConfiguration {
         EncryptingOAuthProviderRepository encrypting = new EncryptingOAuthProviderRepository(files, helper);
         logRewritten(encrypting.rewriteEarlierScheme(), "OAuth provider(s)");
         return encrypting;
-    }
-
-    /** The tools each user keeps in their own account — installation-wide, and no secrets in them. */
-    @Bean
-    @ConditionalOnMissingBean(UserToolRepository.class)
-    UserToolRepository userToolRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new FileUserToolRepository(Path.of(baseDir));
     }
 
     /**
@@ -123,20 +119,5 @@ public class FilePersistenceAutoConfiguration {
         EncryptingConnectionRepository encrypting = new EncryptingConnectionRepository(files, helper);
         logRewritten(encrypting.rewriteEarlierScheme(users.findAll().stream().map(User::id).toList()), "connection(s)");
         return encrypting;
-    }
-
-    /** Installation-wide like the users they are addressed to, and not encrypted: a notice is not a secret. */
-    @Bean
-    @ConditionalOnMissingBean(NotificationRepository.class)
-    NotificationRepository notificationRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new FileNotificationRepository(Path.of(baseDir));
-    }
-
-    /** What each user's screens remember; installation-wide like the users, and not a secret. */
-    @Bean
-    @ConditionalOnMissingBean(ai.mindconnect.user.port.out.PreferenceRepository.class)
-    ai.mindconnect.user.port.out.PreferenceRepository preferenceRepository(
-            @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new ai.mindconnect.user.adapter.file.FilePreferenceRepository(Path.of(baseDir));
     }
 }

@@ -35,17 +35,21 @@ import java.util.Optional;
 public final class FilesystemFileStore implements FileStore {
 
     private static final Logger log = LoggerFactory.getLogger(FilesystemFileStore.class);
-    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private final Path baseDir;
     private final ScopeSupplier scope;
+    private final ObjectMapper mapper;
 
-    /** @param baseDir the data directory; the files live in {@code <baseDir>/<namespace>/files}, the namespace the scope names per call */
-    public FilesystemFileStore(Path baseDir, ScopeSupplier scope) {
+    /**
+     * @param baseDir the data directory; the files live in {@code <baseDir>/<namespace>/files}, the namespace the scope names per call
+     * @param json    the installation's factory: {@code meta.json} names its creator by a typed id, which only its modules write as the plain value
+     */
+    public FilesystemFileStore(Path baseDir, ScopeSupplier scope, JsonMapperFactory json) {
         this.baseDir = baseDir;
         this.scope = scope;
+        this.mapper = json.create()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     /** The files directory of the namespace the current call works in. */
@@ -65,7 +69,7 @@ public final class FilesystemFileStore implements FileStore {
         long size = Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
         StoredFile file = new StoredFile(id, safeName, contentType, size, Instant.now(), creator);
         // The metadata is what makes the upload exist for readers; it lands whole or not at all.
-        AtomicFiles.write(dir.resolve("meta.json"), out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out, file));
+        AtomicFiles.write(dir.resolve("meta.json"), out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out, file));
         return file;
     }
 
@@ -81,7 +85,7 @@ public final class FilesystemFileStore implements FileStore {
             return Optional.empty();
         }
         try {
-            return Optional.of(MAPPER.readValue(meta.toFile(), StoredFile.class));
+            return Optional.of(mapper.readValue(meta.toFile(), StoredFile.class));
         } catch (IOException | IllegalArgumentException e) {
             log.warn("Unreadable file metadata {}: {}", meta, e.getMessage());
             return Optional.empty();

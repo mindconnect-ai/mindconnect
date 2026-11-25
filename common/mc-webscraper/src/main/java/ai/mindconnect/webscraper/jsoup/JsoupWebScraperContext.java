@@ -1,10 +1,11 @@
 package ai.mindconnect.webscraper.jsoup;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.webscraper.BaseWebScraperOptions;
 
 public class JsoupWebScraperContext extends ai.mindconnect.webscraper.BaseWebScraperContext {
 
-    public JsoupWebScraperContext(BaseWebScraperOptions options) {
-        super(options);
+    public JsoupWebScraperContext(BaseWebScraperOptions options, JsonMapperFactory json) {
+        super(options, json);
     }
 }

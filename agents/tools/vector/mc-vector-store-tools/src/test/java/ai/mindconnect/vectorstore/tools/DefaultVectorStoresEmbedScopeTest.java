@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -44,7 +46,7 @@ class DefaultVectorStoresEmbedScopeTest {
         };
         LlmEmbeddings embeddings = (config, texts) -> texts.stream().map(t -> new float[]{1f}).toList();
         VectorStoreTemplate template = new VectorStoreTemplate("default", "embeddings", "file-ingestion", Map.of());
-        DefaultVectorStores stores = new DefaultVectorStores(template, dir, embeddings, configs, bound);
+        DefaultVectorStores stores = new DefaultVectorStores(template, dir, embeddings, configs, bound, new JsonMapperFactory(List.of(new IdJsonModule())));
 
         List<float[]> vectors = bound.runIn(Scope.of(new Namespace("acme")),
                 () -> stores.embedFor("docs", List.of("hello")));

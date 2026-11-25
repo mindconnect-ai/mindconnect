@@ -39,7 +39,8 @@ public final class LlmGatewayModelPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
-        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat, JsonMapperFactory.create(), traces,
+        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat,
+                registry.get(JsonMapperFactory.class).create(), traces,
                 configurations, registry.find(MediaReader.class).orElseGet(MediaReader::none)));
     }
 }

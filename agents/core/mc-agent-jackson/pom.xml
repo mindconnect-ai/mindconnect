@@ -17,9 +17,9 @@
     <description>
         How the ids of the agents stand in JSON, package ai.mindconnect.agent.jackson:
         IdJsonModule writes AgentId, SessionId, UserId, AgentToolId and Namespace as
-        their plain value and reads them back. It announces itself through the
-        ServiceLoader, so every mapper of mc-jackson has it, and the contracts it
-        serves need no Jackson of their own.
+        their plain value and reads them back; IdJsonPlugin contributes it to a
+        runtime, so every mapper of the runtime's JsonMapperFactory has it, and the
+        contracts it serves need no Jackson of their own.
     </description>
 
     <dependencies>
@@ -38,6 +38,11 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-plugin</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>

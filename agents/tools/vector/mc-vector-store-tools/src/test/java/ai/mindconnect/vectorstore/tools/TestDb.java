@@ -16,6 +16,8 @@ import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -126,6 +128,7 @@ final class TestDb {
         return new ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
+                if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
                 if (type == Sql.class) return Optional.ofNullable((T) sql);
                 if (type == DataSource.class) return Optional.ofNullable((T) dataSource);
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
