@@ -17,4 +17,3 @@ D3\:\ a\ class\ has\ at\ most\ 30\ methods=216cd1b2-3a38-4ecc-a25e-9d65ddc943f9
 D3\:\ a\ constructor\ takes\ at\ most\ 7\ parameters\ (a\ record\ is\ exempt)=172902a0-9cad-43cf-a1e0-6a4fc6638487
 D4\:\ a\ class\ name\ says\ what\ the\ thing\ is\ for\ (no\ Helper,\ Util,\ Support,\ Commons,\ Holder,\ Manager)=2b514d31-1d5b-4880-a7e5-b58d2ae22808
 D4\:\ a\ method\ name\ says\ what\ it\ does\ (no\ process,\ handle,\ do)=fbca0bde-6f8f-4449-963c-53daa5a62111
-Sessions\:\ the\ runtime\ knows\ no\ conversations=03e2fe96-5559-4143-89d6-0d4d59ef151d

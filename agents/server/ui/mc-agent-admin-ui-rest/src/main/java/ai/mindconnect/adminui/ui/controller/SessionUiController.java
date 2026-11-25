@@ -13,7 +13,6 @@ import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionManagement;
@@ -60,11 +59,6 @@ public class SessionUiController {
     /** The agent the session runs as, for a dialog's heading; a session without one is still shown. */
     private String agentNameOf(ManagedSession session) {
         return sessions.agentOf(session.id()).map(AgentDefinition::name).orElse("(no agent)");
-    }
-
-    /** What a session's traces are filed under: the session's id, as the runtime files them. */
-    private static ConversationId tracesOf(SessionId sessionId) {
-        return ConversationId.of(sessionId.value());
     }
 
     /**
@@ -205,7 +199,7 @@ public class SessionUiController {
         List<LlmCallTraceHeader> traces = new java.util.ArrayList<>();
         for (SessionId sid : collectSessionTree(sessionId)) {
             try {
-                traces.addAll(traceRepository.findHeadersByConversation(tracesOf(sid)));
+                traces.addAll(traceRepository.findHeadersBySession(sid));
             } catch (Exception e) {
                 log.warn("Failed to load traces for session {}: {}", sid, e.getMessage());
             }

@@ -42,10 +42,6 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-domain</artifactId>
         </dependency>
         <dependency>
@@ -65,12 +61,6 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-management</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>

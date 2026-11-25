@@ -4,8 +4,6 @@ import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +18,7 @@ import java.util.Optional;
  * directory doesn't grow unboundedly on busy sessions.
  *
  * <p>A trace has its own {@link TraceId}; the things it is looked up by —
- * turn, session, conversation — bring the tenant with them.
+ * turn, session — bring the tenant with them.
  */
 public interface LlmCallTraceRepository {
 
@@ -28,26 +26,18 @@ public interface LlmCallTraceRepository {
     void save(LlmCallTrace trace);
 
     /** All traces of one turn, oldest first. */
-    List<LlmCallTrace> findByTurn(ChatTurnId turn);
+    List<LlmCallTrace> findByTurn(String turn);
 
     /** All traces of the session, oldest first. */
     List<LlmCallTrace> findBySession(SessionId session);
 
     /**
-     * All traces stored under the conversation, oldest first. Cheaper than
-     * {@link #findBySession} because it skips the cross-conversation scan —
-     * call this when the conversation id is at hand (e.g. from
-     * {@code AgentSession.conversationId()}).
+     * The same traces as {@link #findBySession}, as headers — the list
+     * without the payloads. The default serves the full traces; a store with
+     * the header's columns answers from those alone.
      */
-    List<LlmCallTrace> findByConversation(ConversationId conversation);
-
-    /**
-     * The same traces as {@link #findByConversation}, as headers — the
-     * list without the payloads. The default serves the full traces; a
-     * store with the header's columns answers from those alone.
-     */
-    default List<? extends LlmCallTraceHeader> findHeadersByConversation(ConversationId conversation) {
-        return findByConversation(conversation);
+    default List<? extends LlmCallTraceHeader> findHeadersBySession(SessionId session) {
+        return findBySession(session);
     }
 
     /**
@@ -56,7 +46,7 @@ public interface LlmCallTraceRepository {
      * spawned, directly or transitively, by that top-level turn. Oldest first by {@code startedAt}. The root turn's own
      * traces are <em>not</em> included; use {@link #findByTurn} for those.
      */
-    List<LlmCallTrace> findDescendants(ChatTurnId root);
+    List<LlmCallTrace> findDescendants(String root);
 
     Optional<LlmCallTrace> findById(TraceId id);
 

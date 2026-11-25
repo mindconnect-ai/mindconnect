@@ -3,8 +3,6 @@ package ai.mindconnect.agent.trace.adapter;
 import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.agent.trace.domain.TraceId;
 
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
@@ -27,10 +25,14 @@ import java.util.Optional;
  *
  * <p>Layout:
  * <pre>
- * {base}/conversations/{conversationId}/traces/
+ * {base}/conversations/{sessionId}/traces/
  *   {turnId}/
  *     {startedAtMs}-{traceId}.json
  * </pre>
+ *
+ * <p>The folder is still called {@code conversations}, as it was when a
+ * session's messages were kept as a conversation of the same id: the traces
+ * written then stay where they are.
  *
  * <p>Sorting by filename = sorting by start time, so listing a turn or
  * session is just a directory walk + filename-sort. Each trace is one
@@ -70,7 +72,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
 
     @Override
     public void save(LlmCallTrace trace) {
-        Path turnDir = turnDirFor(trace.context().conversationId(), trace.context().turnId());
+        Path turnDir = turnDirFor(trace.context().sessionId(), trace.context().turnId());
         Path file = turnDir.resolve(filenameFor(trace));
         try {
             Files.createDirectories(turnDir);
@@ -78,7 +80,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
             log.debug("Saved LLM trace {} for turn {} ({} ms, {} prompt + {} completion tokens)",
                     trace.id(), trace.context().turnId(), trace.durationMs(),
                     trace.promptTokens(), trace.completionTokens());
-            enforceRetention(trace.context().conversationId());
+            enforceRetention(trace.context().sessionId());
         } catch (IOException e) {
             log.warn("Failed to save LLM trace {} for turn {}: {}",
                     trace.id(), trace.context().turnId(), e.getMessage());
@@ -86,12 +88,12 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
     }
 
     @Override
-    public List<LlmCallTrace> findByTurn(ChatTurnId turnId) {
+    public List<LlmCallTrace> findByTurn(String turnId) {
         List<LlmCallTrace> result = new ArrayList<>();
         if (!Files.isDirectory(conversationsDir())) return result;
         try (DirectoryStream<Path> convs = Files.newDirectoryStream(conversationsDir())) {
             for (Path conv : convs) {
-                Path turnDir = conv.resolve("traces").resolve(turnId.value());
+                Path turnDir = conv.resolve("traces").resolve(turnId);
                 if (Files.isDirectory(turnDir)) {
                     result.addAll(loadTurnDir(turnDir));
                 }
@@ -105,19 +107,19 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
     }
 
     @Override
-    public List<LlmCallTrace> findDescendants(ChatTurnId rootTurnId) {
-        java.util.Map<ChatTurnId, List<LlmCallTrace>> byParent = new java.util.HashMap<>();
+    public List<LlmCallTrace> findDescendants(String rootTurnId) {
+        java.util.Map<String, List<LlmCallTrace>> byParent = new java.util.HashMap<>();
         for (LlmCallTrace t : allTraces()) {
-            ChatTurnId parent = t.context() != null ? t.context().parentTurnId() : null;
+            String parent = t.context() != null ? t.context().parentTurnId() : null;
             if (parent == null) continue;
             byParent.computeIfAbsent(parent, k -> new ArrayList<>()).add(t);
         }
         List<LlmCallTrace> out = new ArrayList<>();
-        java.util.ArrayDeque<ChatTurnId> frontier = new java.util.ArrayDeque<>();
-        java.util.Set<ChatTurnId> visited = new java.util.HashSet<>();
+        java.util.ArrayDeque<String> frontier = new java.util.ArrayDeque<>();
+        java.util.Set<String> visited = new java.util.HashSet<>();
         frontier.add(rootTurnId);
         while (!frontier.isEmpty()) {
-            ChatTurnId parent = frontier.poll();
+            String parent = frontier.poll();
             if (!visited.add(parent)) continue; // protect against pathological cycles
             List<LlmCallTrace> children = byParent.get(parent);
             if (children == null) continue;
@@ -133,8 +135,8 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
     }
 
     @Override
-    public List<LlmCallTrace> findByConversation(ConversationId conversationId) {
-        Path tracesRoot = conversationsDir().resolve(conversationId.value()).resolve("traces");
+    public List<LlmCallTrace> findBySession(SessionId sessionId) {
+        Path tracesRoot = conversationsDir().resolve(sessionId.value()).resolve("traces");
         if (!Files.isDirectory(tracesRoot)) return List.of();
         List<LlmCallTrace> result = new ArrayList<>();
         try (DirectoryStream<Path> turns = Files.newDirectoryStream(tracesRoot)) {
@@ -142,18 +144,9 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
                 if (Files.isDirectory(turn)) result.addAll(loadTurnDir(turn));
             }
         } catch (IOException e) {
-            log.warn("Failed to scan traces for conversation {}: {}", conversationId, e.getMessage());
+            log.warn("Failed to scan traces for session {}: {}", sessionId, e.getMessage());
         }
-        result.removeIf(t -> !conversationId.equals(t.context().conversationId()));
-        result.sort(Comparator.comparing(LlmCallTrace::startedAt));
-        return result;
-    }
-
-    @Override
-    public List<LlmCallTrace> findBySession(SessionId sessionId) {
-        List<LlmCallTrace> result = new ArrayList<>(allTraces().stream()
-                .filter(t -> sessionId.equals(t.context().sessionId()))
-                .toList());
+        result.removeIf(t -> !sessionId.equals(t.context().sessionId()));
         result.sort(Comparator.comparing(LlmCallTrace::startedAt));
         return result;
     }
@@ -196,10 +189,10 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
         }
     }
 
-    // ── layout: <conversation>/traces/<turn>/<startedAt>-<id>.json ──────────
+    // ── layout: conversations/<session>/traces/<turn>/<startedAt>-<id>.json ──────────
 
-    private Path turnDirFor(ConversationId conversationId, ChatTurnId turnId) {
-        return conversationsDir().resolve(conversationId.value()).resolve("traces").resolve(turnId.value());
+    private Path turnDirFor(SessionId sessionId, String turnId) {
+        return conversationsDir().resolve(sessionId.value()).resolve("traces").resolve(turnId);
     }
 
     private String filenameFor(LlmCallTrace trace) {
@@ -250,9 +243,9 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
         }
     }
 
-    private void enforceRetention(ConversationId conversationId) {
+    private void enforceRetention(SessionId sessionId) {
         if (maxTracesPerSession <= 0) return;
-        Path tracesRoot = conversationsDir().resolve(conversationId.value()).resolve("traces");
+        Path tracesRoot = conversationsDir().resolve(sessionId.value()).resolve("traces");
         if (!Files.isDirectory(tracesRoot)) return;
         List<Path> all = new ArrayList<>();
         try (DirectoryStream<Path> turns = Files.newDirectoryStream(tracesRoot)) {
@@ -263,7 +256,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
                 }
             }
         } catch (IOException e) {
-            log.warn("Failed to enumerate traces for retention sweep ({}): {}", conversationId, e.getMessage());
+            log.warn("Failed to enumerate traces for retention sweep ({}): {}", sessionId, e.getMessage());
             return;
         }
         if (all.size() <= maxTracesPerSession) return;
@@ -276,7 +269,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
                 log.warn("Failed to prune old trace {}: {}", all.get(i), e.getMessage());
             }
         }
-        log.debug("Retention sweep pruned {} oldest trace(s) for conversation {}", toDelete, conversationId);
+        log.debug("Retention sweep pruned {} oldest trace(s) for session {}", toDelete, sessionId);
     }
 
     /** The conversations directory of the namespace the current call works in. */

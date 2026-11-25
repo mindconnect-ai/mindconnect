@@ -4,8 +4,6 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -21,10 +19,9 @@ class CountingTraceRepositoryTest {
         final List<LlmCallTrace> saved = new ArrayList<>();
         int deletes;
         @Override public void save(LlmCallTrace trace) { saved.add(trace); }
-        @Override public List<LlmCallTrace> findByTurn(ChatTurnId turn) { return List.of(); }
+        @Override public List<LlmCallTrace> findByTurn(String turn) { return List.of(); }
         @Override public List<LlmCallTrace> findBySession(SessionId session) { return List.of(); }
-        @Override public List<LlmCallTrace> findByConversation(ConversationId conversation) { return List.of(); }
-        @Override public List<LlmCallTrace> findDescendants(ChatTurnId root) { return List.of(); }
+        @Override public List<LlmCallTrace> findDescendants(String root) { return List.of(); }
         @Override public Optional<LlmCallTrace> findById(TraceId id) { return Optional.empty(); }
         @Override public void deleteBySession(SessionId session) { deletes++; }
     }

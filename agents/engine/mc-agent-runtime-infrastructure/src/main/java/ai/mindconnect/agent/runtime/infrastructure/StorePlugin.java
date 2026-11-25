@@ -16,10 +16,6 @@ import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
-import ai.mindconnect.message.port.in.ConversationManager;
-import ai.mindconnect.message.port.out.ConversationRepository;
-import ai.mindconnect.message.service.ConversationService;
-import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -42,10 +38,6 @@ public abstract class StorePlugin implements Plugin {
         LlmConfigRepository llmConfigs();
 
         LlmPriceRepository llmPrices();
-
-        ConversationRepository conversations();
-
-        MessageRepository messages();
 
         SessionRepository sessions(ScopeSupplier namespaces);
 
@@ -75,7 +67,7 @@ public abstract class StorePlugin implements Plugin {
     /** The stores, made once the plugins are installed: what they need is in {@code registry} by then. */
     protected abstract Stores stores(PluginRegistry registry);
 
-    /** The sessions' messages, where they are kept apart from the message repository; made on first use. */
+    /** The sessions' messages; made on first use. */
     protected abstract SessionMessageRepository sessionMessages(PluginRegistry registry, ScopeSupplier namespaces);
 
     /** Whether the place keeps the operator's tool settings; where it does not, no such repository is provided. */
@@ -101,10 +93,6 @@ public abstract class StorePlugin implements Plugin {
                 .<LlmConfigRepository>map(key -> new EncryptingLlmConfigRepository(stores.get().llmConfigs(), key))
                 .orElseGet(() -> stores.get().llmConfigs()));
         registry.provide(LlmPriceRepository.class, () -> stores.get().llmPrices());
-        registry.provide(ConversationRepository.class, () -> stores.get().conversations());
-        registry.provide(MessageRepository.class, () -> stores.get().messages());
-        registry.provide(ConversationManager.class, () -> new ConversationService(
-                registry.get(ConversationRepository.class), registry.get(MessageRepository.class)));
         registry.provide(SessionRepository.class, () -> stores.get().sessions(namespaces.get()));
         registry.provide(SessionMessageRepository.class, () -> sessionMessages(registry, namespaces.get()));
         registry.provide(AgentRepository.class, () -> stores.get().agents(namespaces.get()));

@@ -37,10 +37,6 @@
             <artifactId>mc-llm-gateway-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository-core</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>

@@ -5,8 +5,6 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.trace.domain.TraceContext;
 import ai.mindconnect.agent.trace.domain.TraceId;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -20,55 +18,50 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class InMemoryLlmCallTraceRepositoryTest {
 
-    private static final ConversationId CONVERSATION = ConversationId.random();
-    private static final ConversationId OTHER = ConversationId.random();
     private static final SessionId SESSION = SessionId.of("s1");
+    private static final SessionId OTHER = SessionId.of("s2");
 
     @Test
-    void keepsOnlyTheNewestTracesPerConversation() {
+    void keepsOnlyTheNewestTracesPerSession() {
         var repo = new InMemoryLlmCallTraceRepository(3, ScopeSupplier.local());
-        for (int i = 0; i < 5; i++) repo.save(trace(CONVERSATION, "t" + i, Instant.ofEpochSecond(i)));
+        for (int i = 0; i < 5; i++) repo.save(trace(SESSION, "t" + i, Instant.ofEpochSecond(i)));
         repo.save(trace(OTHER, "o1", Instant.ofEpochSecond(0)));
 
-        assertThat(repo.findByConversation(CONVERSATION))
-                .extracting(t -> t.context().turnId().value())
+        assertThat(repo.findBySession(SESSION))
+                .extracting(t -> t.context().turnId())
                 .containsExactlyInAnyOrder("t2", "t3", "t4");
-        assertThat(repo.findByConversation(OTHER)).hasSize(1);   // another conversation's cap is its own
+        assertThat(repo.findBySession(OTHER)).hasSize(1);   // another session's cap is its own
     }
 
     @Test
     void aCapOfZeroKeepsEverything() {
         var repo = new InMemoryLlmCallTraceRepository(0, ScopeSupplier.local());
-        for (int i = 0; i < 60; i++) repo.save(trace(CONVERSATION, "t" + i, Instant.ofEpochSecond(i)));
-        assertThat(repo.findByConversation(CONVERSATION)).hasSize(60);
+        for (int i = 0; i < 60; i++) repo.save(trace(SESSION, "t" + i, Instant.ofEpochSecond(i)));
+        assertThat(repo.findBySession(SESSION)).hasSize(60);
     }
 
     @Test
     void theDefaultCapMatchesTheFileAdapter() {
         var repo = new InMemoryLlmCallTraceRepository(ScopeSupplier.local());
-        for (int i = 0; i < 60; i++) repo.save(trace(CONVERSATION, "t" + i, Instant.ofEpochSecond(i)));
-        assertThat(repo.findByConversation(CONVERSATION))
-                .hasSize(InMemoryLlmCallTraceRepository.DEFAULT_MAX_PER_CONVERSATION);
+        for (int i = 0; i < 60; i++) repo.save(trace(SESSION, "t" + i, Instant.ofEpochSecond(i)));
+        assertThat(repo.findBySession(SESSION))
+                .hasSize(InMemoryLlmCallTraceRepository.DEFAULT_MAX_PER_SESSION);
     }
 
     @Test
     void deleteBySessionForgetsThatSessionOnly() {
         var repo = new InMemoryLlmCallTraceRepository(ScopeSupplier.local());
-        repo.save(trace(CONVERSATION, "t1", Instant.ofEpochSecond(1)));
-        repo.save(trace(OTHER, "o1", Instant.ofEpochSecond(1), SessionId.of("s2")));
+        repo.save(trace(SESSION, "t1", Instant.ofEpochSecond(1)));
+        repo.save(trace(OTHER, "o1", Instant.ofEpochSecond(1)));
 
         repo.deleteBySession(SESSION);
 
         assertThat(repo.findBySession(SESSION)).isEmpty();
-        assertThat(repo.findBySession(SessionId.of("s2"))).hasSize(1);
+        assertThat(repo.findBySession(OTHER)).hasSize(1);
     }
 
-    private static LlmCallTrace trace(ConversationId conversation, String turn, Instant startedAt) {
-        return trace(conversation, turn, startedAt, SESSION);
-    }
-
-    private static LlmCallTrace trace(ConversationId conversation, String turn, Instant startedAt, SessionId session) {
-        var context = new TraceContext(conversation, session, ChatTurnId.of(turn), null, 0, "agent");
+    private static LlmCallTrace trace(SessionId session, String turn, Instant startedAt) {
+        var context = new TraceContext(session, turn, null, 0, "agent");
         return new LlmCallTrace(TraceId.random(), context, startedAt, 1, "cfg", "model", 1, 1, "stop",
                 "{}", List.of(), null, null, null);
     }

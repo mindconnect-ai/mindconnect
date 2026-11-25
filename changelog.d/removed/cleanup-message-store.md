@@ -4,3 +4,8 @@
   sessions are no conversations. Conversations stored with those values before
   are no longer read through the repository; the migrations read them from
   their JSON.
+- The runtime no longer provides a conversation store: `StorePlugin` and its
+  subclasses drop `MessageRepository`, `ConversationRepository` and
+  `ConversationManager`, and the Spring starter their beans. LLM call traces
+  are filed and found by session (`findBySession`, `findHeadersBySession`);
+  `TraceContext` names session and turn only.

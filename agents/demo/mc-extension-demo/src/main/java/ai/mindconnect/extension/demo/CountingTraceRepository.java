@@ -4,8 +4,6 @@ import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.trace.domain.TraceId;
 import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 
@@ -35,7 +33,7 @@ final class CountingTraceRepository implements LlmCallTraceRepository {
     }
 
     @Override
-    public List<LlmCallTrace> findByTurn(ChatTurnId turn) {
+    public List<LlmCallTrace> findByTurn(String turn) {
         return delegate.findByTurn(turn);
     }
 
@@ -45,17 +43,12 @@ final class CountingTraceRepository implements LlmCallTraceRepository {
     }
 
     @Override
-    public List<LlmCallTrace> findByConversation(ConversationId conversation) {
-        return delegate.findByConversation(conversation);
+    public List<? extends LlmCallTraceHeader> findHeadersBySession(SessionId session) {
+        return delegate.findHeadersBySession(session);
     }
 
     @Override
-    public List<? extends LlmCallTraceHeader> findHeadersByConversation(ConversationId conversation) {
-        return delegate.findHeadersByConversation(conversation);
-    }
-
-    @Override
-    public List<LlmCallTrace> findDescendants(ChatTurnId root) {
+    public List<LlmCallTrace> findDescendants(String root) {
         return delegate.findDescendants(root);
     }
 

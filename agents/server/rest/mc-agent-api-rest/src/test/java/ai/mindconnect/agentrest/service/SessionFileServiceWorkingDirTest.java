@@ -14,7 +14,6 @@ import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import org.junit.jupiter.api.BeforeEach;

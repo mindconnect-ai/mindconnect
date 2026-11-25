@@ -7,7 +7,6 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageStore;
 import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -6,7 +6,6 @@ import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.auth.VectorStoreAccess;
 import ai.mindconnect.agentrest.service.VectorStoreService;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import org.junit.jupiter.api.BeforeEach;

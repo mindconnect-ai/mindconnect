@@ -5,8 +5,6 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.trace.domain.TraceContext;
 import ai.mindconnect.agent.trace.domain.TraceId;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.ui.model.UiRow;
 import ai.mindconnect.ui.model.UiTable;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,8 +37,7 @@ class TraceTableComponentTest {
 
     private static LlmCallTrace call(String id, Instant at, String turn, String parentTurn,
                                      int depth, String agent, String model, Integer errorStatus) {
-        var ctx = new TraceContext(ConversationId.of("c1"), SESSION, ChatTurnId.of(turn),
-                parentTurn == null ? null : ChatTurnId.of(parentTurn), depth, agent);
+        var ctx = new TraceContext(SESSION, turn, parentTurn, depth, agent);
         return new LlmCallTrace(TraceId.of(id), ctx, at, 1200, "default", model,
                 100, 20, errorStatus == null ? "STOP" : null, "{}", List.of(), null,
                 errorStatus, errorStatus == null ? null : "boom");

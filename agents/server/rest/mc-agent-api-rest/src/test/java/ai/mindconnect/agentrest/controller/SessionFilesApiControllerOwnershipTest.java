@@ -8,7 +8,6 @@ import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
-import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.agent.jackson.IdJsonModule;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import java.util.List;

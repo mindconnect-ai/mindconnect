@@ -10,8 +10,6 @@ import ai.mindconnect.agent.trace.domain.TraceContext;
 import ai.mindconnect.agent.runtime.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.llm.domain.LlmCallEvent;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 
 /**
  * Every provider call of a turn into the application's trace repository,
@@ -31,12 +29,7 @@ final class RepositoryLlmCallTraceListener implements LlmCallTraceListener {
     @Override
     public void onCall(TurnId turnId, LlmCallEvent event) {
         turns.get().find(turnId).ifPresent(turn -> traces.save(LlmCallTrace.of(
-                new TraceContext(
-                        // Filed under the session's id: where the traces page looks.
-                        ConversationId.of(turn.sessionId().value()),
-                        turn.sessionId(),
-                        ChatTurnId.of(turnId.value()),
-                        null, 0, turn.agent().name()),
+                new TraceContext(turn.sessionId(), turnId.value(), null, 0, turn.agent().name()),
                 event)));
     }
 }

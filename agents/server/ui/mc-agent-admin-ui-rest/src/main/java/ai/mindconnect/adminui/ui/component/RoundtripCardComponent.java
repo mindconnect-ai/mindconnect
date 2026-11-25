@@ -97,8 +97,8 @@ public final class RoundtripCardComponent implements UiComponent {
         var sb = new StringBuilder();
         if (ctx != null) {
             if (ctx.agentName() != null) sb.append("**").append(ctx.agentName()).append("** · ");
-            if (ctx.turnId() != null) sb.append("turn `").append(ctx.turnId().value()).append("` · ");
-            if (ctx.parentTurnId() != null) sb.append("parent turn `").append(ctx.parentTurnId().value()).append("` · ");
+            if (ctx.turnId() != null) sb.append("turn `").append(ctx.turnId()).append("` · ");
+            if (ctx.parentTurnId() != null) sb.append("parent turn `").append(ctx.parentTurnId()).append("` · ");
             if (ctx.sessionId() != null) sb.append("session `").append(ctx.sessionId().value()).append("` · ");
         }
         if (trace.llmConfigName() != null) sb.append("config `").append(trace.llmConfigName()).append("` · ");

@@ -28,8 +28,6 @@ import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
-import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
@@ -47,7 +45,6 @@ final class BackendFixture implements AutoCloseable {
         ScopeSupplier namespaces = ScopeSupplier.fixed(new Namespace("test"));
         SessionRepository sessions = new InMemorySessionRepository(namespaces);
         AgentRepository agents = new InMemoryAgentRepository(namespaces);
-        MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
         var builder = AgentRuntime.builder()
                 .scope(namespaces)
                 .model(new ModelGateway() {
@@ -72,7 +69,6 @@ final class BackendFixture implements AutoCloseable {
                     public void install(PluginRegistry registry) {
                         registry.provide(SessionRepository.class, () -> sessions);
                         registry.provide(AgentRepository.class, () -> agents);
-                        registry.provide(MessageRepository.class, () -> messages);
                         registry.provide(SessionMessageRepository.class,
                                 () -> new InMemorySessionMessageRepository(namespaces, java.time.Clock.systemUTC()));
                     }

@@ -41,7 +41,6 @@ import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;

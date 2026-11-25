@@ -344,7 +344,7 @@ public class AgentApiController {
         SessionId id = owned(sessionId, caller);
         log.info("POST /api/sessions/{}/chat message=\"{}\"", sessionId,
                 message.length() > 80 ? message.substring(0, 80) + "…" : message);
-        return streamTurn(id, ai.mindconnect.message.domain.ContentPart.text(message));
+        return streamTurn(id, List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(message)));
     }
 
     /**
@@ -370,8 +370,8 @@ public class AgentApiController {
         log.info("POST /api/sessions/{}/chat (json) message=\"{}\" parts={}", sessionId,
                 message.length() > 80 ? message.substring(0, 80) + "…" : message,
                 request.parts() == null ? 0 : request.parts().size());
-        List<ai.mindconnect.message.domain.ContentPart> parts = new java.util.ArrayList<>();
-        parts.add(new ai.mindconnect.message.domain.ContentPart.Text(message));
+        List<ai.mindconnect.agent.loop.domain.ContentPart> parts = new java.util.ArrayList<>();
+        parts.add(new ai.mindconnect.agent.loop.domain.ContentPart.Text(message));
         for (var part : request.parts() == null ? List.<ai.mindconnect.agentrest.dto.ChatRequest.Part>of()
                 : request.parts()) {
             parts.add(toPart(part, caller));
@@ -383,13 +383,12 @@ public class AgentApiController {
     }
 
     /**
-     * A requested part as a domain part — the file's name, type and size from
+     * A requested part as the runtime takes it, by the file's id and name from
      * the store. A file the caller may not read is unknown here, like an id
      * that was never uploaded: sending it to the model would hand its content
      * to the caller.
      */
-    private ai.mindconnect.message.domain.ContentPart toPart(ai.mindconnect.agentrest.dto.ChatRequest.Part part,
-                                                              UserId caller) {
+    private ai.mindconnect.agent.loop.domain.ContentPart toPart(ai.mindconnect.agentrest.dto.ChatRequest.Part part, UserId caller) {
         if (part.fileId() == null || part.fileId().isBlank()) {
             throw new IllegalArgumentException("A part needs a fileId — upload via POST /api/files first");
         }
@@ -399,10 +398,10 @@ public class AgentApiController {
                         + "' — upload via POST /api/files first"));
         String kind = part.kind() == null ? "" : part.kind().toLowerCase(java.util.Locale.ROOT);
         return switch (kind) {
-            case "image" -> new ai.mindconnect.message.domain.ContentPart.Image(
-                    stored.id().value(), stored.name(), stored.contentType(), stored.size());
-            case "file", "document" -> new ai.mindconnect.message.domain.ContentPart.File(
-                    stored.id().value(), stored.name(), stored.contentType(), stored.size());
+            case "image" -> new ai.mindconnect.agent.loop.domain.ContentPart.Image(new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId(stored.id().value()),
+                    ai.mindconnect.agent.loop.domain.ContentPart.Image.Detail.AUTO, stored.name());
+            case "file", "document" -> new ai.mindconnect.agent.loop.domain.ContentPart.Document(
+                    new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId(stored.id().value()), stored.name());
             default -> throw new IllegalArgumentException(
                     "Unknown part kind '" + part.kind() + "' — use image or file");
         };
@@ -413,10 +412,10 @@ public class AgentApiController {
      * that waits at the approval gate announces it with an {@code incomplete}
      * frame; the stream stays open and carries the turn on once somebody answers.
      */
-    private SseEmitter streamTurn(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
+    private SseEmitter streamTurn(SessionId sessionId, List<ai.mindconnect.agent.loop.domain.ContentPart> parts) {
         SseEmitter emitter = new SseEmitter(120_000L);
-        frameStream.stream(sessionId, () -> Optional.of(sessionTurns.submit(sessionId,
-                parts.stream().map(AgentApiController::part).toList())), false, sinkTo(emitter, sessionId));
+        frameStream.stream(sessionId, () -> Optional.of(sessionTurns.submit(sessionId, parts)), false,
+                sinkTo(emitter, sessionId));
         return emitter;
     }
 
@@ -437,22 +436,6 @@ public class AgentApiController {
             public void ended(String error) {
                 endStream(emitter, sessionId, error == null ? null : new IllegalStateException(error));
             }
-        };
-    }
-
-    /** A part of a message as the runtime takes it. */
-    private static ai.mindconnect.agent.loop.domain.ContentPart part(ai.mindconnect.message.domain.ContentPart part) {
-        return switch (part) {
-            case ai.mindconnect.message.domain.ContentPart.Text text ->
-                    new ai.mindconnect.agent.loop.domain.ContentPart.Text(text.text());
-            case ai.mindconnect.message.domain.ContentPart.Image image ->
-                    new ai.mindconnect.agent.loop.domain.ContentPart.Image(
-                            new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId(image.fileId()),
-                            ai.mindconnect.agent.loop.domain.ContentPart.Image.Detail.AUTO, image.name());
-            case ai.mindconnect.message.domain.ContentPart.File file ->
-                    new ai.mindconnect.agent.loop.domain.ContentPart.Document(
-                            new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId(file.fileId()),
-                            file.name());
         };
     }
 

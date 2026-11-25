@@ -101,8 +101,6 @@ import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
-import ai.mindconnect.message.port.in.ConversationManager;
-import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.StartupScope;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
@@ -449,8 +447,6 @@ public class RuntimeEngineAutoConfiguration {
     @Bean LlmTranscription llmTranscription(AgentRuntime r) { return r.service(LlmTranscription.class); }
     /** The routing chat by its class too: the config test service asks for the concrete type. */
     @Bean RoutingLlmChatService llmChat(AgentRuntime r) { return r.service(RoutingLlmChatService.class); }
-    @Bean MessageRepository messageRepository(AgentRuntime r) { return r.service(MessageRepository.class); }
-    @Bean ConversationManager conversationManager(AgentRuntime r) { return r.service(ConversationManager.class); }
     /** The queue by its class too: the task monitor reads the local queue's records. Closed with the context. */
     @Bean(destroyMethod = "close") LocalTaskQueue taskQueue(AgentRuntime r) { return (LocalTaskQueue) r.service(TaskQueue.class); }
     @Bean FileStore fileStore(AgentRuntime r) { return r.service(FileStore.class); }

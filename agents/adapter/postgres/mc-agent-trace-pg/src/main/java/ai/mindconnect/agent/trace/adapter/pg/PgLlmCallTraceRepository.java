@@ -11,8 +11,6 @@ import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -28,11 +26,10 @@ import java.util.function.Function;
  * looked up by and the start time everything is ordered by. Every statement
  * matches the namespace the scope names for the current call.
  *
- * <p>Retention is the file store's rule: after each save, a conversation
- * keeps its newest {@code maxTracesPerConversation} traces and the rest are
- * dropped; zero or less keeps everything. (The file store calls the knob
- * "per session" but has always counted per conversation — the name here says
- * what it does.)
+ * <p>Retention is the file store's rule: after each save, a session keeps
+ * its newest {@code maxTracesPerSession} traces and the rest are dropped;
+ * zero or less keeps everything. A table made before still has the column
+ * {@code conversation_id}; nothing writes it any more.
  *
  * <p>{@link #findDescendants} walks the parent-turn links in the database
  * with a recursive query, so a deep sub-agent tree costs one round trip; the
@@ -40,33 +37,32 @@ import java.util.function.Function;
  */
 public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
 
-    public static final int DEFAULT_MAX_PER_CONVERSATION = 50;
+    public static final int DEFAULT_MAX_PER_SESSION = 50;
 
     private final Sql sql;
     private final DocumentTable<LlmCallTrace> traces;
-    private final int maxTracesPerConversation;
+    private final int maxTracesPerSession;
     private final ScopeSupplier scope;
 
     public PgLlmCallTraceRepository(DataSource dataSource, ScopeSupplier scope) {
-        this(Sql.of(dataSource), DEFAULT_MAX_PER_CONVERSATION, scope);
+        this(Sql.of(dataSource), DEFAULT_MAX_PER_SESSION, scope);
     }
 
     public PgLlmCallTraceRepository(Sql sql, ScopeSupplier scope) {
-        this(sql, DEFAULT_MAX_PER_CONVERSATION, scope);
+        this(sql, DEFAULT_MAX_PER_SESSION, scope);
     }
 
-    public PgLlmCallTraceRepository(Sql sql, int maxTracesPerConversation, ScopeSupplier scope) {
+    public PgLlmCallTraceRepository(Sql sql, int maxTracesPerSession, ScopeSupplier scope) {
         this.sql = sql;
-        this.maxTracesPerConversation = maxTracesPerConversation;
+        this.maxTracesPerSession = maxTracesPerSession;
         this.scope = Objects.requireNonNull(scope, "scope");
         this.traces = DocumentTable.of(LlmCallTrace.class)
                 .table("mc_llm_call_trace")
                 .partitionKey("namespace", "TEXT", t -> scope.namespace().value())
                 .id("id", "TEXT", t -> t.id().value())
-                .column("conversation_id", "TEXT", t -> value(t.context().conversationId()))
                 .column("session_id", "TEXT", t -> value(t.context().sessionId()))
-                .column("turn_id", "TEXT", t -> value(t.context().turnId()))
-                .column("parent_turn_id", "TEXT", t -> value(t.context().parentTurnId()))
+                .column("turn_id", "TEXT", t -> t.context().turnId())
+                .column("parent_turn_id", "TEXT", t -> t.context().parentTurnId())
                 .column("started_at", "TIMESTAMPTZ", LlmCallTrace::startedAt)
                 .column("depth", "INTEGER", t -> t.context().depth())
                 .column("agent_name", "TEXT", t -> t.context().agentName())
@@ -77,8 +73,7 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
                 .column("completion_tokens", "INTEGER", LlmCallTrace::completionTokens)
                 .column("finish_reason", "TEXT", LlmCallTrace::finishReason)
                 .column("error_status", "INTEGER", LlmCallTrace::errorStatus)
-                .index("namespace", "conversation_id", "started_at")
-                .index("namespace", "session_id")
+                .index("namespace", "session_id", "started_at")
                 .index("namespace", "turn_id")
                 .index("namespace", "parent_turn_id")
                 .build(sql);
@@ -96,18 +91,18 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
     @Override
     public void save(LlmCallTrace trace) {
         traces.save(trace);
-        ConversationId conversationId = trace.context().conversationId();
-        if (maxTracesPerConversation > 0 && conversationId != null) {
+        SessionId sessionId = trace.context().sessionId();
+        if (maxTracesPerSession > 0 && sessionId != null) {
             sql.update("DELETE FROM mc_llm_call_trace WHERE namespace = ? AND id IN ("
-                            + "SELECT id FROM mc_llm_call_trace WHERE namespace = ? AND conversation_id = ? "
+                            + "SELECT id FROM mc_llm_call_trace WHERE namespace = ? AND session_id = ? "
                             + "ORDER BY started_at DESC NULLS LAST, id DESC OFFSET ?)",
-                    scope.namespace().value(), scope.namespace().value(), conversationId.value(), maxTracesPerConversation);
+                    scope.namespace().value(), scope.namespace().value(), sessionId.value(), maxTracesPerSession);
         }
     }
 
     @Override
-    public List<LlmCallTrace> findByTurn(ChatTurnId turn) {
-        return traces.find("WHERE namespace = ? AND turn_id = ? " + ORDER, scope.namespace().value(), turn.value());
+    public List<LlmCallTrace> findByTurn(String turn) {
+        return traces.find("WHERE namespace = ? AND turn_id = ? " + ORDER, scope.namespace().value(), turn);
     }
 
     @Override
@@ -115,17 +110,11 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
         return traces.find("WHERE namespace = ? AND session_id = ? " + ORDER, scope.namespace().value(), session.value());
     }
 
-    @Override
-    public List<LlmCallTrace> findByConversation(ConversationId conversation) {
-        return traces.find("WHERE namespace = ? AND conversation_id = ? " + ORDER,
-                scope.namespace().value(), conversation.value());
-    }
-
     /** Headers from the columns alone — no {@code requestJson}, no {@code responseEvents} leave the database. */
     @Override
-    public List<Header> findHeadersByConversation(ConversationId conversation) {
-        return traces.select(PgLlmCallTraceRepository::header, "WHERE namespace = ? AND conversation_id = ? " + ORDER,
-                scope.namespace().value(), conversation.value());
+    public List<Header> findHeadersBySession(SessionId session) {
+        return traces.select(PgLlmCallTraceRepository::header, "WHERE namespace = ? AND session_id = ? " + ORDER,
+                scope.namespace().value(), session.value());
     }
 
     /** {@link LlmCallTraceHeader} built from the row. */
@@ -135,10 +124,9 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
 
     private static Header header(Row row) throws SQLException {
         TraceContext context = new TraceContext(
-                id(row.string("conversation_id"), ConversationId::of),
                 id(row.string("session_id"), SessionId::of),
-                id(row.string("turn_id"), ChatTurnId::of),
-                id(row.string("parent_turn_id"), ChatTurnId::of),
+                row.string("turn_id"),
+                row.string("parent_turn_id"),
                 orZero(row.integer("depth")), row.string("agent_name"));
         Long duration = row.longValue("duration_ms");
         return new Header(TraceId.of(row.string("id")), context, row.instant("started_at"),
@@ -156,7 +144,7 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
     }
 
     @Override
-    public List<LlmCallTrace> findDescendants(ChatTurnId root) {
+    public List<LlmCallTrace> findDescendants(String root) {
         return sql.query("""
                 WITH RECURSIVE tree AS (
                     SELECT id, turn_id, started_at, doc FROM mc_llm_call_trace
@@ -167,7 +155,7 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
                     WHERE t.namespace = ?
                 )
                 SELECT doc FROM tree ORDER BY started_at NULLS LAST, id
-                """, traces.mapper(), scope.namespace().value(), root.value(), scope.namespace().value());
+                """, traces.mapper(), scope.namespace().value(), root, scope.namespace().value());
     }
 
     @Override

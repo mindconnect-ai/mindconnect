@@ -113,10 +113,6 @@
             <artifactId>mc-llm-gateway</artifactId>
         </dependency>
         <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

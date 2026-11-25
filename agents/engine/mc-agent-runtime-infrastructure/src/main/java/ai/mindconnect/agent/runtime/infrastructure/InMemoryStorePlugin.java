@@ -23,9 +23,6 @@ import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmRepositoryFactory;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepositoryFactory;
-import ai.mindconnect.message.port.out.ConversationRepository;
-import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.workflow.persistence.memory.InMemoryWorkflowRepositoryFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
@@ -57,15 +54,12 @@ public final class InMemoryStorePlugin extends StorePlugin {
     protected Stores stores(PluginRegistry registry) {
         ScopeSupplier scope = registry.get(ScopeSupplier.class);
         InMemoryLlmRepositoryFactory llm = new InMemoryLlmRepositoryFactory(scope);
-        InMemoryMessageRepositoryFactory messages = new InMemoryMessageRepositoryFactory(scope);
         InMemoryWorkflowRepositoryFactory workflows =
                 new InMemoryWorkflowRepositoryFactory(sideDirectory, () -> scope.namespace().value(),
                         registry.get(JsonMapperFactory.class));
         return new Stores() {
             @Override public LlmConfigRepository llmConfigs() { return llm.llmConfigRepository(); }
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }
-            @Override public ConversationRepository conversations() { return messages.conversationRepository(); }
-            @Override public MessageRepository messages() { return messages.messageRepository(); }
             @Override public SessionRepository sessions(ScopeSupplier namespaces) {
                 return new InMemorySessionRepository(namespaces);
             }

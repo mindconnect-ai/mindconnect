@@ -32,9 +32,6 @@ import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.adapter.pg.PgLlmRepositoryFactory;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
-import ai.mindconnect.message.adapter.pg.PgMessageRepositoryFactory;
-import ai.mindconnect.message.port.out.ConversationRepository;
-import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.workflow.persistence.pg.PgWorkflowRepositoryFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -91,15 +88,12 @@ public final class PostgresStorePlugin extends StorePlugin {
         ScopeSupplier scope = registry.get(ScopeSupplier.class);
         Sql sql = registry.get(Sql.class);
         PgLlmRepositoryFactory llm = new PgLlmRepositoryFactory(sql, scope);
-        PgMessageRepositoryFactory messages = new PgMessageRepositoryFactory(sql, scope);
         PgWorkflowRepositoryFactory workflows =
                 new PgWorkflowRepositoryFactory(sql, () -> scope.namespace().value(), dataDir,
                         registry.get(JsonMapperFactory.class));
         return new Stores() {
             @Override public LlmConfigRepository llmConfigs() { return llm.llmConfigRepository(); }
             @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }
-            @Override public ConversationRepository conversations() { return messages.conversationRepository(); }
-            @Override public MessageRepository messages() { return messages.messageRepository(); }
             @Override public SessionRepository sessions(ScopeSupplier namespaces) {
                 return new PgSessionRepository(sql, namespaces).initSchema();
             }

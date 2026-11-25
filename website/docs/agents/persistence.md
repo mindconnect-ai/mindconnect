@@ -24,7 +24,7 @@ repository below as a service, each built once, on first use. Whoever assembles 
 picks the plugin for the backend it wants; everything else asks the runtime for the
 repository (`runtime.service(LlmConfigRepository.class)`). The domain modules with several
 repositories keep a **repository factory** per backend the plugins use —
-`MessageRepositoryFactory` (messages), `LlmRepositoryFactory` (LLM configs and their prices),
+`LlmRepositoryFactory` (LLM configs and their prices),
 `WorkflowRepositoryFactory`.
 
 The runtime follows a hexagonal (ports-and-adapters) design. Each persisted
@@ -35,8 +35,6 @@ concept is an interface, with an adapter per backend:
 | `AgentRepository` | Agents | `FileAgentRepository` | `PgAgentRepository` |
 | `SessionRepository` | Sessions (incl. parent/child links, and what is kept with a session: attachments, approvals, the summary) | `FileSessionRepository` | `PgSessionRepository` |
 | `SessionMessageRepository` | A session's messages | `FileSessionMessageRepository` (`sessions/<id>/messages/`) | `PgSessionMessageRepository` |
-| `MessageRepository` | Conversation messages — not a session's | `FileMessageRepository` | `PgMessageRepository` |
-| `ConversationRepository` | Conversation metadata | `FileConversationRepository` | `PgConversationRepository` |
 | `TodoListRepository` | Session todo lists | `FileTodoListRepository` | `PgTodoListRepository` |
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
 | `SkillRepository` | Stored [skills](./skills.md) | `FileSkillRepository` | `PgSkillRepository` |
@@ -88,7 +86,7 @@ writable folder — no database, no migrations, ideal for local development and
 single-node deployments.
 
 Besides the file adapters there is a full **in-memory** family
-(`InMemorySessionRepository`, `InMemoryMessageRepository`, …) behind
+(`InMemorySessionRepository`, `InMemorySessionMessageRepository`, …) behind
 `InMemoryStorePlugin` — `mindconnect.persistence=memory` in a Spring app, the
 plugin itself in a Spring-free embedding — and in tests. Like the others they
 ask the scope on every call and keep a store per namespace. The trace store is
@@ -153,11 +151,12 @@ have written, rendered by the application's `ObjectMapper`.
 
 The tables are named `mc_managed_agent`, `mc_session`, `mc_session_message` (with
 `mc_session_message_seq`, each session's last place),
-`mc_conversation`, `mc_message`, `mc_todo_list`, `mc_llm_call_trace`,
+`mc_todo_list`, `mc_llm_call_trace`,
 `mc_skill`, `mc_user_memory`, `mc_llm_config`, `mc_llm_price`,
 `mc_workflow`, `mc_workflow_instance`, `mc_file`, `mc_vector_store_template`,
 `mc_vector_store_instance` and `mc_vector_store_member`, plus the embedding
-index `mc_embedding` and `mc_embedding_field` when the database has pgvector. The small JDBC layer
+index `mc_embedding` and `mc_embedding_field` when the database has pgvector. `mc_conversation`
+and `mc_message`, where sessions were kept before, are no longer written; the migrations read them. The small JDBC layer
 underneath — `Sql`, `Row`, `DocumentTable` — lives in `common/mc-jdbc`; the
 adapters are the `agents/adapter/postgres/*-pg` and
 `workflow/mc-workflow-persistence-pg` modules, the Spring wiring is
