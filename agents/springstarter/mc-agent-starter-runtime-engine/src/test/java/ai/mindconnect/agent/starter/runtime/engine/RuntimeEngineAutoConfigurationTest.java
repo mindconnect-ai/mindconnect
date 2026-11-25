@@ -42,10 +42,6 @@ import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.port.out.MessageRepository;
-import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;
@@ -92,10 +88,9 @@ class RuntimeEngineAutoConfigurationTest {
                     assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
                     assertThat(context.getBean(AgentRuntime.class).service(SessionStore.class).messages(session.id()))
                             .extracting(TurnMessage::text).containsExactly("Hi", "Hello.");
-                    // The same conversation the application's own code reads.
-                    assertThat(context.getBean(MessageRepository.class)
-                            .findByConversation(ConversationId.of(session.id().value()), new PageRequest(0, 10)))
-                            .extracting(Message::content).containsExactly("Hi", "Hello.");
+                    // The same messages, as the management API reads them.
+                    assertThat(context.getBean(SessionManagement.class).messages(session.id()))
+                            .extracting(managed -> managed.message().text()).containsExactly("Hi", "Hello.");
                     // An agent kept in the management is one the runtime finds by name.
                     context.getBean(AgentManagement.class).create(ManagedAgent.of(HELPER));
                     assertThat(context.getBean(AgentRuntime.class).all(AgentResolver.class).stream()

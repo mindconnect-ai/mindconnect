@@ -23,7 +23,9 @@ import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.Tool;
 import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
 import ai.mindconnect.agent.runtime.store.SessionRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
@@ -71,6 +73,8 @@ final class BackendFixture implements AutoCloseable {
                         registry.provide(SessionRepository.class, () -> sessions);
                         registry.provide(AgentRepository.class, () -> agents);
                         registry.provide(MessageRepository.class, () -> messages);
+                        registry.provide(SessionMessageRepository.class,
+                                () -> new InMemorySessionMessageRepository(namespaces, java.time.Clock.systemUTC()));
                     }
                 })
                 .plugin(new ManagementPlugin())

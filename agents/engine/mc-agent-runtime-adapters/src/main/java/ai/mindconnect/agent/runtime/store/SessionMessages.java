@@ -21,7 +21,7 @@ public enum SessionMessages {
     /** The setting that chooses; every plugin that provides a session store reads it. */
     public static final Setting<SessionMessages> SETTING = Setting.of("sessions.messages",
             "Where a session's messages are kept: conversation (the message repository) or own",
-            SessionMessages::parse).defaultsTo(CONVERSATION);
+            SessionMessages::parse).defaultsTo(OWN);
 
     /** The choice of {@code settings}, for a host that reads it before the plugins do. */
     public static SessionMessages of(SettingSource settings) {

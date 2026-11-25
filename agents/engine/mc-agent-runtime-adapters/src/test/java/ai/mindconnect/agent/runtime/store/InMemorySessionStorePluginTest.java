@@ -29,8 +29,8 @@ class InMemorySessionStorePluginTest {
     }
 
     @Test
-    void without_the_setting_the_messages_stay_in_the_message_repository() {
-        assertThat(storeWith(Map.of())).isInstanceOf(RepositorySessionStore.class);
+    void without_the_setting_the_messages_are_kept_in_their_own_repository() {
+        assertThat(storeWith(Map.of())).isInstanceOf(DefaultSessionStore.class);
     }
 
     @Test
