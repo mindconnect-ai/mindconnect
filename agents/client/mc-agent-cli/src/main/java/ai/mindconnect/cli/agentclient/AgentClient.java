@@ -6,7 +6,7 @@ import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 
 import java.util.List;
 import java.util.Optional;
@@ -39,7 +39,7 @@ public interface AgentClient {
 
     List<ManagedSession> listSessions(AgentId agentId, UserId userId);
 
-    List<Message> loadHistory(SessionId sessionId);
+    List<ManagedMessage> loadHistory(SessionId sessionId);
 
     void deleteSession(SessionId sessionId);
 

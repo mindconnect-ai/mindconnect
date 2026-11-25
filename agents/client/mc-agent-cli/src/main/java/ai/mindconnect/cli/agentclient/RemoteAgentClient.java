@@ -11,7 +11,8 @@ import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.format.AgentJson;
 import ai.mindconnect.cli.agentclient.StreamEvent;
-import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.loop.domain.TurnMessageConverter;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +35,7 @@ public class RemoteAgentClient implements AgentClient {
     private final String baseUrl;
     private final OkHttpClient http;
     private final ObjectMapper mapper;
+    private static final TurnMessageConverter MESSAGES = new TurnMessageConverter();
     /**
      * Active chat SSE calls keyed by sessionId. Lets {@link #cancelChat} abort
      * the local stream immediately rather than waiting for the server's
@@ -144,12 +146,23 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public List<Message> loadHistory(SessionId sessionId) {
+    public List<ManagedMessage> loadHistory(SessionId sessionId) {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions/" + sessionId.value() + "/history")
                 .get().build();
-        return execute(req, new TypeReference<>() {
-        });
+        List<ManagedMessage> history = new java.util.ArrayList<>();
+        execute(req, JsonNode.class).forEach(entry -> history.add(managedMessage(entry)));
+        return history;
+    }
+
+    /** A message of the history as the server writes it: the message in the runtime's own JSON. */
+    private ManagedMessage managedMessage(JsonNode entry) {
+        Map<String, Object> message = mapper.convertValue(entry.get("message"), new TypeReference<>() { });
+        return new ManagedMessage(entry.path("id").asText(null), entry.path("sequence").asInt(),
+                entry.hasNonNull("sentAt") ? java.time.Instant.parse(entry.get("sentAt").asText()) : null,
+                MESSAGES.fromJson(message),
+                entry.hasNonNull("durationMillis") ? entry.get("durationMillis").asLong() : null,
+                entry.hasNonNull("tokens") ? entry.get("tokens").asInt() : null);
     }
 
     @Override

@@ -5,6 +5,7 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
@@ -21,12 +22,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
 import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
-import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.port.out.MessageRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +37,6 @@ import java.util.function.Consumer;
  */
 public class LocalAgentClient implements AgentClient {
 
-    private static final PageRequest EVERYTHING = new PageRequest(0, Integer.MAX_VALUE);
 
     private final AgentRuntime runtime;
 
@@ -104,8 +99,8 @@ public class LocalAgentClient implements AgentClient {
     }
 
     @Override
-    public List<Message> loadHistory(SessionId sessionId) {
-        return runtime.service(MessageRepository.class).findByConversation(conversationOf(sessionId), EVERYTHING);
+    public List<ManagedMessage> loadHistory(SessionId sessionId) {
+        return sessions().messages(sessionId);
     }
 
     @Override
@@ -118,18 +113,7 @@ public class LocalAgentClient implements AgentClient {
         if (fromSeq > toSeq) {
             throw new IllegalArgumentException("fromSeq must be <= toSeq");
         }
-        MessageRepository messages = runtime.service(MessageRepository.class);
-        ConversationId conversation = conversationOf(sessionId);
-        int deleted = (int) messages.findByConversation(conversation, EVERYTHING).stream()
-                .filter(message -> message.sequenceNum() >= fromSeq && message.sequenceNum() <= toSeq).count();
-        messages.deleteBySequenceRange(conversation, fromSeq, toSeq);
-        return deleted;
-    }
-
-    /** The conversation the session's messages are kept in. */
-    private ConversationId conversationOf(SessionId sessionId) {
-        return runtime.sessions().find(sessionId).map(RepositorySessionStore::conversationOf)
-                .orElseThrow(() -> new IllegalArgumentException("There is no session " + sessionId.value()));
+        return sessions().deleteMessages(sessionId, fromSeq, toSeq);
     }
 
     // ── Chat ────────────────────────────────────────────────────────────────

@@ -14,8 +14,9 @@ import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import org.springframework.beans.factory.annotation.Value;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -395,7 +396,7 @@ public class CliRunner implements CommandLineRunner {
      * </ul>
      */
     private void printHistoryWithArg(ManagedSession session, AgentClient client, String arg) {
-        List<Message> all;
+        List<ManagedMessage> all;
         try { all = client.loadHistory(session.id()); }
         catch (Exception e) {
             System.out.println("[Failed to load history: " + e.getMessage() + "]");
@@ -427,7 +428,7 @@ public class CliRunner implements CommandLineRunner {
      * tool-call counts attached to a kept agent message are computed correctly.
      */
     private void renderHistory(ManagedSession session, AgentClient client,
-                                List<Message> history, Integer pairLimit) {
+                                List<ManagedMessage> history, Integer pairLimit) {
         if (history.isEmpty()) {
             String welcome = session.agentId().flatMap(client::findAgent)
                     .map(ManagedAgent::welcomeMessage).orElse(null);
@@ -445,12 +446,11 @@ public class CliRunner implements CommandLineRunner {
             // Walk backwards over CHAT messages, count user→agent pairs.
             int pairsCounted = 0;
             for (int k = history.size() - 1; k >= 0; k--) {
-                Message m = history.get(k);
-                if (m.type() != ai.mindconnect.message.domain.MessageType.CHAT) continue;
-                if (m.senderType() == ParticipantType.USER) {
+                ManagedMessage m = history.get(k);
+                if (isFromUser(m)) {
                     pairsCounted++;
                     if (pairsCounted >= pairLimit) {
-                        minSeqToShow = m.sequenceNum();
+                        minSeqToShow = m.sequence();
                         break;
                     }
                 }
@@ -467,23 +467,21 @@ public class CliRunner implements CommandLineRunner {
         System.out.println("\n── History" + headerSuffix + " ─────────────────────────────");
         int i = 0;
         while (i < history.size()) {
-            Message m = history.get(i);
-            if (m.type() == ai.mindconnect.message.domain.MessageType.CHAT
-                    && m.sequenceNum() >= minSeqToShow) {
-                String speaker = m.senderType() == ParticipantType.USER ? "You" : "Agent";
-                // Count any tool calls that follow this agent message before the next CHAT
+            ManagedMessage m = history.get(i);
+            if (isChat(m) && m.sequence() >= minSeqToShow) {
+                String speaker = isFromUser(m) ? "You" : "Agent";
+                // Count any tool calls that follow this agent message before the next one said
                 int toolCallCount = 0;
-                if (m.senderType() == ParticipantType.AGENT) {
+                if (!isFromUser(m)) {
                     int j = i + 1;
-                    while (j < history.size()
-                            && history.get(j).type() != ai.mindconnect.message.domain.MessageType.CHAT) {
-                        if (history.get(j).type() == ai.mindconnect.message.domain.MessageType.TOOL_CALL) {
+                    while (j < history.size() && !isChat(history.get(j))) {
+                        if (history.get(j).message().type() == TurnMessage.Type.TOOL_CALL) {
                             toolCallCount++;
                         }
                         j++;
                     }
                 }
-                System.out.print("\n" + speaker + ":\n" + m.content());
+                System.out.print("\n" + speaker + ":\n" + m.message().text());
                 if (toolCallCount > 0) {
                     System.out.print("\n\033[90m(" + toolCallCount
                             + " tool call" + (toolCallCount > 1 ? "s" : "") + " executed — use /tool-calls for details)\033[0m");
@@ -902,10 +900,8 @@ public class CliRunner implements CommandLineRunner {
         int[] cachedLast = {Integer.MIN_VALUE};
         java.util.function.IntSupplier lastSeq = () -> {
             if (cachedLast[0] == Integer.MIN_VALUE) {
-                java.util.List<ai.mindconnect.message.domain.Message> hist =
-                        client.loadHistory(session.id());
-                cachedLast[0] = hist.isEmpty() ? 0
-                        : hist.stream().mapToInt(ai.mindconnect.message.domain.Message::sequenceNum).max().orElse(0);
+                java.util.List<ManagedMessage> hist = client.loadHistory(session.id());
+                cachedLast[0] = hist.stream().mapToInt(ManagedMessage::sequence).max().orElse(0);
             }
             return cachedLast[0];
         };
@@ -998,7 +994,7 @@ public class CliRunner implements CommandLineRunner {
      * </ul>
      */
     private void printToolCallHistory(ManagedSession session, AgentClient client, String arg) {
-        List<ai.mindconnect.message.domain.Message> history;
+        List<ManagedMessage> history;
         try {
             history = client.loadHistory(session.id());
         } catch (Exception e) {
@@ -1010,55 +1006,35 @@ public class CliRunner implements CommandLineRunner {
             return;
         }
 
-        // Index TOOL_RESULTs by their toolCallId so we can match them with TOOL_CALL entries.
-        // The TOOL_RESULT content is JSON of the form {"toolCallId":"...","toolName":"...","result":"..."}.
-        java.util.Map<String, ai.mindconnect.message.domain.Message> resultsByCallId = new java.util.HashMap<>();
-        for (ai.mindconnect.message.domain.Message m : history) {
-            if (m.type() == ai.mindconnect.message.domain.MessageType.TOOL_RESULT) {
-                String id = extractJsonField(m.content(), "toolCallId");
-                if (id != null) resultsByCallId.put(id, m);
+        // Index the results by the call they answer, so each call is shown with its result.
+        java.util.Map<String, ManagedMessage> resultsByCallId = new java.util.HashMap<>();
+        for (ManagedMessage m : history) {
+            if (m.message().type() == TurnMessage.Type.TOOL_RESULT
+                    && m.message().metadata().get("callId") instanceof String id) {
+                resultsByCallId.put(id, m);
             }
         }
 
-        // Each TOOL_CALL message wraps {"toolCalls":[{id,name,arguments}, ...]}.
-        // Flatten into one entry per individual tool call, preserving conversation order.
-        record Entry(int seq, ai.mindconnect.message.domain.MessageId resultMessageId, String time, String toolName,
+        // One entry per tool call, in the order they were made.
+        record Entry(int seq, String resultMessageId, String time, String toolName,
                      java.util.Map<String, Object> arguments, String result, Long durationMs) {}
         java.util.List<Entry> entries = new java.util.ArrayList<>();
-        com.fasterxml.jackson.databind.ObjectMapper mapper = plainMapper;
-        for (ai.mindconnect.message.domain.Message m : history) {
-            if (m.type() != ai.mindconnect.message.domain.MessageType.TOOL_CALL) continue;
-            try {
-                java.util.Map<String, Object> payload = mapper.readValue(m.content(),
-                        new com.fasterxml.jackson.core.type.TypeReference<>() {});
-                @SuppressWarnings("unchecked")
-                java.util.List<java.util.Map<String, Object>> calls =
-                        (java.util.List<java.util.Map<String, Object>>) payload.getOrDefault("toolCalls", java.util.List.of());
-                for (java.util.Map<String, Object> tc : calls) {
-                    String id = (String) tc.get("id");
-                    String name = (String) tc.get("name");
-                    @SuppressWarnings("unchecked")
-                    java.util.Map<String, Object> args =
-                            (java.util.Map<String, Object>) tc.getOrDefault("arguments", java.util.Map.of());
-                    ai.mindconnect.message.domain.Message resultMsg = id != null ? resultsByCallId.get(id) : null;
-                    String resultText = "(no result yet)";
-                    int seq = m.sequenceNum();
-                    ai.mindconnect.message.domain.MessageId resultMessageId = null;
-                    Long durationMs = null;
-                    if (resultMsg != null) {
-                        seq = resultMsg.sequenceNum();
-                        resultMessageId = resultMsg.id();
-                        durationMs = resultMsg.durationMs();
-                        String r = extractJsonField(resultMsg.content(), "result");
-                        if (r != null) resultText = r;
-                    }
-                    entries.add(new Entry(seq, resultMessageId,
-                            DATE_FMT.format(m.sentAt()),
-                            name != null ? name : "(unknown)",
-                            args, resultText, durationMs));
+        for (ManagedMessage m : history) {
+            for (TurnMessage.ToolCall call : m.message().toolCalls()) {
+                ManagedMessage resultMsg = call.callId() != null ? resultsByCallId.get(call.callId()) : null;
+                String resultText = "(no result yet)";
+                int seq = m.sequence();
+                String resultMessageId = null;
+                Long durationMs = null;
+                if (resultMsg != null) {
+                    seq = resultMsg.sequence();
+                    resultMessageId = resultMsg.id();
+                    durationMs = resultMsg.durationMillis();
+                    resultText = resultMsg.message().text();
                 }
-            } catch (Exception ignored) {
-                // Skip malformed TOOL_CALL payloads — no point spamming the CLI.
+                entries.add(new Entry(seq, resultMessageId, time(m),
+                        call.name() != null ? call.name() : "(unknown)",
+                        call.arguments() != null ? call.arguments() : java.util.Map.of(), resultText, durationMs));
             }
         }
 
@@ -1074,9 +1050,8 @@ public class CliRunner implements CommandLineRunner {
             // Default: tool calls executed for the current turn — i.e. since the
             // last USER chat message. If there's no user message yet, show all.
             int lastUserSeq = history.stream()
-                    .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER
-                              && m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
-                    .mapToInt(ai.mindconnect.message.domain.Message::sequenceNum)
+                    .filter(CliRunner::isFromUser)
+                    .mapToInt(ManagedMessage::sequence)
                     .max().orElse(0);
             shown = entries.stream().filter(e -> e.seq() >= lastUserSeq).toList();
             title = lastUserSeq > 0
@@ -1132,7 +1107,7 @@ public class CliRunner implements CommandLineRunner {
      * </ul>
      */
     private void printMessageList(ManagedSession session, AgentClient client, String arg) {
-        List<ai.mindconnect.message.domain.Message> history;
+        List<ManagedMessage> history;
         try {
             history = client.loadHistory(session.id());
         } catch (Exception e) {
@@ -1144,15 +1119,14 @@ public class CliRunner implements CommandLineRunner {
             return;
         }
 
-        java.util.List<ai.mindconnect.message.domain.Message> shown;
+        java.util.List<ManagedMessage> shown;
         String title;
         if (arg == null || arg.isEmpty()) {
             int lastUserSeq = history.stream()
-                    .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER
-                              && m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
-                    .mapToInt(ai.mindconnect.message.domain.Message::sequenceNum)
+                    .filter(CliRunner::isFromUser)
+                    .mapToInt(ManagedMessage::sequence)
                     .max().orElse(0);
-            shown = history.stream().filter(m -> m.sequenceNum() >= lastUserSeq).toList();
+            shown = history.stream().filter(m -> m.sequence() >= lastUserSeq).toList();
             title = lastUserSeq > 0
                     ? "Messages since last user message (seq ≥ " + lastUserSeq + ")"
                     : "Messages (no user message yet)";
@@ -1180,15 +1154,15 @@ public class CliRunner implements CommandLineRunner {
         }
 
         System.out.println("\n── " + title + " ───────────────────────────");
-        for (ai.mindconnect.message.domain.Message m : shown) {
-            String role = m.senderType().name();
-            String type = m.type().name();
-            String time = DATE_FMT.format(m.sentAt());
-            String tokens = m.tokenCount() != null ? m.tokenCount() + "t" : "—";
-            String dur = m.durationMs() != null ? "  (" + m.durationMs() + "ms)" : "";
-            String compressedTag = m.compressed() ? "  \033[33m[compressed]\033[0m" : "";
+        for (ManagedMessage m : shown) {
+            String role = isFromUser(m) ? "USER" : "AGENT";
+            String type = m.message().type().name();
+            String time = time(m);
+            String tokens = m.tokens() != null ? m.tokens() + "t" : "—";
+            String dur = m.durationMillis() != null ? "  (" + m.durationMillis() + "ms)" : "";
+            String compressedTag = shownAs(m) != null ? "  \033[33m[compressed]\033[0m" : "";
             System.out.printf("  seq=%-3d %-12s %-6s [%s]  %s%s%s%n",
-                    m.sequenceNum(), type, role, time, tokens, dur, compressedTag);
+                    m.sequence(), type, role, time, tokens, dur, compressedTag);
             String preview = previewFor(m);
             if (!preview.isEmpty()) {
                 System.out.println("    " + preview);
@@ -1202,47 +1176,30 @@ public class CliRunner implements CommandLineRunner {
      * content; TOOL_CALL summarises the tool name(s); TOOL_RESULT shows the result
      * field if parseable, or falls back to the raw content.
      */
-    private String previewFor(ai.mindconnect.message.domain.Message m) {
-        String content = m.content() != null ? m.content() : "";
-        switch (m.type()) {
-            case TOOL_CALL: {
-                try {
-                    com.fasterxml.jackson.databind.JsonNode node =
-                            plainMapper.readTree(content);
-                    com.fasterxml.jackson.databind.JsonNode calls = node.get("toolCalls");
-                    if (calls != null && calls.isArray() && calls.size() > 0) {
-                        StringBuilder sb = new StringBuilder("→ ");
-                        for (int i = 0; i < calls.size(); i++) {
-                            if (i > 0) sb.append(", ");
-                            com.fasterxml.jackson.databind.JsonNode c = calls.get(i);
-                            sb.append(c.path("name").asText("?"));
-                            com.fasterxml.jackson.databind.JsonNode args = c.path("arguments");
-                            if (args.isObject() && args.size() > 0) {
-                                sb.append("(");
-                                int k = 0;
-                                java.util.Iterator<String> fieldNames = args.fieldNames();
-                                while (fieldNames.hasNext() && k < 2) {
-                                    if (k > 0) sb.append(", ");
-                                    String f = fieldNames.next();
-                                    sb.append(f).append("=").append(truncate(args.path(f).asText(""), 40));
-                                    k++;
-                                }
-                                if (args.size() > 2) sb.append(", …");
-                                sb.append(")");
-                            }
-                        }
-                        return truncate(sb.toString(), 140);
+    private String previewFor(ManagedMessage m) {
+        TurnMessage message = m.message();
+        if (!message.toolCalls().isEmpty()) {
+            StringBuilder sb = new StringBuilder("→ ");
+            for (int i = 0; i < message.toolCalls().size(); i++) {
+                if (i > 0) sb.append(", ");
+                TurnMessage.ToolCall call = message.toolCalls().get(i);
+                sb.append(call.name() != null ? call.name() : "?");
+                java.util.Map<String, Object> args = call.arguments() != null ? call.arguments() : java.util.Map.of();
+                if (!args.isEmpty()) {
+                    sb.append("(");
+                    int k = 0;
+                    for (java.util.Iterator<String> names = args.keySet().iterator(); names.hasNext() && k < 2; k++) {
+                        if (k > 0) sb.append(", ");
+                        String f = names.next();
+                        sb.append(f).append("=").append(truncate(String.valueOf(args.get(f)), 40));
                     }
-                } catch (Exception ignored) {}
-                return truncate(content.replace('\n', ' '), 140);
+                    if (args.size() > 2) sb.append(", …");
+                    sb.append(")");
+                }
             }
-            case TOOL_RESULT: {
-                String r = extractJsonField(content, "result");
-                return truncate((r != null ? r : content).replace('\n', ' '), 140);
-            }
-            default:
-                return truncate(content.replace('\n', ' '), 140);
+            return truncate(sb.toString(), 140);
         }
+        return truncate(message.text().replace('\n', ' '), 140);
     }
 
     /**
@@ -1336,14 +1293,32 @@ public class CliRunner implements CommandLineRunner {
         return "█".repeat(filled) + "░".repeat(width - filled);
     }
 
+    /** Whether the message is something said — by the user or the agent — rather than a tool's part. */
+    private static boolean isChat(ManagedMessage m) {
+        return m.message().type() == TurnMessage.Type.USER || m.message().type() == TurnMessage.Type.ASSISTANT;
+    }
+
+    private static boolean isFromUser(ManagedMessage m) {
+        return m.message().type() == TurnMessage.Type.USER;
+    }
+
+    /** What the model is shown in place of the message; {@code null} when it is shown in full. */
+    private static String shownAs(ManagedMessage m) {
+        return m.message().metadata().get(SessionStore.COMPRESSED) instanceof String note ? note : null;
+    }
+
+    private static String time(ManagedMessage m) {
+        return m.sentAt() == null ? "—" : DATE_FMT.format(m.sentAt());
+    }
+
     private void printMessage(ManagedSession session, int sequenceNum, AgentClient client) {
-        List<Message> history = client.loadHistory(session.id());
-        Message msg = history.stream()
-                .filter(m -> m.sequenceNum() == sequenceNum)
+        List<ManagedMessage> history = client.loadHistory(session.id());
+        ManagedMessage msg = history.stream()
+                .filter(m -> m.sequence() == sequenceNum)
                 .findFirst()
                 .orElse(null);
         if (msg == null) {
-            System.out.println("[No message with sequenceNum=" + sequenceNum + " in this session.]");
+            System.out.println("[No message with sequence=" + sequenceNum + " in this session.]");
             return;
         }
         try {
@@ -1351,30 +1326,29 @@ public class CliRunner implements CommandLineRunner {
 
             // Metadata header as pretty JSON (no content fields here)
             java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
-            meta.put("id",                   msg.id());
-            meta.put("conversationId",       msg.conversationId().value());
-            meta.put("senderId",             msg.senderId());
-            meta.put("senderType",           msg.senderType());
-            meta.put("recipientId",          msg.recipientId());
-            meta.put("type",                 msg.type());
-            meta.put("sequenceNum",          msg.sequenceNum());
-            meta.put("sentAt",               msg.sentAt().toString());
-            meta.put("tokenCount",           msg.tokenCount());
-            meta.put("compressed",           msg.compressed());
-            meta.put("compressedTokenCount", msg.compressedTokenCount());
-            if (msg.metadata() != null && !msg.metadata().isEmpty()) {
-                meta.put("metadata", msg.metadata());
+            meta.put("id",             msg.id());
+            meta.put("turnId",         msg.message().turnId());
+            meta.put("type",           msg.message().type());
+            meta.put("sequence",       msg.sequence());
+            meta.put("sentAt",         msg.sentAt() == null ? null : msg.sentAt().toString());
+            meta.put("tokens",         msg.tokens());
+            meta.put("durationMillis", msg.durationMillis());
+            if (!msg.message().toolCalls().isEmpty()) {
+                meta.put("toolCalls", msg.message().toolCalls());
+            }
+            if (!msg.message().metadata().isEmpty()) {
+                meta.put("metadata", msg.message().metadata());
             }
             System.out.println(prettyMapper.writeValueAsString(meta));
 
             // Content — printed raw so \n renders as real newlines.
             // If it parses as JSON, pretty-print the JSON; otherwise print the string as-is.
             System.out.println("\n── content ──");
-            printFieldValue(msg.content());
+            printFieldValue(msg.message().text());
 
-            if (msg.compressedContent() != null) {
-                System.out.println("\n── compressedContent ──");
-                printFieldValue(msg.compressedContent());
+            if (shownAs(msg) != null) {
+                System.out.println("\n── shown to the model instead ──");
+                printFieldValue(shownAs(msg));
             }
 
             System.out.println("────────────────────────────────────────────────────────────");
