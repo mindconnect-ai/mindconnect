@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin.ui;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.schema.Schema;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -23,7 +24,7 @@ import java.util.Map;
  */
 public final class ParamCoercion {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = JsonMapperFactory.create();
 
     private ParamCoercion() {}
 

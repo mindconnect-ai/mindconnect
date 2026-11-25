@@ -1,5 +1,6 @@
 package ai.mindconnect.webscraper;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,7 +65,7 @@ public class RailsWebScraperConfigCreator {
     }
 
     private static void printAsJSON(RailsWebScraperConfig config) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = JsonMapperFactory.create();
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
         System.out.println(mapper.writeValueAsString(config));
     }

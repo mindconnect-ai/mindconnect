@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin.run;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.StepData;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.edit.WorkflowMutator;
@@ -344,7 +345,7 @@ public class WorkflowRunService {
      * happens to carry.
      */
     private static final com.fasterxml.jackson.databind.ObjectMapper TRACE_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
+            JsonMapperFactory.create();
 
     /**
      * The run a stored instance describes. This is how history is read back:

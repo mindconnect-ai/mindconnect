@@ -2,6 +2,7 @@ package ai.mindconnect.agent.tools.web;
 
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.RelevantExcerpts;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;
@@ -19,7 +20,7 @@ public class WebSearchTool implements Tool {
     private static final Logger log = LoggerFactory.getLogger(WebSearchTool.class);
     private static final String TAVILY_URL = "https://api.tavily.com/search";
     private static final MediaType JSON = MediaType.get("application/json");
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final String apiKey;
     private final OkHttpClient httpClient;

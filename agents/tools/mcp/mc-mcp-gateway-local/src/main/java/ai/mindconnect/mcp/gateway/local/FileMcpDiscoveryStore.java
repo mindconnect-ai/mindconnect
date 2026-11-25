@@ -2,6 +2,7 @@ package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.util.AtomicFiles;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +25,7 @@ public final class FileMcpDiscoveryStore implements McpDiscoveryStore {
 
     private static final Logger log = LoggerFactory.getLogger(FileMcpDiscoveryStore.class);
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
             .enable(SerializationFeature.INDENT_OUTPUT);
 
     private final Path storageDir;

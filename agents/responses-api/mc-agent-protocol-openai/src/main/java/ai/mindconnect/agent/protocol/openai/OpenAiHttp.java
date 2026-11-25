@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.protocol.openai;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -23,7 +24,7 @@ final class OpenAiHttp {
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(30))
             .build();
-    private final ObjectMapper json = new ObjectMapper();
+    private final ObjectMapper json = JsonMapperFactory.create();
     private final String baseUrl;
     private final String apiKey;
 

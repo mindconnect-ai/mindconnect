@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -38,7 +39,7 @@ public final class LlmGatewayModelPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
-        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat, new ObjectMapper(), traces,
+        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat, JsonMapperFactory.create(), traces,
                 configurations, registry.find(MediaReader.class).orElseGet(MediaReader::none)));
     }
 }

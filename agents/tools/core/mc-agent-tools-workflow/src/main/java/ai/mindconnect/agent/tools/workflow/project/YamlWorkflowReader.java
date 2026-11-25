@@ -3,6 +3,7 @@ package ai.mindconnect.agent.tools.workflow.project;
 import ai.mindconnect.agent.tools.workflow.step.AgentCallData;
 import ai.mindconnect.agent.tools.workflow.step.SandboxCodeData;
 import ai.mindconnect.agent.tools.workflow.step.ToolCallData;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.schema.Schema;
 import ai.mindconnect.workflow.domain.AssignVariablesData;
 import ai.mindconnect.workflow.domain.BaseStepContainerData;
@@ -428,7 +429,7 @@ final class YamlWorkflowReader {
 
     private static String json(Object value) {
         try {
-            return new ObjectMapper().writeValueAsString(value);
+            return JsonMapperFactory.create().writeValueAsString(value);
         } catch (IOException e) {
             throw new WorkflowFormatException("a value cannot be written as JSON: " + e.getMessage());
         }

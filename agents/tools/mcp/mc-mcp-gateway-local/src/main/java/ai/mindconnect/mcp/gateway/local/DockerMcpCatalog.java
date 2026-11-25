@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpCatalogEntry;
 import ai.mindconnect.mcp.gateway.McpTarget;
@@ -43,7 +44,7 @@ public final class DockerMcpCatalog implements McpCatalog {
 
     public static final String DEFAULT_URL = "https://desktop.docker.com/mcp/catalog/v2/catalog.yaml";
 
-    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
+    private static final ObjectMapper YAML = JsonMapperFactory.create(new YAMLFactory());
 
     private final URI url;
     private final Duration ttl;

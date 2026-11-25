@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -43,7 +44,7 @@ final class OpenAiChat {
         // No read timeout: a reasoning model sends its first byte after it has thought.
         OkHttpClient http = new OkHttpClient.Builder()
                 .readTimeout(Duration.ZERO).callTimeout(Duration.ofMinutes(10)).build();
-        ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
+        ObjectMapper json = JsonMapperFactory.create().registerModule(new JavaTimeModule());
         return new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(Map.of(
                 LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json, EncryptionHelper.noEncryption()))));
     }

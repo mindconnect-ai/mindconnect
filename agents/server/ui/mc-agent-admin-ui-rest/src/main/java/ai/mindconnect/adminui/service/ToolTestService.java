@@ -6,6 +6,7 @@ import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -32,7 +33,7 @@ import java.util.Map;
 public class ToolTestService {
 
     private static final Logger log = LoggerFactory.getLogger(ToolTestService.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
     private static final String TEST_USER_ID = "admin-test";
 
     private final ToolRegistry toolRegistry;

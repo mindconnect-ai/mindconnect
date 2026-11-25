@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.config;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -32,7 +33,7 @@ public class InfrastructureConfig {
 
     @Bean
     ObjectMapper objectMapper() {
-        return new ObjectMapper()
+        return JsonMapperFactory.create()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);

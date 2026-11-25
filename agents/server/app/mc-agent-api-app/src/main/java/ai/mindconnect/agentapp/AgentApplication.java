@@ -1,6 +1,7 @@
 package ai.mindconnect.agentapp;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -43,7 +44,7 @@ public class AgentApplication {
 
     @Bean
     ObjectMapper objectMapper() {
-        return new ObjectMapper()
+        return JsonMapperFactory.create()
                 .registerModule(new JavaTimeModule())
                 .enable(SerializationFeature.INDENT_OUTPUT)
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)

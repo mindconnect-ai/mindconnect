@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.security;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,7 +35,7 @@ public class ApiErrorResponder implements AuthenticationEntryPoint, AccessDenied
             "A bearer token is required: a personal API token (mct_...) or an access token of the identity provider";
     static final String ACCESS_DENIED = "Access denied";
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = JsonMapperFactory.create();
 
     private final BearerTokenAuthenticationEntryPoint unauthorized = new BearerTokenAuthenticationEntryPoint();
     private final BearerTokenAccessDeniedHandler forbidden = new BearerTokenAccessDeniedHandler();

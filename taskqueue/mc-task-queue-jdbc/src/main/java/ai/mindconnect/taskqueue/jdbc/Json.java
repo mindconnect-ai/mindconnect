@@ -1,5 +1,6 @@
 package ai.mindconnect.taskqueue.jdbc;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.taskqueue.TaskFailure;
 import ai.mindconnect.taskqueue.TaskNotification;
 import ai.mindconnect.taskqueue.TaskQueueException;
@@ -8,7 +9,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.util.LinkedHashSet;
@@ -26,7 +26,7 @@ import java.util.Set;
  */
 final class Json {
 
-    private static final ObjectMapper MAPPER = JsonMapper.builder()
+    private static final ObjectMapper MAPPER = JsonMapperFactory.builder()
             .addModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)

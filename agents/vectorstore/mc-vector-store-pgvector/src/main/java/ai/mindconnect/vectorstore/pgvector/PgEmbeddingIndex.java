@@ -4,6 +4,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChecks;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
@@ -72,7 +73,7 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
 
     private static final java.util.regex.Pattern TABLE_NAME = java.util.regex.Pattern.compile("[a-z_][a-z0-9_]{0,47}");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
     private static final TypeReference<Map<String, String>> META = new TypeReference<>() {};
 
     /** Serialises concurrent first uses across JVMs; any constant key will do. */

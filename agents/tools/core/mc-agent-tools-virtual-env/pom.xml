@@ -25,6 +25,10 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-json</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-scope</artifactId>
         </dependency>
         <dependency>

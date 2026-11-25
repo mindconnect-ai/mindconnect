@@ -2,6 +2,7 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -28,7 +29,7 @@ import java.util.List;
  */
 public final class ToolCallHistory {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final MessageListComponent.SubAgentTreeProvider subAgentTree;
     /** Whose messages these are: a long result is downloaded from that session. */

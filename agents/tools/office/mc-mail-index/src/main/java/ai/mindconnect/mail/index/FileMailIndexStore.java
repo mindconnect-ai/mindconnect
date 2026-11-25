@@ -1,6 +1,7 @@
 package ai.mindconnect.mail.index;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.mail.Location;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,7 +55,7 @@ public final class FileMailIndexStore implements MailIndexStore {
     public FileMailIndexStore(java.util.function.Supplier<Path> dataDir, java.util.function.Supplier<String> namespace) {
         this.dataDir = Objects.requireNonNull(dataDir, "dataDir");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
-        this.json = new ObjectMapper()
+        this.json = JsonMapperFactory.create()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);

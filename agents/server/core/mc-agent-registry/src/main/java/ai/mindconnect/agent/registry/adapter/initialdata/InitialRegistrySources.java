@@ -4,6 +4,7 @@ import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.domain.RegistrySourceId;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.initialdata.ImportInitialDataInstaller;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,7 +34,7 @@ public class InitialRegistrySources {
     /** Where applications put their registries. */
     public static final String LOCATION = "classpath*:initial-data/registries/*.json";
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private InitialRegistrySources() {

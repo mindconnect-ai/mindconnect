@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.embedding;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,7 +34,7 @@ import java.util.stream.Stream;
  */
 public final class FileEntryStore implements EntryStore {
 
-    private static final ObjectMapper JSON = new ObjectMapper()
+    private static final ObjectMapper JSON = JsonMapperFactory.create()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private static final java.util.Map<Path, MemoryEmbeddingIndex> INDEXES = new java.util.concurrent.ConcurrentHashMap<>();

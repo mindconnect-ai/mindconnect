@@ -10,6 +10,7 @@ import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -29,7 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public final class ToolDetailComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final ManagedAgent agent;
     private final AgentTool tool;

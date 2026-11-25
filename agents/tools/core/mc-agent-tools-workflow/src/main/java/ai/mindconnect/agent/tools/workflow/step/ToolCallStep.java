@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.workflow.step;
 
 import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.workflow.execution.BaseStepInstance;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +16,7 @@ import java.util.Map;
  */
 public class ToolCallStep extends BaseStepInstance<ToolCallData> {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     @Override
     public void execute() {

@@ -11,6 +11,7 @@ import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -41,7 +42,7 @@ import java.util.Map;
  */
 public final class ToolFormComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final ManagedAgent agent;
     private final AgentTool tool;

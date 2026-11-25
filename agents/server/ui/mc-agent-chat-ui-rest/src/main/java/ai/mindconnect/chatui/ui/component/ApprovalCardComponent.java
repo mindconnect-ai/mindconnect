@@ -10,6 +10,7 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.ui.model.UiList;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.json.JsonMapperFactory;
 
 /**
  * The card that asks a human whether a tool may run.
@@ -24,7 +25,7 @@ import ai.mindconnect.agent.SessionId;
 public final class ApprovalCardComponent {
 
     private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
+            JsonMapperFactory.create();
 
     private ApprovalCardComponent() {
     }

@@ -40,6 +40,7 @@ import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.tools.todo.TodoPlugin;
 import ai.mindconnect.agent.tools.usermemory.UserMemoryPlugin;
 import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.plugin.Plugin;
@@ -53,7 +54,7 @@ import ai.mindconnect.plugin.PluginRegistry;
  */
 final class DemoRuntime {
 
-    private static final ObjectMapper JSON = new ObjectMapper().registerModule(new JavaTimeModule())
+    private static final ObjectMapper JSON = JsonMapperFactory.create().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 

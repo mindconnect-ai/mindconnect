@@ -2,6 +2,7 @@ package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.initialdata.FileCopyInitialDataInstaller;
 import ai.mindconnect.initialdata.ImportInitialDataInstaller;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
@@ -14,7 +15,7 @@ import java.io.InputStream;
  */
 public final class BundledMcpRegistrations {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private BundledMcpRegistrations() {
     }

@@ -1,5 +1,6 @@
 package ai.mindconnect.webscraper;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -54,7 +55,7 @@ public class BaseWebScraperContext {
     private SaveFunction saveFunction = null;
     public BaseWebScraperContext(BaseWebScraperOptions options) {
         this.options = options;
-        this.objectMapper = new ObjectMapper()
+        this.objectMapper = JsonMapperFactory.create()
                 .enable(SerializationFeature.INDENT_OUTPUT)
                 .registerModule(new JavaTimeModule());
         this.saveFunction = new DefaultSaveFunction(this.objectMapper);

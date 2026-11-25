@@ -6,6 +6,7 @@ import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -39,7 +40,7 @@ public class WorkflowRegistryInstaller implements RegistryInstaller {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowRegistryInstaller.class);
     /** Reads a serialised workflow as a plain tree, to search it for references. */
-    private static final ObjectMapper TREE_READER = new ObjectMapper();
+    private static final ObjectMapper TREE_READER = JsonMapperFactory.create();
 
     private final WorkflowDataRepository repository;
     private final JacksonWorkflowSerializer serializer;

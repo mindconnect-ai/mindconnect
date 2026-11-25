@@ -12,6 +12,7 @@ import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalAgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
+import ai.mindconnect.json.JsonMapperFactory;
 import org.springframework.beans.factory.annotation.Value;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -30,7 +31,7 @@ public class CliRunner implements CommandLineRunner {
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
     private static final com.fasterxml.jackson.databind.ObjectMapper PRETTY_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper()
+            JsonMapperFactory.create()
                     .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
                     .enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT)
                     .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -1021,7 +1022,7 @@ public class CliRunner implements CommandLineRunner {
         record Entry(int seq, ai.mindconnect.message.domain.MessageId resultMessageId, String time, String toolName,
                      java.util.Map<String, Object> arguments, String result, Long durationMs) {}
         java.util.List<Entry> entries = new java.util.ArrayList<>();
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.ObjectMapper mapper = JsonMapperFactory.create();
         for (ai.mindconnect.message.domain.Message m : history) {
             if (m.type() != ai.mindconnect.message.domain.MessageType.TOOL_CALL) continue;
             try {
@@ -1204,7 +1205,7 @@ public class CliRunner implements CommandLineRunner {
             case TOOL_CALL: {
                 try {
                     com.fasterxml.jackson.databind.JsonNode node =
-                            new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
+                            JsonMapperFactory.create().readTree(content);
                     com.fasterxml.jackson.databind.JsonNode calls = node.get("toolCalls");
                     if (calls != null && calls.isArray() && calls.size() > 0) {
                         StringBuilder sb = new StringBuilder("→ ");
@@ -1249,7 +1250,7 @@ public class CliRunner implements CommandLineRunner {
     private static String extractJsonField(String json, String field) {
         try {
             com.fasterxml.jackson.databind.JsonNode node =
-                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+                    JsonMapperFactory.create().readTree(json);
             com.fasterxml.jackson.databind.JsonNode v = node.get(field);
             return v != null && !v.isNull() ? v.asText() : null;
         } catch (Exception e) {

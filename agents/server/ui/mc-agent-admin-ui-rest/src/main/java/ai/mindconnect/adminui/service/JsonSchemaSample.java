@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.service;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
@@ -20,7 +21,7 @@ import java.util.Map;
  */
 public final class JsonSchemaSample {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
     private static final int MAX_DEPTH = 5;
 
     private JsonSchemaSample() {}

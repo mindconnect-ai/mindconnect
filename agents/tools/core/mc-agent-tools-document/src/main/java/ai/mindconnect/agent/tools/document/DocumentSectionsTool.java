@@ -5,6 +5,7 @@ import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.DocumentModel;
 import ai.mindconnect.agent.tools.document.DocumentReader;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -23,7 +24,7 @@ import java.util.Map;
 public final class DocumentSectionsTool implements Tool {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentSectionsTool.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final Path baseDir;
     private final FileRoots roots;

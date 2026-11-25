@@ -1,5 +1,6 @@
 package ai.mindconnect.webscraper;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import lombok.Data;
@@ -29,7 +30,7 @@ public class ApplicationConfig {
 
 
     public static ApplicationConfig load() throws IOException {
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        ObjectMapper mapper = JsonMapperFactory.create(new YAMLFactory());
         return mapper.readValue(ApplicationConfig.class.getResourceAsStream("/application.yml"), ApplicationConfig.class);
     }
 }

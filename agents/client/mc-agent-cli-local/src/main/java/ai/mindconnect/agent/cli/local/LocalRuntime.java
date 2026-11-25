@@ -26,6 +26,7 @@ import ai.mindconnect.agent.runtime.store.RepositorySessionStore;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.sdk.AgentRuntimeBuilder;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
@@ -59,7 +60,7 @@ public final class LocalRuntime {
 
     /** A builder that lacks only the model. */
     public AgentRuntimeBuilder builder() {
-        ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
+        ObjectMapper json = JsonMapperFactory.create().registerModule(new JavaTimeModule());
         HarnessDirectories directories = new HarnessDirectories(home);
         ScopeSupplier scope = ScopeSupplier.fixed(new Namespace(NAMESPACE));
         Path data = home.resolve(".mc").resolve("data");

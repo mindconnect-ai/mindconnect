@@ -1,5 +1,6 @@
 package ai.mindconnect.chatui.ui;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.ZoneId;
@@ -23,7 +24,7 @@ public final class SessionUiCommons {
      * mutate it, and Jackson's {@link ObjectMapper} is documented as
      * thread-safe for read/write of normal records.
      */
-    public static final ObjectMapper MAPPER = new ObjectMapper();
+    public static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     /** Time formatter used in conversation, memory and trace headers. */
     public static final DateTimeFormatter DT_FMT =

@@ -5,6 +5,7 @@ import ai.mindconnect.agent.registry.domain.RegistryIndex;
 import ai.mindconnect.agent.registry.domain.RegistryPackage;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.port.out.RegistryClient;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -71,7 +72,7 @@ public class GitHubRegistryClient implements RegistryClient {
         this.ttl = ttl == null ? Duration.ZERO : ttl;
         this.timeout = timeout == null ? Duration.ofSeconds(20) : timeout;
         this.env = env == null ? name -> null : env;
-        this.objectMapper = new ObjectMapper()
+        this.objectMapper = JsonMapperFactory.create()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.http = HttpClient.newBuilder()
                 .connectTimeout(this.timeout)

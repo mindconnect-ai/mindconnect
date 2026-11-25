@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.workflow.step;
 
 import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.workflow.execution.BaseStepInstance;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,7 +34,7 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
     /** How much of a failed program's output an error message quotes. */
     private static final int ERROR_EXCERPT = 2_000;
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
     private static final Pattern EXIT_CODE = Pattern.compile("^exit code: (-?\\d+)", Pattern.MULTILINE);
 
     @Override

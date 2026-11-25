@@ -2,6 +2,7 @@ package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.util.AtomicFiles;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,7 +40,7 @@ public final class FileMcpServerRepository implements McpServerRepository {
 
     private static final Logger log = LoggerFactory.getLogger(FileMcpServerRepository.class);
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final Path storageDir;
     private final ScopeSupplier scope;

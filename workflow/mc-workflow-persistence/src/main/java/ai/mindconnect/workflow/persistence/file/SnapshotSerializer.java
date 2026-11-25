@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.file;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.workflow.persist.FrameSnapshot;
 import ai.mindconnect.workflow.persist.WorkflowInstanceSnapshot;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,7 +26,7 @@ public class SnapshotSerializer {
     private final ObjectMapper mapper;
 
     public SnapshotSerializer() {
-        this.mapper = new ObjectMapper();
+        this.mapper = JsonMapperFactory.create();
         this.mapper.enable(SerializationFeature.INDENT_OUTPUT);
     }
 

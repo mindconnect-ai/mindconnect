@@ -13,6 +13,7 @@ import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -50,7 +51,7 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
 
     public AgentDefinitionInstaller(AgentManagement agents) {
         this.agents = agents;
-        this.files = new AgentJson(new ObjectMapper()
+        this.files = new AgentJson(JsonMapperFactory.create()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
@@ -125,7 +126,7 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
 
     /** The file's text, named after its registry entry when it names no agent itself. */
     private static String withName(String content, String entryName) throws Exception {
-        ObjectMapper plain = new ObjectMapper();
+        ObjectMapper plain = JsonMapperFactory.create();
         JsonNode agent = plain.readTree(content);
         if (!(agent instanceof ObjectNode fields)) {
             return content;

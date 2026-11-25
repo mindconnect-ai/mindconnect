@@ -9,6 +9,7 @@ import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiTable;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -24,7 +25,7 @@ import java.util.Map;
  */
 public final class ToolTableComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final ManagedAgent agent;
     private final AgentToolId selectedToolId;

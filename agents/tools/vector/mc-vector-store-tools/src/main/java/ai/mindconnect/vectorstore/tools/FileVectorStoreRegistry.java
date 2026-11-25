@@ -2,6 +2,7 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.filerepo.FileWrites;
 import ai.mindconnect.filerepo.PathLocks;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -32,7 +33,7 @@ import java.util.Optional;
 public final class FileVectorStoreRegistry implements VectorStoreRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(FileVectorStoreRegistry.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper()
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);

@@ -1,5 +1,6 @@
 package ai.mindconnect.webscraper;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.webscraper.jsoup.JsoupWebScraper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -30,7 +31,7 @@ public class WebScraperMain {
         JsoupWebScraper scraper = new JsoupWebScraper();
         var results = scraper.scrape(List.of(options));
 
-//        ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+//        ObjectMapper mapper = JsonMapperFactory.create().enable(SerializationFeature.INDENT_OUTPUT);
 //        Map<String, Object> map = new HashMap<>();
 //        //File file = new File("community-fiber-help.json");
 //        File file = new File("placetel.json");

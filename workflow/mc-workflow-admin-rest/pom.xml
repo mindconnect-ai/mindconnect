@@ -24,6 +24,10 @@
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-json</artifactId>
+        </dependency>
         <!-- Workflow domain + execution -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

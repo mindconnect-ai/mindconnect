@@ -1,6 +1,7 @@
 package ai.mindconnect.extension.demo;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -22,7 +23,7 @@ import java.util.List;
  */
 final class FileDiceRollRepository implements DiceRollRepository {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule())
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private final Path dataDir;

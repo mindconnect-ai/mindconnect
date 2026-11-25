@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpTool;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -32,7 +33,7 @@ import java.util.Map;
  */
 public final class McpDiscoveryJson {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private static final TypeReference<LinkedHashMap<String, Object>> SCHEMA = new TypeReference<>() { };
 

@@ -1,7 +1,9 @@
 package ai.mindconnect.arch;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaConstructorCall;
 import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
@@ -49,6 +51,10 @@ public final class McArchRules {
         "Configuration", "AutoConfiguration", "ControllerAdvice", "RestControllerAdvice");
 
     private static final String PROJECT_PACKAGE = "ai.mindconnect.";
+
+    private static final String JSON_MAPPER_FACTORY = "ai.mindconnect.json.JsonMapperFactory";
+    private static final String OBJECT_MAPPER = "com.fasterxml.jackson.databind.ObjectMapper";
+    private static final String JSON_MAPPER = "com.fasterxml.jackson.databind.json.JsonMapper";
 
     private McArchRules() {
     }
@@ -181,6 +187,26 @@ public final class McArchRules {
     static final ArchRule slf4jOnly = FreezingArchRule.freeze(
         noClasses().should().dependOnClassesThat().resideInAPackage("java.util.logging..")
             .as("Conventions: SLF4J everywhere, never java.util.logging"));
+
+    /**
+     * Conventions: every ObjectMapper comes from JsonMapperFactory. A mapper
+     * built by hand misses the modules the installation announces — an id is
+     * then written as an object, and nothing fails.
+     */
+    @ArchTest
+    static final ArchRule mappersFromTheFactory = FreezingArchRule.freeze(
+        noClasses().that().doNotHaveFullyQualifiedName(JSON_MAPPER_FACTORY)
+            .should().callCodeUnitWhere(buildAMapper())
+            .as("Conventions: every ObjectMapper comes from JsonMapperFactory"));
+
+    private static DescribedPredicate<JavaCall<?>> buildAMapper() {
+        return DescribedPredicate.describe("build an ObjectMapper themselves", call -> {
+            String owner = call.getTargetOwner().getFullName();
+            boolean mapperType = owner.equals(OBJECT_MAPPER) || owner.equals(JSON_MAPPER);
+            return mapperType && (call instanceof JavaConstructorCall
+                || owner.equals(JSON_MAPPER) && call.getName().equals("builder"));
+        });
+    }
 
     private static DescribedPredicate<JavaMethod> nameNoSupertypeDeclares() {
         return DescribedPredicate.describe("are not named by a supertype", method -> {

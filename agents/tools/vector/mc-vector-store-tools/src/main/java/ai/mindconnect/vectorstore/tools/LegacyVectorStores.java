@@ -3,6 +3,7 @@ package ai.mindconnect.vectorstore.tools;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
@@ -46,7 +47,7 @@ import java.util.stream.Stream;
 final class LegacyVectorStores {
 
     private static final Logger log = LoggerFactory.getLogger(LegacyVectorStores.class);
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = JsonMapperFactory.create();
 
     /** A chunk as the old stores wrote it. */
     @JsonIgnoreProperties(ignoreUnknown = true)

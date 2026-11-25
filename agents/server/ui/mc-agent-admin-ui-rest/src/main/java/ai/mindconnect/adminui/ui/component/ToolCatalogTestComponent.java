@@ -6,6 +6,7 @@ import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -24,7 +25,7 @@ import java.util.Map;
  */
 public final class ToolCatalogTestComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create();
 
     private final String toolName;
     private final ToolRegistry toolRegistry;

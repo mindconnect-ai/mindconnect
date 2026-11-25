@@ -11,6 +11,7 @@ import ai.mindconnect.agent.protocol.item.ContentPart;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.protocol.item.Role;
+import ai.mindconnect.json.JsonMapperFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -28,7 +29,7 @@ import java.util.Set;
 /** Translates between the protocol vocabulary and OpenAI's wire JSON. Stateless. */
 final class OpenAiMapper {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = JsonMapperFactory.create();
 
     private OpenAiMapper() { }
 

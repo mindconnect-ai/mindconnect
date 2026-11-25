@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.virtualenv;
 
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -47,7 +48,7 @@ public class VirtualEnvClient {
     private final TokenSource tokens;
     private final Duration requestTimeout;
     private final HttpClient http;
-    private final ObjectMapper json = new ObjectMapper()
+    private final ObjectMapper json = JsonMapperFactory.create()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public VirtualEnvClient(URI baseUrl, TokenSource tokens, Duration requestTimeout) {

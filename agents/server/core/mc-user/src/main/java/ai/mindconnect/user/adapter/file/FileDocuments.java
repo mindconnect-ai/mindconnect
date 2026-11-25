@@ -1,6 +1,7 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.common.util.AtomicFiles;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -26,7 +27,7 @@ class FileDocuments<T> {
 
     private static final Logger log = LoggerFactory.getLogger(FileDocuments.class);
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
+    private static final ObjectMapper MAPPER = JsonMapperFactory.create()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)

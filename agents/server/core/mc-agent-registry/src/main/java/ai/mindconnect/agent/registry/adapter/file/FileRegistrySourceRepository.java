@@ -8,6 +8,7 @@ import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
+import ai.mindconnect.json.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,7 +34,7 @@ public class FileRegistrySourceRepository implements RegistrySourceRepository {
     private final ScopeSupplier scope;
 
     public FileRegistrySourceRepository(Path storageDir, ScopeSupplier scope) {
-        ObjectMapper objectMapper = new ObjectMapper()
+        ObjectMapper objectMapper = JsonMapperFactory.create()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.storageDir = storageDir;
         this.scope = scope;

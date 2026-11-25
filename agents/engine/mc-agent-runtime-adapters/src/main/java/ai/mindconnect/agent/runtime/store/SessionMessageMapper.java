@@ -16,6 +16,7 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.loop.domain.TurnMessageConverter;
+import ai.mindconnect.json.JsonMapperFactory;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
@@ -47,7 +48,7 @@ final class SessionMessageMapper {
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() { };
 
     private final TurnMessageConverter turnMessages = new TurnMessageConverter();
-    private final ObjectMapper json = new ObjectMapper();
+    private final ObjectMapper json = JsonMapperFactory.create();
 
     /**
      * The conversation a session's messages are in: the one its metadata

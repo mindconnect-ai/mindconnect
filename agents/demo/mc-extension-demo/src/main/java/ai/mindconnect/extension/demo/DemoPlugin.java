@@ -14,6 +14,7 @@ import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.json.JsonMapperFactory;
 
 /**
  * The demo's plugin — found through
@@ -80,6 +81,6 @@ public final class DemoPlugin implements Plugin {
         return registry.find(ToolEnvironment.class).flatMap(env -> env.getString("dataBaseDir")).map(Path::of);
     }
 
-    private static final ObjectMapper JSON = new ObjectMapper().registerModule(new JavaTimeModule())
+    private static final ObjectMapper JSON = JsonMapperFactory.create().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 }
