@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
@@ -212,6 +213,17 @@ public final class McArchRules {
                 "ai.mindconnect.agent.runtime.api..", "ai.mindconnect.agent.loop..")
             .should().dependOnClassesThat().resideInAPackage("com.fasterxml..")
             .as("Contracts: the agents' contracts know no Jackson"));
+
+    /**
+     * Conventions: no ObjectMapper is static. A static mapper is built before
+     * any runtime exists and so knows none of the modules its plugins
+     * contribute; a component gets its JsonMapperFactory through its constructor.
+     */
+    @ArchTest
+    static final ArchRule noStaticMapper = FreezingArchRule.freeze(
+        noFields().that().areStatic()
+            .should().haveRawType(JavaClass.Predicates.assignableTo(OBJECT_MAPPER))
+            .as("Conventions: no ObjectMapper is static"));
 
     private static DescribedPredicate<JavaCall<?>> buildAMapper() {
         return DescribedPredicate.describe("build an ObjectMapper themselves", call -> {

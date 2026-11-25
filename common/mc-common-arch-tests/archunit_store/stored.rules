@@ -1,8 +1,9 @@
 #
-#Wed Nov 25 11:24:04 CET 2026
+#Wed Nov 25 14:25:51 CET 2026
 Contracts\:\ the\ agents'\ contracts\ know\ no\ Jackson=6870b112-46e2-4a7b-9280-9f1f0b1722c1
 Conventions\:\ SLF4J\ everywhere,\ never\ java.util.logging=cd78fff1-d53f-47c1-8991-95be46ad0614
 Conventions\:\ every\ ObjectMapper\ comes\ from\ JsonMapperFactory=5f1c2e66-8dc8-41d0-8dc6-72b5461b7461
+Conventions\:\ no\ ObjectMapper\ is\ static=b4879e6a-c0fd-40f3-a040-037824fdba1b
 Conventions\:\ one\ constructor\ per\ class=0de44684-b4fd-47b2-9c94-a4ae5effacd7
 D1\:\ -core\ modules\ and\ engines\ know\ no\ framework=c00eb8ea-5b0e-43f3-b5ad-f5d9c259559a
 D1\:\ @Component,\ @Configuration,\ @RestController\ ...\ only\ in\ starters,\ apps,\ rest/ui\ modules\ and\ demos=91b512a6-40f7-4ec6-8094-014ed5480326
