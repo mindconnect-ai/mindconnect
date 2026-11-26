@@ -16,7 +16,6 @@ import ai.mindconnect.llm.providers.openai.OpenAiCompatibleGateway;
 import ai.mindconnect.llm.providers.openai.OpenAiResponsesGateway;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
 import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
-import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.scope.TenantScope;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,17 +38,13 @@ import java.util.Map;
  * <p>Run with {@code OPENAI_API_KEY} set; the first argument is the question. Every
  * run is a paid call to OpenAI.
  */
-public final class LlmChatDemo {
+public final class LlmChatWithOurProvidersDemo {
 
-    private LlmChatDemo() {
+    private LlmChatWithOurProvidersDemo() {
     }
 
     public static void main(String[] args) {
-        if (System.getenv("OPENAI_API_KEY") == null || System.getenv("OPENAI_API_KEY").isBlank()) {
-            System.err.println("Set OPENAI_API_KEY to run this demo.");
-            System.exit(1);
-        }
-        String question = args.length > 0 ? String.join(" ", args) : "Name three rivers in Germany.";
+        DemoConsole.requireOpenAiKey();
 
         // Our providers, one per provider family. Only what is in this map is reachable.
         OkHttpClient http = new OkHttpClient();
@@ -73,15 +68,8 @@ public final class LlmChatDemo {
 
         LlmRequest request = LlmRequest.streaming("agent-default", List.of(
                 LlmMessage.system("Answer in one short paragraph."),
-                LlmMessage.user(question)));
-        chat.chatStreaming(request, chunk -> {
-            switch (chunk) {
-                case LlmStreamChunk.TextDelta delta -> System.out.print(delta.text());
-                case LlmStreamChunk.Done done -> System.out.printf("%n[%s, %d tokens in, %d out]%n",
-                        done.finishReason(), done.inputTokens(), done.outputTokens());
-                default -> { }
-            }
-        });
+                LlmMessage.user(DemoConsole.question(args))));
+        chat.chatStreaming(request, DemoConsole::print);
         http.dispatcher().executorService().shutdown();
         http.connectionPool().evictAll();
     }
