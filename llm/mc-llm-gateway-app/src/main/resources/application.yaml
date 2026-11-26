@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: mc-llm-gateway-app
+
+server:
+  port: ${MC_LLM_GATEWAY_PORT:8095}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

@@ -203,6 +203,8 @@
         <module>conversation/mc-conversation-arch-tests</module>
         <module>llm/mc-llm-arch-tests</module>
         <module>agents/mc-agents-arch-tests</module>
+        <!-- Not in llm/pom.xml: it depends on agents/ until the gateway service moves to llm/. -->
+        <module>llm/mc-llm-gateway-app</module>
     </modules>
 
     <build>
