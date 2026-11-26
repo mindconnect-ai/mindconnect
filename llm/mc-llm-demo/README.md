@@ -7,11 +7,10 @@ How a library user calls a model through the LLM gateway, in two ways:
 2. **With a provider of your own.** You implement the provider SPI yourself; here with
    the official OpenAI Java SDK (`com.openai:openai-java`).
 
-The second way runs today. The first needs `mc-llm-gateway` and `mc-llm-providers`,
-which still live in `agents/` and move to `llm/` next; until then it is shown here as
-the code it will be.
+Both ways run against the same gateway service, `mc-llm-gateway`: it finds the config
+by name, follows aliases and fallbacks, resolves the secrets and retries rate limits.
 
-## 1. With our providers (after the gateway and the providers move here)
+## 1. With our providers
 
 ```xml
 <dependency>
@@ -25,19 +24,35 @@ the code it will be.
 ```
 
 ```java
-LlmChat chat = LlmGatewayService.builder()
-        .providers(OpenAiProviders.all())                  // our providers, one per LlmProvider
-        .config(LlmConfig.openAi("agent-default", "gpt-5.4-mini", "${OPENAI_API_KEY}"))
-        .build();                                          // configs in memory, secrets from the environment
+OkHttpClient http = new OkHttpClient();
+ObjectMapper json = JsonMapper.builder()
+        .addModule(new LlmJsonModule()).addModule(new JavaTimeModule()).build();
 
-LlmResponse answer = chat.chat("local",
-        LlmRequest.of("agent-default", List.of(LlmMessage.user("Name three rivers in Germany."))));
+Map<LlmProvider, LlmGateway> providers = new EnumMap<>(LlmProvider.class);
+providers.put(LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json));
+providers.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, json));
+providers.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, json));
+providers.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, json));
+providers.put(LlmProvider.LM_STUDIO, new OpenAiCompatibleGateway(http, json));
+
+LlmConfigRepository configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
+configs.save(LlmConfig.openAi("agent-default", "gpt-5.4-mini", "${OPENAI_API_KEY}"));
+
+LlmChat chat = new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(providers),
+        LlmConfigResolver::resolved);           // ${VAR} placeholders from the process environment
+
+chat.chatStreaming(LlmRequest.streaming("agent-default",
+        List.of(LlmMessage.user("Name three rivers in Germany."))), chunk -> ...);
 ```
 
-The caller knows a namespace and the name of a config, nothing else: no provider, no
-model, no key. The builder's names are the plan, not yet code.
+The caller knows the name of a config, nothing else: no provider, no model, no key.
+The namespace is the store's: `TenantScope.fixed` for one, a scope that answers per
+call for a host that serves several. Only the providers you put into the map are
+reachable; a config naming another provider fails at the call.
+[`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
+wires the same for the REST server.
 
-## 2. With a provider of your own (runs today)
+## 2. With a provider of your own
 
 ```xml
 <dependency>
