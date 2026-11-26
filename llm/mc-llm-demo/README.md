@@ -67,14 +67,19 @@ gateway.chatStreaming(config, LlmRequest.streaming(config.name(), messages),
         Cancellation.none(), LlmCallListener.NOOP);
 ```
 
-Once the gateway service is in `llm/`, the same provider plugs into it, and callers
-again only name the config:
+The same provider plugs into the gateway service, and callers again only name the
+config. [`LlmChatWithConfigInMemoryTest`](src/test/java/ai/mindconnect/llm/demo/LlmChatWithConfigInMemoryTest.java)
+wires it with the configs in memory:
 
 ```java
-LlmChat chat = LlmGatewayService.builder()
-        .provider(LlmProvider.OPENAI, new OpenAiSdkGateway())
-        .config(...)
-        .build();
+LlmConfigRepository configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
+configs.save(config);                                   // model, endpoint, key: ${VAR} placeholders allowed
+
+LlmChat chat = new RoutingLlmChatService(configs,
+        new DefaultLlmGatewayRegistry(Map.of(LlmProvider.OPENAI, new OpenAiSdkGateway())),
+        LlmConfigResolver::resolved);                   // placeholders from the process environment
+
+chat.chatStreaming(LlmRequest.streaming("agent-default", messages), chunk -> ...);
 ```
 
 Run it (a paid call to OpenAI):
@@ -85,6 +90,8 @@ OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainC
 
 `OpenAiSdkGatewayTest` runs the provider against a local server that answers like
 OpenAI: text, tool calls, a tool round trip and a rate limit, without network or cost.
+`LlmChatWithConfigInMemoryTest` does the same through `LlmChat`, with `mc-llm-gateway`
+in test scope only, so the provider itself still needs nothing but the SPI.
 
 ## What this demo shows about the API
 

@@ -38,6 +38,13 @@
             <artifactId>openai-java</artifactId>
             <version>${openai-java.version}</version>
         </dependency>
+        <!-- The test that calls through LlmChat: routing, retry and the in-memory config store. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-gateway</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
