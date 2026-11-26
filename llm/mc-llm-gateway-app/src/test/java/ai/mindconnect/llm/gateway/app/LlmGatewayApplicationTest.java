@@ -13,7 +13,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {"mindconnect.llm.store=memory",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration"})
 @AutoConfigureMockMvc
 class LlmGatewayApplicationTest {
 
@@ -73,6 +74,15 @@ class LlmGatewayApplicationTest {
         mvc.perform(post("/api/ns/zeta/chat").contentType(MediaType.APPLICATION_JSON).content("""
                         {"configName":"nope","messages":[{"role":"USER","content":"hi"}]}"""))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void the_default_namespace_starts_with_the_openai_configs() throws Exception {
+        mvc.perform(get("/api/ns/default/configs"))
+                .andExpect(jsonPath("$[*].name").value(org.hamcrest.Matchers.containsInAnyOrder(
+                        "openai-chat", "openai-embedding", "openai-transcription")))
+                .andExpect(jsonPath("$[?(@.name=='openai-embedding')].type").value("EMBEDDING"))
+                .andExpect(jsonPath("$[?(@.name=='openai-transcription')].type").value("SPEECH_TO_TEXT"));
     }
 
     @Test

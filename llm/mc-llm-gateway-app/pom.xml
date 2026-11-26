@@ -19,7 +19,7 @@
     <packaging>jar</packaging>
     <description>
         The LLM gateway as a REST server: chat by config name, and managing configs and
-        prices, per namespace. Configs live in memory; Swagger UI, no security.
+        prices, per namespace. Configs live in Postgres; Swagger UI, no security.
     </description>
 
     <properties>
@@ -51,7 +51,24 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-store-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-namespace-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
