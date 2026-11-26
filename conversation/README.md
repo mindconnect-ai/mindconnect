@@ -25,10 +25,14 @@ not here.
 
 | Module | What |
 |---|---|
-| `mc-conversation-core` | the model, `ConversationManager`, `ConversationService`, the store ports and the channel SPI |
-| `mc-conversation` | the stores in memory and on files (`<namespace>/conversation-threads/<id>/`) |
+| `mc-conversation-api` | the model, `ConversationManager`, the store ports and the channel SPI; no implementation. Its test-jar holds `ConversationStoreContract`, the test every store passes |
+| `mc-conversation` | `ConversationService` and the stores in memory: enough to run conversations |
+| `mc-conversation-file` | the store on files (`<namespace>/conversation-threads/<id>/`) |
 | `mc-conversation-pg` | the store in Postgres (`mc_conversation_thread`, `mc_conversation_entry`) |
-| `mc-conversation-arch-tests` | the shared ArchUnit rules over this area, and that it knows no agents |
+| `mc-conversation-arch-tests` | the shared ArchUnit rules over this area, that it knows no agents and that the API knows no implementation |
+
+Write a channel or a store of your own against `mc-conversation-api` alone;
+for a store, extend `ConversationStoreContract` in its test.
 
 The area knows no agents — a rule in `mc-conversation-arch-tests` says so — and
 builds on its own with the few `common` modules it needs:

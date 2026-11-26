@@ -118,8 +118,9 @@
         <module>agents/springstarter/mc-agent-starter-extension</module>
         <module>agents/springstarter/mc-agent-starter-workflow</module>
         <module>agents/server/core/mc-credentials</module>
-        <module>conversation/mc-conversation-core</module>
+        <module>conversation/mc-conversation-api</module>
         <module>conversation/mc-conversation</module>
+        <module>conversation/mc-conversation-file</module>
         <module>agents/responses-api/mc-agent-protocol</module>
         <module>agents/responses-api/mc-agent-protocol-openai</module>
         <module>agents/responses-api/mc-agent-protocol-runtime</module>

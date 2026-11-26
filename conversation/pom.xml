@@ -30,8 +30,9 @@
         <module>../common/mc-scope</module>
         <module>../common/mc-file-repo</module>
         <module>../common/mc-jdbc</module>
-        <module>mc-conversation-core</module>
+        <module>mc-conversation-api</module>
         <module>mc-conversation</module>
+        <module>mc-conversation-file</module>
         <module>mc-conversation-pg</module>
         <module>mc-conversation-arch-tests</module>
     </modules>
