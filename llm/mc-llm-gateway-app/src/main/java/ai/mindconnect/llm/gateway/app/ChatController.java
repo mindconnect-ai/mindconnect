@@ -2,11 +2,8 @@ package ai.mindconnect.llm.gateway.app;
 
 import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.llm.runtime.api.domain.Cancellation;
-import ai.mindconnect.llm.runtime.api.domain.FinishReason;
-import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
 import ai.mindconnect.llm.runtime.api.domain.LlmResponse;
 import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
-import ai.mindconnect.llm.runtime.api.domain.ToolCall;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,8 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 /** The runtime API over HTTP: a client names the namespace and the config, nothing else. */
 @RestController
@@ -44,20 +39,7 @@ class ChatController {
     @Operation(summary = "Chat and wait for the whole answer")
     @PostMapping
     LlmResponse chat(@PathVariable String namespace, @RequestBody ChatRequest request) {
-        StringBuilder text = new StringBuilder();
-        AtomicReference<LlmStreamChunk.Done> done = new AtomicReference<>();
-        AtomicReference<LlmCallEvent> call = new AtomicReference<>();
-        chat.chatStreaming(request.toLlmRequest(false), chunk -> {
-            if (chunk instanceof LlmStreamChunk.TextDelta delta) text.append(delta.text());
-            if (chunk instanceof LlmStreamChunk.Done end) done.set(end);
-        }, Cancellation.none(), call::set);
-        // The provider adapter reassembles the tool calls for its call event; the chunks carry only fragments.
-        List<ToolCall> toolCalls = call.get() == null || call.get().response() == null
-                ? List.of() : List.copyOf(call.get().response().toolCalls());
-        LlmStreamChunk.Done end = done.get();
-        FinishReason finish = end == null ? null : end.finishReason();
-        return new LlmResponse(text.toString(), toolCalls, finish,
-                end == null ? 0 : end.inputTokens(), end == null ? 0 : end.outputTokens());
+        return chat.chat(request.toLlmRequest(false));
     }
 
     /**

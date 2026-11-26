@@ -1,16 +1,14 @@
 package ai.mindconnect.llm.provider.spi.port.out;
 
 import ai.mindconnect.llm.runtime.api.domain.Cancellation;
-import ai.mindconnect.llm.runtime.api.domain.FinishReason;
 import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import ai.mindconnect.llm.runtime.api.domain.LlmResponse;
+import ai.mindconnect.llm.runtime.api.domain.LlmResponseCollector;
 import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
-import ai.mindconnect.llm.runtime.api.domain.ToolCall;
 import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
 
-import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -49,31 +47,12 @@ public interface LlmGateway {
     default LlmResponse chat(LlmConfig config, LlmRequest request,
                               Cancellation cancellation,
                               LlmCallListener listener) {
-        StringBuilder text = new StringBuilder();
-        FinishReason[] finish = { null };
-        int[] inputTokens  = { 0 };
-        int[] outputTokens = { 0 };
-        LlmCallEvent[] call = { null };
-
-        chatStreaming(config, request, chunk -> {
-            switch (chunk) {
-                case LlmStreamChunk.TextDelta td -> text.append(td.text());
-                case LlmStreamChunk.ToolCallDelta ignored -> { }
-                case LlmStreamChunk.ThinkingDelta ignored -> { }
-                case LlmStreamChunk.Done done -> {
-                    finish[0] = done.finishReason();
-                    inputTokens[0]  = done.inputTokens();
-                    outputTokens[0] = done.outputTokens();
-                }
-            }
-        }, cancellation, event -> {
-            call[0] = event;
+        LlmResponseCollector collector = new LlmResponseCollector();
+        chatStreaming(config, request, collector::accept, cancellation, event -> {
+            collector.onCall(event);
             if (listener != null) listener.onCall(event);
         });
-
-        List<ToolCall> toolCalls = call[0] == null || call[0].response() == null
-                ? List.of() : List.copyOf(call[0].response().toolCalls());
-        return new LlmResponse(text.toString(), toolCalls, finish[0], inputTokens[0], outputTokens[0]);
+        return collector.response();
     }
 
     /**
