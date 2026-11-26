@@ -3,20 +3,21 @@ package ai.mindconnect.llm.gateway.app;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
-import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
-import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
-import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
-import ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway;
 import ai.mindconnect.llm.jackson.LlmJsonModule;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
+import ai.mindconnect.llm.providers.anthropic.ClaudeGateway;
+import ai.mindconnect.llm.providers.gemini.GeminiGateway;
+import ai.mindconnect.llm.providers.openai.AzureOpenAiGateway;
+import ai.mindconnect.llm.providers.openai.OpenAiCompatibleGateway;
+import ai.mindconnect.llm.providers.openai.OpenAiResponsesGateway;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
+import ai.mindconnect.llm.service.LlmConfigResolver;
 import ai.mindconnect.llm.service.LlmConfigService;
 import ai.mindconnect.llm.service.LlmPriceService;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
@@ -79,18 +80,17 @@ class LlmGatewayConfiguration {
                 .readTimeout(120, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build();
-        EncryptionHelper plain = EncryptionHelper.noEncryption();
-        EnvVarResolver env = EnvVarResolver.system();
-        LlmGateway openAiCompatible = new OpenAiCompatibleGateway(http, json, plain, env);
+        LlmGateway openAiCompatible = new OpenAiCompatibleGateway(http, json);
         Map<LlmProvider, LlmGateway> gateways = new EnumMap<>(LlmProvider.class);
         for (LlmProvider provider : LlmProvider.values()) {
             gateways.put(provider, openAiCompatible);
         }
-        gateways.put(LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json, plain, env));
-        gateways.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, json, plain, env));
-        gateways.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, json, plain, env));
-        gateways.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, json, plain, env));
-        return new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(gateways));
+        gateways.put(LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json));
+        gateways.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, json));
+        gateways.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, json));
+        gateways.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, json));
+        LlmConfigResolver resolver = new LlmConfigResolver(EnvVarResolver.system(), EncryptionHelper.noEncryption());
+        return new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(gateways), resolver);
     }
 
     @Bean
