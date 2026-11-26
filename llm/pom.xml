@@ -23,6 +23,7 @@
         <module>mc-llm-management-api</module>
         <module>mc-llm-provider-spi</module>
         <module>mc-llm-jackson</module>
+        <module>mc-llm-demo</module>
         <module>mc-llm-arch-tests</module>
     </modules>
 </project>

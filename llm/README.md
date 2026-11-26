@@ -9,6 +9,7 @@ without the rest of mindconnect: nothing here depends on `agents/` or `common/`.
 | `mc-llm-management-api` | the runtime API, SLF4J | managing models: `LlmConfig`, prices and the stores they are kept in (`port.out`) |
 | `mc-llm-provider-spi` | the management API | what a provider implements, called with the config itself: `LlmGateway`, `EmbeddingGateway`, `TranscriptionGateway` (`port.out`) |
 | `mc-llm-jackson` | the management API, Jackson | the stored JSON form of configs and prices, as a Jackson module |
+| `mc-llm-demo` | the provider SPI, the OpenAI Java SDK | how a library user calls a model; a provider of one's own on the OpenAI SDK |
 | `mc-llm-arch-tests` | — | the area's ArchUnit rules |
 
 A caller needs the runtime API only: it names a config, never a provider, model
