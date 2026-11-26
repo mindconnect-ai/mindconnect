@@ -36,7 +36,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-gateway-pg</artifactId>
+            <artifactId>mc-llm-store-pg</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

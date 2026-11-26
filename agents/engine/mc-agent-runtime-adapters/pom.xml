@@ -25,6 +25,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-jackson</artifactId>
         </dependency>
@@ -40,7 +45,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-store</artifactId>
+            <artifactId>mc-llm-gateway</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

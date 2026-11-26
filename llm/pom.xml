@@ -24,6 +24,8 @@
         <module>mc-llm-provider-spi</module>
         <module>mc-llm-providers</module>
         <module>mc-llm-gateway</module>
+        <module>mc-llm-store-file</module>
+        <module>mc-llm-store-pg</module>
         <module>mc-llm-jackson</module>
         <module>mc-llm-demo</module>
         <module>mc-llm-arch-tests</module>

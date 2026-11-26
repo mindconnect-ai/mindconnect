@@ -18,12 +18,21 @@ class LlmArchitectureTest {
     @ArchTest
     static final ArchTests conventions = ArchTests.in(McArchRules.class);
 
-    /** The gateway stands on its own: a library user takes it without agents or the shared libraries. */
+    /** The gateway stands on its own: a library user takes it without agents; of mindconnect only common/ comes along. */
     @ArchTest
-    static final ArchRule gatewayKnowsNoOtherArea = noClasses().that().resideInAPackage("ai.mindconnect.llm..")
+    static final ArchRule gatewayKnowsOnlyCommon = noClasses().that().resideInAPackage("ai.mindconnect.llm..")
+            .should().dependOnClassesThat(resideInAPackage("ai.mindconnect..")
+                    .and(not(resideInAnyPackage("ai.mindconnect.llm..", "ai.mindconnect.common..",
+                            "ai.mindconnect.scope..", "ai.mindconnect.filerepo..", "ai.mindconnect.jdbc..",
+                            "ai.mindconnect.jackson.."))))
+            .as("The LLM gateway depends on no area but common/");
+
+    /** Whoever takes our providers gets okhttp and Jackson with them, nothing of mindconnect beyond llm/. */
+    @ArchTest
+    static final ArchRule providersKnowNothingButLlm = noClasses().that().resideInAPackage("ai.mindconnect.llm.providers..")
             .should().dependOnClassesThat(resideInAPackage("ai.mindconnect..")
                     .and(not(resideInAPackage("ai.mindconnect.llm.."))))
-            .as("The LLM gateway depends on no other area");
+            .as("The LLM providers depend on nothing of mindconnect outside llm/");
 
     /** Whoever only calls a model takes the runtime API and nothing but a logging facade with it. */
     @ArchTest

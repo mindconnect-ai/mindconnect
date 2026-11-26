@@ -96,8 +96,6 @@
         <module>workflow/mc-workflow-admin-app</module>
 
         <!-- agents -->
-        <module>agents/core/mc-llm-store</module>
-        <module>agents/adapter/postgres/mc-llm-gateway-pg</module>
         <module>conversation/mc-conversation-pg</module>
         <module>agents/adapter/postgres/mc-file-store-pg</module>
         <module>agents/server/core/mc-user-core</module>
@@ -122,6 +120,8 @@
         <module>llm/mc-llm-provider-spi</module>
         <module>llm/mc-llm-providers</module>
         <module>llm/mc-llm-gateway</module>
+        <module>llm/mc-llm-store-file</module>
+        <module>llm/mc-llm-store-pg</module>
         <module>llm/mc-llm-jackson</module>
         <module>llm/mc-llm-demo</module>
         <module>conversation/mc-conversation-api</module>

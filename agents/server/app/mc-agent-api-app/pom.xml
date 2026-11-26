@@ -110,7 +110,7 @@
         <!-- LLM gateways -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-store</artifactId>
+            <artifactId>mc-llm-gateway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

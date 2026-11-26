@@ -51,12 +51,16 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-store</artifactId>
+            <artifactId>mc-llm-gateway</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-providers</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-store-file</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
