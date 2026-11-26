@@ -30,6 +30,15 @@ not here.
 | `mc-conversation-pg` | the store in Postgres (`mc_conversation_thread`, `mc_conversation_entry`) |
 | `mc-conversation-arch-tests` | the shared ArchUnit rules over this area, and that it knows no agents |
 
+The area knows no agents — a rule in `mc-conversation-arch-tests` says so — and
+builds on its own with the few `common` modules it needs:
+
+    mvn -f conversation/pom.xml install
+
+The stores ask `TenantScope` from `common/mc-scope` which namespace a call works
+in; the agents' `ScopeSupplier` is one, so a host hands its own straight in, and
+an embedding with one namespace takes `TenantScope.fixed("local")`.
+
 `agents` will depend on `conversation`, never the other way round. The tables
 `mc_conversation` and `mc_message` and the folder `conversations/` are where the
 agent runtime kept its sessions before; only the migrations read them.

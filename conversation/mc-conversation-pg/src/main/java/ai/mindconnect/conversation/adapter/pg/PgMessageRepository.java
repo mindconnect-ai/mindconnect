@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.function.LongFunction;
 import java.util.function.UnaryOperator;
 
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.scope.TenantScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.conversation.domain.ConversationId;
 import ai.mindconnect.conversation.domain.Message;
@@ -42,14 +42,14 @@ public final class PgMessageRepository implements MessageRepository {
 
     private final DocumentTable<Message> messages;
     private final Sql sql;
-    private final ScopeSupplier scope;
+    private final TenantScope scope;
 
-    public PgMessageRepository(Sql sql, ScopeSupplier scope) {
+    public PgMessageRepository(Sql sql, TenantScope scope) {
         this.sql = sql;
         this.scope = scope;
         this.messages = DocumentTable.of(Message.class)
                 .table("mc_conversation_entry")
-                .partitionKey("namespace", "TEXT", m -> scope.namespace().value())
+                .partitionKey("namespace", "TEXT", m -> scope.tenant().namespace())
                 .id("id", "TEXT", m -> m.id().value())
                 .requiredColumn("conversation_id", "TEXT", m -> m.conversationId().value())
                 .requiredColumn("seq", "BIGINT", Message::sequence)
@@ -68,11 +68,11 @@ public final class PgMessageRepository implements MessageRepository {
     @Override
     public Message append(ConversationId conversation, LongFunction<Message> create) {
         return sql.inTransaction((Sql tx) -> {
-            long place = tx.scalar(NEXT_PLACE, Long.class, scope.namespace().value(), conversation.value());
+            long place = tx.scalar(NEXT_PLACE, Long.class, scope.tenant().namespace(), conversation.value());
             Message message = create.apply(place);
             tx.update("INSERT INTO mc_conversation_entry (namespace, id, conversation_id, seq, doc) "
                             + "VALUES (?, ?, ?, ?, ?)",
-                    scope.namespace().value(), message.id().value(), conversation.value(), place,
+                    scope.tenant().namespace(), message.id().value(), conversation.value(), place,
                     tx.json().jsonb(message));
             return message;
         });
@@ -81,23 +81,23 @@ public final class PgMessageRepository implements MessageRepository {
     /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
     @Override
     public Optional<Message> update(ConversationId conversation, MessageId id, UnaryOperator<Message> change) {
-        return messages.update(scope.namespace().value(), id.value(), change);
+        return messages.update(scope.tenant().namespace(), id.value(), change);
     }
 
     @Override
     public List<Message> findByConversation(ConversationId conversation, PageRequest page) {
         return messages.find("WHERE namespace = ? AND conversation_id = ? ORDER BY seq LIMIT ? OFFSET ?",
-                scope.namespace().value(), conversation.value(), page.size(), page.offset());
+                scope.tenant().namespace(), conversation.value(), page.size(), page.offset());
     }
 
     @Override
     public Optional<Message> findById(ConversationId conversation, MessageId id) {
         return messages.findOne("WHERE namespace = ? AND conversation_id = ? AND id = ?",
-                scope.namespace().value(), conversation.value(), id.value());
+                scope.tenant().namespace(), conversation.value(), id.value());
     }
 
     @Override
     public void deleteByConversation(ConversationId conversation) {
-        messages.delete("WHERE namespace = ? AND conversation_id = ?", scope.namespace().value(), conversation.value());
+        messages.delete("WHERE namespace = ? AND conversation_id = ?", scope.tenant().namespace(), conversation.value());
     }
 }

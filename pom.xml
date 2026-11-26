@@ -63,6 +63,7 @@
         <module>common/mc-jdbc</module>
         <module>common/mc-file-repo</module>
         <module>common/mc-plugin</module>
+        <module>common/mc-scope</module>
 
         <!-- Task queue — its own tree; more modules follow (remote queue, dispatcher UI) -->
         <module>taskqueue/mc-task-queue</module>

@@ -19,8 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import ai.mindconnect.agent.scope.Namespace;
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.scope.TenantScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.conversation.adapter.file.FileConversationRepository;
 import ai.mindconnect.conversation.adapter.file.FileMessageRepository;
@@ -41,7 +40,7 @@ import ai.mindconnect.conversation.port.out.MessageRepository;
 /** What both stores of this module keep: conversations with their participants, messages in order. */
 class ConversationStoreTest {
 
-    static final ScopeSupplier SCOPE = ScopeSupplier.fixed(new Namespace("test"));
+    static final TenantScope SCOPE = TenantScope.fixed("test");
     static final PageRequest ALL = new PageRequest(0, 1000);
 
     abstract static class Contract {

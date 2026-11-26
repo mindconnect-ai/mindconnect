@@ -7,7 +7,7 @@ import java.util.Optional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.scope.TenantScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.conversation.domain.Conversation;
 import ai.mindconnect.conversation.domain.ConversationId;
@@ -28,10 +28,10 @@ public final class FileConversationRepository implements ConversationRepository 
 
     private final Documents<ConversationId, Conversation> conversations;
 
-    public FileConversationRepository(Path base, ObjectMapper json, ScopeSupplier scope) {
+    public FileConversationRepository(Path base, ObjectMapper json, TenantScope scope) {
         this.conversations = Documents.of(Conversation.class)
                 .path((ConversationId id) -> THREADS + "/" + id.value() + "/" + FILE_NAME)
-                .build(() -> FileRepo.open(base, scope.namespace().value()), json);
+                .build(() -> FileRepo.open(base, scope.tenant().namespace()), json);
     }
 
     @Override

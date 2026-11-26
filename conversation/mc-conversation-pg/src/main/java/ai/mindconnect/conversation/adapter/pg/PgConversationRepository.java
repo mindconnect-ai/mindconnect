@@ -1,6 +1,6 @@
 package ai.mindconnect.conversation.adapter.pg;
 
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.scope.TenantScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
@@ -24,14 +24,14 @@ import java.util.Optional;
 public final class PgConversationRepository implements ConversationRepository {
 
     private final DocumentTable<Conversation> conversations;
-    private final ScopeSupplier scope;
+    private final TenantScope scope;
 
     /** On a {@link Sql} shared with the other stores, and with it the application's JSON mapper. */
-    public PgConversationRepository(Sql sql, ScopeSupplier scope) {
+    public PgConversationRepository(Sql sql, TenantScope scope) {
         this.scope = Objects.requireNonNull(scope, "scope");
         this.conversations = DocumentTable.of(Conversation.class)
                 .table("mc_conversation_thread")
-                .partitionKey("namespace", "TEXT", c -> scope.namespace().value())
+                .partitionKey("namespace", "TEXT", c -> scope.tenant().namespace())
                 .id("id", "TEXT", c -> c.id().value())
                 .column("created_at", "TIMESTAMPTZ", Conversation::createdAt)
                 .index("namespace", "created_at")
@@ -50,17 +50,17 @@ public final class PgConversationRepository implements ConversationRepository {
 
     @Override
     public Optional<Conversation> findById(ConversationId id) {
-        return conversations.findById(scope.namespace().value(), id.value());
+        return conversations.findById(scope.tenant().namespace(), id.value());
     }
 
     @Override
     public List<Conversation> findAll(PageRequest page) {
         return conversations.find("WHERE namespace = ? ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
-                scope.namespace().value(), page.size(), page.offset());
+                scope.tenant().namespace(), page.size(), page.offset());
     }
 
     @Override
     public void deleteById(ConversationId id) {
-        conversations.delete("WHERE namespace = ? AND id = ?", scope.namespace().value(), id.value());
+        conversations.delete("WHERE namespace = ? AND id = ?", scope.tenant().namespace(), id.value());
     }
 }

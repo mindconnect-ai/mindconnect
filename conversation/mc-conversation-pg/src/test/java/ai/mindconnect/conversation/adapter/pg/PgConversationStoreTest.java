@@ -14,8 +14,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import ai.mindconnect.agent.scope.Namespace;
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.scope.TenantScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.conversation.domain.ContentPart;
 import ai.mindconnect.conversation.domain.Conversation;
@@ -42,11 +41,11 @@ class PgConversationStoreTest {
     }
 
     private PgConversationRepository conversations(String namespace) {
-        return new PgConversationRepository(sql, ScopeSupplier.fixed(new Namespace(namespace))).initSchema();
+        return new PgConversationRepository(sql, TenantScope.fixed(namespace)).initSchema();
     }
 
     private PgMessageRepository messages(String namespace) {
-        return new PgMessageRepository(sql, ScopeSupplier.fixed(new Namespace(namespace))).initSchema();
+        return new PgMessageRepository(sql, TenantScope.fixed(namespace)).initSchema();
     }
 
     private static Message message(ConversationId conversation, long place, String text) {
