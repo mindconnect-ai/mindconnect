@@ -34,6 +34,10 @@ mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect
 </dependency>
 <dependency>
     <groupId>ai.mindconnect</groupId>
+    <artifactId>mc-jackson</artifactId>
+</dependency>
+<dependency>
+    <groupId>ai.mindconnect</groupId>
     <artifactId>mc-llm-jackson</artifactId>
 </dependency>
 <dependency>
@@ -44,8 +48,7 @@ mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect
 
 ```java
 OkHttpClient http = new OkHttpClient();
-ObjectMapper json = JsonMapper.builder()
-        .addModule(new LlmJsonModule()).addModule(new JavaTimeModule()).build();
+ObjectMapper json = new JsonMapperFactory(List.of(new LlmJsonModule(), new JavaTimeModule())).create();
 
 Map<LlmProvider, LlmGateway> providers = new EnumMap<>(LlmProvider.class);
 providers.put(LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json));
@@ -54,7 +57,7 @@ providers.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, json));
 providers.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, json));
 providers.put(LlmProvider.LM_STUDIO, new OpenAiCompatibleGateway(http, json));
 
-LlmConfigRepository configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
+LlmConfigRepository configs = new InMemoryLlmConfigRepository(LlmScopeSupplier.fixed("demo"));
 configs.save(LlmConfig.openAi("openai-mini", "gpt-5.4-mini", "${OPENAI_API_KEY}"));
 configs.save(LlmConfig.alias("agent-default", "openai-mini"));   // callers keep the name, the model may change
 
@@ -66,7 +69,7 @@ chat.chatStreaming(LlmRequest.streaming("agent-default",
 ```
 
 The caller knows the name of a config, nothing else: no provider, no model, no key.
-The namespace is the store's: `TenantScope.fixed` for one, a scope that answers per
+The namespace is the store's: `LlmScopeSupplier.fixed` for one, a scope that answers per
 call for a host that serves several. Only the providers you put into the map are
 reachable; a config naming another provider fails at the call.
 [`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
@@ -108,7 +111,7 @@ The same provider plugs into the gateway service, and callers again only name th
 config. `LlmChatWithOwnProviderDemo` wires it with the configs in memory:
 
 ```java
-LlmConfigRepository configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
+LlmConfigRepository configs = new InMemoryLlmConfigRepository(LlmScopeSupplier.fixed("demo"));
 configs.save(config);                                   // model, endpoint, key: ${VAR} placeholders allowed
 
 LlmChat chat = new RoutingLlmChatService(configs,

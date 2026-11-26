@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.demo;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.jackson.LlmJsonModule;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
@@ -8,7 +9,6 @@ import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
 import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import okhttp3.OkHttpClient;
 
@@ -31,8 +31,8 @@ public final class LlmGatewayWithOurProviderDemo {
     public static void main(String[] args) {
         LlmConfig config = LlmConfig.openAi("demo", "gpt-5.4-mini", DemoConsole.openAiKey());
         OkHttpClient http = new OkHttpClient();
-        LlmGateway gateway = new OpenAiResponsesGateway(http, JsonMapper.builder()
-                .addModule(new LlmJsonModule()).addModule(new JavaTimeModule()).build());
+        LlmGateway gateway = new OpenAiResponsesGateway(http,
+                new JsonMapperFactory(List.of(new LlmJsonModule(), new JavaTimeModule())).create());
 
         LlmRequest request = LlmRequest.streaming(config.name(), List.of(
                 LlmMessage.system("Answer in one short paragraph."),

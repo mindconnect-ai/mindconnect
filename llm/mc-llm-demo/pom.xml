@@ -56,7 +56,13 @@
             <artifactId>mc-llm-providers</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- The providers expect a mapper that knows the LLM types; they leave the choice to the caller. -->
+        <!-- The providers expect a mapper that knows the LLM types; they leave the choice to the caller,
+             and every mapper comes from JsonMapperFactory. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-jackson</artifactId>

@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.demo;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.env.LlmConfigResolver;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.gateway.service.DefaultLlmGatewayRegistry;
@@ -19,7 +20,6 @@ import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import okhttp3.OkHttpClient;
 
@@ -46,8 +46,7 @@ public final class LlmChatWithOurProvidersDemo {
     public static void main(String[] args) {
         // Our providers, one per provider family. Only what is in this map is reachable.
         OkHttpClient http = new OkHttpClient();
-        ObjectMapper json = JsonMapper.builder()
-                .addModule(new LlmJsonModule()).addModule(new JavaTimeModule()).build();
+        ObjectMapper json = new JsonMapperFactory(List.of(new LlmJsonModule(), new JavaTimeModule())).create();
         Map<LlmProvider, LlmGateway> providers = new EnumMap<>(LlmProvider.class);
         providers.put(LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json));
         providers.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, json));
