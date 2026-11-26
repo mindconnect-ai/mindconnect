@@ -15,7 +15,7 @@ import java.util.List;
  * {@link LlmGateway} SPI, without the gateway service: the caller holds the config,
  * with model and key, and hands it in with every request.
  *
- * <p>Run with {@code OPENAI_API_KEY} set; the first argument is the question. Every
+ * <p>The key comes from {@code mc.env} or the environment; the first argument is the question. Every
  * run is a paid call to OpenAI.
  */
 public final class LlmGatewayWithOwnProviderDemo {
@@ -24,8 +24,7 @@ public final class LlmGatewayWithOwnProviderDemo {
     }
 
     public static void main(String[] args) {
-        DemoConsole.requireOpenAiKey();
-        LlmConfig config = LlmConfig.openAi("demo", "gpt-5.4-mini", System.getenv("OPENAI_API_KEY"));
+        LlmConfig config = LlmConfig.openAi("demo", "gpt-5.4-mini", DemoConsole.openAiKey());
         LlmGateway gateway = new OpenAiSdkGateway();
 
         LlmRequest request = LlmRequest.streaming(config.name(), List.of(

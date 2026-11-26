@@ -20,7 +20,7 @@ import java.util.List;
  * with model and key, and hands it in with every request. No routing, no aliases, no
  * retries; that is what {@link LlmChatWithOurProvidersDemo} adds.
  *
- * <p>Run with {@code OPENAI_API_KEY} set; the first argument is the question. Every
+ * <p>The key comes from {@code mc.env} or the environment; the first argument is the question. Every
  * run is a paid call to OpenAI.
  */
 public final class LlmGatewayWithOurProviderDemo {
@@ -29,8 +29,7 @@ public final class LlmGatewayWithOurProviderDemo {
     }
 
     public static void main(String[] args) {
-        DemoConsole.requireOpenAiKey();
-        LlmConfig config = LlmConfig.openAi("demo", "gpt-5.4-mini", System.getenv("OPENAI_API_KEY"));
+        LlmConfig config = LlmConfig.openAi("demo", "gpt-5.4-mini", DemoConsole.openAiKey());
         OkHttpClient http = new OkHttpClient();
         LlmGateway gateway = new OpenAiResponsesGateway(http, JsonMapper.builder()
                 .addModule(new LlmJsonModule()).addModule(new JavaTimeModule()).build());

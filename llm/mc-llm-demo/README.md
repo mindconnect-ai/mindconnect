@@ -14,10 +14,11 @@ provider. One program for each:
 - **Through `LlmGateway`** the caller holds the config itself, with model and key, and
   hands it to one provider with every request: no store, no routing, no retries.
 
-Run any of them (a paid call to OpenAI):
+Run any of them (a paid call to OpenAI). The key comes from the repository's `mc.env`,
+as for the other demos (`McEnv`), unless `OPENAI_API_KEY` is set in the environment:
 
 ```bash
-OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect.llm.demo.LlmChatWithOurProvidersDemo -Dexec.args="Name three rivers in Germany."
+mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect.llm.demo.LlmChatWithOurProvidersDemo -Dexec.args="Name three rivers in Germany."
 ```
 
 ## 1. Through LlmChat, with our providers

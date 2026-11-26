@@ -38,6 +38,12 @@
             <artifactId>openai-java</artifactId>
             <version>${openai-java.version}</version>
         </dependency>
+        <!-- McEnv: the demos read the real key from mc.env. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Calling through LlmChat: routing, retry and the in-memory config store. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

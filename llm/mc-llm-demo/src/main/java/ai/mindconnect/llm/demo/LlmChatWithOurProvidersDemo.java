@@ -35,7 +35,7 @@ import java.util.Map;
  * {@code agent-default} points at an OpenAI config, so the model behind the name can
  * change without the caller noticing.
  *
- * <p>Run with {@code OPENAI_API_KEY} set; the first argument is the question. Every
+ * <p>The key comes from {@code mc.env} or the environment; the first argument is the question. Every
  * run is a paid call to OpenAI.
  */
 public final class LlmChatWithOurProvidersDemo {
@@ -44,8 +44,6 @@ public final class LlmChatWithOurProvidersDemo {
     }
 
     public static void main(String[] args) {
-        DemoConsole.requireOpenAiKey();
-
         // Our providers, one per provider family. Only what is in this map is reachable.
         OkHttpClient http = new OkHttpClient();
         ObjectMapper json = JsonMapper.builder()
@@ -58,13 +56,13 @@ public final class LlmChatWithOurProvidersDemo {
         providers.put(LlmProvider.LM_STUDIO, new OpenAiCompatibleGateway(http, json));
 
         // The configs of one namespace. The key stays a placeholder in the store and
-        // resolves from the environment on every call.
+        // resolves on every call, here from mc.env.
         LlmConfigRepository configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
         configs.save(LlmConfig.openAi("openai-mini", "gpt-5.4-mini", "${OPENAI_API_KEY}"));
         configs.save(LlmConfig.alias("agent-default", "openai-mini"));
 
         LlmChat chat = new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(providers),
-                LlmConfigResolver::resolved);
+                config -> LlmConfigResolver.resolved(config, DemoConsole.environment()));
 
         LlmRequest request = LlmRequest.streaming("agent-default", List.of(
                 LlmMessage.system("Answer in one short paragraph."),
