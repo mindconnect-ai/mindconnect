@@ -9,8 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongFunction;
 import java.util.function.UnaryOperator;
 
-import ai.mindconnect.agent.scope.NamespaceMap;
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.scope.TenantMap;
+import ai.mindconnect.scope.TenantScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.conversation.domain.ConversationId;
 import ai.mindconnect.conversation.domain.Message;
@@ -26,20 +26,20 @@ public final class InMemoryMessageRepository implements MessageRepository {
         private long lastPlace;
     }
 
-    private final ScopeSupplier scope;
-    private final NamespaceMap<Map<ConversationId, Thread>> store = new NamespaceMap<>(ConcurrentHashMap::new);
+    private final TenantScope scope;
+    private final TenantMap<Map<ConversationId, Thread>> store = new TenantMap<>(ConcurrentHashMap::new);
 
-    public InMemoryMessageRepository(ScopeSupplier scope) {
+    public InMemoryMessageRepository(TenantScope scope) {
         this.scope = scope;
     }
 
     private Optional<Thread> thread(ConversationId conversation) {
-        return Optional.ofNullable(store.of(scope.namespace()).get(conversation));
+        return Optional.ofNullable(store.of(scope).get(conversation));
     }
 
     @Override
     public Message append(ConversationId conversation, LongFunction<Message> create) {
-        Thread thread = store.of(scope.namespace()).computeIfAbsent(conversation, id -> new Thread());
+        Thread thread = store.of(scope).computeIfAbsent(conversation, id -> new Thread());
         synchronized (thread) {
             Message message = Objects.requireNonNull(create.apply(++thread.lastPlace), "append: no message");
             thread.messages.add(message);
@@ -81,6 +81,6 @@ public final class InMemoryMessageRepository implements MessageRepository {
 
     @Override
     public void deleteByConversation(ConversationId conversation) {
-        store.of(scope.namespace()).remove(conversation);
+        store.of(scope).remove(conversation);
     }
 }

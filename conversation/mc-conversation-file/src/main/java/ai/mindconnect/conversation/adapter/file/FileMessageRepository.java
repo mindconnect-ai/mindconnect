@@ -8,7 +8,7 @@ import java.util.function.UnaryOperator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.scope.TenantScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.conversation.domain.ConversationId;
 import ai.mindconnect.conversation.domain.Message;
@@ -27,13 +27,13 @@ public final class FileMessageRepository implements MessageRepository {
 
     private final RecordLog<ConversationId, Message> messages;
 
-    public FileMessageRepository(Path base, ObjectMapper json, ScopeSupplier scope) {
+    public FileMessageRepository(Path base, ObjectMapper json, TenantScope scope) {
         this.messages = RecordLog.of(Message.class)
                 .dir((ConversationId conversation) ->
                         FileConversationRepository.THREADS + "/" + conversation.value() + "/messages")
                 .key(Message::sequence)
                 .id(message -> message.id().value())
-                .build(() -> FileRepo.open(base, scope.namespace().value()), json);
+                .build(() -> FileRepo.open(base, scope.tenant().namespace()), json);
     }
 
     @Override

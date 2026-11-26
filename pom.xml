@@ -63,6 +63,7 @@
         <module>common/mc-jdbc</module>
         <module>common/mc-file-repo</module>
         <module>common/mc-plugin</module>
+        <module>common/mc-scope</module>
 
         <!-- Task queue — its own tree; more modules follow (remote queue, dispatcher UI) -->
         <module>taskqueue/mc-task-queue</module>
@@ -120,8 +121,9 @@
         <module>llm/mc-llm-runtime-api</module>
         <module>llm/mc-llm-management-api</module>
         <module>llm/mc-llm-jackson</module>
-        <module>conversation/mc-conversation-core</module>
+        <module>conversation/mc-conversation-api</module>
         <module>conversation/mc-conversation</module>
+        <module>conversation/mc-conversation-file</module>
         <module>agents/responses-api/mc-agent-protocol</module>
         <module>agents/responses-api/mc-agent-protocol-openai</module>
         <module>agents/responses-api/mc-agent-protocol-runtime</module>

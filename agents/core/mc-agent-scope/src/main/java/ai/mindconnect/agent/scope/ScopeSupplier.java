@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.scope;
 
+import ai.mindconnect.scope.Tenant;
+import ai.mindconnect.scope.TenantScope;
+
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
@@ -25,7 +28,7 @@ import java.util.function.Supplier;
  * A scope fixed for good has nothing to bind and simply runs the body.
  */
 @FunctionalInterface
-public interface ScopeSupplier extends Supplier<Scope> {
+public interface ScopeSupplier extends Supplier<Scope>, TenantScope {
 
     /** The scope of the current unit of work. Never {@code null}. */
     @Override
@@ -34,6 +37,13 @@ public interface ScopeSupplier extends Supplier<Scope> {
     /** Shorthand for {@code get().namespace()}. */
     default Namespace namespace() {
         return get().namespace();
+    }
+
+    /** The scope as the areas beside the agents ask for it: namespace and user as plain strings. */
+    @Override
+    default Tenant tenant() {
+        Scope scope = get();
+        return new Tenant(scope.namespace().value(), scope.user() == null ? null : scope.user().value());
     }
 
     /**

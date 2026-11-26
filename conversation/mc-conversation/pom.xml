@@ -15,19 +15,20 @@
     <name>mc-conversation</name>
     <packaging>jar</packaging>
     <description>
-        Where conversations are kept, in memory and on files: the stores of
-        the ports declared in mc-conversation-core.
+        ConversationService, the implementation of ConversationManager, and
+        the stores in memory. Enough to run conversations without anything
+        else; add mc-conversation-file or mc-conversation-pg to keep them.
     </description>
 
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-scope</artifactId>
+            <artifactId>mc-conversation-api</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-conversation-core</artifactId>
+            <artifactId>mc-scope</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -35,18 +36,13 @@
             <artifactId>mc-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-file-repo</artifactId>
+            <artifactId>mc-conversation-api</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

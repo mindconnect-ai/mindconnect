@@ -24,12 +24,12 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-scope</artifactId>
+            <artifactId>mc-scope</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-conversation-core</artifactId>
+            <artifactId>mc-conversation-api</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
