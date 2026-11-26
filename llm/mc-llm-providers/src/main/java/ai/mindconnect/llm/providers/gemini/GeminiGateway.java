@@ -1,10 +1,8 @@
-package ai.mindconnect.llm.adapter.gemini;
+package ai.mindconnect.llm.providers.gemini;
 
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.SseBlockReader;
-import ai.mindconnect.llm.adapter.SseStreamingGateway;
-import ai.mindconnect.llm.adapter.StreamDelta;
+import ai.mindconnect.llm.providers.SseBlockReader;
+import ai.mindconnect.llm.providers.SseStreamingGateway;
+import ai.mindconnect.llm.providers.StreamDelta;
 import ai.mindconnect.llm.runtime.api.domain.*;
 import ai.mindconnect.llm.management.api.domain.*;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -44,15 +42,8 @@ public class GeminiGateway extends SseStreamingGateway {
     private static final MediaType JSON = MediaType.get("application/json");
 
 
-    /** Placeholders resolve from the process environment alone — the library and desktop case. */
-    public GeminiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
-        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
-    }
-
-    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
-    public GeminiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
-                         EnvVarResolver env) {
-        super("Gemini", httpClient, objectMapper, encryption, env);
+    public GeminiGateway(OkHttpClient httpClient, ObjectMapper objectMapper) {
+        super("Gemini", httpClient, objectMapper);
     }
 
     @Override

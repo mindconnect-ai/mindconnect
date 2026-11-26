@@ -16,4 +16,3 @@ ai.mindconnect.chatui.ui.controller.ChatUiController depends on more than 25 oth
 ai.mindconnect.cli.agentclient.LocalAgentClient depends on more than 25 other classes of the project
 ai.mindconnect.demo.agent.simple.DemoRuntime depends on more than 25 other classes of the project
 ai.mindconnect.extension.demo.DungeonController depends on more than 25 other classes of the project
-ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway depends on more than 25 other classes of the project

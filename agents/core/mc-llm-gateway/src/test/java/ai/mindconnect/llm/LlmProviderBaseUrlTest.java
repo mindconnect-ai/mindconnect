@@ -64,9 +64,9 @@ class LlmProviderBaseUrlTest {
         assertThat(LlmConfig.xai("grok", "grok-4", "k").baseUrl()).isEqualTo("https://api.x.ai");
         assertThat(LlmConfig.moonshot("kimi", "kimi-k2-turbo-preview", "k").baseUrl())
                 .isEqualTo("https://api.moonshot.ai");
-        assertThat(ai.mindconnect.llm.adapter.ProviderModelCatalog.supports(LlmProvider.XAI))
+        assertThat(ai.mindconnect.llm.providers.ProviderModelCatalog.supports(LlmProvider.XAI))
                 .as("their model lists are OpenAI-compatible too").isTrue();
-        assertThat(ai.mindconnect.llm.adapter.ProviderModelCatalog.supports(LlmProvider.MOONSHOT))
+        assertThat(ai.mindconnect.llm.providers.ProviderModelCatalog.supports(LlmProvider.MOONSHOT))
                 .isTrue();
     }
 

@@ -1,4 +1,4 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
 /**
  * Routes what some OpenAI-compatible servers send inline as {@code <think>…</think>}

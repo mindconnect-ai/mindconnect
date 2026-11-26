@@ -1,15 +1,11 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.llm.service.LlmConfigResolver;
-
-import ai.mindconnect.llm.adapter.LlmHttpError;
+import ai.mindconnect.llm.providers.LlmHttpError;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmParameterMap;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
 import ai.mindconnect.llm.provider.spi.port.out.TranscriptionGateway;
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.Call;
@@ -61,21 +57,10 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final EncryptionHelper encryption;
-    private final EnvVarResolver env;
 
-    /** Placeholders resolve from the process environment alone — the library and desktop case. */
-    public OpenAiTranscriptionGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
-        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
-    }
-
-    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
-    public OpenAiTranscriptionGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
-                                      EnvVarResolver env) {
+    public OpenAiTranscriptionGateway(OkHttpClient httpClient, ObjectMapper objectMapper) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
-        this.encryption = encryption;
-        this.env = env;
     }
 
     @Override
@@ -92,9 +77,8 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
      * server that refuses fields it does not know.
      */
     @Override
-    public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
+    public TranscriptionResult transcribe(LlmConfig cfg, TranscriptionRequest request,
                                           Consumer<String> onDelta) {
-        LlmConfig cfg = LlmConfigResolver.resolved(config, env, encryption);
         String baseUrl = cfg.provider().baseUrlOr(cfg.baseUrl());
         LlmParameterMap params = LlmParameterMap.of(cfg, null);
         String responseFormat = param(params, "response_format", "json");

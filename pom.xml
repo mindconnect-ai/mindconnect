@@ -121,6 +121,7 @@
         <module>llm/mc-llm-runtime-api</module>
         <module>llm/mc-llm-management-api</module>
         <module>llm/mc-llm-provider-spi</module>
+        <module>llm/mc-llm-providers</module>
         <module>llm/mc-llm-jackson</module>
         <module>llm/mc-llm-demo</module>
         <module>conversation/mc-conversation-api</module>

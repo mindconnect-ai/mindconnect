@@ -12,15 +12,18 @@ public class RoutingLlmEmbeddingService implements LlmEmbedding {
 
     private final LlmConfigRepository configRepository;
     private final EmbeddingGateway gateway;
+    private final LlmConfigResolver resolver;
 
-    public RoutingLlmEmbeddingService(LlmConfigRepository configRepository, EmbeddingGateway gateway) {
+    public RoutingLlmEmbeddingService(LlmConfigRepository configRepository, EmbeddingGateway gateway,
+                                      LlmConfigResolver resolver) {
         this.configRepository = configRepository;
         this.gateway = gateway;
+        this.resolver = resolver;
     }
 
     @Override
     public List<float[]> embed(String configName, List<String> texts) {
-        return gateway.embed(configRepository.findResolvedByName(configName)
-                .orElseThrow(() -> DomainException.notFound("LlmConfig", configName)), texts);
+        return gateway.embed(resolver.resolve(configRepository.findResolvedByName(configName)
+                .orElseThrow(() -> DomainException.notFound("LlmConfig", configName))), texts);
     }
 }

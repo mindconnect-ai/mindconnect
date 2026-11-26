@@ -1,12 +1,10 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.LlmWireLog;
-import ai.mindconnect.llm.adapter.SseBlockReader;
-import ai.mindconnect.llm.adapter.SseStreamingGateway;
-import ai.mindconnect.llm.adapter.StreamDelta;
-import ai.mindconnect.llm.adapter.ToolCallBuilder;
+import ai.mindconnect.llm.providers.LlmWireLog;
+import ai.mindconnect.llm.providers.SseBlockReader;
+import ai.mindconnect.llm.providers.SseStreamingGateway;
+import ai.mindconnect.llm.providers.StreamDelta;
+import ai.mindconnect.llm.providers.ToolCallBuilder;
 import ai.mindconnect.llm.runtime.api.domain.*;
 import ai.mindconnect.llm.management.api.domain.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,9 +33,8 @@ abstract class AbstractOpenAiGateway extends SseStreamingGateway {
     private static final Logger log = LoggerFactory.getLogger(AbstractOpenAiGateway.class);
     private static final MediaType JSON = MediaType.get("application/json");
 
-    AbstractOpenAiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
-                          EnvVarResolver env) {
-        super("OpenAI-compatible", httpClient, objectMapper, encryption, env);
+    AbstractOpenAiGateway(OkHttpClient httpClient, ObjectMapper objectMapper) {
+        super("OpenAI-compatible", httpClient, objectMapper);
     }
 
     @Override

@@ -6,13 +6,25 @@ import ai.mindconnect.llm.management.api.domain.LlmConfig;
 
 /**
  * Expands the placeholders of a config and decrypts its key, at the point of
- * use, so that storage keeps the raw form. Lives outside {@link LlmConfig},
- * which knows neither the environment nor encryption, until the gateway
- * resolves secrets through a port of its own.
+ * use, so that storage keeps the raw form. A provider receives the config only
+ * after this, since it knows neither the environment nor encryption. Lives
+ * outside {@link LlmConfig} until the gateway resolves secrets through a port
+ * of its own.
  */
 public final class LlmConfigResolver {
 
-    private LlmConfigResolver() {
+    private final EnvVarResolver env;
+    private final EncryptionHelper encryption;
+
+    /** @param env where {@code ${VAR}} placeholders resolve from: on a server the user's, the namespace's and the process's variables, in that order */
+    public LlmConfigResolver(EnvVarResolver env, EncryptionHelper encryption) {
+        this.env = env;
+        this.encryption = encryption;
+    }
+
+    /** The config as a provider receives it: placeholders expanded and the key decrypted. */
+    public LlmConfig resolve(LlmConfig config) {
+        return resolved(config, env, encryption);
     }
 
     /**

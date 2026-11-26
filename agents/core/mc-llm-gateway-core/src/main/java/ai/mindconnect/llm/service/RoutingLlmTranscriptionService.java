@@ -22,11 +22,13 @@ public class RoutingLlmTranscriptionService implements LlmTranscription {
 
     private final LlmConfigRepository configRepository;
     private final TranscriptionGateway gateway;
+    private final LlmConfigResolver resolver;
 
     public RoutingLlmTranscriptionService(LlmConfigRepository configRepository,
-                                          TranscriptionGateway gateway) {
+                                          TranscriptionGateway gateway, LlmConfigResolver resolver) {
         this.configRepository = configRepository;
         this.gateway = gateway;
+        this.resolver = resolver;
     }
 
     @Override
@@ -41,7 +43,7 @@ public class RoutingLlmTranscriptionService implements LlmTranscription {
     }
 
     /**
-     * The config behind the name, aliases followed. A config of the wrong type
+     * The config behind the name, aliases followed and secrets resolved. A config of the wrong type
      * is refused here rather than at the provider: sending a chat model to the
      * transcription endpoint fails with a message about the endpoint, which
      * says nothing about the actual mistake.
@@ -53,6 +55,6 @@ public class RoutingLlmTranscriptionService implements LlmTranscription {
             throw new IllegalStateException("LLM config '" + configName + "' is a "
                     + config.type() + " config, not a speech-to-text one");
         }
-        return config;
+        return resolver.resolve(config);
     }
 }

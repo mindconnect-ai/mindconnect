@@ -1,10 +1,7 @@
-package ai.mindconnect.llm.adapter.gemini;
-
-import ai.mindconnect.llm.service.LlmConfigResolver;
+package ai.mindconnect.llm.providers.gemini;
 
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.runtime.api.domain.LlmContent;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
@@ -22,9 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** A user message with media as Gemini parts: text as {@code text}, media as {@code inline_data}. */
 class GeminiGatewayContentBlocksTest {
 
-    private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final GeminiGateway gateway =
-            new GeminiGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
+            new GeminiGateway(new OkHttpClient(), TestJson.MAPPER);
 
     private final LlmConfig config = new LlmConfig(LlmConfigId.random(), "gemini",
             LlmProvider.GOOGLE_GEMINI, "gemini-2.0-flash", "https://generativelanguage.googleapis.com",
@@ -34,7 +30,7 @@ class GeminiGatewayContentBlocksTest {
     void textOnlyMessagesAreOneTextPart() throws Exception {
         LlmRequest req = LlmRequest.streaming("gemini", List.of(LlmMessage.user("hi")));
 
-        JsonNode parts = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req)
+        JsonNode parts = gateway.buildRequestNode(config, req)
                 .path("contents").path(0).path("parts");
 
         assertThat(parts).hasSize(1);
@@ -49,7 +45,7 @@ class GeminiGatewayContentBlocksTest {
                 new LlmContent.Document("UERG", "application/pdf", "spec.pdf")));
         LlmRequest req = LlmRequest.streaming("gemini", List.of(user));
 
-        JsonNode turn = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req)
+        JsonNode turn = gateway.buildRequestNode(config, req)
                 .path("contents").path(0);
         JsonNode parts = turn.path("parts");
 

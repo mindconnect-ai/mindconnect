@@ -1,11 +1,9 @@
-package ai.mindconnect.llm.adapter.anthropic;
+package ai.mindconnect.llm.providers.anthropic;
 
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.SseBlockReader;
-import ai.mindconnect.llm.adapter.SseStreamingGateway;
-import ai.mindconnect.llm.adapter.StreamDelta;
-import ai.mindconnect.llm.adapter.ToolCallBuilder;
+import ai.mindconnect.llm.providers.SseBlockReader;
+import ai.mindconnect.llm.providers.SseStreamingGateway;
+import ai.mindconnect.llm.providers.StreamDelta;
+import ai.mindconnect.llm.providers.ToolCallBuilder;
 import ai.mindconnect.llm.runtime.api.domain.*;
 import ai.mindconnect.llm.management.api.domain.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -43,15 +41,8 @@ public class ClaudeGateway extends SseStreamingGateway {
     private static final String ANTHROPIC_VERSION = "2023-06-01";
     private static final MediaType JSON = MediaType.get("application/json");
 
-    /** Placeholders resolve from the process environment alone — the library and desktop case. */
-    public ClaudeGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
-        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
-    }
-
-    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
-    public ClaudeGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
-                         EnvVarResolver env) {
-        super("Anthropic", httpClient, objectMapper, encryption, env);
+    public ClaudeGateway(OkHttpClient httpClient, ObjectMapper objectMapper) {
+        super("Anthropic", httpClient, objectMapper);
     }
 
     @Override

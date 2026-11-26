@@ -1,15 +1,11 @@
-package ai.mindconnect.llm.adapter.openai;
-
-import ai.mindconnect.llm.service.LlmConfigResolver;
+package ai.mindconnect.llm.providers.openai;
 
 import ai.mindconnect.llm.runtime.api.domain.Cancellation;
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.LlmCallEventBuilder;
-import ai.mindconnect.llm.adapter.LlmHttpError;
-import ai.mindconnect.llm.adapter.LlmWireLog;
-import ai.mindconnect.llm.adapter.SseBlockReader;
-import ai.mindconnect.llm.adapter.ToolCallBuilder;
+import ai.mindconnect.llm.providers.LlmCallEventBuilder;
+import ai.mindconnect.llm.providers.LlmHttpError;
+import ai.mindconnect.llm.providers.LlmWireLog;
+import ai.mindconnect.llm.providers.SseBlockReader;
+import ai.mindconnect.llm.providers.ToolCallBuilder;
 import ai.mindconnect.llm.runtime.api.domain.FinishReason;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.runtime.api.domain.LlmContent;
@@ -69,22 +65,11 @@ public class OpenAiResponsesGateway implements LlmGateway {
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final EncryptionHelper encryption;
-    private final EnvVarResolver env;
     private final ObjectWriter prettyWriter;
 
-    /** Placeholders resolve from the process environment alone — the library and desktop case. */
-    public OpenAiResponsesGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
-        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
-    }
-
-    /** @param env where {@code ${VAR}} placeholders in a config resolve from */
-    public OpenAiResponsesGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
-                                  EnvVarResolver env) {
+    public OpenAiResponsesGateway(OkHttpClient httpClient, ObjectMapper objectMapper) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
-        this.encryption = encryption;
-        this.env = env;
         this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
     }
 
@@ -107,16 +92,15 @@ public class OpenAiResponsesGateway implements LlmGateway {
                               Consumer<LlmStreamChunk> handler,
                               Cancellation cancellation,
                               LlmCallListener listener) {
-        LlmConfig resolved = LlmConfigResolver.resolved(config, env, encryption);
-        String endpoint = resolved.provider().baseUrlOr(resolved.baseUrl()) + "|" + Objects.hashCode(resolved.apiKey());
+        String endpoint = config.provider().baseUrlOr(config.baseUrl()) + "|" + Objects.hashCode(config.apiKey());
         try {
-            stream(resolved, request, handler, cancellation, listener, summariesRefused.contains(endpoint));
+            stream(config, request, handler, cancellation, listener, summariesRefused.contains(endpoint));
         } catch (SummaryRefused refused) {
             log.warn("OpenAI refused a reasoning summary for model {} (organization not verified?) — "
                     + "asking again without one; set additionalParams.reasoning_summary=none to skip the attempt",
-                    resolved.model());
+                    config.model());
             summariesRefused.add(endpoint);
-            stream(resolved, request, handler, cancellation, listener, true);
+            stream(config, request, handler, cancellation, listener, true);
         }
     }
 

@@ -1,6 +1,6 @@
-package ai.mindconnect.llm.adapter.lmstudio;
+package ai.mindconnect.llm.providers.lmstudio;
 
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmCapability;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import com.sun.net.httpserver.HttpServer;

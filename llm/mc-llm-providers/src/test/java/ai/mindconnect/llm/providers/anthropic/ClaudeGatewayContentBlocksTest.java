@@ -1,10 +1,7 @@
-package ai.mindconnect.llm.adapter.anthropic;
-
-import ai.mindconnect.llm.service.LlmConfigResolver;
+package ai.mindconnect.llm.providers.anthropic;
 
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.runtime.api.domain.LlmContent;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
@@ -22,9 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** A user message with media as Anthropic content blocks; text-only stays a string. */
 class ClaudeGatewayContentBlocksTest {
 
-    private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final ClaudeGateway gateway =
-            new ClaudeGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
+            new ClaudeGateway(new OkHttpClient(), TestJson.MAPPER);
 
     private final LlmConfig config = new LlmConfig(LlmConfigId.random(), "claude", LlmProvider.ANTHROPIC,
             "claude-sonnet-4-6", "https://api.anthropic.com", "sk-test", 0.7, 8192, Map.of(), 200_000,
@@ -35,7 +31,7 @@ class ClaudeGatewayContentBlocksTest {
         LlmRequest req = LlmRequest.streaming("claude",
                 List.of(LlmMessage.system("be brief"), LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req);
+        JsonNode root = gateway.buildRequestNode(config, req);
 
         assertThat(root.path("system").asText()).isEqualTo("be brief");
         assertThat(root.path("messages").path(0).path("content").isTextual()).isTrue();
@@ -50,7 +46,7 @@ class ClaudeGatewayContentBlocksTest {
                 new LlmContent.Document("UERG", "application/pdf", "spec.pdf")));
         LlmRequest req = LlmRequest.streaming("claude", List.of(user));
 
-        JsonNode message = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req)
+        JsonNode message = gateway.buildRequestNode(config, req)
                 .path("messages").path(0);
         JsonNode content = message.path("content");
 

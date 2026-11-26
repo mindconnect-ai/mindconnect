@@ -1,4 +1,4 @@
-package ai.mindconnect.llm.adapter;
+package ai.mindconnect.llm.providers;
 
 import ai.mindconnect.llm.runtime.api.domain.FinishReason;
 

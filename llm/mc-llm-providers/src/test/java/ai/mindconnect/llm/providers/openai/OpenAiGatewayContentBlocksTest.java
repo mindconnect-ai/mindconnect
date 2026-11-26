@@ -1,10 +1,7 @@
-package ai.mindconnect.llm.adapter.openai;
-
-import ai.mindconnect.llm.service.LlmConfigResolver;
+package ai.mindconnect.llm.providers.openai;
 
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.runtime.api.domain.LlmContent;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
@@ -26,9 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class OpenAiGatewayContentBlocksTest {
 
-    private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final OpenAiCompatibleGateway gateway =
-            new OpenAiCompatibleGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
+            new OpenAiCompatibleGateway(new OkHttpClient(), TestJson.MAPPER);
 
     private final LlmConfig config = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
             "gpt-5", "https://api.openai.com", "sk-test", 0.7, 4096, Map.of(), 128_000,
@@ -39,7 +35,7 @@ class OpenAiGatewayContentBlocksTest {
         LlmRequest req = LlmRequest.streaming("openai",
                 List.of(LlmMessage.system("be brief"), LlmMessage.user("hi"), LlmMessage.assistant("hello")));
 
-        JsonNode messages = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req).path("messages");
+        JsonNode messages = gateway.buildRequestNode(config, req).path("messages");
 
         assertThat(messages).hasSize(3);
         assertThat(messages.get(1).path("content").isTextual()).isTrue();
@@ -54,7 +50,7 @@ class OpenAiGatewayContentBlocksTest {
                 new LlmContent.Document("UERG", "application/pdf", "spec.pdf")));
         LlmRequest req = LlmRequest.streaming("openai", List.of(user));
 
-        JsonNode content = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req)
+        JsonNode content = gateway.buildRequestNode(config, req)
                 .path("messages").path(0).path("content");
 
         assertThat(content.isArray()).isTrue();
@@ -81,7 +77,7 @@ class OpenAiGatewayContentBlocksTest {
                 new LlmContent.Image("QUJD", "image/png"),
                 new LlmContent.Document("UERG", "application/pdf", "spec.pdf")));
 
-        JsonNode content = gateway.buildRequestNode(LlmConfigResolver.resolved(local, encryption),
+        JsonNode content = gateway.buildRequestNode(local,
                 LlmRequest.streaming("local", List.of(user))).path("messages").path(0).path("content");
 
         assertThat(content).hasSize(3);

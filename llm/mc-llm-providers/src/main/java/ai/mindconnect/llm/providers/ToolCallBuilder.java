@@ -1,4 +1,4 @@
-package ai.mindconnect.llm.adapter;
+package ai.mindconnect.llm.providers;
 
 import ai.mindconnect.llm.runtime.api.domain.ToolCall;
 import com.fasterxml.jackson.core.type.TypeReference;

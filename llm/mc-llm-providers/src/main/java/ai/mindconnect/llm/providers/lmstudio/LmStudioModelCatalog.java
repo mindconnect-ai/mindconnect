@@ -1,7 +1,7 @@
-package ai.mindconnect.llm.adapter.lmstudio;
+package ai.mindconnect.llm.providers.lmstudio;
 
-import ai.mindconnect.llm.adapter.ModelListing;
-import ai.mindconnect.llm.adapter.ModelListingReader;
+import ai.mindconnect.llm.providers.ModelListing;
+import ai.mindconnect.llm.providers.ModelListingReader;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

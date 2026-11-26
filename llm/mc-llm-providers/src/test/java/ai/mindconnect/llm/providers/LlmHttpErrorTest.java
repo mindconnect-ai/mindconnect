@@ -1,4 +1,4 @@
-package ai.mindconnect.llm.adapter;
+package ai.mindconnect.llm.providers;
 
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.RetryConfig;

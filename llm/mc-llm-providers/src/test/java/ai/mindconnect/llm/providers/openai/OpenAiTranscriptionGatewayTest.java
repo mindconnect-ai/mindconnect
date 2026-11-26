@@ -1,7 +1,6 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
@@ -75,7 +74,7 @@ class OpenAiTranscriptionGatewayTest {
     }
 
     private OpenAiTranscriptionGateway gateway() {
-        return new OpenAiTranscriptionGateway(new OkHttpClient(), MAPPER, new EncryptionHelper(null));
+        return new OpenAiTranscriptionGateway(new OkHttpClient(), MAPPER);
     }
 
     private static TranscriptionRequest recording() {

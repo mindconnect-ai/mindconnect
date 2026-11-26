@@ -1,9 +1,9 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.llm.adapter.ModelListing;
-import ai.mindconnect.llm.adapter.ProviderModelCatalog;
-import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
+import ai.mindconnect.llm.providers.ModelListing;
+import ai.mindconnect.llm.providers.ProviderModelCatalog;
+import ai.mindconnect.llm.providers.lmstudio.LmStudioModel;
 import ai.mindconnect.llm.management.api.domain.LlmCapability;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;

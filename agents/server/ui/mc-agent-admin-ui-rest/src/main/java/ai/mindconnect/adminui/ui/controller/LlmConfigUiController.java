@@ -9,15 +9,16 @@ import ai.mindconnect.adminui.ui.page.LlmConfigDetailPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigFormPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigListPage;
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
-import ai.mindconnect.llm.adapter.ModelListing;
-import ai.mindconnect.llm.adapter.ProviderModelCatalog;
-import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
-import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
+import ai.mindconnect.llm.providers.ModelListing;
+import ai.mindconnect.llm.providers.ProviderModelCatalog;
+import ai.mindconnect.llm.providers.lmstudio.LmStudioModel;
+import ai.mindconnect.llm.providers.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.service.LlmConfigResolver;
 import ai.mindconnect.llm.service.LlmConfigService;
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
 import ai.mindconnect.ui.model.UiNode;
@@ -154,10 +155,9 @@ public class LlmConfigUiController {
             }
         } else if (!isAlias && ProviderModelCatalog.supports(provider)) {
             ModelListing<ProviderModelCatalog.Model> catalog =
-                    providerModels.fetch(provider, baseUrl,
+                    remoteModels(provider, baseUrl,
                             // The form shows only the mask for a stored key: the listing is asked with the key itself.
-                            LlmConfigForm.MASKED_KEY.equals(apiKey) && config != null ? config.apiKey() : apiKey,
-                            environment, encryption);
+                            LlmConfigForm.MASKED_KEY.equals(apiKey) && config != null ? config.apiKey() : apiKey);
             choices = ModelChoices.ofRemote(catalog);
             ProviderModelCatalog.Model picked = catalog.find(m -> m.id().equals(model));
             if (picked != null) {
@@ -270,8 +270,25 @@ public class LlmConfigUiController {
             return ModelChoices.ofLmStudio(lmStudio.fetch(config.baseUrl()));
         }
         if (!ProviderModelCatalog.supports(config.provider())) return ModelChoices.none();
-        return ModelChoices.ofRemote(providerModels.fetch(config.provider(), config.baseUrl(), config.apiKey(),
-                environment, encryption));
+        return ModelChoices.ofRemote(remoteModels(config.provider(), config.baseUrl(), config.apiKey()));
+    }
+
+    /**
+     * The models an endpoint offers, asked with a key as it is stored: {@code
+     * ${VAR}} expanded and {@code enc:} decrypted, exactly as before a call.
+     * For a form that has a provider, an endpoint and a key but no config yet.
+     */
+    private ModelListing<ProviderModelCatalog.Model> remoteModels(LlmProvider provider, String baseUrl, String apiKey) {
+        LlmConfig probe = new LlmConfig(LlmConfigId.random(), "probe", provider, null, baseUrl, apiKey,
+                0, 0, Map.of(), null, false, null, null, null, LlmConfigType.CHAT, null);
+        LlmConfig asked = probe;
+        try {
+            asked = LlmConfigResolver.resolved(probe, environment, encryption);
+        } catch (RuntimeException e) {
+            // A key that cannot be decrypted (a rotated secret) must not take
+            // down the form: the listing simply fails and says why.
+        }
+        return providerModels.fetch(asked);
     }
 
     @PostMapping

@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
-import ai.mindconnect.llm.adapter.ModelListing;
-import ai.mindconnect.llm.adapter.ProviderModelCatalog;
+import ai.mindconnect.llm.providers.ModelListing;
+import ai.mindconnect.llm.providers.ProviderModelCatalog;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiFieldGroup;

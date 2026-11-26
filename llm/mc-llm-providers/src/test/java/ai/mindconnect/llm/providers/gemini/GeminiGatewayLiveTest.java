@@ -1,9 +1,8 @@
-package ai.mindconnect.llm.adapter.gemini;
+package ai.mindconnect.llm.providers.gemini;
 
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.adapter.LiveChatGatewayContract;
-import ai.mindconnect.llm.adapter.LiveTestEnvironment;
+import ai.mindconnect.llm.providers.TestJson;
+import ai.mindconnect.llm.providers.LiveChatGatewayContract;
+import ai.mindconnect.llm.providers.LiveTestEnvironment;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
@@ -21,7 +20,7 @@ class GeminiGatewayLiveTest extends LiveChatGatewayContract {
 
     @Override
     protected LlmGateway gateway() {
-        return new GeminiGateway(httpClient(), TestJson.MAPPER, EncryptionHelper.noEncryption());
+        return new GeminiGateway(httpClient(), TestJson.MAPPER);
     }
 
     @Override

@@ -1,9 +1,6 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.llm.service.LlmConfigResolver;
-
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.runtime.api.domain.FinishReason;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
@@ -34,14 +31,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class OpenAiResponsesGatewayTest {
 
-    private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final OpenAiResponsesGateway gateway =
-            new OpenAiResponsesGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
+            new OpenAiResponsesGateway(new OkHttpClient(), TestJson.MAPPER);
 
     private LlmConfig config(String model, Map<String, Object> params) {
-        return LlmConfigResolver.resolved(new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
+        return new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
                 model, "https://api.openai.com", "sk-test", 0.7, 4096, params, 128_000,
-                false, null, null, null, null, null), encryption);
+                false, null, null, null, null, null);
     }
 
     private static final ToolDefinition CALC =

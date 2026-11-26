@@ -1,6 +1,6 @@
-package ai.mindconnect.llm.adapter;
+package ai.mindconnect.llm.providers;
 
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;

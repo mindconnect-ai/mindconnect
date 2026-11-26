@@ -1,4 +1,4 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
 import java.util.regex.Pattern;
 

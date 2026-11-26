@@ -1,9 +1,8 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.adapter.LiveChatGatewayContract;
-import ai.mindconnect.llm.adapter.LiveTestEnvironment;
+import ai.mindconnect.llm.providers.TestJson;
+import ai.mindconnect.llm.providers.LiveChatGatewayContract;
+import ai.mindconnect.llm.providers.LiveTestEnvironment;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
@@ -24,7 +23,7 @@ class OpenAiResponsesGatewayLiveTest extends LiveChatGatewayContract {
 
     @Override
     protected LlmGateway gateway() {
-        return new OpenAiResponsesGateway(httpClient(), TestJson.MAPPER, EncryptionHelper.noEncryption());
+        return new OpenAiResponsesGateway(httpClient(), TestJson.MAPPER);
     }
 
     @Override

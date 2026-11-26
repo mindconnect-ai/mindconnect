@@ -36,10 +36,13 @@ public class RoutingLlmChatService implements LlmChat {
 
     private final LlmConfigRepository configRepository;
     private final LlmGatewayRegistry gatewayRegistry;
+    private final LlmConfigResolver resolver;
 
-    public RoutingLlmChatService(LlmConfigRepository configRepository, LlmGatewayRegistry gatewayRegistry) {
+    public RoutingLlmChatService(LlmConfigRepository configRepository, LlmGatewayRegistry gatewayRegistry,
+                                 LlmConfigResolver resolver) {
         this.configRepository = configRepository;
         this.gatewayRegistry = gatewayRegistry;
+        this.resolver = resolver;
     }
 
     @Override
@@ -51,7 +54,8 @@ public class RoutingLlmChatService implements LlmChat {
         List<LlmConfig> chain = fallbackChain(config);
         if (chain.size() == 1) {
             // The common case: no fallbacks — route straight through, nothing to guard.
-            gatewayRegistry.gatewayFor(config).chatStreaming(config, request, handler, cancellation, listener);
+            gatewayRegistry.gatewayFor(config).chatStreaming(resolver.resolve(config), request, handler,
+                    cancellation, listener);
             return;
         }
 
@@ -67,7 +71,7 @@ public class RoutingLlmChatService implements LlmChat {
             LlmRequest attemptRequest = i == 0 ? request : request.withConfigName(attempt.name());
             try {
                 gatewayRegistry.gatewayFor(attempt)
-                        .chatStreaming(attempt, attemptRequest, guarded, cancellation, listener);
+                        .chatStreaming(resolver.resolve(attempt), attemptRequest, guarded, cancellation, listener);
                 if (i > 0) {
                     log.info("LLM fallback succeeded: config '{}' (model {}) answered for rate-limited '{}'",
                             attempt.name(), attempt.model(), config.name());

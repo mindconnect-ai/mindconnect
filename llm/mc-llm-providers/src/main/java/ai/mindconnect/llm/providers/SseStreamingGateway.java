@@ -1,10 +1,6 @@
-package ai.mindconnect.llm.adapter;
-
-import ai.mindconnect.llm.service.LlmConfigResolver;
+package ai.mindconnect.llm.providers;
 
 import ai.mindconnect.llm.runtime.api.domain.Cancellation;
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.runtime.api.domain.FinishReason;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
@@ -29,8 +25,8 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The call every streaming provider makes the same way: resolve the config,
- * send one JSON request, read the answer as server-sent events, book what
+ * The call every streaming provider makes the same way: send one JSON
+ * request, read the answer as server-sent events, book what
  * each block contributed, tell the listener how it went, and end with one
  * {@link LlmStreamChunk.Done}. A provider adds its request body, its HTTP
  * request and how one block is parsed; nothing else differs on the wire.
@@ -46,22 +42,14 @@ public abstract class SseStreamingGateway implements LlmGateway {
     protected final OkHttpClient httpClient;
     protected final ObjectMapper objectMapper;
     protected final ObjectWriter prettyWriter;
-    private final EncryptionHelper encryption;
-    private final EnvVarResolver env;
     private final String provider;
 
-    /**
-     * @param provider the provider's name in logs and error messages
-     * @param env      where {@code ${VAR}} placeholders in a config resolve from
-     */
-    protected SseStreamingGateway(String provider, OkHttpClient httpClient, ObjectMapper objectMapper,
-                                  EncryptionHelper encryption, EnvVarResolver env) {
+    /** @param provider the provider's name in logs and error messages */
+    protected SseStreamingGateway(String provider, OkHttpClient httpClient, ObjectMapper objectMapper) {
         this.provider = provider;
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
-        this.encryption = encryption;
-        this.env = env;
     }
 
     /**
@@ -85,7 +73,7 @@ public abstract class SseStreamingGateway implements LlmGateway {
 
     protected abstract Stream newStream();
 
-    /** The request body, with the config already resolved. */
+    /** The request body. */
     protected abstract ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException;
 
     protected abstract Request httpRequest(LlmConfig config, String body);
@@ -104,7 +92,6 @@ public abstract class SseStreamingGateway implements LlmGateway {
                                     Consumer<LlmStreamChunk> handler,
                                     Cancellation cancellation,
                                     LlmCallListener listener) {
-        config = LlmConfigResolver.resolved(config, env, encryption);
         log.debug("{} stream → model={} messages={} tools={}", provider, config.model(),
                 request.messages() == null ? 0 : request.messages().size(),
                 request.tools() == null ? 0 : request.tools().size());

@@ -1,4 +1,4 @@
-package ai.mindconnect.llm.adapter.lmstudio;
+package ai.mindconnect.llm.providers.lmstudio;
 
 import ai.mindconnect.llm.management.api.domain.LlmCapability;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;

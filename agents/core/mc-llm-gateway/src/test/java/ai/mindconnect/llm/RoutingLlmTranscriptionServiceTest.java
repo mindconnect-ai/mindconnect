@@ -1,5 +1,10 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import java.util.Map;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
@@ -42,7 +47,7 @@ class RoutingLlmTranscriptionServiceTest {
             used.set(config);
             return TranscriptionResult.of("what the model heard");
         };
-        service = new RoutingLlmTranscriptionService(repository, gateway);
+        service = new RoutingLlmTranscriptionService(repository, gateway, new LlmConfigResolver(EnvVarResolver.of(Map.of()), EncryptionHelper.noEncryption()));
     }
 
     @Test

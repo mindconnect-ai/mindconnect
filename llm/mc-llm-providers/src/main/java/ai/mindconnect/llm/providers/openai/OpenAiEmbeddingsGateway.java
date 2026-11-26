@@ -1,10 +1,6 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.llm.service.LlmConfigResolver;
-
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.LlmHttpError;
+import ai.mindconnect.llm.providers.LlmHttpError;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.provider.spi.port.out.EmbeddingGateway;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,21 +31,10 @@ public final class OpenAiEmbeddingsGateway implements EmbeddingGateway {
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final EncryptionHelper encryption;
-    private final EnvVarResolver env;
 
-    /** Placeholders resolve from the process environment alone — the library and desktop case. */
-    public OpenAiEmbeddingsGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
-        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
-    }
-
-    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
-    public OpenAiEmbeddingsGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
-                                   EnvVarResolver env) {
+    public OpenAiEmbeddingsGateway(OkHttpClient httpClient, ObjectMapper objectMapper) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
-        this.encryption = encryption;
-        this.env = env;
     }
 
     @Override
@@ -57,7 +42,6 @@ public final class OpenAiEmbeddingsGateway implements EmbeddingGateway {
         if (texts.isEmpty()) {
             return List.of();
         }
-        config = LlmConfigResolver.resolved(config, env, encryption);
         String baseUrl = config.provider().baseUrlOr(config.baseUrl());
 
         ObjectNode body = objectMapper.createObjectNode();

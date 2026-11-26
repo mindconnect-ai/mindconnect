@@ -1,10 +1,7 @@
-package ai.mindconnect.llm.adapter.anthropic;
-
-import ai.mindconnect.llm.service.LlmConfigResolver;
+package ai.mindconnect.llm.providers.anthropic;
 
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
@@ -29,10 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ClaudeGatewayThinkingTest {
 
-    private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final ObjectMapper mapper = TestJson.MAPPER;
     private final ClaudeGateway gateway =
-            new ClaudeGateway(new OkHttpClient(), mapper, encryption);
+            new ClaudeGateway(new OkHttpClient(), mapper);
 
     private LlmConfig config(Map<String, Object> additionalParams) {
         return new LlmConfig(LlmConfigId.random(), "claude", LlmProvider.ANTHROPIC,
@@ -46,7 +42,7 @@ class ClaudeGatewayThinkingTest {
                 "thinkingDisplay", "summarized"));
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
+        JsonNode root = gateway.buildRequestNode(cfg, req);
 
         assertThat(root.path("thinking").path("type").asText()).isEqualTo("adaptive");
         assertThat(root.path("thinking").path("display").asText()).isEqualTo("summarized");
@@ -60,7 +56,7 @@ class ClaudeGatewayThinkingTest {
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")))
                 .withAdditionalParams(Map.of("effort", "low"));
 
-        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
+        JsonNode root = gateway.buildRequestNode(cfg, req);
 
         assertThat(root.path("output_config").path("effort").asText()).isEqualTo("low");
     }
@@ -70,7 +66,7 @@ class ClaudeGatewayThinkingTest {
         LlmConfig cfg = config(Map.of());
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
+        JsonNode root = gateway.buildRequestNode(cfg, req);
 
         assertThat(root.has("thinking")).isFalse();
         assertThat(root.has("output_config")).isFalse();
@@ -82,7 +78,7 @@ class ClaudeGatewayThinkingTest {
         LlmConfig cfg = config(Map.of("thinking", "disabled"));
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
+        JsonNode root = gateway.buildRequestNode(cfg, req);
 
         assertThat(root.path("thinking").path("type").asText()).isEqualTo("disabled");
         assertThat(root.has("temperature")).isTrue();
@@ -102,7 +98,7 @@ class ClaudeGatewayThinkingTest {
         LlmRequest req = LlmRequest.streaming("claude",
                 List.of(LlmMessage.user("weather?"), assistant));
 
-        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
+        JsonNode root = gateway.buildRequestNode(cfg, req);
 
         // messages[1] is the assistant turn; its content must be
         // [thinking, tool_use, tool_use] in that exact order.
@@ -126,7 +122,7 @@ class ClaudeGatewayThinkingTest {
         LlmRequest req = LlmRequest.streaming("claude",
                 List.of(LlmMessage.user("weather?"), assistant));
 
-        JsonNode content = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req)
+        JsonNode content = gateway.buildRequestNode(cfg, req)
                 .path("messages").path(1).path("content");
 
         assertThat(content.get(0).path("type").asText()).isEqualTo("redacted_thinking");

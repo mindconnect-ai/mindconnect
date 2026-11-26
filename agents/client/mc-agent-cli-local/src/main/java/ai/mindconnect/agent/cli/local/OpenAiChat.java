@@ -11,7 +11,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
-import ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway;
+import ai.mindconnect.llm.providers.openai.OpenAiResponsesGateway;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;
@@ -19,6 +19,8 @@ import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.llm.service.LlmConfigResolver;
 
 /**
  * An LLM gateway that knows one OpenAI model, set up from an API key. The
@@ -48,6 +50,7 @@ final class OpenAiChat {
                 .readTimeout(Duration.ZERO).callTimeout(Duration.ofMinutes(10)).build();
         ObjectMapper json = this.json.create().registerModule(new JavaTimeModule());
         return new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(Map.of(
-                LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json, EncryptionHelper.noEncryption()))));
+                LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json))),
+                new LlmConfigResolver(EnvVarResolver.system(), EncryptionHelper.noEncryption()));
     }
 }

@@ -1,5 +1,9 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.llm.runtime.api.domain.*;
 import ai.mindconnect.llm.management.api.domain.*;
@@ -54,7 +58,7 @@ class RoutingLlmChatServiceTest {
         };
 
         var registry = new DefaultLlmGatewayRegistry(Map.of(LM_STUDIO, stubGateway));
-        service = new RoutingLlmChatService(repo, registry);
+        service = new RoutingLlmChatService(repo, registry, new LlmConfigResolver(EnvVarResolver.of(Map.of()), EncryptionHelper.noEncryption()));
     }
 
     @Test

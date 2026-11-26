@@ -1,5 +1,9 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.llm.runtime.api.domain.FinishReason;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
@@ -60,7 +64,7 @@ class RoutingLlmChatFallbackTest {
             if (gateway == null) throw new IllegalStateException("no stub gateway for " + config.name());
             return gateway;
         };
-        service = new RoutingLlmChatService(repository, registry);
+        service = new RoutingLlmChatService(repository, registry, new LlmConfigResolver(EnvVarResolver.of(Map.of()), EncryptionHelper.noEncryption()));
     }
 
     /** A config that names its fallbacks, plus a stub gateway behind it. */

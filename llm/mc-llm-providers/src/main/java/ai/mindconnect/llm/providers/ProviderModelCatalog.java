@@ -1,11 +1,6 @@
-package ai.mindconnect.llm.adapter;
+package ai.mindconnect.llm.providers;
 
-import ai.mindconnect.llm.service.LlmConfigResolver;
-
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
-import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -92,29 +86,8 @@ public class ProviderModelCatalog {
     }
 
     /**
-     * The models an endpoint offers, asked with a key as it is stored: {@code
-     * ${VAR}} expanded and {@code enc:} decrypted, exactly as a gateway would
-     * before a call. For a form that has a provider, an endpoint and a key but
-     * no config yet.
-     */
-    public ModelListing<Model> fetch(LlmProvider provider, String baseUrl, String apiKey,
-                                     EnvVarResolver environment, EncryptionHelper encryption) {
-        LlmConfig probe = new LlmConfig(LlmConfigId.random(), "probe", provider, null, baseUrl, apiKey,
-                0, 0, Map.of(), null, false, null, null, null, LlmConfigType.CHAT, null);
-        LlmConfig asked = probe;
-        try {
-            asked = LlmConfigResolver.resolved(probe, environment, encryption);
-        } catch (RuntimeException e) {
-            // A key that cannot be decrypted (a rotated secret) must not take
-            // down the form — the listing simply fails and says why.
-        }
-        return fetch(asked);
-    }
-
-    /**
      * The models {@code config}'s provider offers. Pass a config whose
-     * {@code apiKey} is already resolved ({@link LlmConfig#resolved}) — this
-     * sends it as it stands.
+     * {@code apiKey} is already resolved: this sends it as it stands.
      */
     public ModelListing<Model> fetch(LlmConfig config) {
         if (config == null || !supports(config.provider())) {

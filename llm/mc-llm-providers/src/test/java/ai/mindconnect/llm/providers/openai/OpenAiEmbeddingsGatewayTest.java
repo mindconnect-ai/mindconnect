@@ -1,7 +1,6 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.providers.TestJson;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,7 +57,7 @@ class OpenAiEmbeddingsGatewayTest {
     }
 
     private OpenAiEmbeddingsGateway gateway() {
-        return new OpenAiEmbeddingsGateway(new OkHttpClient(), MAPPER, new EncryptionHelper(null));
+        return new OpenAiEmbeddingsGateway(new OkHttpClient(), MAPPER);
     }
 
     @Test

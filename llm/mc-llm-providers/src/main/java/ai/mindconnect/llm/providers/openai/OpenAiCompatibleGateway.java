@@ -1,7 +1,5 @@
-package ai.mindconnect.llm.adapter.openai;
+package ai.mindconnect.llm.providers.openai;
 
-import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,15 +11,8 @@ import okhttp3.OkHttpClient;
  */
 public class OpenAiCompatibleGateway extends AbstractOpenAiGateway {
 
-    /** Placeholders resolve from the process environment alone — the library and desktop case. */
-    public OpenAiCompatibleGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
-        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
-    }
-
-    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
-    public OpenAiCompatibleGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
-                                   EnvVarResolver env) {
-        super(httpClient, objectMapper, encryption, env);
+    public OpenAiCompatibleGateway(OkHttpClient httpClient, ObjectMapper objectMapper) {
+        super(httpClient, objectMapper);
     }
 
     @Override
