@@ -15,7 +15,8 @@ import ai.mindconnect.agent.tool.ToolSettings;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.chatui.ui.controller.FormBody;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDialog;
@@ -64,17 +65,20 @@ public class ToolCatalogUiController {
      * effective view no longer has.
      */
     private final ToolRegistry sourceRegistry;
+    private final JsonMapperFactory json;
 
     public ToolCatalogUiController(ToolRegistry toolRegistry,
                                  ToolTestService toolTestService,
                                  AdminLayoutFactory layoutFactory,
                                  ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
-                                 ObjectProvider<ToolRepository> toolRepository) {
+                                 ObjectProvider<ToolRepository> toolRepository,
+                                 JsonMapperFactory json) {
         this.toolRegistry = toolRegistry;
         this.toolTestService = toolTestService;
         this.layoutFactory = layoutFactory;
         this.mcpRegistryAdmin = mcpRegistryAdmin;
         this.toolRepository = toolRepository;
+        this.json = json;
         this.sourceRegistry = toolRegistry instanceof OverlayToolRegistry overlay
                 ? overlay.source()
                 : toolRegistry;
@@ -118,12 +122,12 @@ public class ToolCatalogUiController {
             }
         });
 
-        // Inline tools handled by AgentChatService (run_agent / run_agents) —
-        // these have no ToolFactory, so their schema lives in the service, not
+        // Tools the sub-agent plugin brings (run_agent / run_agents / list_agents) —
+        // these have no ToolFactory, so their schema lives in the plugin, not
         // the registry. They are agent functions, so they join the "Agents"
         // rubric. (putIfAbsent so a registry entry would win, though today
         // there is no overlap.)
-        for (var def : AgentChatService.inlineToolDefinitions()) {
+        for (var def : SubAgentPlugin.delegationTools()) {
             byName.putIfAbsent(def.name(), entryFromDefinition(def));
         }
 
@@ -291,7 +295,7 @@ public class ToolCatalogUiController {
     private ai.mindconnect.ui.model.UiPatch toolTestDialog(String name, String previousJson,
                                                            ToolTestService.Result result) {
         var component = new ToolCatalogTestComponent(
-                name, toolRegistry, previousJson, result);
+                name, toolRegistry, previousJson, result, json);
         UiDialog dialog = UiDialog.of(component.title(), null, component.render());
         dialog.setId("tool-test-dialog");
         return ai.mindconnect.ui.model.UiPatch.of()
@@ -299,9 +303,9 @@ public class ToolCatalogUiController {
                 .patch(ai.mindconnect.ui.model.UiPatch.Operation.append("sui-dialogs", dialog));
     }
 
-    /** Builds a catalog entry straight from an inline {@link ai.mindconnect.llm.domain.ToolDefinition}. */
+    /** Builds a catalog entry straight from an inline {@link ai.mindconnect.agent.runtime.api.domain.ToolDefinition}. */
     private ToolCatalogComponent.Entry entryFromDefinition(
-            ai.mindconnect.llm.domain.ToolDefinition def) {
+            ai.mindconnect.agent.runtime.api.domain.ToolDefinition def) {
         return new ToolCatalogComponent.Entry("agents", def.name(), def.description(),
                 def.parametersSchema(), null);
     }

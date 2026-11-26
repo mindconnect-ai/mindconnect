@@ -244,7 +244,8 @@ final class RegistryEntryView {
                     .icon("refresh")
                     .confirm("Replace what is here with '" + entry.name() + "' from "
                             + source.coordinates() + "? Entities of the same name are "
-                            + "overwritten, keeping their local ids.")
+                            + "overwritten, keeping their local ids. What it requires and is "
+                            + "already here stays as it is.")
                     .onClick(UiTrigger.api("POST",
                             base + "/import/" + entry.id() + "?mode=OVERWRITE", payload)));
         }

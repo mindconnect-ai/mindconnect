@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.config;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.jackson.JsonMapperCustomizer;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import okhttp3.OkHttpClient;
@@ -30,10 +30,11 @@ public class InfrastructureConfig {
                 .build();
     }
 
+    /** How this application writes JSON; the runtime builds the mapper, Spring's ObjectMapper is that one. */
     @Bean
-    ObjectMapper objectMapper() {
-        return new ObjectMapper()
-                .registerModule(new JavaTimeModule())
+    JsonMapperCustomizer jsonMapperCustomizer() {
+        return mapper -> mapper
+                .addModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }

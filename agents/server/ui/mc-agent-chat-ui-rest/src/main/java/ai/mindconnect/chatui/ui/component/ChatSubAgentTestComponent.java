@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
@@ -47,15 +47,15 @@ public class ChatSubAgentTestComponent {
      * @param message the message last sent, kept in the field; {@code null} for none
      * @param result  the answer to it; {@code null} before the first Send
      */
-    public static UiNode node(SessionId sessionId, AgentDefinition agent, String message, Result result) {
+    public static UiNode node(SessionId sessionId, ManagedAgent agent, String message, Result result) {
         var form = UiForm.of(formId(sessionId), null)
                 .field(UiField.textarea("message", "Message", message == null ? "" : message)
                         .asEditable().asRequired()
-                        .hint("Sent to " + agent.name() + " as a task of its own — its prompt, its "
+                        .hint("Sent to " + agent.definition().name() + " as a task of its own — its prompt, its "
                                 + "model, its tools. This chat does not see it."))
                 .action(UiAction.primary("send", "Send").icon("send")
                         .onClick(trigger(on(ChatUiController.class)
-                                        .testSubAgent(sessionId.value(), agent.name(), null, null),
+                                        .testSubAgent(sessionId.value(), agent.definition().name(), null, null),
                                 formId(sessionId))))
                 .action(UiAction.secondary("back", "Back").icon("arrow-left")
                         .onClick(trigger(on(ChatUiController.class)

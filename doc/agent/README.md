@@ -24,7 +24,7 @@ parts:
 
 Next: the first `/tidy` run on a small `-core` module, then decide from its
 diff what is missing. The fuller harness (hooks, reviewer subagents, a spec
-loop, PMD, Jacoco, a numbered quality catalog) is parked on the branch
+loop, Jacoco, a numbered quality catalog) is parked on the branch
 `chore/harness-skeleton`; its `doc/agent/README.md` says when each piece
 comes back.
 

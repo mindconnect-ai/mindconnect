@@ -1,6 +1,7 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.UserTool;
 import ai.mindconnect.user.domain.UserToolId;
 import ai.mindconnect.user.port.out.UserToolRepository;
@@ -20,9 +21,9 @@ public class FileUserToolRepository implements UserToolRepository {
     private final FileDocuments<UserTool> tools;
     private final Object lock = new Object();
 
-    public FileUserToolRepository(Path storageDir) {
+    public FileUserToolRepository(Path storageDir, JsonMapperFactory json) {
         Objects.requireNonNull(storageDir, "storageDir");
-        this.tools = new FileDocuments<>(storageDir.resolve("system").resolve("user-tools"), UserTool.class);
+        this.tools = new FileDocuments<>(storageDir.resolve("system").resolve("user-tools"), UserTool.class, json);
     }
 
     @Override

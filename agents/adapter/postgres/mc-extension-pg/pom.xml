@@ -23,11 +23,20 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-extension-core</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-jdbc</artifactId>
+        </dependency>
+        <!-- PgExtensionPlugin: the extensions' plugin, their stores in the database -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-extension</artifactId>
         </dependency>
 
         <dependency>

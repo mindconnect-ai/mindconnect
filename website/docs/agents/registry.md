@@ -79,6 +79,11 @@ Importing has two modes:
   rest. The default; it cannot destroy anything.
 - **Import and overwrite** replaces entities of the same name, keeping their
   local ids — so the agents, aliases and sessions pointing at them keep working.
+  It replaces what was asked for — the entry, or a package's included
+  members — and nothing else: what such an entry requires is installed when
+  it is missing and left as it is when it is here, so an LLM config several
+  agents share is not reset because one of them was. To reset it, overwrite
+  it from its own row.
 
 Nothing is rolled back if one member of a package fails: the others are
 installed, and the report says line by line what happened.

@@ -1,13 +1,16 @@
 package ai.mindconnect.agentrest.service;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -29,7 +32,8 @@ class VectorStoreServiceIngestTest {
 
     @Test
     void aFileTheReaderMayNotReadIsReportedLikeAMissingOne() throws Exception {
-        FileStore files = new FilesystemFileStore(dir.resolve("data"), ScopeSupplier.fixed(new Namespace("test")));
+        FileStore files = new FilesystemFileStore(dir.resolve("data"), ScopeSupplier.fixed(new Namespace("test")),
+                new JsonMapperFactory(List.of(new IdJsonModule())));
         StoredFile alices = files.save("notes.txt", "text/plain",
                 new ByteArrayInputStream("secret".getBytes(StandardCharsets.UTF_8)), UserId.of("alice"));
         var beans = new StaticListableBeanFactory();
@@ -37,7 +41,8 @@ class VectorStoreServiceIngestTest {
         VectorStoreService service = new VectorStoreService(beans.getBeanProvider(VectorStores.class),
                 beans.getBeanProvider(FileStore.class), beans.getBeanProvider(WorkflowDataRepository.class),
                 dir.resolve("tools").toString(),
-                beans.getBeanProvider(ai.mindconnect.common.env.EnvVarResolver.class));
+                beans.getBeanProvider(ai.mindconnect.common.env.EnvVarResolver.class),
+                new JsonMapperFactory(List.of(new IdJsonModule())));
 
         assertThatThrownBy(() -> service.ingestStoredFile("handbook", alices.id().value(), UserId.of("bob")))
                 .isInstanceOf(IllegalArgumentException.class)

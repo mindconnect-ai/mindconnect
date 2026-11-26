@@ -1,15 +1,14 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.service.LlmPriceService;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
+import ai.mindconnect.llm.gateway.service.LlmPriceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,8 +36,10 @@ class LlmPriceUiControllerTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-24T10:00:00Z"), ZoneOffset.UTC);
     private final LlmPriceUiController controller = new LlmPriceUiController(configs, service, clock,
             EnvVarResolver.none());
-    private final LlmConfigUiController configController = new LlmConfigUiController(configs, null,
-            EncryptionHelper.noEncryption(), new LmStudioModelCatalog(new OkHttpClient(), new ObjectMapper())).withPrices(service);
+    private final LlmConfigUiController configController = new LlmConfigUiController(configs,
+            new ai.mindconnect.llm.gateway.service.LlmConfigService(configs, service), EncryptionHelper.noEncryption(),
+            new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(EnvVarResolver.class),
+            new OkHttpClient(), new ObjectMapper());
 
     private LlmConfig claude;
     private LlmConfig alias;
@@ -221,7 +222,7 @@ class LlmPriceUiControllerTest {
 
     @Test
     void editingAPriceStoredWithoutAModelOffersTheCurrentOne() throws Exception {
-        LlmPrice legacy = new LlmPrice(ai.mindconnect.llm.domain.LlmPriceId.random(), "claude", null,
+        LlmPrice legacy = new LlmPrice(ai.mindconnect.llm.management.api.domain.LlmPriceId.random(), "claude", null,
                 LocalDate.parse("2026-01-01"), null, "USD", java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, null);
         prices.save(legacy);
 

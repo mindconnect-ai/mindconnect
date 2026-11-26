@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.channel.Subscription;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>the {@link TaskMonitor}'s board, as {@code patch} frames that keep
  *       the header badge and the task dialog current, rendered for the user
  *       on this connection (whether a Cancel appears depends on who looks);</li>
- *   <li>the user's {@link UserChannels} stream, as {@code user} frames — a
+ *   <li>the user's lifecycle ({@link SessionManagement#lifecycle}), as {@code user} frames — a
  *       session opened or titled, a turn started or finished, a tool waiting
  *       for an answer — so a tab learns what happens in the sessions it is
  *       not looking at.</li>
@@ -60,7 +60,7 @@ public class UserStream {
     /** SSE comment keeping idle connections alive through proxies. */
     private static final long HEARTBEAT_SECONDS = 20;
 
-    private record Attached(Subscription tasks, Subscription events) {
+    private record Attached(Subscription tasks, ai.mindconnect.agent.runtime.api.port.in.Subscription events) {
         void close() {
             if (tasks != null) tasks.close();
             events.close();
@@ -69,32 +69,32 @@ public class UserStream {
 
     /** Absent when the host runs no task queue; the stream then carries user events only. */
     private final TaskMonitor taskMonitor;
-    private final UserChannels userChannels;
+    private final SessionManagement sessions;
     private final ObjectMapper objectMapper;
     private final Map<SseEmitter, Attached> attached = new ConcurrentHashMap<>();
     /** The namespace a user chose last — asked on every board frame, so a switch shows without a reload. */
-    private final java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespace;
+    private final java.util.function.Function<UserId, Optional<ai.mindconnect.agent.scope.Namespace>> activeNamespace;
     private final ScheduledExecutorService pulse = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "user-stream-heartbeat");
         t.setDaemon(true);
         return t;
     });
 
-    public UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper) {
-        this(taskMonitor, userChannels, objectMapper, user -> Optional.empty());
+    public UserStream(Optional<TaskMonitor> taskMonitor, SessionManagement sessions, ObjectMapper objectMapper) {
+        this(taskMonitor, sessions, objectMapper, user -> Optional.empty());
     }
 
     @org.springframework.beans.factory.annotation.Autowired
-    public UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
+    public UserStream(Optional<TaskMonitor> taskMonitor, SessionManagement sessions, ObjectMapper objectMapper,
                       org.springframework.beans.factory.ObjectProvider<ai.mindconnect.user.service.UserService> users,
                       org.springframework.beans.factory.ObjectProvider<ai.mindconnect.namespace.service.NamespaceService> namespaces) {
-        this(taskMonitor, userChannels, objectMapper, activeNamespaceOf(users.getIfAvailable(), namespaces.getIfAvailable()));
+        this(taskMonitor, sessions, objectMapper, activeNamespaceOf(users.getIfAvailable(), namespaces.getIfAvailable()));
     }
 
-    UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
-               java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespace) {
+    UserStream(Optional<TaskMonitor> taskMonitor, SessionManagement sessions, ObjectMapper objectMapper,
+               java.util.function.Function<UserId, Optional<ai.mindconnect.agent.scope.Namespace>> activeNamespace) {
         this.taskMonitor = taskMonitor.orElse(null);
-        this.userChannels = userChannels;
+        this.sessions = sessions;
         this.objectMapper = objectMapper;
         this.activeNamespace = activeNamespace;
         pulse.scheduleWithFixedDelay(this::heartbeat, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
@@ -130,7 +130,7 @@ public class UserStream {
      * @param attachedIn the namespace the attaching request works in — what the board
      *                   shows until the user chooses another; null shows every namespace
      */
-    public void attach(SseEmitter emitter, String userId, ai.mindconnect.agent.Namespace attachedIn) {
+    public void attach(SseEmitter emitter, String userId, ai.mindconnect.agent.scope.Namespace attachedIn) {
         try {
             emitter.send(SseEmitter.event().comment("attached"));
         } catch (Exception e) {
@@ -141,7 +141,7 @@ public class UserStream {
         Subscription tasks = taskMonitor == null ? null : taskMonitor.subscribe(event -> {
             try {
                 // The board as this viewer sees it: the namespace they chose last, else the one they attached in.
-                ai.mindconnect.agent.Namespace namespace = activeNamespace.apply(viewer).orElse(attachedIn);
+                ai.mindconnect.agent.scope.Namespace namespace = activeNamespace.apply(viewer).orElse(attachedIn);
                 emitter.send(SseEmitter.event()
                         .id(Long.toString(event.seq()))
                         .name("patch")
@@ -151,11 +151,9 @@ public class UserStream {
             }
         });
         UserId user = UserId.of(userId);
-        Subscription events = userChannels.subscribe(user, userChannels.lastSeq(user), event -> {
+        var events = sessions.lifecycle(user, event -> {
             try {
-                emitter.send(SseEmitter.event()
-                        .name("user")
-                        .data(json(UserEventFrame.of(event.seq(), event.value()))));
+                emitter.send(SseEmitter.event().name("user").data(json(UserEventFrame.of(event))));
             } catch (Exception e) {
                 detach(emitter);
             }
@@ -166,7 +164,7 @@ public class UserStream {
     }
 
     /** The viewer's remembered namespace — while they may still work there; a member who was removed sees it no more. */
-    private static java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespaceOf(
+    private static java.util.function.Function<UserId, Optional<ai.mindconnect.agent.scope.Namespace>> activeNamespaceOf(
             ai.mindconnect.user.service.UserService users,
             ai.mindconnect.namespace.service.NamespaceService namespaces) {
         if (users == null) return user -> Optional.empty();

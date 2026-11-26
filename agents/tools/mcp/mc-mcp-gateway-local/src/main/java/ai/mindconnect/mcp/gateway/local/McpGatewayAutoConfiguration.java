@@ -1,7 +1,8 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpGateway;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -66,12 +67,13 @@ public class McpGatewayAutoConfiguration {
             ObjectProvider<McpStoreFactory> stores,
             // The installation's default namespace: start-up works there when nothing else is bound.
             @Value("${mindconnect.namespace:local}") String defaultNamespace,
-            @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir) {
+            @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
+            JsonMapperFactory json) {
         ScopeSupplier current = scope.getIfAvailable(ScopeSupplier::local);
-        McpServerRepository repository = stores.getIfAvailable(() -> fileStores(environment, dataBaseDir))
+        McpServerRepository repository = stores.getIfAvailable(() -> fileStores(environment, dataBaseDir, json))
                 .serverRepository(current);
         StartupScope.run(current, new Namespace(defaultNamespace),
-                () -> BundledMcpRegistrations.seed(repository, "classpath:initial-data/mcp-servers/*.json"));
+                () -> BundledMcpRegistrations.seed(repository, "classpath:initial-data/mcp-servers/*.json", json));
         return repository;
     }
 
@@ -80,12 +82,12 @@ public class McpGatewayAutoConfiguration {
      * bean says otherwise. Postgres persistence without one (its adapter not on
      * the classpath) keeps the files, and says so.
      */
-    private static McpStoreFactory fileStores(Environment environment, String dataBaseDir) {
+    private static McpStoreFactory fileStores(Environment environment, String dataBaseDir, JsonMapperFactory json) {
         if ("postgres".equals(environment.getProperty("mindconnect.persistence"))) {
             log.warn("mindconnect.persistence=postgres, but no Postgres store for MCP registrations "
                     + "(mc-mcp-gateway-pg) on the classpath — they stay in files under {}", dataBaseDir);
         }
-        return McpStoreFactory.files(storageRoot(dataBaseDir));
+        return McpStoreFactory.files(storageRoot(dataBaseDir), json);
     }
 
     /**
@@ -99,8 +101,9 @@ public class McpGatewayAutoConfiguration {
     public McpCatalog mcpCatalog(
             @Value("${mindconnect.mcp.catalog.url:}") String url,
             @Value("${mindconnect.mcp.catalog.ttl:PT6H}") Duration ttl,
-            @Value("${mindconnect.mcp.catalog.timeout:PT10S}") Duration timeout) {
-        return new DockerMcpCatalog(url, ttl, timeout);
+            @Value("${mindconnect.mcp.catalog.timeout:PT10S}") Duration timeout,
+            JsonMapperFactory json) {
+        return new DockerMcpCatalog(url, ttl, timeout, json);
     }
 
     @Bean
@@ -130,9 +133,10 @@ public class McpGatewayAutoConfiguration {
             ObjectProvider<ScopeSupplier> scope,
             ObjectProvider<McpStoreFactory> stores,
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
-            @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime) {
+            @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime,
+            JsonMapperFactory json) {
         ScopeSupplier current = scope.getIfAvailable(ScopeSupplier::local);
-        McpDiscoveryStore discoveries = stores.getIfAvailable(() -> McpStoreFactory.files(storageRoot(dataBaseDir)))
+        McpDiscoveryStore discoveries = stores.getIfAvailable(() -> McpStoreFactory.files(storageRoot(dataBaseDir), json))
                 .discoveryStore(current);
         // Whether process and docker targets start is the installation's call:
         // mindconnect.mcp.allow-process / allow-docker, unset following sign-in.

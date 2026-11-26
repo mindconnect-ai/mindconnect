@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.namespaces;
 
 import ai.mindconnect.adminui.branding.Branding;
 import ai.mindconnect.adminui.branding.BrandingProperties;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.starter.namespace.HostNamespaces;
 import org.springframework.stereotype.Component;
 

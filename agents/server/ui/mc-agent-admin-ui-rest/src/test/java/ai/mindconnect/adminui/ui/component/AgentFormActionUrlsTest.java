@@ -1,12 +1,10 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -36,24 +34,18 @@ class AgentFormActionUrlsTest {
         @Override public void deleteById(LlmConfigId id) { throw new UnsupportedOperationException(); }
     };
 
-    private static final AgentDefinitionRepository NO_AGENTS = new AgentDefinitionRepository() {
-        @Override public AgentDefinition save(AgentDefinition d) { throw new UnsupportedOperationException(); }
-        @Override public Optional<AgentDefinition> findById(AgentId id) { return Optional.empty(); }
-        @Override public List<AgentDefinition> findAll() { return List.of(); }
-        @Override public Optional<AgentDefinition> findByName(String name) { return Optional.empty(); }
-        @Override public void deleteById(AgentId id) { throw new UnsupportedOperationException(); }
-    };
-
-    private static AgentDefinition agent() {
-        return new AgentDefinition(AGENT_ID, "Scout", "A test agent",
-                "assistants", "bot", "prompt", null, "cfg", 5, null,
-                AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null);
+    private static ManagedAgent agent() {
+        return new ManagedAgent(AGENT_ID,
+                new ai.mindconnect.agent.runtime.api.domain.AgentDefinition("Scout", "A test agent", "prompt",
+                        ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel("cfg"), List.of(), 5,
+                        java.util.Map.of()),
+                "assistants", "bot", null, ManagedAgent.Status.ACTIVE, null, null, 0);
     }
 
-    private static String render(AgentDefinition agent) throws Exception {
+    private static String render(ManagedAgent agent) throws Exception {
         var mapper = new ObjectMapper();
         return mapper.writeValueAsString(
-                new AgentFormComponent(agent, NO_CONFIGS, NO_AGENTS, mapper).render());
+                new AgentFormComponent(agent, NO_CONFIGS, List.of(), mapper).render());
     }
 
     @Test

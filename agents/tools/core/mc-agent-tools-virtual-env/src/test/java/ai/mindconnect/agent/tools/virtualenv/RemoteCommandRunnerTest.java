@@ -4,8 +4,10 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +26,7 @@ class RemoteCommandRunnerTest {
         String stdin;
 
         RecordingClient() {
-            super(URI.create("http://virtual-env.invalid"), TokenSource.none(), Duration.ofSeconds(1));
+            super(URI.create("http://virtual-env.invalid"), TokenSource.none(), Duration.ofSeconds(1), new JsonMapperFactory(List.of()));
         }
 
         @Override

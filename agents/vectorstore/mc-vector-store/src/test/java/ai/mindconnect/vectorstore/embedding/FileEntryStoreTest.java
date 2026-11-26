@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +27,7 @@ class FileEntryStoreTest {
 
     @Test
     void whatIsWrittenIsThereAfterARestart() {
-        EmbeddingIndex index = FileEntryStore.index(dir);
+        EmbeddingIndex index = FileEntryStore.index(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         index.declareField(new MetadataField(EntityType.MAIL, "received_at", MetadataField.Kind.TIMESTAMP));
         index.replace(INBOX, ALICE, "v1", MODEL, List.of(new EmbeddingChunk("c0", 0, "invoice",
                 Map.of("received_at", "2026-09-01T08:00:00Z"), new float[]{1f, 0f})));
@@ -36,7 +38,7 @@ class FileEntryStoreTest {
         index.replace(FILE, null, "2", "other", List.of());
 
         FileEntryStore.forget(dir);
-        EmbeddingIndex restarted = FileEntryStore.index(dir);
+        EmbeddingIndex restarted = FileEntryStore.index(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
 
         assertThat(restarted).isNotSameAs(index);
         assertThat(restarted.indexedVersion(INBOX, MODEL)).isEmpty();
@@ -52,13 +54,13 @@ class FileEntryStoreTest {
 
         restarted.delete(FILE);
         FileEntryStore.forget(dir);
-        assertThat(FileEntryStore.index(dir).indexedVersion(FILE, MODEL)).isEmpty();
+        assertThat(FileEntryStore.index(dir, new JsonMapperFactory(List.of(new IdJsonModule()))).indexedVersion(FILE, MODEL)).isEmpty();
     }
 
     @Test
     void theSameDirectoryIsOneIndexInTheJvm() throws Exception {
-        assertThat(FileEntryStore.index(dir)).isSameAs(FileEntryStore.index(dir.resolve(".").normalize()));
-        FileEntryStore.index(dir).replace(FILE, null, "1", MODEL,
+        assertThat(FileEntryStore.index(dir, new JsonMapperFactory(List.of(new IdJsonModule())))).isSameAs(FileEntryStore.index(dir.resolve(".").normalize(), new JsonMapperFactory(List.of(new IdJsonModule()))));
+        FileEntryStore.index(dir, new JsonMapperFactory(List.of(new IdJsonModule()))).replace(FILE, null, "1", MODEL,
                 List.of(new EmbeddingChunk("c0", 0, "podman", Map.of(), new float[]{0f, 1f})));
         try (var files = Files.walk(dir.resolve("entries"))) {
             assertThat(files.filter(f -> f.toString().endsWith(".json")).count()).isEqualTo(1);

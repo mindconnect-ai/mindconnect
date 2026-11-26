@@ -1,8 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

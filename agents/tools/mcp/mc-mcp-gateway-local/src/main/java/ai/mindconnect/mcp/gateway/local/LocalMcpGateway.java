@@ -1,7 +1,7 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.mcp.gateway.McpCaller;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpGateway;

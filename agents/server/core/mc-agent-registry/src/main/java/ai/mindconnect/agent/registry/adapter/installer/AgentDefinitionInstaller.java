@@ -1,22 +1,28 @@
 package ai.mindconnect.agent.registry.adapter.installer;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.registry.domain.ImportMode;
 import ai.mindconnect.agent.registry.domain.ImportStatus;
 import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.format.AgentJson;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
+import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,14 +46,17 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
 
     private static final Logger log = LoggerFactory.getLogger(AgentDefinitionInstaller.class);
 
-    private final AgentDefinitionRepository repository;
-    private final ObjectMapper objectMapper;
+    private final AgentManagement agents;
+    private final AgentJson files;
+    private final ObjectMapper plain;
 
-    public AgentDefinitionInstaller(AgentDefinitionRepository repository) {
-        this.repository = repository;
-        this.objectMapper = new ObjectMapper()
+    public AgentDefinitionInstaller(AgentManagement agents, JsonMapperFactory json) {
+        this.agents = agents;
+        this.plain = json.create();
+        this.files = new AgentJson(json.create()
                 .registerModule(new JavaTimeModule())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES));
     }
 
     @Override
@@ -57,12 +66,12 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
 
     @Override
     public boolean exists(String name) {
-        return name != null && repository.findByName(name).isPresent();
+        return name != null && agents.findByName(name).isPresent();
     }
 
     /**
      * Agents running on that LLM config, calling or reviewing with that agent,
-     * or naming that skill. An agent whose skills mode is ALL is not listed:
+     * or naming that skill. An agent that loads every skill is not listed:
      * it loads whatever is here and misses nothing by name.
      */
     @Override
@@ -70,70 +79,63 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
         if (name == null) {
             return List.of();
         }
-        return repository.findAll().stream()
+        return agents.list().stream()
+                .map(ManagedAgent::definition)
                 .filter(agent -> switch (type) {
-                    case LLM_CONFIG -> name.equals(agent.llmConfigName());
+                    case LLM_CONFIG -> name.equals(agent.modelSettings().model());
                     case AGENT -> !name.equals(agent.name())
-                            && (contains(agent.callableAgents(), name)
-                                    || contains(agent.responseReviewers(), name));
-                    case SKILL -> contains(agent.skillsOrDefault().names(), name);
+                            && (SubAgentPlugin.subAgentsOf(agent).contains(name)
+                                    || ResponseReviewPlugin.reviewersOf(agent).contains(name));
+                    case SKILL -> SkillPlugin.skillsOf(agent).map(picked -> picked.contains(name)).orElse(false);
                     default -> false;
                 })
                 .map(AgentDefinition::name)
                 .toList();
     }
 
-    private static boolean contains(List<String> names, String name) {
-        return names != null && names.contains(name);
-    }
-
     @Override
     public ImportedItem remove(RegistryEntry entry) {
-        Optional<AgentDefinition> existing = repository.findByName(entry.name());
+        Optional<ManagedAgent> existing = agents.findByName(entry.name());
         if (existing.isEmpty()) {
             return ImportedItem.skipped(entry, entry.name(), "no agent of this name is here");
         }
-        repository.deleteById(existing.get().id());
+        agents.delete(existing.get().id());
         log.info("Removed agent '{}' (registry entry '{}')", entry.name(), entry.id());
         return ImportedItem.removed(entry, entry.name());
     }
 
     @Override
     public ImportedItem install(RegistryEntry entry, String content, ImportMode mode) throws Exception {
-        AgentDefinition incoming = objectMapper.readValue(content, AgentDefinition.class);
-        String name = incoming.name() != null && !incoming.name().isBlank()
-                ? incoming.name() : entry.name();
-        Optional<AgentDefinition> existing = repository.findByName(name);
+        ManagedAgent incoming = files.read(withName(content, entry.name()));
+        String name = incoming.definition().name();
+        Optional<ManagedAgent> existing = agents.findByName(name);
 
         if (existing.isPresent() && mode == ImportMode.SKIP_EXISTING) {
             return ImportedItem.skipped(entry, name, "an agent of this name is already here");
         }
-
-        Instant now = Instant.now();
-        AgentDefinition toSave = new AgentDefinition(
-                existing.map(AgentDefinition::id).orElseGet(AgentId::random),
-                name,
-                incoming.description(),
-                incoming.group(),
-                incoming.icon(),
-                incoming.systemPrompt(),
-                incoming.welcomeMessage(),
-                incoming.llmConfigName(),
-                incoming.maxIterations() > 0 ? incoming.maxIterations() : 10,
-                incoming.effectiveMemoryConfig(),
-                incoming.status() != null ? incoming.status() : AgentDefinitionStatus.ACTIVE,
-                incoming.tools(),
-                incoming.responseReviewers(),
-                incoming.callableAgents(),
-                incoming.callableByAgents(),
-                incoming.skills(),
-                existing.map(AgentDefinition::createdAt).orElse(now),
-                now,
-                existing.map(AgentDefinition::version).orElse(null));
-        repository.save(toSave);
+        if (existing.isPresent()) {
+            agents.update(existing.get().id(), existing.get().version(), stored -> incoming);
+        } else {
+            // A new agent gets an id of this installation: the author's may be taken here.
+            agents.create(new ManagedAgent(null, incoming.definition(), incoming.group(), incoming.icon(),
+                    incoming.welcomeMessage(), incoming.status(), null, null, 0));
+        }
         log.info("Imported agent '{}' from registry entry '{}'", name, entry.id());
 
         return new ImportedItem(entry.id(), type(), name,
                 existing.isPresent() ? ImportStatus.UPDATED : ImportStatus.IMPORTED, null);
+    }
+
+    /** The file's text, named after its registry entry when it names no agent itself. */
+    private String withName(String content, String entryName) throws Exception {
+        JsonNode agent = plain.readTree(content);
+        if (!(agent instanceof ObjectNode fields)) {
+            return content;
+        }
+        JsonNode holder = fields.has("definition") ? fields.get("definition") : fields;
+        if (holder instanceof ObjectNode named && !(named.hasNonNull("name") && !named.get("name").asText().isBlank())) {
+            named.put("name", entryName);
+        }
+        return plain.writeValueAsString(fields);
     }
 }

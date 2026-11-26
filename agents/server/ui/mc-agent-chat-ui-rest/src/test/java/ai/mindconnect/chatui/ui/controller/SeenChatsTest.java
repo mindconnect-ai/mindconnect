@@ -1,11 +1,8 @@
 package ai.mindconnect.chatui.ui.controller;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
-import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectories;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -16,45 +13,46 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** A chat started elsewhere is new to this browser until it has been on screen here. */
 class SeenChatsTest {
 
-    private record Chat(SessionId id, Instant startedAt) implements AgentSessionHeader {
-        public AgentId agentDefinitionId() { return null; }
-        public UserId userId() { return null; }
-        public ConversationId conversationId() { return null; }
-        public String title() { return null; }
-        public SessionStatus status() { return null; }
-        public Instant completedAt() { return null; }
-        public SessionId parentSessionId() { return null; }
+    /** A chat as the management API lists it. */
+    private static ManagedSession chat(SessionId id, String title, Instant startedAt) {
+        return new ManagedSession(id,
+                ai.mindconnect.agent.UserId.of("ada"), null, null, title, ManagedSession.CHAT,
+                ManagedSession.Status.IDLE, SessionDirectories.NONE, startedAt, java.util.Map.of());
+    }
+
+    private static SessionId id(ManagedSession chat) {
+        return chat.id();
     }
 
     private static final Instant BEGAN = Instant.parse("2026-09-11T10:00:00Z");
-    private static final Chat BEFORE = new Chat(SessionId.random(), BEGAN.minusSeconds(3600));
-    private static final Chat ELSEWHERE = new Chat(SessionId.random(), BEGAN.plusSeconds(60));
-    private static final Chat HERE = new Chat(SessionId.random(), BEGAN.plusSeconds(30));
+    private static final ManagedSession BEFORE = chat(SessionId.random(), null, BEGAN.minusSeconds(3600));
+    private static final ManagedSession ELSEWHERE = chat(SessionId.random(), null, BEGAN.plusSeconds(60));
+    private static final ManagedSession HERE = chat(SessionId.random(), null, BEGAN.plusSeconds(30));
 
     @Test
     void aChatStartedElsewhereIsNewUntilItHasBeenOnScreen() {
-        SeenChats seen = SeenChats.from(BEGAN).withShown(HERE.id());
-        List<Chat> chats = List.of(ELSEWHERE, HERE, BEFORE);
+        SeenChats seen = SeenChats.from(BEGAN).withShown(id(HERE));
+        List<ManagedSession> chats = List.of(ELSEWHERE, HERE, BEFORE);
 
-        assertThat(seen.unseen(chats)).containsExactly(ELSEWHERE.id());
-        assertThat(seen.withShown(ELSEWHERE.id()).unseen(chats)).isEmpty();
+        assertThat(seen.unseen(chats)).containsExactly(id(ELSEWHERE));
+        assertThat(seen.withShown(id(ELSEWHERE)).unseen(chats)).isEmpty();
     }
 
     @Test
     void theChatsFromBeforeThisBrowserBeganAreNotNewToIt() {
         assertThat(SeenChats.from(BEGAN).unseen(List.of(BEFORE)))
                 .as("a first visit does not mark the whole history").isEmpty();
-        assertThat(SeenChats.from(BEGAN).unseen(List.of(new Chat(SessionId.random(), null)))).isEmpty();
+        assertThat(SeenChats.from(BEGAN).unseen(List.of(chat(SessionId.random(), null, null)))).isEmpty();
     }
 
     @Test
     void recordingAChatLeavesTheStoredValueAlone() {
         SeenChats stored = SeenChats.from(BEGAN);
-        SeenChats after = stored.withShown(ELSEWHERE.id());
+        SeenChats after = stored.withShown(id(ELSEWHERE));
 
         assertThat(stored.shown()).isEmpty();
-        assertThat(after.shown()).containsExactly(ELSEWHERE.id().value());
-        assertThat(after.withShown(ELSEWHERE.id())).as("showing it twice changes nothing").isSameAs(after);
+        assertThat(after.shown()).containsExactly(id(ELSEWHERE).value());
+        assertThat(after.withShown(id(ELSEWHERE))).as("showing it twice changes nothing").isSameAs(after);
         assertThat(after.since()).isEqualTo(BEGAN);
     }
 }

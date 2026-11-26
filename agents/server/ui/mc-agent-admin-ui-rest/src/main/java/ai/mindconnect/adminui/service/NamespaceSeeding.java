@@ -1,13 +1,14 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
@@ -21,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 /**
  * Gives every namespace the bundled content it should have — the first time
@@ -56,16 +59,22 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
     private final ObjectProvider<ScopeSupplier> scope;
     private final ObjectProvider<NamespaceService> namespaces;
     private final NamespaceFirstUse firstUse = new NamespaceFirstUse("Seeding", this::seed);
+    /**
+     * Namespaces bound while they did not exist: a request that outlives a
+     * delete binds the namespace once more. That is no first use — the
+     * namespace created under the name next would otherwise count as seeded.
+     */
+    private final Set<Namespace> missing = ConcurrentHashMap.newKeySet();
     /** What the seeder did on this thread — for {@link #extensionsChanged()} to report. */
     private final ThreadLocal<NamespaceSeeder.Report> ranHere = new ThreadLocal<>();
 
     @Autowired
-    public NamespaceSeeding(LlmConfigRepository llmConfigs, AgentDefinitionRepository agents,
+    public NamespaceSeeding(LlmConfigRepository llmConfigs, AgentManagement agents,
                             SkillRepository skills, WorkflowDataRepository workflows,
                             InstalledSeedRepository installedSeeds, ExtensionService extensions,
                             ObjectMapper objectMapper, ObjectProvider<ScopeSupplier> scope,
-                            ObjectProvider<NamespaceService> namespaces) {
-        this(new NamespaceSeeder(new BundledSeeds(objectMapper), llmConfigs, agents, skills, workflows,
+                            ObjectProvider<NamespaceService> namespaces, JsonMapperFactory json) {
+        this(new NamespaceSeeder(new BundledSeeds(objectMapper, json), llmConfigs, agents, skills, workflows,
                 installedSeeds, extensions), scope, namespaces);
     }
 
@@ -92,9 +101,20 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
     public void ensure(Namespace namespace) {
         try {
             firstUse.ensure(namespace);
+            if (missing.remove(namespace)) {
+                firstUse.forget(namespace);
+            }
         } finally {
             ranHere.remove();
         }
+    }
+
+    /**
+     * The namespace was deleted: one created under its name later is a new
+     * namespace, and is seeded on its first use like any other.
+     */
+    public void deleted(Namespace namespace) {
+        firstUse.forget(namespace);
     }
 
     /**
@@ -126,6 +146,7 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
         NamespaceService service = namespaces.getIfAvailable();
         if (service != null && service.find(namespace).isEmpty()) {
             log.debug("Namespace '{}' does not exist (any more) — nothing to seed", namespace.value());
+            missing.add(namespace);
             return;
         }
         ranHere.set(scope.getIfAvailable() instanceof ThreadBoundScopeSupplier bound

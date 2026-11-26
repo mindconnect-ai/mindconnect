@@ -1,6 +1,6 @@
 package ai.mindconnect.chatui.service;
 
-import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;

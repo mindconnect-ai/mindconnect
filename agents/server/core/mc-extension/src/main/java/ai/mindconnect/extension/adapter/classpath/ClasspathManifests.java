@@ -3,9 +3,9 @@ package ai.mindconnect.extension.adapter.classpath;
 import ai.mindconnect.extension.domain.Extension;
 import ai.mindconnect.extension.domain.ExtensionManifest;
 import ai.mindconnect.extension.domain.ExtensionRegistry;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,8 +38,8 @@ public final class ClasspathManifests {
     }
 
     /** The manifests on the given class loader's classpath, read with a mapper that ignores what it does not know. */
-    public static ExtensionRegistry load(ClassLoader classLoader) {
-        return load(classLoader, JsonMapper.builder()
+    public static ExtensionRegistry load(ClassLoader classLoader, JsonMapperFactory json) {
+        return load(classLoader, json.builder()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build());
     }

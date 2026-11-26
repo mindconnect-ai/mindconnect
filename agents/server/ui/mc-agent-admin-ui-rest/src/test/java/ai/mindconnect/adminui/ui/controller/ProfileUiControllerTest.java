@@ -3,8 +3,8 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.adminui.ui.page.NamespacesPage;
 import ai.mindconnect.adminui.ui.page.ProfilePage;
 import ai.mindconnect.adminui.service.NamespaceMembers;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.domain.NamespaceRole;
@@ -51,13 +51,13 @@ class ProfileUiControllerTest {
                     java.util.List.of(),
                     // As the server wires it: a namespace lists addresses, the user store has them.
                     id -> users.find(id).map(ai.mindconnect.user.domain.User::email)
-                            .flatMap(ai.mindconnect.agent.Email::parse),
+                            .flatMap(ai.mindconnect.namespace.domain.Email::parse),
                     "local");
     private final ProfileUiController controller = controller(true);
 
     private ProfileUiController controller(boolean authEnabled) {
-        return new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users),
-                ScopeSupplier.fixed(Namespace.DEFAULT), Clock.fixed(NOW, ZoneOffset.UTC), authEnabled);
+        return new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users, new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class)),
+                ScopeSupplier.fixed(Namespace.DEFAULT), authEnabled).clock(Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -250,8 +250,8 @@ class ProfileUiControllerTest {
         namespaces.create("acme", null, UserId.of("alice"));
         namespaces.invite(new Namespace("acme"), UserId.of("alice"), namespaces.address("bob"), NamespaceRole.USER);
         users.selectNamespace(UserId.of("bob"), new Namespace("acme"));
-        ProfileUiController inAcme = new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users),
-                ScopeSupplier.fixed(new Namespace("acme")), Clock.fixed(NOW, ZoneOffset.UTC), true);
+        ProfileUiController inAcme = new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users, new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class)),
+                ScopeSupplier.fixed(new Namespace("acme")), true).clock(Clock.fixed(NOW, ZoneOffset.UTC));
 
         var answer = inAcme.leave(user("bob"), "acme");
 

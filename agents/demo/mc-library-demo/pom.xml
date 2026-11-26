@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-library-demo</artifactId>
+    <name>mc-library-demo</name>
+    <packaging>jar</packaging>
+    <description>The agent loop as a plain library: a Java program that calls a model with tools and keeps the conversation itself. No harness, no server, no storage.</description>
+
+    <!-- Only what this user really needs. Every dependency added here is part of the design. -->
+    <dependencies>
+    </dependencies>
+</project>

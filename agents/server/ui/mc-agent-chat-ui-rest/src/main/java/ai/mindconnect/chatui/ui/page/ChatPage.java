@@ -3,16 +3,19 @@ package ai.mindconnect.chatui.ui.page;
 import ai.mindconnect.chatui.ui.component.ChatFormComponent;
 import ai.mindconnect.chatui.ui.component.MessageListComponent;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionAgent;
+import ai.mindconnect.chatui.ui.component.ChatAgent;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiSection;
 
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The agent-session chat page. Composes three components into a
@@ -50,22 +53,25 @@ public final class ChatPage {
         return p;
     }
 
-    private final AgentSession session;
-    private final AgentDefinition agent;
+    private final ManagedSession session;
+    private final ManagedAgent agent;
+    private final SessionId sessionId;
 
     private final MessageListComponent messages;
     private final ChatFormComponent    chatForm;
+    /** Writes the history's tool cards and the composer's patches; Jackson's defaults, not the shared mapper. */
+    private final ObjectMapper json;
 
-    public ChatPage(AgentSession session, AgentDefinition agent,
-                    List<Message> history, WorkingMemory memory) {
-        this(session, agent, history, memory, false);
+    public ChatPage(ManagedSession session, ManagedAgent agent,
+                    List<ManagedMessage> history, WorkingMemory memory, ObjectMapper json) {
+        this(session, agent, history, memory, false, json);
     }
 
-    public ChatPage(AgentSession session, AgentDefinition agent,
-                    List<Message> history, WorkingMemory memory,
-                    boolean streaming) {
+    public ChatPage(ManagedSession session, ManagedAgent agent,
+                    List<ManagedMessage> history, WorkingMemory memory,
+                    boolean streaming, ObjectMapper json) {
         this(session, agent, history, memory, streaming,
-                MessageListComponent.SubAgentTreeProvider.NONE);
+                MessageListComponent.SubAgentTreeProvider.NONE, json);
     }
 
     /**
@@ -77,31 +83,35 @@ public final class ChatPage {
      *                     historic rendering (rebuilt from persisted child
      *                     sessions); {@link MessageListComponent.SubAgentTreeProvider#NONE}
      *                     for a flat fallback.
+     * @param json         the mapper the components write with
      */
-    public ChatPage(AgentSession session, AgentDefinition agent,
-                    List<Message> history, WorkingMemory memory,
+    public ChatPage(ManagedSession session, ManagedAgent agent,
+                    List<ManagedMessage> history, WorkingMemory memory,
                     boolean streaming,
-                    MessageListComponent.SubAgentTreeProvider subAgentTree) {
+                    MessageListComponent.SubAgentTreeProvider subAgentTree, ObjectMapper json) {
         this.session = session;
         this.agent = agent;
-        this.messages = new MessageListComponent(session.id(), agent, history, memory, subAgentTree)
+        this.sessionId = session.id();
+        this.json = json;
+        this.messages = new MessageListComponent(sessionId, agent, history, memory, subAgentTree, json)
                 .withSessionTitle(session.title())
-                .withCustomPrompt(session.mainAgent()
-                        .filter(a -> a instanceof SessionAgentRef)
-                        .map(a -> ((SessionAgentRef) a)
-                                .hasPromptOverride())
-                        .orElse(false))
-                .withParentSession(session.parentSessionId());
-        this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
-                .withModelLabel(agent.llmConfigName())
+                .withParentSession(session.parentId());
+        this.chatForm = new ChatFormComponent(sessionId, ChatAgent.id(agent), streaming)
+                .withModelLabel(ChatAgent.model(agent))
                 .withAgentCounts(agent, List.of())
-                .withWorkingDir(session.workingDir());
+                .withWorkingDir(session.directories().working());
     }
 
     /**
      * The tools the registry can hand out here, so the "+" menu's Tools badge
      * counts what the Tools picker counts — a binding without a row is not in it.
      */
+    /** Whether the chat runs on settings of its own and no longer follows its agent — the header says so. */
+    public ChatPage withOwnSettings(boolean ownSettings) {
+        messages.withOwnSettings(ownSettings);
+        return this;
+    }
+
     public ChatPage withOfferedTools(java.util.Collection<String> offeredTools) {
         this.chatForm.withAgentCounts(agent, offeredTools);
         return this;
@@ -134,24 +144,23 @@ public final class ChatPage {
             ai.mindconnect.chatui.ui.ChatHostLinks links) {
         var items = new java.util.ArrayList<ai.mindconnect.ui.model.UiMenuItem>();
 
-        if (session.parentSessionId() != null) {
+        if (session.parentId() != null) {
             items.add(ai.mindconnect.ui.model.UiMenuItem.link("parent", "Parent session",
-                    "/chat/sessions/" + session.parentSessionId().value()).icon("arrow-up"));
+                    "/chat/sessions/" + session.parentId().value()).icon("arrow-up"));
         }
         // Only a chat that references a registry agent has an agent to go
         // back to. An inline session agent's id resolves to nothing, so the
         // link would land on an agent page for an agent that does not exist.
-        boolean registryAgent = session.mainAgent()
-                .map(a -> a instanceof SessionAgentRef)
-                .orElse(true);
-        if (registryAgent) {
-            String back = links.backHref(session.agentDefinitionId(), session.id());
+        boolean registryAgent = session.agent() == null || session.agent() instanceof SessionAgent.Ref;
+        if (registryAgent && session.agentId().isPresent()) {
+            String back = links.backHref(
+                    session.agentId().get(), sessionId);
             if (back != null) {
                 items.add(ai.mindconnect.ui.model.UiMenuItem.link("back", "Back to agent", back)
                         .icon("back"));
             }
         }
-        for (var tool : links.sessionTools(session.id())) {
+        for (var tool : links.sessionTools(sessionId)) {
             items.add(ai.mindconnect.ui.model.UiMenuItem.of(tool.id(), tool.label())
                     .icon(tool.icon())
                     .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", tool.url())));
@@ -189,7 +198,7 @@ public final class ChatPage {
 
 
     /** The files hanging on the conversation, counted on the composer's "+" and in its menu. */
-    public ChatPage withAttachments(java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> attachments) {
+    public ChatPage withAttachments(java.util.List<ai.mindconnect.agent.management.api.SessionAttachment> attachments) {
         this.chatForm.withAttachments(attachments);
         return this;
     }
@@ -216,7 +225,7 @@ public final class ChatPage {
      * Files land in the session's vector store via the ingestion workflow,
      * and vector_search activates for the session.
      */
-    public static ai.mindconnect.ui.model.UiUpload attachZone(ai.mindconnect.agent.SessionId sessionId) {
+    public static ai.mindconnect.ui.model.UiUpload attachZone(SessionId sessionId) {
         return attachZone(sessionId, false);
     }
 
@@ -229,7 +238,7 @@ public final class ChatPage {
      *                   from a document by its media type.
      */
     public static ai.mindconnect.ui.model.UiUpload attachZone(
-            ai.mindconnect.agent.SessionId sessionId, boolean imagesOnly) {
+            SessionId sessionId, boolean imagesOnly) {
         var zone = ai.mindconnect.ui.model.UiUpload
                 .of("chat-attach", null)
                 .multiple()
@@ -250,6 +259,11 @@ public final class ChatPage {
      * <p>Separate from {@link #render()} so a host can put the conversation
      * inside its own shell instead of taking the whole page.
      */
+    /** The chat this page shows. */
+    public SessionId sessionId() {
+        return sessionId;
+    }
+
     public UiSection renderContent() {
         // No attachment strip above the input: the files live behind the "+",
         // which carries their count. A panel that is empty most of the time
@@ -319,7 +333,7 @@ public final class ChatPage {
      * swaps to its streaming state (Send → Stop).
      */
     public UiPatch streamResume() {
-        return patch(chatForm.toStreaming());
+        return patch(chatForm.toStreaming(json));
     }
 
     /**
@@ -341,7 +355,7 @@ public final class ChatPage {
     public UiPatch streamStart(String userBubble, String typingId) {
         return patch(
                 messages.appendUserMessage(userBubble),
-                chatForm.toStreaming(),
+                chatForm.toStreaming(json),
                 appendTyping(typingId));
     }
 
@@ -363,7 +377,7 @@ public final class ChatPage {
     public UiPatch streamFirstToken(String pendingId, String typingId) {
         return patch(
                 removeTyping(typingId),
-                messages.appendBotPending(pendingId, agent.name()));
+                messages.appendBotPending(pendingId, agent.definition().name()));
     }
 
     private UiPatch.Operation appendTyping(String typingId) {
@@ -427,7 +441,7 @@ public final class ChatPage {
      * name: a turn that ends without a single token still has it.
      */
     public UiPatch streamDone(String typingId) {
-        return patch(chatForm.toIdle(), messages.replaceAll(), removeTyping(typingId));
+        return patch(chatForm.toIdle(json), messages.replaceAll(), removeTyping(typingId));
     }
 
     /**
@@ -437,6 +451,6 @@ public final class ChatPage {
      * persisted history.
      */
     public UiPatch streamError(String message, String typingId) {
-        return patch(removeTyping(typingId), messages.appendErrorNotice(message), chatForm.toIdle());
+        return patch(removeTyping(typingId), messages.appendErrorNotice(message), chatForm.toIdle(json));
     }
 }

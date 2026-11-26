@@ -5,6 +5,7 @@ import ai.mindconnect.agent.registry.domain.RegistryIndex;
 import ai.mindconnect.agent.registry.domain.RegistryPackage;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.port.out.RegistryClient;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -59,19 +60,19 @@ public class GitHubRegistryClient implements RegistryClient {
 
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
-    public GitHubRegistryClient() {
-        this(Duration.ofMinutes(10), Duration.ofSeconds(20));
+    public GitHubRegistryClient(JsonMapperFactory json) {
+        this(Duration.ofMinutes(10), Duration.ofSeconds(20), json);
     }
 
-    public GitHubRegistryClient(Duration ttl, Duration timeout) {
-        this(ttl, timeout, System::getenv);
+    public GitHubRegistryClient(Duration ttl, Duration timeout, JsonMapperFactory json) {
+        this(ttl, timeout, System::getenv, json);
     }
 
-    public GitHubRegistryClient(Duration ttl, Duration timeout, Function<String, String> env) {
+    public GitHubRegistryClient(Duration ttl, Duration timeout, Function<String, String> env, JsonMapperFactory json) {
         this.ttl = ttl == null ? Duration.ZERO : ttl;
         this.timeout = timeout == null ? Duration.ofSeconds(20) : timeout;
         this.env = env == null ? name -> null : env;
-        this.objectMapper = new ObjectMapper()
+        this.objectMapper = json.create()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.http = HttpClient.newBuilder()
                 .connectTimeout(this.timeout)

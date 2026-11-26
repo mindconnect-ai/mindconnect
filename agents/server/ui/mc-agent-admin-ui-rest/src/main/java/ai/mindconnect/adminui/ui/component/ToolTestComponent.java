@@ -2,8 +2,8 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
@@ -11,6 +11,7 @@ import ai.mindconnect.adminui.ui.controller.ToolCatalogUiController;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -34,24 +35,25 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public final class ToolTestComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
     private final String previousJson;
     private final ToolTestService.Result result;
+    private final ObjectMapper mapper;
 
-    public ToolTestComponent(AgentDefinition agent,
+    public ToolTestComponent(ManagedAgent agent,
                               AgentTool tool,
                               ToolRegistry toolRegistry,
                               String previousJson,
-                              ToolTestService.Result result) {
+                              ToolTestService.Result result,
+                              JsonMapperFactory json) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
         this.previousJson = previousJson;
         this.result = result;
+        this.mapper = json.create();
     }
 
     @Override
@@ -75,7 +77,7 @@ public final class ToolTestComponent implements UiComponent {
                 .asEditable().asRequired()
                 .hint("A JSON object passed to Tool.execute(Map). Empty object = no arguments."))
             .action(UiAction.primary("send", "Send").icon("send")
-                    .onClick(trigger(on(AgentUiController.class).runToolTest(agent.id().value(), tool.id().value(), null),
+                    .onClick(trigger(on(AgentToolUiController.class).runToolTest(agent.id().value(), tool.id().value(), null),
                             id())))
             // Close only removes the overlay (a tiny remove-patch) — never a
             // page reload, so the page state behind the dialog survives.
@@ -97,7 +99,7 @@ public final class ToolTestComponent implements UiComponent {
         var resolved = toolRegistry.resolve(tool, ToolCallScope.detached(null));
         if (resolved.isEmpty()) return null;
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter()
+            return mapper.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(resolved.get().parametersSchema());
         } catch (JsonProcessingException e) {
             return null;

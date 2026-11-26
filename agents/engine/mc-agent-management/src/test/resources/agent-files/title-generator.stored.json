@@ -1,0 +1,33 @@
+{
+  "id" : "00000002-0000-0000-0000-000000000002",
+  "definition" : {
+    "name" : "title-generator",
+    "description" : "Generates a short title for a conversation from the first user message",
+    "instructions" : "You generate short conversation titles. Given a conversation exchange, respond with a concise title of 4-6 words that captures the topic. No punctuation at the end, no quotes — just the title.",
+    "modelSettings" : {
+      "model" : "agent-default",
+      "temperature" : null,
+      "maxOutputTokens" : null,
+      "reasoningEffort" : null,
+      "extra" : { }
+    },
+    "tools" : [ ],
+    "maxRounds" : 10,
+    "metadata" : {
+      "memory" : {
+        "strategy" : "none"
+      },
+      "callableByAgents" : false,
+      "skills" : [ ],
+      "id" : "00000002-0000-0000-0000-000000000002",
+      "subAgents" : [ ]
+    }
+  },
+  "group" : "utilities",
+  "icon" : "heading",
+  "welcomeMessage" : null,
+  "status" : "ACTIVE",
+  "createdAt" : "2025-01-01T00:00:00Z",
+  "updatedAt" : "2025-01-01T00:00:00Z",
+  "version" : 0
+}

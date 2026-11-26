@@ -1,11 +1,9 @@
 package ai.mindconnect.extension.demo;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
-import ai.mindconnect.agent.runtime.domain.TraceId;
-import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
+import ai.mindconnect.agent.trace.domain.TraceId;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -21,10 +19,9 @@ class CountingTraceRepositoryTest {
         final List<LlmCallTrace> saved = new ArrayList<>();
         int deletes;
         @Override public void save(LlmCallTrace trace) { saved.add(trace); }
-        @Override public List<LlmCallTrace> findByTurn(ChatTurnId turn) { return List.of(); }
+        @Override public List<LlmCallTrace> findByTurn(String turn) { return List.of(); }
         @Override public List<LlmCallTrace> findBySession(SessionId session) { return List.of(); }
-        @Override public List<LlmCallTrace> findByConversation(ConversationId conversation) { return List.of(); }
-        @Override public List<LlmCallTrace> findDescendants(ChatTurnId root) { return List.of(); }
+        @Override public List<LlmCallTrace> findDescendants(String root) { return List.of(); }
         @Override public Optional<LlmCallTrace> findById(TraceId id) { return Optional.empty(); }
         @Override public void deleteBySession(SessionId session) { deletes++; }
     }
@@ -46,10 +43,20 @@ class CountingTraceRepositoryTest {
     }
 
     @Test
-    void the_feature_says_who_it_is() {
-        DemoFeature feature = new DemoFeature();
+    void the_plugin_says_who_it_is() {
+        assertThat(new DemoPlugin().name()).isEqualTo("demo-dungeon");
+    }
 
-        assertThat(feature.name()).isEqualTo("demo-dungeon");
-        assertThat(feature.dependsOn()).isEmpty();
+    @Test
+    void the_plugin_counts_on_the_trace_store_the_host_provided_before_it() {
+        Recording store = new Recording();
+        ai.mindconnect.plugin.PluginRegistry registry = new ai.mindconnect.plugin.DefaultPluginRegistry();
+        registry.provide(LlmCallTraceRepository.class, () -> store);
+
+        registry.install(new DemoPlugin());
+        registry.get(LlmCallTraceRepository.class).save(null);
+
+        assertThat(registry.get(LlmCallCounter.class).calls()).isEqualTo(1);
+        assertThat(store.saved).hasSize(1);
     }
 }

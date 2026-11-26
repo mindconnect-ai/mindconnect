@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.admin.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpCaller;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpGateway;
@@ -33,7 +34,7 @@ class McpServerPrefixIsFixedTest {
 
     private final FakeAdmin admin = new FakeAdmin();
     private final McpGatewayUiController controller =
-            new McpGatewayUiController(admin, new SilentGateway(), null);
+            new McpGatewayUiController(admin, new SilentGateway(), null, new JsonMapperFactory(List.of()));
 
     private static McpTarget target() {
         return new McpTarget.Process(List.of("/bin/echo", "hi"), Map.of());
@@ -44,7 +45,7 @@ class McpServerPrefixIsFixedTest {
         body.put("id", "gmail");          // on an edit the path wins; harmless here
         body.put("displayName", "Gmail");
         body.put("enabled", true);
-        body.put("target", McpTargetForm.toJson(target()));
+        body.put("target", new McpTargetForm(new JsonMapperFactory(List.of())).toJson(target()));
         if (prefix != null) {
             body.put("toolNamePrefix", prefix);
         }

@@ -1,12 +1,9 @@
 package ai.mindconnect.agentrest.auth;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.http.HttpStatus;
@@ -51,14 +48,14 @@ class CurrentUsersTest {
 
     @Test
     void aSessionOpensOnlyForItsOwner() {
-        var repo = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-        AgentSession alices = repo.create(AgentSession.start(AgentId.of("default-chat"), UserId.of("alice"),
-                ConversationId.random()));
-        var access = new SessionAccess(repo);
+        var sessions = new ai.mindconnect.agentrest.SessionFixture();
+        var alices = sessions.open("alice", null);
+        var id = alices.id();
+        var access = new SessionAccess(sessions.runtime());
 
-        assertThat(access.requireOwned(alices.id(), UserId.of("alice"))).isEqualTo(alices);
-        assertThat(access.owned(alices.id(), UserId.of("bob"))).isEmpty();
-        assertThatThrownBy(() -> access.requireOwned(alices.id(), UserId.of("bob")))
+        assertThat(access.requireOwned(id, UserId.of("alice"))).isEqualTo(alices);
+        assertThat(access.owned(id, UserId.of("bob"))).isEmpty();
+        assertThatThrownBy(() -> access.requireOwned(id, UserId.of("bob")))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         assertThat(access.owned(SessionId.random(), UserId.of("alice"))).isEmpty();

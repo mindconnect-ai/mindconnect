@@ -1,7 +1,8 @@
 package ai.mindconnect.mcp.gateway.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static ai.mindconnect.mcp.gateway.adapter.pg.PgMcpServerRepositoryTest.registration;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,12 +40,12 @@ class PgMcpImportTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.freshMcpTables();
-        stores = new PgMcpStoreFactory(sql, dataDir);
+        stores = new PgMcpStoreFactory(sql, dataDir, new JsonMapperFactory(List.of()));
     }
 
     @Test
     void a_namespaces_files_are_imported_on_first_use_and_kept() {
-        FileMcpServerRepository files = new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME));
+        FileMcpServerRepository files = new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME), new JsonMapperFactory(List.of()));
         files.save(registration("gmail", "Gmail"));
         files.save(registration("files", "Files"));
 
@@ -56,7 +58,7 @@ class PgMcpImportTest {
 
     @Test
     void the_import_happens_once() {
-        FileMcpServerRepository files = new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME));
+        FileMcpServerRepository files = new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME), new JsonMapperFactory(List.of()));
         files.save(registration("gmail", "Gmail"));
         McpServerRepository first = stores.serverRepository(ScopeSupplier.fixed(ACME));
 
@@ -64,13 +66,13 @@ class PgMcpImportTest {
         first.deleteById(McpServerId.of("gmail"));
         files.save(registration("later", "Later"));
 
-        assertThat(new PgMcpStoreFactory(sql, dataDir).serverRepository(ScopeSupplier.fixed(ACME)).findAll()).isEmpty();
+        assertThat(new PgMcpStoreFactory(sql, dataDir, new JsonMapperFactory(List.of())).serverRepository(ScopeSupplier.fixed(ACME)).findAll()).isEmpty();
     }
 
     @Test
     void a_namespace_already_in_postgres_imports_nothing() {
         new PgMcpServerRepository(sql, ScopeSupplier.fixed(ACME)).initSchema().save(registration("remote", "Remote"));
-        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME)).save(registration("gmail", "Gmail"));
+        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME), new JsonMapperFactory(List.of())).save(registration("gmail", "Gmail"));
 
         assertThat(stores.serverRepository(ScopeSupplier.fixed(ACME)).findAll())
                 .extracting(McpServerRegistration::id).containsExactly(McpServerId.of("remote"));
@@ -78,8 +80,8 @@ class PgMcpImportTest {
 
     @Test
     void a_namespace_imports_its_own_files_only() {
-        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME)).save(registration("gmail", "Gmail"));
-        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(OTHER)).save(registration("files", "Files"));
+        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME), new JsonMapperFactory(List.of())).save(registration("gmail", "Gmail"));
+        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(OTHER), new JsonMapperFactory(List.of())).save(registration("files", "Files"));
 
         assertThat(stores.serverRepository(ScopeSupplier.fixed(ACME)).findAll())
                 .extracting(McpServerRegistration::id).containsExactly(McpServerId.of("gmail"));
@@ -91,11 +93,11 @@ class PgMcpImportTest {
     void the_files_are_imported_before_the_bundled_registrations_are_seeded() {
         // Seeding writes into the table; had it come first, the namespace would
         // have a row and its files would never be imported.
-        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME)).save(registration("gmail", "My Gmail"));
-        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME)).save(registration("files", "Files"));
+        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME), new JsonMapperFactory(List.of())).save(registration("gmail", "My Gmail"));
+        new FileMcpServerRepository(dataDir, ScopeSupplier.fixed(ACME), new JsonMapperFactory(List.of())).save(registration("files", "Files"));
         McpServerRepository acme = stores.serverRepository(ScopeSupplier.fixed(ACME));
 
-        BundledMcpRegistrations.seed(acme, "classpath:initial-data/mcp-servers/*.json");
+        BundledMcpRegistrations.seed(acme, "classpath:initial-data/mcp-servers/*.json", new JsonMapperFactory(List.of()));
 
         assertThat(acme.findAll())
                 .extracting(McpServerRegistration::displayName).containsExactly("Files", "My Gmail");
@@ -105,8 +107,8 @@ class PgMcpImportTest {
     void a_namespace_without_files_is_seeded_into_the_table() {
         McpServerRepository acme = stores.serverRepository(ScopeSupplier.fixed(ACME));
 
-        BundledMcpRegistrations.seed(acme, "classpath:initial-data/mcp-servers/*.json");
-        BundledMcpRegistrations.seed(acme, "classpath:initial-data/mcp-servers/*.json");
+        BundledMcpRegistrations.seed(acme, "classpath:initial-data/mcp-servers/*.json", new JsonMapperFactory(List.of()));
+        BundledMcpRegistrations.seed(acme, "classpath:initial-data/mcp-servers/*.json", new JsonMapperFactory(List.of()));
 
         assertThat(new PgMcpServerRepository(sql, ScopeSupplier.fixed(ACME)).findAll()).singleElement()
                 .satisfies(r -> {

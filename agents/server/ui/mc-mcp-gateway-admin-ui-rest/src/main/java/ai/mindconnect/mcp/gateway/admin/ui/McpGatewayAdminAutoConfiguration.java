@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.admin.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpGateway;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -29,9 +30,10 @@ public class McpGatewayAdminAutoConfiguration {
     @ConditionalOnBean({McpRegistryAdmin.class, McpGateway.class})
     @ConditionalOnMissingBean
     public McpGatewayUiController mcpGatewayUiController(McpRegistryAdmin admin, McpGateway gateway,
-                                                         ObjectProvider<McpCatalog> catalog) {
+                                                         ObjectProvider<McpCatalog> catalog,
+                                                         JsonMapperFactory json) {
         // The catalog is optional; without one the screen simply has no
         // "browse" button.
-        return new McpGatewayUiController(admin, gateway, catalog.getIfAvailable());
+        return new McpGatewayUiController(admin, gateway, catalog.getIfAvailable(), json);
     }
 }

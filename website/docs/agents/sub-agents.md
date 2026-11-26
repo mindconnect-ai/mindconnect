@@ -19,7 +19,9 @@ title generator — are never callable, whatever a roster says.
 
 The sub-agent runs in its **own session** — own prompt, tools and model — does
 its work, and returns the result. Sub-agents can call sub-agents recursively,
-up to a depth of **5**; each sub-agent call times out after 2 hours.
+up to a depth of **5** (`mindconnect.agent.sub-agents.max-depth`); a call
+beyond it fails with an error the calling agent reads. Each sub-agent call
+times out after 2 hours.
 
 ![Sub-agent recursion](/img/agents/sub-agent-recursion.svg)
 

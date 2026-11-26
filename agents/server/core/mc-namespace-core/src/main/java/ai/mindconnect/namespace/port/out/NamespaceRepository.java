@@ -1,6 +1,6 @@
 package ai.mindconnect.namespace.port.out;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 

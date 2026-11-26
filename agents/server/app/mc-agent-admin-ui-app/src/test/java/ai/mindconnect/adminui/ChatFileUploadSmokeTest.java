@@ -1,12 +1,13 @@
 package ai.mindconnect.adminui;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionAttachment;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agentrest.service.ChatOpening;
 import ai.mindconnect.agentrest.service.SessionFileService;
-import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
@@ -80,9 +81,9 @@ class ChatFileUploadSmokeTest {
     }
 
     @Autowired TestRestTemplate rest;
-    @Autowired AgentDefinitionRepository agents;
-    @Autowired AgentSessionRepository sessions;
-    @Autowired AgentSessionService sessionService;
+    @Autowired AgentManagement agents;
+    @Autowired SessionManagement sessions;
+    @Autowired ChatOpening chats;
     @Autowired SessionFileService sessionFiles;
     @Autowired ThreadBoundScopeSupplier scope;
 
@@ -116,8 +117,9 @@ class ChatFileUploadSmokeTest {
         // session has to be the caller's: the chat endpoints refuse anyone
         // else's, and with authentication off every request runs as the dev
         // user.
-        AgentDefinition agent = agents.findAll().stream().findFirst().orElseThrow();
-        AgentSession session = sessionService.openChat(agent.id(), UserId.of(SessionOwnership.ANONYMOUS_USER));
+        ManagedAgent agent = agents.list().stream().findFirst().orElseThrow();
+        ManagedSession session = chats.open(agent.id(),
+                UserId.of(SessionOwnership.ANONYMOUS_USER), null, null, java.util.List.of());
 
         String text = "Mindconnect upload smoke test.\n"
                 + "The secret ingredient of the test soup is paprika.\n".repeat(40);
@@ -145,8 +147,8 @@ class ChatFileUploadSmokeTest {
         assertThat(attachments).as("one ingested file with chunks").hasSize(1);
         assertThat(attachments.values().iterator().next()).isGreaterThan(0L);
 
-        AgentSession reloaded = sessions.findById(session.id()).orElseThrow();
-        assertThat(reloaded.attachedFileNames())
+        ManagedSession reloaded = sessions.find(session.id()).orElseThrow();
+        assertThat(reloaded.attachments()).extracting(SessionAttachment::name)
                 .as("the system prompt announces the file")
                 .contains("soup-notes.md");
     }

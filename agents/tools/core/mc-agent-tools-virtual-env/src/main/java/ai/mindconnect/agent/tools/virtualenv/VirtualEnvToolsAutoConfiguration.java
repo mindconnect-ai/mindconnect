@@ -1,7 +1,8 @@
 package ai.mindconnect.agent.tools.virtualenv;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.workspace.WorkspaceProvider;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -62,7 +63,8 @@ public class VirtualEnvToolsAutoConfiguration {
     @ConditionalOnMissingBean(WorkspaceProvider.class)
     public VirtualEnvWorkspaceProvider virtualEnvWorkspaceProvider(Environment env,
                                                                    ObjectProvider<OnBehalfTokens> onBehalf,
-                                                                   ObjectProvider<ScopeSupplier> scopes) {
+                                                                   ObjectProvider<ScopeSupplier> scopes,
+                                                                   JsonMapperFactory json) {
         String url = env.getRequiredProperty("mindconnect.virtual-env.client.url");
         String token = env.getProperty("mindconnect.virtual-env.client.token", "");
         String template = env.getProperty("mindconnect.virtual-env.client.default-template", "python");
@@ -89,7 +91,7 @@ public class VirtualEnvToolsAutoConfiguration {
             tokens = TokenSource.none();
             auth = "no token";
         }
-        VirtualEnvClient client = new VirtualEnvClient(URI.create(url), tokens, requestTimeout);
+        VirtualEnvClient client = new VirtualEnvClient(URI.create(url), tokens, requestTimeout, json);
         log.info("Agent tools work in virtual environments on {} (default template {}, {})", url, template, auth);
         return new VirtualEnvWorkspaceProvider(client, template, queueTimeout, idleTimeout, Clock.systemUTC());
     }

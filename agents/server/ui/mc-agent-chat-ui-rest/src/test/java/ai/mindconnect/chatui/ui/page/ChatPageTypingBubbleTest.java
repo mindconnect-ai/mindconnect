@@ -1,17 +1,13 @@
 package ai.mindconnect.chatui.ui.page;
 
-import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.chatui.ui.component.ChatFormComponent;
-import ai.mindconnect.message.domain.ConversationId;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,12 +19,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ChatPageTypingBubbleTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final AgentDefinition AGENT = new AgentDefinition(AgentId.random(), "coder", null, null, null, null,
-            null, "cfg", 5, null, null, List.of(), List.of(), List.of(), null, null, null);
+    private static final ai.mindconnect.agent.management.api.ManagedAgent AGENT =
+            ai.mindconnect.chatui.ChatFixture.agent("coder", "", "", "cfg");
     private static final String TYPING = "bot-typing-s-1";
 
-    private final AgentSession session = AgentSession.start(AGENT.id(), UserId.of("u"), ConversationId.random());
-    private final ChatPage page = new ChatPage(session, AGENT, List.of(), null);
+    private final ai.mindconnect.agent.management.api.ManagedSession session =
+            ai.mindconnect.chatui.ChatFixture.session("u", AGENT, null, List.of());
+    private final ChatPage page = new ChatPage(session, AGENT, List.of(), null, new JsonMapperFactory(List.of()).create());
 
     private List<JsonNode> ops(Object patch) {
         var out = new ArrayList<JsonNode>();

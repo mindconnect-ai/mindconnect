@@ -1,76 +1,83 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.cli.agentclient.StreamEvent;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * Unified CLI-facing API over the agent runtime, with both the local
- * (in-process) and remote (HTTP) implementations behind the same interface.
- *
- * <p>Listed methods are exactly those the CLI uses — this interface no longer
- * extends the runtime's inbound ports, so the CLI is free to evolve its own
- * shape independently. Migration / debugging operations like restoreSession
- * and recompressToolResults are intentionally absent: they were maintenance
- * helpers and are no longer part of the CLI surface.
- *
- * <p>Agents and sessions are addressed by their typed ids; the remote
- * implementation puts an id's value into the path, the local one hands it
- * straight to the runtime.
+ * What the CLI asks of an agent runtime — the one in this process or a
+ * server's, behind the same calls. The CLI does not create or edit agents:
+ * that happens in the admin UI or over the REST API.
  */
 public interface AgentClient {
 
     // ── Agents ──────────────────────────────────────────────────────────────
 
-    Optional<AgentDefinition> findAgent(AgentId agentId);
+    Optional<ManagedAgent> findAgent(AgentId agentId);
 
-    List<AgentDefinition> listAgents();
+    List<ManagedAgent> listAgents();
 
     // ── Sessions ────────────────────────────────────────────────────────────
 
-    AgentSession startSession(AgentId agentDefinitionId, UserId userId);
+    ManagedSession startSession(AgentId agentId, UserId userId);
 
-    /**
-     * Same, with the directory the session works in — where the CLI was
-     * launched — or {@code null} for the runtime's default.
-     */
-    AgentSession startSession(AgentId agentDefinitionId, UserId userId, String workingDir);
+    /** @param workingDir the directory the session's tools work in; {@code null} for the runtime's default */
+    ManagedSession startSession(AgentId agentId, UserId userId, String workingDir);
 
-    /** Moves a session to another working directory ({@code null} clears it); {@code /cd}. */
-    AgentSession changeWorkingDir(SessionId sessionId, String workingDir);
+    ManagedSession changeWorkingDir(SessionId sessionId, String workingDir);
 
-    /**
-     * Same, and replaces the additional directories the session may reach by
-     * absolute path ({@code /add-dir}); {@code null} keeps them as they are.
-     */
-    AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs);
+    /** @param additionalDirs the further directories the session may reach; {@code null} keeps the current ones */
+    ManagedSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs);
 
-    List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId);
+    List<ManagedSession> listSessions(AgentId agentId, UserId userId);
 
-    List<Message> loadHistory(SessionId sessionId);
+    List<ManagedMessage> loadHistory(SessionId sessionId);
 
     void deleteSession(SessionId sessionId);
 
+    /** @return how many messages with a sequence number in {@code [fromSeq, toSeq]} were deleted */
     int deleteMessages(SessionId sessionId, int fromSeq, int toSeq);
 
     // ── Chat ────────────────────────────────────────────────────────────────
 
+    /** Sends the message and blocks until the turn is over; what happens meanwhile goes to the handler. */
     String chat(SessionId sessionId, String userMessage, Consumer<StreamEvent> eventHandler);
 
+    /** @return whether there was a turn to cancel */
     boolean cancelChat(SessionId sessionId);
+
+    /**
+     * Whether a tool approval can be answered through this client while its
+     * turn waits. Where it cannot, the question is answered elsewhere — in
+     * the web UI of the server the client talks to.
+     */
+    default boolean answersApprovals() {
+        return false;
+    }
+
+    /**
+     * Answers the approval a tool call of the session's turn waits for; the
+     * turn goes on within the {@link #chat} call that reported the question.
+     *
+     * @param forSession with {@code approved}: the tool may run for the rest of the session
+     * @return whether the question was still open
+     */
+    default boolean answerApproval(SessionId sessionId, String callId, boolean approved, boolean forSession) {
+        return false;
+    }
 
     // ── Memory ──────────────────────────────────────────────────────────────
 
-    WorkingMemory getWorkingMemory(SessionId sessionId);
+    MemoryView getWorkingMemory(SessionId sessionId);
 
+    /** @return how many messages went into the summary */
     int compressMemory(SessionId sessionId);
 }

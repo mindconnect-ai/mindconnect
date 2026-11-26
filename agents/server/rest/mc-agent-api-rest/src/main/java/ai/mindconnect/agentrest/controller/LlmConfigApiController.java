@@ -1,11 +1,12 @@
 package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.gateway.service.LlmConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -39,15 +40,18 @@ public class LlmConfigApiController {
 
     private final LlmConfigRepository repository;
     private final LlmConfigTestService testService;
+    private final LlmConfigService configs;
 
-    public LlmConfigApiController(LlmConfigRepository repository, LlmConfigTestService testService) {
+    public LlmConfigApiController(LlmConfigRepository repository, LlmConfigTestService testService,
+                                  LlmConfigService configs) {
         this.repository = repository;
         this.testService = testService;
+        this.configs = configs;
     }
 
     /** One provider with the additional-parameter fields its gateway understands. */
     public record ProviderInfo(String name,
-                               List<ai.mindconnect.llm.domain.AdditionalParamSpec> additionalParams) {}
+                               List<ai.mindconnect.llm.management.api.domain.AdditionalParamSpec> additionalParams) {}
 
     @Operation(summary = "List providers and their additional parameters",
             description = "Every supported provider plus the catalog of keys its gateway reads "
@@ -55,7 +59,7 @@ public class LlmConfigApiController {
                     + "values, config type they apply to).")
     @GetMapping("/providers")
     public List<ProviderInfo> providers() {
-        return java.util.Arrays.stream(ai.mindconnect.llm.domain.LlmProvider.values())
+        return java.util.Arrays.stream(ai.mindconnect.llm.management.api.domain.LlmProvider.values())
                 .map(p -> new ProviderInfo(p.name(), p.additionalParams()))
                 .toList();
     }
@@ -79,22 +83,22 @@ public class LlmConfigApiController {
     @Operation(summary = "Create or replace an LLM config",
             description = "Saves the config under its id. A plaintext apiKey is encrypted "
                     + "(enc: prefix) by the repository before it hits disk — same as a UI "
-                    + "save; enc:/plain:-tagged and ${VAR} values are stored as-is.")
+                    + "save; enc:/plain:-tagged and ${VAR} values are stored as-is. A renamed "
+                    + "config takes its prices along, and an LM Studio config without a key "
+                    + "gets the placeholder key its local server expects.")
     @PostMapping
     public ResponseEntity<Void> save(@RequestBody LlmConfig config) {
         log.info("POST /api/llm-configs name={} provider={}", config.name(), config.provider());
-        repository.save(config);
+        configs.save(config);
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "Delete an LLM config")
+    @Operation(summary = "Delete an LLM config", description = "Its prices go with it.")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         log.info("DELETE /api/llm-configs/{}", id);
-        LlmConfigId configId = LlmConfigId.of(id);
-        if (repository.findById(configId).isEmpty()) return ResponseEntity.notFound().build();
-        repository.deleteById(configId);
-        return ResponseEntity.noContent().build();
+        return configs.delete(LlmConfigId.of(id))
+                ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 
     /**

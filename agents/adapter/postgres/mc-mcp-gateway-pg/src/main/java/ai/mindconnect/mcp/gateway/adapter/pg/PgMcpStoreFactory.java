@@ -1,7 +1,8 @@
 package ai.mindconnect.mcp.gateway.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.mcp.gateway.local.FileMcpServerRepository;
 import ai.mindconnect.mcp.gateway.local.McpDiscoveryStore;
@@ -28,14 +29,16 @@ public class PgMcpStoreFactory implements McpStoreFactory {
 
     private final Sql sql;
     private final Path dataDir;
+    private final JsonMapperFactory json;
 
     /**
      * @param dataDir where the file stores kept their data ({@code mindconnect.data.base-dir}) —
      *                read for the one-time import, never written
      */
-    public PgMcpStoreFactory(Sql sql, Path dataDir) {
+    public PgMcpStoreFactory(Sql sql, Path dataDir, JsonMapperFactory json) {
         this.sql = Objects.requireNonNull(sql, "sql");
         this.dataDir = Objects.requireNonNull(dataDir, "dataDir");
+        this.json = json;
     }
 
     @Override
@@ -43,14 +46,14 @@ public class PgMcpStoreFactory implements McpStoreFactory {
         PgMcpServerRepository repository = new PgMcpServerRepository(sql, scope).initSchema();
         for (Namespace namespace : namespacesWithFiles()) {
             ScopeSupplier only = ScopeSupplier.fixed(namespace);
-            new PgMcpServerRepository(sql, only).importOnce(new FileMcpServerRepository(dataDir, only));
+            new PgMcpServerRepository(sql, only).importOnce(new FileMcpServerRepository(dataDir, only, json));
         }
         return repository;
     }
 
     @Override
     public McpDiscoveryStore discoveryStore(ScopeSupplier scope) {
-        return new PgMcpDiscoveryStore(sql, scope).initSchema();
+        return new PgMcpDiscoveryStore(sql, scope, json).initSchema();
     }
 
     /**

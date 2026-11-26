@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.security;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.service.ApiTokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,9 +44,12 @@ public class ApiAuthentication {
 
     private final AuthenticationManager manager;
     private final UserRecorder recorder;
+    private final JsonMapperFactory json;
 
-    public ApiAuthentication(ApiTokenService tokens, UserRecorder recorder, JwtDecoder jwtDecoder) {
+    public ApiAuthentication(ApiTokenService tokens, UserRecorder recorder, JwtDecoder jwtDecoder,
+                             JsonMapperFactory json) {
         this.recorder = Objects.requireNonNull(recorder, "recorder");
+        this.json = json;
         ApiTokenAuthenticationProvider apiTokens = new ApiTokenAuthenticationProvider(tokens, recorder);
         JwtAuthenticationProvider jwt = new JwtAuthenticationProvider(Objects.requireNonNull(jwtDecoder, "jwtDecoder"));
         jwt.setJwtAuthenticationConverter(new JwtUserConverter(recorder));
@@ -65,7 +69,7 @@ public class ApiAuthentication {
      * ({@link ApiErrorResponder}).
      */
     public HttpSecurity apply(HttpSecurity http) throws Exception {
-        ApiErrorResponder errors = new ApiErrorResponder();
+        ApiErrorResponder errors = new ApiErrorResponder(json);
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

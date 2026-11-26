@@ -11,10 +11,11 @@ import ai.mindconnect.chatui.ui.controller.StreamController;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiPatch;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AttachedFile;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.SessionAttachment;
 import ai.mindconnect.agent.SessionId;
 
 /**
@@ -35,7 +36,7 @@ import ai.mindconnect.agent.SessionId;
  * </ul>
  *
  * <p>The form id and the textarea are the same in both states. The switch
- * between them is a MERGE ({@link #toStreaming()}, {@link #toIdle()}) that
+ * between them is a MERGE ({@link #toStreaming}, {@link #toIdle}) that
  * swaps the form's class, footer and extras but never its fields, so what the
  * user has typed survives it whether or not the textarea has focus — a
  * REPLACE only keeps the value of the focused control. {@link #reset()} is the
@@ -91,9 +92,9 @@ public final class ChatFormComponent implements UiComponent {
      * Puts the file count on the "+" — so it is visible while typing — and the
      * document and picture counts on the menu's Upload files and Add images entries.
      */
-    public ChatFormComponent withAttachments(java.util.List<AttachedFile> attachments) {
+    public ChatFormComponent withAttachments(java.util.List<SessionAttachment> attachments) {
         this.imageCount = attachments == null ? 0
-                : (int) attachments.stream().filter(AttachedFile::isImage).count();
+                : (int) attachments.stream().filter(SessionAttachment::isImage).count();
         this.documentCount = attachments == null ? 0 : attachments.size() - imageCount;
         return this;
     }
@@ -112,10 +113,10 @@ public final class ChatFormComponent implements UiComponent {
      *
      * @param offeredTools every tool name the registry can hand out here
      */
-    public ChatFormComponent withAgentCounts(AgentDefinition agent,
+    public ChatFormComponent withAgentCounts(ManagedAgent agent,
                                              java.util.Collection<String> offeredTools) {
         this.toolCount = ChatToolsPickerComponent.onCount(agent, offeredTools);
-        this.subAgentCount = agent == null ? 0 : agent.effectiveCallableAgents().size();
+        this.subAgentCount = agent == null ? 0 : ChatAgent.roster(agent).size();
         return this;
     }
 
@@ -190,7 +191,7 @@ public final class ChatFormComponent implements UiComponent {
      * REPLACE that resets the form to its idle state with an EMPTY textarea.
      * For the one path that submitted the text and waited for the answer
      * (the non-streaming {@code POST /chat}); a streaming turn ends with
-     * {@link #toIdle()}, which keeps whatever was typed meanwhile.
+     * {@link #toIdle}, which keeps whatever was typed meanwhile.
      */
     public UiPatch.Operation reset() {
         return UiPatch.Operation.replace(id(), idleForm());
@@ -202,17 +203,17 @@ public final class ChatFormComponent implements UiComponent {
      * the textarea stays open and keeps its text and its focus. Used at the
      * start of a streaming turn.
      */
-    public UiPatch.Operation toStreaming() {
-        return mergeInto(streamingForm());
+    public UiPatch.Operation toStreaming(ObjectMapper json) {
+        return mergeInto(streamingForm(), json);
     }
 
     /**
      * MERGE back into the idle state at the end of a streaming turn. Like
-     * {@link #toStreaming()} it leaves the fields alone, so a message typed
+     * {@link #toStreaming} it leaves the fields alone, so a message typed
      * during the turn is still in the textarea afterwards, ready to send.
      */
-    public UiPatch.Operation toIdle() {
-        return mergeInto(idleForm());
+    public UiPatch.Operation toIdle(ObjectMapper json) {
+        return mergeInto(idleForm(), json);
     }
 
     /**
@@ -224,22 +225,23 @@ public final class ChatFormComponent implements UiComponent {
      * <p>The nodes go in as JSON trees, each written as a node of its own.
      * The attributes are a {@code Map<String, Object>}, and a node that is
      * only an {@code Object} to Jackson is written without its {@code type}
-     * — the client then has no renderer for it and dumps it as JSON.
+     * — the client then has no renderer for it and dumps it as JSON. The trees
+     * are written by {@code json}.
      */
-    private UiPatch.Operation mergeInto(UiForm target) {
+    private UiPatch.Operation mergeInto(UiForm target, ObjectMapper json) {
         var attributes = new java.util.LinkedHashMap<String, Object>();
         attributes.put("cssClass", target.getCssClass());
-        attributes.put("content", trees(target.getContent()));
-        attributes.put("actions", trees(target.getActions()));
+        attributes.put("content", trees(target.getContent(), json));
+        attributes.put("actions", trees(target.getActions(), json));
         return UiPatch.Operation.merge(id(), attributes);
     }
 
     private static java.util.List<com.fasterxml.jackson.databind.JsonNode> trees(
-            java.util.List<? extends ai.mindconnect.ui.model.UiNode> nodes) {
+            java.util.List<? extends ai.mindconnect.ui.model.UiNode> nodes, ObjectMapper json) {
         if (nodes == null) return java.util.List.of();
         return nodes.stream()
                 .map(n -> (com.fasterxml.jackson.databind.JsonNode)
-                        ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER.valueToTree(n))
+                        json.valueToTree(n))
                 .toList();
     }
 

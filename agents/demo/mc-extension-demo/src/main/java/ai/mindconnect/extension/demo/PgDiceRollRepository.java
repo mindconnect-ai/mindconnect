@@ -1,6 +1,6 @@
 package ai.mindconnect.extension.demo;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 

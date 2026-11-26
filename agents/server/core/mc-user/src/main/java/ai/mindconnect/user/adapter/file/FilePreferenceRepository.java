@@ -1,6 +1,7 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.Preferences;
 import ai.mindconnect.user.port.out.PreferenceRepository;
 
@@ -22,10 +23,12 @@ public class FilePreferenceRepository implements PreferenceRepository {
 
     private final Path root;
     private final Object lock = new Object();
+    private final JsonMapperFactory json;
 
-    public FilePreferenceRepository(Path storageDir) {
+    public FilePreferenceRepository(Path storageDir, JsonMapperFactory json) {
         Objects.requireNonNull(storageDir, "storageDir");
         this.root = storageDir.resolve("system").resolve("preferences");
+        this.json = json;
     }
 
     @Override
@@ -54,7 +57,7 @@ public class FilePreferenceRepository implements PreferenceRepository {
     }
 
     private FileDocuments<Preferences> documents(UserId userId) {
-        return new FileDocuments<>(root.resolve(FileUserRepository.fileKey(userId)), Preferences.class);
+        return new FileDocuments<>(root.resolve(FileUserRepository.fileKey(userId)), Preferences.class, json);
     }
 
     /** A scope becomes a file name: nothing but what {@link Preferences#SCOPE} allows gets that far. */

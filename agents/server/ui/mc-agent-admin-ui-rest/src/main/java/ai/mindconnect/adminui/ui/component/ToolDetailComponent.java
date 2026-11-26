@@ -1,15 +1,16 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -29,16 +30,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public final class ToolDetailComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
+    private final ObjectMapper mapper;
 
-    public ToolDetailComponent(AgentDefinition agent, AgentTool tool, ToolRegistry toolRegistry) {
+    public ToolDetailComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry, JsonMapperFactory json) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
+        this.mapper = json.create();
     }
 
     @Override
@@ -50,18 +51,18 @@ public final class ToolDetailComponent implements UiComponent {
     public UiNode render() {
         String overridesJson = "";
         if (tool.overrides() != null && !tool.overrides().isEmpty()) {
-            try { overridesJson = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(tool.overrides()); }
+            try { overridesJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(tool.overrides()); }
             catch (JsonProcessingException ignored) {}
         }
 
         // Schema comes from the registry, or — for inline tools (run_agent /
-        // run_agents, handled by AgentChatService) — from the inline defs.
+        // run_agents, brought by the sub-agent plugin) — from its definitions.
         Object schema = null;
         var resolved = toolRegistry.resolve(tool, ToolCallScope.detached(null));
         if (resolved.isPresent()) {
             schema = resolved.get().parametersSchema();
         } else {
-            schema = AgentChatService.inlineToolDefinitions().stream()
+            schema = SubAgentPlugin.delegationTools().stream()
                     .filter(d -> d.name().equals(tool.name()))
                     .map(d -> (Object) d.parametersSchema())
                     .findFirst().orElse(null);
@@ -70,11 +71,10 @@ public final class ToolDetailComponent implements UiComponent {
                 .field(UiField.text("name",        "Name",        tool.name()))
                 .field(UiField.text("description", "Description", tool.description()))
                 .field(UiField.textarea("overrides", "Overrides (JSON)", overridesJson))
-                .field(UiField.text("enabled",     "Enabled",     tool.enabled() ? "Yes" : "No"))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
-                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id().value(), tool.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).editToolForm(agent.id().value(), tool.id().value()))))
                 .action(UiAction.secondary("test", "Test").icon("flash")
-                        .onClick(trigger(on(AgentUiController.class).testToolDialog(agent.id().value(), tool.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).testToolDialog(agent.id().value(), tool.id().value()))))
                 .link(UiLink.of("back",
                         "/admin/agents/" + agent.id().value() + "?section=tools&row=" + tool.id().value(),
                         "← Back to Agent"));

@@ -4,6 +4,7 @@ import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
 import ai.mindconnect.agent.tool.Connections;
 import ai.mindconnect.agent.tool.UserToolRoster;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.adapter.tool.StoredUserToolRoster;
 import ai.mindconnect.user.port.out.UserToolRepository;
 import ai.mindconnect.user.service.UserToolService;
@@ -23,7 +24,6 @@ import ai.mindconnect.user.port.out.UserRepository;
 import ai.mindconnect.user.service.ApiTokenService;
 import ai.mindconnect.user.service.NotificationService;
 import ai.mindconnect.user.service.UserService;
-import ai.mindconnect.user.service.UserTimeZones;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.customizers.OpenApiCustomizer;
@@ -41,8 +41,10 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import java.util.List;
 
 /**
- * The parts the apps compose their security from: the user and token
- * services over the persistence starter's repositories, the caller resolver
+ * The parts the apps compose their security from: the token and notification
+ * services over the persistence starter's repositories — the users themselves,
+ * their service and their time zones come from the runtime's users plugin,
+ * which the persistence starter installs — the caller resolver
  * for the REST layer, and {@link ApiAuthentication}. Filter chains are not
  * defined here — which paths take a browser login, a bearer token or nothing
  * is each app's decision.
@@ -61,12 +63,6 @@ import java.util.List;
 @ConditionalOnClass(HttpSecurity.class)
 @ConditionalOnBean({UserRepository.class, ApiTokenRepository.class})
 public class MindconnectSecurityAutoConfiguration {
-
-    @Bean
-    @ConditionalOnMissingBean
-    UserService userService(UserRepository users) {
-        return new UserService(users);
-    }
 
     @Bean
     @ConditionalOnMissingBean
@@ -181,23 +177,6 @@ public class MindconnectSecurityAutoConfiguration {
         return refreshing == null ? lookup : new RefreshingConnections(lookup, refreshing);
     }
 
-    /**
-     * The zone each user lives in, for the runtime's tools and the system
-     * prompt: what the user chose on the profile page or their browser
-     * reported, else {@code mindconnect.time-zone} — the JVM's zone when that
-     * is unset. The runtime finds it through its bean fallback into this
-     * context, like {@link Connections}.
-     */
-    @Bean
-    @ConditionalOnMissingBean(ai.mindconnect.agent.tool.TimeZones.class)
-    UserTimeZones userTimeZones(UserService users, @Value("${mindconnect.time-zone:}") String installationZone) {
-        if (installationZone == null || installationZone.isBlank()) return new UserTimeZones(users);
-        java.time.ZoneId zone = ai.mindconnect.agent.tool.TimeZones.parse(installationZone)
-                .orElseThrow(() -> new IllegalStateException("mindconnect.time-zone is not a time zone: \""
-                        + installationZone + "\". Use an id such as Europe/Zurich."));
-        return new UserTimeZones(users, zone);
-    }
-
     @Bean
     @ConditionalOnMissingBean
     UserRecorder userRecorder(UserService users) {
@@ -219,8 +198,9 @@ public class MindconnectSecurityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    ApiAuthentication apiAuthentication(ApiTokenService tokens, UserRecorder recorder, JwtDecoder jwtDecoder) {
-        return new ApiAuthentication(tokens, recorder, jwtDecoder);
+    ApiAuthentication apiAuthentication(ApiTokenService tokens, UserRecorder recorder, JwtDecoder jwtDecoder,
+                                        JsonMapperFactory json) {
+        return new ApiAuthentication(tokens, recorder, jwtDecoder, json);
     }
 
     /**

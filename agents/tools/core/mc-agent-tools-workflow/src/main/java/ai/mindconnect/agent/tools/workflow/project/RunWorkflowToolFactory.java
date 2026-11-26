@@ -1,11 +1,12 @@
 package ai.mindconnect.agent.tools.workflow.project;
 
-import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
 import ai.mindconnect.agent.tools.workflow.step.CallerLimits;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,6 +24,8 @@ import java.util.Set;
  */
 public final class RunWorkflowToolFactory implements ToolFactory {
 
+    private JsonMapperFactory json;
+
     @Override
     public String name() {
         return ProjectWorkflowFiles.TOOL;
@@ -34,9 +37,14 @@ public final class RunWorkflowToolFactory implements ToolFactory {
     }
 
     @Override
+    public void bind(ToolEnvironment env) {
+        this.json = env.require(JsonMapperFactory.class);
+    }
+
+    @Override
     public Tool create(AgentTool agentTool, ToolCallScope scope) {
         if (agentTool == null) {
-            return new RunWorkflowTool(scope, CallerLimits.none());
+            return new RunWorkflowTool(scope, CallerLimits.none(), json);
         }
         List<AgentTool> tools = new ArrayList<>();
         if (agentTool.overrides().get(ProjectWorkflowFiles.CALLER_TOOLS) instanceof Collection<?> raw) {
@@ -49,6 +57,6 @@ public final class RunWorkflowToolFactory implements ToolFactory {
         if (agentTool.overrides().get(ProjectWorkflowFiles.CALLER_AGENTS) instanceof Collection<?> raw) {
             raw.forEach(v -> agents.add(String.valueOf(v)));
         }
-        return new RunWorkflowTool(scope, CallerLimits.of(tools, agents));
+        return new RunWorkflowTool(scope, CallerLimits.of(tools, agents), json);
     }
 }

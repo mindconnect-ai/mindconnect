@@ -2,13 +2,14 @@ package ai.mindconnect.agent.tools.workflow.project;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
+import ai.mindconnect.agent.tool.MapToolEnvironment;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvoker;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvokers;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,7 +80,9 @@ class RunWorkflowToolTest {
                 ProjectWorkflowFiles.CALLER_TOOLS, callerTools.stream().map(ProjectWorkflowFiles::callerTool).toList(),
                 ProjectWorkflowFiles.CALLER_AGENTS, List.of()));
         ToolCallScope scope = ToolCallScope.ofSession(UserId.of("u"), SessionId.of("s"), project.toString());
-        return new RunWorkflowToolFactory().create(binding, scope);
+        RunWorkflowToolFactory factory = new RunWorkflowToolFactory();
+        factory.bind(MapToolEnvironment.builder().service(JsonMapperFactory.class, new JsonMapperFactory(List.of())).build());
+        return factory.create(binding, scope);
     }
 
     private String run(Tool tool, String workflow, Map<String, Object> input) {

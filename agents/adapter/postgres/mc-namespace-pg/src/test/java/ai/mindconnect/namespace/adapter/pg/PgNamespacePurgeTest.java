@@ -1,6 +1,6 @@
 package ai.mindconnect.namespace.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.jdbc.Sql;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

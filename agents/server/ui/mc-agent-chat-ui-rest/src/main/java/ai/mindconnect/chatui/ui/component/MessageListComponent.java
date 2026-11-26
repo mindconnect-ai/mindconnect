@@ -1,17 +1,17 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
-import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPatch;
 
 import java.util.Comparator;
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.agent.SessionId;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
@@ -73,16 +73,18 @@ public final class MessageListComponent implements UiComponent {
     }
 
     private final SessionId sessionId;
-    private final AgentDefinition agent;
-    private final List<Message> history;
+    private final ManagedAgent agent;
+    private final List<ManagedMessage> history;
     private final WorkingMemory memory;
     private final SubAgentTreeProvider subAgentTree;
+    /** The mapper the tool cards of past turns pretty-print their arguments with. */
+    private final ObjectMapper json;
     /** Set when this session was spawned by a parent (sub-agent session) — drives the header link. */
     private SessionId parentSessionId;
     /** This conversation's title, when it has one — the header's subject. */
     private String sessionTitle;
-    /** Whether this chat replaced its agent's system prompt with its own. */
-    private boolean customPrompt;
+    /** Whether this chat runs on settings of its own, taken from its agent and changed since. */
+    private boolean ownSettings;
     /** Bubbled sub-agent approval cards (from the ToolApprovalRepository), rendered after the history. */
     private List<UiList.Item> bubbledApprovalCards = List.of();
     /** The host's overflow menu (parent session, back to agent, memory/trace
@@ -92,15 +94,16 @@ public final class MessageListComponent implements UiComponent {
 
 
 
-    public MessageListComponent(SessionId sessionId, AgentDefinition agent,
-                                List<Message> history, WorkingMemory memory) {
-        this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE);
+    public MessageListComponent(SessionId sessionId, ManagedAgent agent,
+                                List<ManagedMessage> history, WorkingMemory memory, ObjectMapper json) {
+        this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE, json);
     }
 
-    public MessageListComponent(SessionId sessionId, AgentDefinition agent,
-                                List<Message> history, WorkingMemory memory,
-                                SubAgentTreeProvider subAgentTree) {
+    public MessageListComponent(SessionId sessionId, ManagedAgent agent,
+                                List<ManagedMessage> history, WorkingMemory memory,
+                                SubAgentTreeProvider subAgentTree, ObjectMapper json) {
         this.sessionId = sessionId;
+        this.json = json;
         this.agent = agent;
         this.history = history;
         this.memory = memory;
@@ -120,14 +123,14 @@ public final class MessageListComponent implements UiComponent {
     }
 
     /**
-     * Marks that this chat runs on its own system prompt rather than the
-     * agent's. The badge says so: the header still names the agent, because
-     * its tools and the agents it may call are still the agent's — but the
-     * name would be misleading on its own. Returns {@code this} for fluent
-     * chaining.
+     * Marks that this chat runs on settings of its own rather than the
+     * agent's. The badge says so: the header still names the agent the
+     * settings were taken from, but the name would be misleading on its own —
+     * what is changed on that agent no longer reaches this chat. Returns
+     * {@code this} for fluent chaining.
      */
-    public MessageListComponent withCustomPrompt(boolean customPrompt) {
-        this.customPrompt = customPrompt;
+    public MessageListComponent withOwnSettings(boolean ownSettings) {
+        this.ownSettings = ownSettings;
         return this;
     }
 
@@ -181,13 +184,13 @@ public final class MessageListComponent implements UiComponent {
         // from the others — and with the history a closed drawer, the header is
         // the only place that can say which chat you are in. An untitled chat
         // falls back to the agent's name; "New chat" would say nothing at all.
-        String agentName = agent == null ? "Chat" : agent.name();
+        String agentName = agent == null ? "Chat" : agent.definition().name();
         boolean titled = sessionTitle != null && !sessionTitle.isBlank();
         var list = UiList.of(id(), titled ? sessionTitle : agentName);
         // The icon leads the title, the way every other screen's does — the
         // agent's own where it has one, so the conversation is recognisable
         // as this agent's and not just as "a chat".
-        list.icon(agent == null ? "chat" : agent.iconOrDefault());
+        list.icon(agent == null ? "chat" : ChatAgent.icon(agent));
         list.withCssClass("chat-container");
         // The history is a drawer now, opened from here. chat-ui.js owns the
         // click: the drawer is client state, and the server has no opinion
@@ -208,11 +211,11 @@ public final class MessageListComponent implements UiComponent {
         // Titled: the badge names the agent, because the header names the
         // conversation. Untitled: the header already names the agent, so the
         // badge is only worth drawing when there is something else to say —
-        // and an overridden prompt is exactly that, on the chat where the
-        // header would otherwise claim the agent's own.
+        // and settings of its own are exactly that, on the chat where the
+        // header would otherwise claim the agent's.
         String badge = titled
-                ? (customPrompt ? agentName + " · own prompt" : agentName)
-                : (customPrompt ? "own prompt" : null);
+                ? (ownSettings ? agentName + " · own settings" : agentName)
+                : (ownSettings ? "own settings" : null);
         if (badge != null) {
             tools.child(ai.mindconnect.ui.model.UiText.of(id() + "-agent", badge)
                     .<ai.mindconnect.ui.model.UiText>withCssClass("chat-agent-badge"));
@@ -223,12 +226,13 @@ public final class MessageListComponent implements UiComponent {
 
         // Sort by sequenceNum to be safe — persisted ordering should already
         // be correct but the component does not trust upstream.
-        List<Message> sorted = history.stream()
-                .sorted(Comparator.comparingInt(Message::sequenceNum))
+        List<ManagedMessage> sorted = history.stream()
+                .sorted(Comparator.comparingInt(ManagedMessage::sequence))
                 .toList();
 
-        List<Message> chatMessages = sorted.stream()
-                .filter(m -> m.type() == MessageType.CHAT)
+        List<ManagedMessage> chatMessages = sorted.stream()
+                .filter(m -> m.message().type() == TurnMessage.Type.USER
+                        || m.message().type() == TurnMessage.Type.ASSISTANT)
                 .toList();
 
         if (chatMessages.isEmpty()) {
@@ -242,11 +246,11 @@ public final class MessageListComponent implements UiComponent {
         // own collapsible task card BEFORE the agent message — so the flow
         // reads top-to-bottom (user → tools → answer), Claude-style.
         int prevAgentSeq = -1;
-        for (Message m : chatMessages) {
-            boolean isUser = m.senderType() == ParticipantType.USER;
+        for (ManagedMessage m : chatMessages) {
+            boolean isUser = m.message().type() == TurnMessage.Type.USER;
             // Before a user message too: a turn that was cancelled or failed has
             // tool calls but no answer, and its cards belong above the next question.
-            List<TaskCardComponent> tasks = toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, m.sequenceNum());
+            List<TaskCardComponent> tasks = toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, m.sequence());
             for (TaskCardComponent t : tasks) {
                 // Reuse the wrapper render to get the same <li> shape.
                 list.item(((UiList) t.render()).getItems().get(0));
@@ -258,7 +262,7 @@ public final class MessageListComponent implements UiComponent {
                         list.item(((UiList) Thoughts.card(m, thought).render()).getItems().get(0)));
             }
             list.item(messageItem(m, isUser));
-            prevAgentSeq = m.sequenceNum();
+            prevAgentSeq = m.sequence();
         }
         // The IN-FLIGHT turn's activity: task messages after the last CHAT
         // have no agent answer to group under yet — render them anyway, or a
@@ -447,7 +451,7 @@ public final class MessageListComponent implements UiComponent {
     private void addWelcomeOrEmpty(UiList list) {
         String welcome = agent.welcomeMessage();
         if (welcome != null && !welcome.isBlank()) {
-            list.item(UiList.Item.of("welcome", agent.name())
+            list.item(UiList.Item.of("welcome", agent.definition().name())
                     .content(UiMarkdown.of("welcome-md", welcome)));
         } else {
             list.item(UiList.Item.of("empty", "No messages yet")
@@ -467,15 +471,15 @@ public final class MessageListComponent implements UiComponent {
      * component's {@link SubAgentTreeProvider}.
      */
     public List<TaskCardComponent> allHistoricTaskCards() {
-        List<Message> sorted = history.stream()
-                .sorted(Comparator.comparingInt(Message::sequenceNum))
+        List<ManagedMessage> sorted = history.stream()
+                .sorted(Comparator.comparingInt(ManagedMessage::sequence))
                 .toList();
         return toolCallHistory().buildHistoricTaskCards(sorted, Integer.MIN_VALUE, Integer.MAX_VALUE);
     }
 
     /** The final assistant CHAT text in this component's history, or {@code null}. */
     public String lastAssistantText() {
-        return lastAssistantMessage().map(Message::content).orElse(null);
+        return lastAssistantMessage().map(m -> m.message().text()).orElse(null);
     }
 
     /**
@@ -487,22 +491,21 @@ public final class MessageListComponent implements UiComponent {
         return lastAssistantMessage().flatMap(m -> Thoughts.of(m).map(thought -> Thoughts.card(m, thought)));
     }
 
-    private java.util.Optional<Message> lastAssistantMessage() {
+    private java.util.Optional<ManagedMessage> lastAssistantMessage() {
         return history.stream()
-                .filter(m -> m.type() == MessageType.CHAT)
-                .filter(m -> m.senderType() != ParticipantType.USER)
-                .max(Comparator.comparingInt(Message::sequenceNum));
+                .filter(m -> m.message().type() == TurnMessage.Type.ASSISTANT)
+                .max(Comparator.comparingInt(ManagedMessage::sequence));
     }
 
     // ── Internal: the pieces this list is assembled from ───────────────────
 
     /** One message, rendered by its own component. */
-    private UiList.Item messageItem(Message m, boolean isUser) {
+    private UiList.Item messageItem(ManagedMessage m, boolean isUser) {
         return new MessageComponent(sessionId, agent, m, isUser, DT_FMT).item();
     }
 
     /** Rebuilds the tool cards of a past turn. */
     private ToolCallHistory toolCallHistory() {
-        return new ToolCallHistory(subAgentTree);
+        return new ToolCallHistory(sessionId, subAgentTree, json);
     }
 }

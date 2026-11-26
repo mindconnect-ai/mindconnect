@@ -59,7 +59,22 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-jackson</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-scope</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-jackson</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -74,12 +89,7 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-llm-gateway-pg</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-message-repository-pg</artifactId>
+                <artifactId>mc-llm-store-pg</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -194,12 +204,37 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-llm-gateway-core</artifactId>
+                <artifactId>mc-llm-runtime-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-llm-management-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-llm-provider-spi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-llm-providers</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-llm-jackson</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-llm-gateway</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-llm-store-file</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -210,21 +245,6 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-credentials-pg</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-message-repository-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-message-repository</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-agent-runtime-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

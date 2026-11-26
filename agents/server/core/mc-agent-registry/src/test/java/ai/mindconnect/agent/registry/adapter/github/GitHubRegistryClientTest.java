@@ -2,9 +2,11 @@ package ai.mindconnect.agent.registry.adapter.github;
 
 import ai.mindconnect.agent.registry.domain.RegistryException;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class GitHubRegistryClientTest {
 
     private final GitHubRegistryClient client =
-            new GitHubRegistryClient(Duration.ZERO, Duration.ofSeconds(1), name -> null);
+            new GitHubRegistryClient(Duration.ZERO, Duration.ofSeconds(1), name -> null, new JsonMapperFactory(List.of()));
 
     private final RegistrySource source = RegistrySource.of("acme/registry@v1.0.0");
 

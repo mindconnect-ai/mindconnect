@@ -18,6 +18,26 @@
 
     <dependencies>
         <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- The OpenAI Responses API, served by the same process as the admin UI. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-api-responses-rest</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
@@ -26,11 +46,6 @@
              library compiles against none of them. -->
         <!-- The OpenAI Responses API over this runtime; served alongside
              the admin UI so one process answers both. -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-api-responses-rest</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tools</artifactId>
@@ -111,15 +126,8 @@
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime</artifactId>
-        </dependency>
         <!-- persistence: one starter per backend, mindconnect.persistence picks -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-starter-runtime</artifactId>
-        </dependency>
+        <!-- The runtime on the plugin kernel, beside the earlier one until the chat has moved over. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-file</artifactId>
@@ -132,10 +140,6 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-persistence-pg</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

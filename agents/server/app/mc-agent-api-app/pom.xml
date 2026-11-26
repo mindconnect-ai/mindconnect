@@ -19,6 +19,15 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>
         </dependency>
         <!-- bearer authentication of the REST API: Keycloak JWT or personal API token -->
@@ -27,10 +36,7 @@
             <artifactId>mc-agent-security</artifactId>
         </dependency>
         <!-- persistence: one starter per backend, mindconnect.persistence picks -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-starter-runtime</artifactId>
-        </dependency>
+        <!-- The runtime on the plugin kernel and its stores: this server keeps sessions and agents where the admin UI does. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-file</artifactId>
@@ -105,10 +111,6 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-gateway</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

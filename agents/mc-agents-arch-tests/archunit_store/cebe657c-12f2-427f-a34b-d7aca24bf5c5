@@ -1,0 +1,16 @@
+package ai.mindconnect.adminui.service depends on ai.mindconnect.adminui.ui.component, which leads back to it
+package ai.mindconnect.adminui.ui depends on ai.mindconnect.adminui.service, which leads back to it
+package ai.mindconnect.adminui.ui depends on ai.mindconnect.adminui.ui.component, which leads back to it
+package ai.mindconnect.adminui.ui.component depends on ai.mindconnect.adminui.service, which leads back to it
+package ai.mindconnect.adminui.ui.component depends on ai.mindconnect.adminui.ui.controller, which leads back to it
+package ai.mindconnect.adminui.ui.controller depends on ai.mindconnect.adminui.service, which leads back to it
+package ai.mindconnect.adminui.ui.controller depends on ai.mindconnect.adminui.ui, which leads back to it
+package ai.mindconnect.adminui.ui.controller depends on ai.mindconnect.adminui.ui.component, which leads back to it
+package ai.mindconnect.adminui.ui.controller depends on ai.mindconnect.adminui.ui.page, which leads back to it
+package ai.mindconnect.adminui.ui.page depends on ai.mindconnect.adminui.service, which leads back to it
+package ai.mindconnect.adminui.ui.page depends on ai.mindconnect.adminui.ui, which leads back to it
+package ai.mindconnect.adminui.ui.page depends on ai.mindconnect.adminui.ui.component, which leads back to it
+package ai.mindconnect.chatui.ui.component depends on ai.mindconnect.chatui.ui.controller, which leads back to it
+package ai.mindconnect.chatui.ui.controller depends on ai.mindconnect.chatui.ui.component, which leads back to it
+package ai.mindconnect.chatui.ui.controller depends on ai.mindconnect.chatui.ui.page, which leads back to it
+package ai.mindconnect.chatui.ui.page depends on ai.mindconnect.chatui.ui.component, which leads back to it

@@ -1,11 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
-import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTrigger;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,17 +16,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** The drawer leads where the page says: the chat's own URLs, or a feature's. */
 class ChatShellComponentHistoryTest {
 
-    private record Chat(SessionId id, Instant startedAt) implements AgentSessionHeader {
-        public AgentId agentDefinitionId() { return null; }
-        public UserId userId() { return null; }
-        public ConversationId conversationId() { return null; }
-        public String title() { return "a talk"; }
-        public SessionStatus status() { return null; }
-        public Instant completedAt() { return null; }
-        public SessionId parentSessionId() { return null; }
+    /** A chat as the management API lists it. */
+    private static ManagedSession chat(SessionId id, String title, Instant startedAt) {
+        return new ManagedSession(id,
+                ai.mindconnect.agent.UserId.of("ada"), null, null, title, ManagedSession.CHAT,
+                ManagedSession.Status.IDLE, SessionDirectories.NONE, startedAt, java.util.Map.of());
     }
 
-    private final Chat chat = new Chat(SessionId.of("s1"), Instant.now());
+    private static SessionId id(ManagedSession chat) {
+        return chat.id();
+    }
+
+    private final ManagedSession chat = chat(SessionId.of("s1"), "a talk", Instant.now());
 
     @Test
     void theChatsOwnDrawerLinksToTheChatRoutes() throws Exception {

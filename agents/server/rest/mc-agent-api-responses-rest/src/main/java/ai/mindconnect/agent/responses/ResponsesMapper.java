@@ -142,7 +142,9 @@ public final class ResponsesMapper {
             case ConversationItem.AgentCall agentCall -> new ResponseDto.OutputItemDto(
                     id, "function_call", "completed", null, null,
                     agentCall.callId(), "run_agent",
-                    writeArguments(Map.of("agent", agentCall.agentName(), "input", agentCall.input())),
+                    // The task text is not known for every call; the call is shown all the same.
+                    writeArguments(Map.of("agent", agentCall.agentName(),
+                            "input", agentCall.input() == null ? "" : agentCall.input())),
                     null, null);
 
             default -> null;

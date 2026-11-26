@@ -2,6 +2,7 @@ package ai.mindconnect.adminui;
 
 import ai.mindconnect.agent.tools.workflow.step.AgentCallData;
 import ai.mindconnect.agent.tools.workflow.step.ToolCallData;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.StepData;
 import ai.mindconnect.workflow.domain.StepContainerData;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -28,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SeedWorkflowsTest {
 
     private static final JacksonWorkflowSerializer SERIALIZER =
-            new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create());
+            new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of())));
 
     @Test
     void everyBundledSeedDeserializes() throws IOException {

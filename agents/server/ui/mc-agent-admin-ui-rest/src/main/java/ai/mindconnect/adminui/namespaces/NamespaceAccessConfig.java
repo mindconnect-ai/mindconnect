@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.namespaces;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.namespace.service.NamespaceService;
 import jakarta.servlet.http.HttpServletRequest;

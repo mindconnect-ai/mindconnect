@@ -1,6 +1,8 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.Preferences;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,14 +25,14 @@ class FilePreferenceRepositoryTest {
 
     @Test
     void a_scope_is_one_file_in_the_users_directory_and_survives_a_new_repository() throws Exception {
-        var repo = new FilePreferenceRepository(dir);
+        var repo = new FilePreferenceRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         UserId alice = UserId.of("alice@example.com");
         Preferences email = new Preferences(alice, "office.email", Map.of("folder", "INBOX"), AT);
         repo.save(email);
         repo.save(new Preferences(alice, "office.calendar", Map.of("view", "week"), AT));
         repo.save(new Preferences(UserId.of("bob"), "office.email", Map.of("folder", "Sent"), AT));
 
-        var again = new FilePreferenceRepository(dir);
+        var again = new FilePreferenceRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
         assertThat(again.find(alice, "office.email")).contains(email);
         assertThat(again.findByUser(alice)).hasSize(2);
         assertThat(Files.exists(dir.resolve("system/preferences/"
@@ -46,7 +49,7 @@ class FilePreferenceRepositoryTest {
 
     @Test
     void a_scope_never_becomes_a_path_it_could_escape_through() {
-        var repo = new FilePreferenceRepository(dir);
+        var repo = new FilePreferenceRepository(dir, new JsonMapperFactory(List.of(new IdJsonModule())));
 
         assertThatThrownBy(() -> repo.find(UserId.of("alice"), "../../x"))
                 .isInstanceOf(IllegalArgumentException.class);

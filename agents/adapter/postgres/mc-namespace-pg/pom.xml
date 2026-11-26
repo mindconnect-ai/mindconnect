@@ -22,11 +22,20 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-namespace-core</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-jdbc</artifactId>
+        </dependency>
+        <!-- PgNamespacePlugin: the namespaces' plugin, their store in the database -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-namespace</artifactId>
         </dependency>
 
         <dependency>

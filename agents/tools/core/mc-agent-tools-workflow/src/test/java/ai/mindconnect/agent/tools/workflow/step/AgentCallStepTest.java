@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,7 +53,7 @@ class AgentCallStepTest {
             return "Roses are red";
         });
 
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow(), Map.of("topic", "spring"));
 
         assertThat(result.isSuccess()).isTrue();
@@ -62,7 +63,7 @@ class AgentCallStepTest {
 
     @Test
     void failsDescriptivelyWhenNoAgentRuntimeIsAvailable() {
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow(), Map.of("topic", "spring"));
 
         assertThat(result.isError()).isTrue();
@@ -75,7 +76,7 @@ class AgentCallStepTest {
         WorkflowData wf = workflow();
         ((AgentCallData) wf.getSteps().get(0)).setAgent(null);
 
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(wf, Map.of("topic", "spring"));
 
         assertThat(result.isError()).isTrue();

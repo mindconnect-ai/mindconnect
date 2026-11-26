@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-java-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../mc-java-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-conversation-aggregator</artifactId>
+    <packaging>pom</packaging>
+    <description>
+        Multi-module build for conversations: people and bots talking in one
+        thread, kept in memory, on files or in Postgres.
+    </description>
+
+    <properties>
+        <skipPublishing>true</skipPublishing>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <modules>
+        <!-- shared modules pulled in so this area builds on its own, without agents -->
+        <module>../common/mc-arch-rules</module>
+        <module>../common/mc-common</module>
+        <module>../common/mc-scope</module>
+        <module>../common/mc-file-repo</module>
+        <module>../common/mc-jdbc</module>
+        <module>mc-conversation-api</module>
+        <module>mc-conversation</module>
+        <module>mc-conversation-file</module>
+        <module>mc-conversation-pg</module>
+        <module>mc-conversation-arch-tests</module>
+    </modules>
+</project>

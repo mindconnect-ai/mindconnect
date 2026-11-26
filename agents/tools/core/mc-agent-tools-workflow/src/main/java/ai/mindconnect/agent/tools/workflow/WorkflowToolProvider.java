@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.workflow;
 
 import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.execution.WorkflowExecutorService;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -43,6 +44,8 @@ public final class WorkflowToolProvider implements MultiToolProvider {
     private WorkflowDataRepository repository;
     /** What a run's {@code env} variable holds; the process environment unless the host provides {@link EnvVarResolver}. */
     private Supplier<Map<String, String>> environment = WorkflowExecutorService::processEnvironment;
+    /** The host's mapper factory, for a run's JSON support. */
+    private JsonMapperFactory json;
 
     @Override
     public String group() {
@@ -55,6 +58,7 @@ public final class WorkflowToolProvider implements MultiToolProvider {
         environment = env.get(EnvVarResolver.class)
                 .<Supplier<Map<String, String>>>map(vars -> vars.shared()::asMap)
                 .orElse(WorkflowExecutorService::processEnvironment);
+        json = env.require(JsonMapperFactory.class);
         repository = env.get(WorkflowDataRepository.class).orElseThrow(() -> new IllegalStateException(
                 "WorkflowToolProvider: the tool environment carries no WorkflowDataRepository"
                         + " — no workflow tools available"));
@@ -93,6 +97,6 @@ public final class WorkflowToolProvider implements MultiToolProvider {
         // The run acts for this scope: its tool steps resolve their tools with it.
         // The tool catalog probes with null userId/sessionId, which a run tolerates.
         return repository.findById(workflowId)
-                .map(wf -> new WorkflowTool(repository, workflowId, wf, scope, environment));
+                .map(wf -> new WorkflowTool(repository, workflowId, wf, scope, environment, json));
     }
 }

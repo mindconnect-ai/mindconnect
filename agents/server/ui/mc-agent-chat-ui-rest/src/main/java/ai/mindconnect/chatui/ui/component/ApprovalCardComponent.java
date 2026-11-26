@@ -10,6 +10,7 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.ui.model.UiList;
 
 import ai.mindconnect.agent.SessionId;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The card that asks a human whether a tool may run.
@@ -23,23 +24,21 @@ import ai.mindconnect.agent.SessionId;
  */
 public final class ApprovalCardComponent {
 
-    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
-
     private ApprovalCardComponent() {
     }
 
     /** The tool name and pretty-printed arguments out of a request's content JSON. */
     public record ApprovalCall(String toolName, String argsJson) { }
 
-    public static ApprovalCall parseApprovalContent(String content) {
+    /** @param json the mapper that reads the request and pretty-prints its arguments */
+    public static ApprovalCall parseApprovalContent(String content, ObjectMapper json) {
         String toolName = "?";
         String argsJson = "{}";
         try {
-            var node = MAPPER.readTree(content);
+            var node = json.readTree(content);
             if (node.hasNonNull("name")) toolName = node.get("name").asText();
             if (node.has("arguments")) {
-                argsJson = MAPPER.writerWithDefaultPrettyPrinter()
+                argsJson = json.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(node.get("arguments"));
             }
         } catch (Exception ignored) {

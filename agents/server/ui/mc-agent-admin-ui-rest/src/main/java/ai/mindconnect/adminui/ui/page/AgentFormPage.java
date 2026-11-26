@@ -2,9 +2,8 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.AgentFormComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.ui.model.UiPage;
 
 /**
@@ -19,34 +18,34 @@ import ai.mindconnect.ui.model.UiPage;
  */
 public final class AgentFormPage extends AdminPage {
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final LlmConfigRepository llmConfigRepository;
-    private final AgentDefinitionRepository agentRepository;
+    private final java.util.List<ManagedAgent> all;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
-    private final ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog;
+    private final ai.mindconnect.agent.skill.port.out.SkillRepository skills;
 
     /**
      * @param agent {@code null} for the new-agent form, a populated
-     *              {@link AgentDefinition} for the edit form
+     *              agent for the edit form
      *              (including the copy-then-edit flow)
      */
-    public AgentFormPage(AgentDefinition agent,
+    public AgentFormPage(ManagedAgent agent,
                           LlmConfigRepository llmConfigRepository,
-                          AgentDefinitionRepository agentRepository,
+                          java.util.List<ManagedAgent> all,
                           com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
-        this(agent, llmConfigRepository, agentRepository, objectMapper, null);
+        this(agent, llmConfigRepository, all, objectMapper, null);
     }
 
-    public AgentFormPage(AgentDefinition agent,
+    public AgentFormPage(ManagedAgent agent,
                           LlmConfigRepository llmConfigRepository,
-                          AgentDefinitionRepository agentRepository,
+                          java.util.List<ManagedAgent> all,
                           com.fasterxml.jackson.databind.ObjectMapper objectMapper,
-                          ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog) {
+                          ai.mindconnect.agent.skill.port.out.SkillRepository skills) {
         this.agent = agent;
         this.llmConfigRepository = llmConfigRepository;
-        this.agentRepository = agentRepository;
+        this.all = all;
         this.objectMapper = objectMapper;
-        this.skillCatalog = skillCatalog;
+        this.skills = skills;
     }
 
     @Override
@@ -55,7 +54,7 @@ public final class AgentFormPage extends AdminPage {
                 ? "/admin/agents/new"
                 : "/admin/agents/" + agent.id().value() + "/edit";
         return UiPage.of(url,
-                new AgentFormComponent(agent, llmConfigRepository, agentRepository, objectMapper,
-                        skillCatalog).render());
+                new AgentFormComponent(agent, llmConfigRepository, all, objectMapper,
+                        skills).render());
     }
 }

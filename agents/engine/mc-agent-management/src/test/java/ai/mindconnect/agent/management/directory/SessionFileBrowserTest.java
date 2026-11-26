@@ -1,0 +1,352 @@
+package ai.mindconnect.agent.management.directory;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** A session's directories as a file explorer sees them: listed, opened, and never left. */
+class SessionFileBrowserTest {
+
+    @TempDir
+    Path tmp;
+
+    Path work;
+    Path outside;
+    SessionFileBrowser dirs;
+    String root;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        work = Files.createDirectories(tmp.resolve("work")).toRealPath();
+        outside = Files.createDirectories(tmp.resolve("outside")).toRealPath();
+        Files.writeString(outside.resolve("secret.txt"), "not yours");
+        Files.createDirectories(work.resolve("out/charts"));
+        Files.writeString(work.resolve("report.md"), "# Report");
+        Files.writeString(work.resolve("out/data.csv"), "a,b\n1,2\n");
+        dirs = new SessionFileBrowser(List.of(work), java.util.Map.of());
+        root = work.toString();
+    }
+
+    @Test
+    void aRootListsFoldersFirstThenFiles_withPathsRelativeToIt() {
+        var listing = dirs.list(root, "").orElseThrow();
+
+        assertThat(listing.path()).isEmpty();
+        assertThat(listing.entries()).extracting(SessionFileBrowser.Entry::name)
+                .containsExactly("out", "report.md");
+        var report = listing.entries().get(1);
+        assertThat(report.directory()).isFalse();
+        assertThat(report.size()).isEqualTo("# Report".length());
+        assertThat(report.path()).isEqualTo("report.md");
+        assertThat(listing.truncated()).isFalse();
+    }
+
+    @Test
+    void aSubfolderListsWithItsOwnPath_andItsFilesOpen() {
+        var listing = dirs.list(root, "out").orElseThrow();
+
+        assertThat(listing.path()).isEqualTo("out");
+        assertThat(listing.entries()).extracting(SessionFileBrowser.Entry::path)
+                .containsExactly("out/charts", "out/data.csv");
+        assertThat(dirs.file(root, "out/data.csv")).contains(work.resolve("out/data.csv"));
+        assertThat(dirs.file(root, "out")).as("a folder is no file").isEmpty();
+        assertThat(dirs.list(root, "report.md")).as("a file is no folder").isEmpty();
+    }
+
+    @Test
+    void nothingOutsideTheRootIsReachable() {
+        assertThat(dirs.file(root, "../outside/secret.txt")).isEmpty();
+        assertThat(dirs.file(root, "out/../../outside/secret.txt")).isEmpty();
+        assertThat(dirs.list(root, "..")).isEmpty();
+        assertThat(dirs.file(root, outside.resolve("secret.txt").toString()))
+                .as("an absolute path is taken as relative to the root").isEmpty();
+    }
+
+    @Test
+    void onlyTheSessionsRootsAreRoots() {
+        assertThat(dirs.list(outside.toString(), "")).isEmpty();
+        assertThat(dirs.file(outside.toString(), "secret.txt")).isEmpty();
+        assertThat(dirs.list(null, "")).isEmpty();
+    }
+
+    @Test
+    void aLinkOutOfTheRootIsNeitherListedNorOpened() throws Exception {
+        Files.createSymbolicLink(work.resolve("escape.txt"), outside.resolve("secret.txt"));
+        Files.createSymbolicLink(work.resolve("escape-dir"), outside);
+        Files.createSymbolicLink(work.resolve("inside.md"), work.resolve("report.md"));
+
+        assertThat(dirs.list(root, "").orElseThrow().entries()).extracting(SessionFileBrowser.Entry::name)
+                .containsExactly("out", "inside.md", "report.md");
+        assertThat(dirs.file(root, "escape.txt")).isEmpty();
+        assertThat(dirs.list(root, "escape-dir")).isEmpty();
+        assertThat(dirs.file(root, "escape-dir/secret.txt")).isEmpty();
+        assertThat(dirs.file(root, "inside.md")).as("a link that stays inside opens")
+                .contains(work.resolve("report.md"));
+    }
+
+    @Test
+    void missingRootsAreLeftOut_andDuplicatesFolded() {
+        var withGaps = new SessionFileBrowser(List.of(work, tmp.resolve("gone"), work, outside), java.util.Map.of());
+
+        assertThat(withGaps.roots()).containsExactly(work, outside);
+    }
+
+    @Test
+    void aVeryLargeFolderIsCut() throws Exception {
+        Path big = Files.createDirectories(work.resolve("big"));
+        for (int i = 0; i <= SessionFileBrowser.MAX_ENTRIES; i++) {
+            Files.writeString(big.resolve("f" + i + ".txt"), "");
+        }
+
+        var listing = dirs.list(root, "big").orElseThrow();
+
+        assertThat(listing.entries()).hasSize(SessionFileBrowser.MAX_ENTRIES);
+        assertThat(listing.truncated()).isTrue();
+    }
+
+    @Test
+    void a_workspace_elsewhere_is_listed_first_without_its_internals_and_opens_through_its_port() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home"));
+        Files.createDirectories(remote.resolve("deck"));
+        Files.writeString(remote.resolve("deck/sales.pptx"), "pptx-bytes");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(work), java.util.Map.of("/workspace", workspace));
+
+        assertThat(dirs.roots()).containsExactly(Path.of("/workspace"), work);
+        assertThat(dirs.list("/workspace", "").orElseThrow().entries())
+                .extracting(SessionFileBrowser.Entry::name).containsExactly("deck");
+        assertThat(dirs.list("/workspace", "deck").orElseThrow().entries())
+                .extracting(SessionFileBrowser.Entry::path).containsExactly("deck/sales.pptx");
+        var content = dirs.open("/workspace", "deck/sales.pptx").orElseThrow();
+        assertThat(content.size()).isEqualTo(10);
+        assertThat(new String(content.stream().readAllBytes())).isEqualTo("pptx-bytes");
+        assertThat(dirs.open("/workspace", "../../etc/passwd")).isEmpty();
+    }
+
+    @Test
+    void aFolderZipsWithEverythingBelowIt_insideAFolderOfItsName() throws Exception {
+        Files.writeString(work.resolve("out/charts/bar.png"), "png");
+
+        var archive = dirs.archive(root, "out").orElseThrow();
+
+        assertThat(archive.name()).isEqualTo("out.zip");
+        assertThat(archive.tooLarge()).isFalse();
+        assertThat(archive.files()).isEqualTo(2);
+        assertThat(unzip(archive)).containsExactly(
+                java.util.Map.entry("out/", ""),
+                java.util.Map.entry("out/charts/", ""),
+                java.util.Map.entry("out/charts/bar.png", "png"),
+                java.util.Map.entry("out/data.csv", "a,b\n1,2\n"));
+    }
+
+    @Test
+    void aRootZipsUnderTheNameItIsShownBy() throws Exception {
+        var archive = dirs.archive(root, "", "Session dir").orElseThrow();
+
+        assertThat(archive.name()).isEqualTo("Session dir.zip");
+        assertThat(unzip(archive).keySet()).containsExactly(
+                "Session dir/", "Session dir/out/", "Session dir/out/charts/", "Session dir/out/data.csv",
+                "Session dir/report.md");
+    }
+
+    @Test
+    void aZipHoldsNothingTheListingWouldNotShow() throws Exception {
+        Files.createSymbolicLink(work.resolve("escape.txt"), outside.resolve("secret.txt"));
+        Files.createSymbolicLink(work.resolve("escape-dir"), outside);
+        Files.createSymbolicLink(work.resolve("out/loop"), work);
+
+        var entries = unzip(dirs.archive(root, "").orElseThrow());
+
+        assertThat(entries.keySet()).noneMatch(name -> name.contains("escape") || name.contains("loop"));
+        assertThat(entries.values()).doesNotContain("not yours");
+        assertThat(dirs.archive(root, "..")).isEmpty();
+        assertThat(dirs.archive(root, "report.md")).as("a file is no folder").isEmpty();
+        assertThat(dirs.archive(outside.toString(), "")).isEmpty();
+    }
+
+    @Test
+    void aFolderWithTooManyFilesIsTooLargeToZip() throws Exception {
+        Path big = Files.createDirectories(work.resolve("big"));
+        for (int i = 0; i <= SessionFileBrowser.MAX_ARCHIVE_FILES; i++) {
+            Files.createFile(big.resolve("f" + i));
+        }
+
+        var archive = dirs.archive(root, "big").orElseThrow();
+
+        assertThat(archive.tooLarge()).isTrue();
+        assertThat(archive.files()).isEqualTo(SessionFileBrowser.MAX_ARCHIVE_FILES);
+    }
+
+    @Test
+    void a_workspace_elsewhere_zips_without_its_internals() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home"));
+        Files.writeString(remote.resolve(".home/.bashrc"), "internal");
+        Files.createDirectories(remote.resolve("deck"));
+        Files.writeString(remote.resolve("deck/sales.pptx"), "pptx-bytes");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(), java.util.Map.of("/workspace", workspace));
+
+        var whole = dirs.archive("/workspace", "").orElseThrow();
+        assertThat(whole.name()).isEqualTo("workspace.zip");
+        assertThat(unzip(whole)).containsExactly(
+                java.util.Map.entry("workspace/", ""),
+                java.util.Map.entry("workspace/deck/", ""),
+                java.util.Map.entry("workspace/deck/sales.pptx", "pptx-bytes"));
+        assertThat(unzip(dirs.archive("/workspace", "deck").orElseThrow()).keySet())
+                .containsExactly("deck/", "deck/sales.pptx");
+        assertThat(dirs.archive("/workspace", "../..")).isEmpty();
+    }
+
+    @Test
+    void textPreviewsAsText_binaryAndLargeFilesDoNot() throws Exception {
+        Files.write(work.resolve("out/chart.png"), new byte[]{(byte) 0x89, 'P', 'N', 'G', 0, 1});
+        Files.write(work.resolve("out/big.txt"), new byte[SessionFileBrowser.MAX_EDIT_BYTES + 1]);
+        Files.write(work.resolve("out/latin1.txt"), new byte[]{'M', (byte) 0xFC, 'l', 'l'});
+
+        var report = dirs.preview(root, "report.md").orElseThrow();
+        assertThat(report.editable()).isTrue();
+        assertThat(report.text()).isEqualTo("# Report");
+        assertThat(report.entry().path()).isEqualTo("report.md");
+        assertThat(report.entry().size()).isEqualTo(8);
+
+        assertThat(dirs.preview(root, "out/chart.png").orElseThrow().editable()).isFalse();
+        assertThat(dirs.preview(root, "out/big.txt").orElseThrow().editable()).isFalse();
+        assertThat(dirs.preview(root, "out/latin1.txt").orElseThrow().editable()).isFalse();
+        assertThat(dirs.preview(root, "out")).as("a folder is no file").isEmpty();
+        assertThat(dirs.preview(root, "../outside/secret.txt")).isEmpty();
+    }
+
+    @Test
+    void aFileIsSavedAsText_butNoneIsCreatedAndNothingOutsideIsWritten() throws Exception {
+        var saved = dirs.write(root, "out/data.csv", "a,b\n3,4\n").orElseThrow();
+
+        assertThat(Files.readString(work.resolve("out/data.csv"))).isEqualTo("a,b\n3,4\n");
+        assertThat(saved.size()).isEqualTo(8);
+        assertThat(dirs.write(root, "out/new.txt", "x")).isEmpty();
+        assertThat(work.resolve("out/new.txt")).doesNotExist();
+        assertThat(dirs.write(root, "../outside/secret.txt", "mine")).isEmpty();
+        Files.createSymbolicLink(work.resolve("escape.txt"), outside.resolve("secret.txt"));
+        assertThat(dirs.write(root, "escape.txt", "mine")).isEmpty();
+        assertThat(Files.readString(outside.resolve("secret.txt"))).isEqualTo("not yours");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        dirs.write(root, "report.md", "x".repeat(SessionFileBrowser.MAX_EDIT_BYTES + 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aFileOrAFolderWithEverythingInItIsDeleted_butNeitherARootNorAnythingOutside() throws Exception {
+        assertThat(dirs.delete(root, "report.md")).isTrue();
+        assertThat(work.resolve("report.md")).doesNotExist();
+
+        assertThat(dirs.delete(root, "out")).isTrue();
+        assertThat(work.resolve("out")).doesNotExist();
+
+        assertThat(dirs.delete(root, "")).isFalse();
+        assertThat(dirs.delete(root, ".")).isFalse();
+        assertThat(dirs.delete(root, "..")).isFalse();
+        assertThat(dirs.delete(root, "../outside/secret.txt")).isFalse();
+        assertThat(dirs.delete(root, "gone.txt")).isFalse();
+        assertThat(dirs.delete(outside.toString(), "secret.txt")).isFalse();
+        assertThat(work).exists();
+        assertThat(outside.resolve("secret.txt")).exists();
+    }
+
+    @Test
+    void deletingALinkRemovesTheLink_notWhatItPointsTo() throws Exception {
+        Files.createSymbolicLink(work.resolve("escape-dir"), outside);
+        Files.createDirectories(work.resolve("keep"));
+        Files.createSymbolicLink(work.resolve("keep/outside-link"), outside);
+        Files.createSymbolicLink(work.resolve("inside.md"), work.resolve("report.md"));
+
+        assertThat(dirs.delete(root, "escape-dir/secret.txt")).as("nothing through a link out").isFalse();
+        assertThat(dirs.delete(root, "escape-dir")).isTrue();
+        assertThat(dirs.delete(root, "keep")).isTrue();
+        assertThat(dirs.delete(root, "inside.md")).isTrue();
+
+        assertThat(work.resolve("escape-dir")).doesNotExist();
+        assertThat(work.resolve("keep")).doesNotExist();
+        assertThat(outside.resolve("secret.txt")).hasContent("not yours");
+        assertThat(work.resolve("report.md")).exists();
+        assertThat(dirs.delete(root, "escape-dir/secret.txt")).as("gone with its parent").isFalse();
+    }
+
+    @Test
+    void a_workspace_elsewhere_previews_saves_and_deletes_but_keeps_its_internals() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home"));
+        Files.writeString(remote.resolve(".home/.bashrc"), "internal");
+        Files.createDirectories(remote.resolve("deck"));
+        Files.writeString(remote.resolve("deck/notes.md"), "draft");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(), java.util.Map.of("/workspace", workspace));
+
+        assertThat(dirs.preview("/workspace", "deck/notes.md").orElseThrow().text()).isEqualTo("draft");
+        assertThat(dirs.write("/workspace", "deck/notes.md", "final")).isPresent();
+        assertThat(remote.resolve("deck/notes.md")).hasContent("final");
+
+        assertThat(dirs.preview("/workspace", ".home/.bashrc")).isEmpty();
+        assertThat(dirs.write("/workspace", ".home/.bashrc", "x")).isEmpty();
+        assertThat(dirs.delete("/workspace", ".home")).isFalse();
+        assertThat(dirs.delete("/workspace", "")).isFalse();
+        assertThat(remote.resolve(".home/.bashrc")).hasContent("internal");
+
+        assertThat(dirs.delete("/workspace", "deck")).isTrue();
+        assertThat(remote.resolve("deck")).doesNotExist();
+    }
+
+    @Test
+    void a_workspaces_internals_are_neither_listed_opened_nor_zipped_when_asked_for_by_path() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home/.ssh"));
+        Files.writeString(remote.resolve(".home/.bashrc"), "internal");
+        Files.writeString(remote.resolve(".home/.ssh/id_ed25519"), "key");
+        Files.createDirectories(remote.resolve(".mc"));
+        Files.writeString(remote.resolve(".mc/state.json"), "{}");
+        Files.createDirectories(remote.resolve("deck/.home"));
+        Files.writeString(remote.resolve("deck/.home/notes.md"), "the session's own");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionFileBrowser dirs = new SessionFileBrowser(List.of(), java.util.Map.of("/workspace", workspace));
+
+        for (String internal : List.of(".home", ".home/.ssh", "/.mc", "deck/../.home", "./.mc")) {
+            assertThat(dirs.list("/workspace", internal)).as("list %s", internal).isEmpty();
+            assertThat(dirs.archive("/workspace", internal)).as("archive %s", internal).isEmpty();
+        }
+        assertThat(dirs.open("/workspace", ".home/.bashrc")).isEmpty();
+        assertThat(dirs.open("/workspace", ".home/.ssh/id_ed25519")).isEmpty();
+        assertThat(dirs.open("/workspace", "deck/../.mc/state.json")).isEmpty();
+
+        assertThat(dirs.list("/workspace", "deck").orElseThrow().entries())
+                .as("only the root's folders of that name are the environment's")
+                .extracting(SessionFileBrowser.Entry::path).containsExactly("deck/.home");
+        assertThat(dirs.list("/workspace", "deck/.home")).isPresent();
+        assertThat(new String(dirs.open("/workspace", "deck/.home/notes.md").orElseThrow().stream().readAllBytes()))
+                .isEqualTo("the session's own");
+        assertThat(unzip(dirs.archive("/workspace", "deck").orElseThrow()).keySet())
+                .containsExactly("deck/", "deck/.home/", "deck/.home/notes.md");
+    }
+
+    /** The zip's entries in order, each with its content as text. */
+    private static java.util.Map<String, String> unzip(SessionFileBrowser.Archive archive) throws Exception {
+        var bytes = new java.io.ByteArrayOutputStream();
+        archive.writeTo(bytes);
+        var entries = new java.util.LinkedHashMap<String, String>();
+        try (var zip = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                entries.put(entry.getName(), new String(zip.readAllBytes()));
+            }
+        }
+        return entries;
+    }
+}

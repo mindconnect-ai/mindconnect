@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.postgres;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.adapter.pg.PgMcpServerRepository;
 import ai.mindconnect.mcp.gateway.local.McpGatewayAutoConfiguration;
 import ai.mindconnect.mcp.gateway.local.McpServerRepository;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -54,6 +56,7 @@ class PostgresMcpStoresTest {
                 .withInitializer(context -> context.getBeanFactory()
                         .setConversionService(ApplicationConversionService.getSharedInstance()))
                 .withBean(ObjectMapper.class, ObjectMapper::new)
+                .withBean(JsonMapperFactory.class, () -> new JsonMapperFactory(List.of()))
                 .withPropertyValues(
                         "mindconnect.persistence=postgres",
                         "mindconnect.postgres.url=" + URL,

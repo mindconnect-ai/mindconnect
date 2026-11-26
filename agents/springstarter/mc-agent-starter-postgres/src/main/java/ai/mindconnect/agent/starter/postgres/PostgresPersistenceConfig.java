@@ -1,9 +1,19 @@
 package ai.mindconnect.agent.starter.postgres;
 
-import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.jdbc.Json;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.agent.tool.TimeZones;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import ai.mindconnect.user.port.out.ApiTokenRepository;
+import ai.mindconnect.user.port.out.NotificationRepository;
+import ai.mindconnect.user.port.out.PreferenceRepository;
+import ai.mindconnect.user.port.out.UserRepository;
+import ai.mindconnect.user.port.out.UserToolRepository;
+import ai.mindconnect.user.runtime.UserPlugin;
+import ai.mindconnect.user.runtime.pg.PgUserPlugin;
+import ai.mindconnect.user.service.UserService;
+import org.springframework.beans.factory.ObjectProvider;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
@@ -25,10 +35,10 @@ import javax.sql.DataSource;
  * Registered as a Spring Boot auto-configuration: having this module on the
  * classpath is enough, no {@code @Import} in the application.
  *
- * <p>One pooled {@link DataSource}, one {@link Sql} around the application's
- * {@link ObjectMapper} — so a document in the database is the same JSON the
- * file store would have written — and every store creates its own tables on
- * start ({@code CREATE TABLE IF NOT EXISTS}; no migration tool).
+ * <p>One pooled {@link DataSource}; the runtime builds the one {@link Sql}
+ * around its mapper from it — so a document in the database is the same JSON
+ * the file store would have written — and every store creates its own tables
+ * on start ({@code CREATE TABLE IF NOT EXISTS}; no migration tool).
  *
  * <p>Every store is one adapter whose statements match the namespace the
  * scope of the call names, when the namespace starter binds one.
@@ -63,82 +73,62 @@ public class PostgresPersistenceConfig {
         return new HikariDataSource(config);
     }
 
-    @Bean
-    Sql mindconnectSql(DataSource mindconnectDataSource, ObjectMapper objectMapper) {
-        return Sql.of(mindconnectDataSource, new Json(objectMapper));
-    }
-
-    /** What the runtime starter builds every store of the runtime from: Postgres, side channels under the data dir. */
-    @Bean
-    @ConditionalOnMissingBean(Persistence.class)
-    Persistence persistence(DataSource mindconnectDataSource,
-                            @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return Persistence.postgres(mindconnectDataSource, java.nio.file.Path.of(baseDir));
-    }
-
     // ── users ───────────────────────────────────────────────────────────────
 
+    /**
+     * The users, their API tokens, tools, notices and preferences as tables, installed
+     * into the runtime: the runtime asks a user's zone and own variables, so it holds the
+     * stores. Installation-wide, not per namespace: a user is the same person in every namespace.
+     */
     @Bean
-    /** Installation-wide, not per namespace: a user is the same person in every namespace. */
-    ai.mindconnect.user.port.out.UserRepository userRepository(
-            Sql mindconnectSql,
-            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption) {
-        var rows = new ai.mindconnect.user.adapter.pg.PgUserRepository(mindconnectSql).initSchema();
-        var helper = encryption.getIfAvailable();
-        // A user's own variables are secrets — enc: at rest when there is a key, like LLM credentials.
-        if (helper == null) {
-            log.warn("No EncryptionHelper — users' own variables are stored unencrypted");
-            return rows;
-        }
-        return new ai.mindconnect.user.adapter.env.EncryptingUserRepository(rows, helper);
+    @ConditionalOnMissingBean(UserPlugin.class)
+    PgUserPlugin pgUserPlugin(ObjectProvider<EncryptionHelper> encryption,
+                              @Value("${mindconnect.time-zone:}") String installationZone) {
+        return new PgUserPlugin(encryption.getIfAvailable(), installationZone);
     }
 
-    @Bean
-    ai.mindconnect.user.port.out.ApiTokenRepository apiTokenRepository(Sql mindconnectSql) {
-        return new ai.mindconnect.user.adapter.pg.PgApiTokenRepository(mindconnectSql).initSchema();
+    @Bean UserRepository userRepository(AgentRuntime r) { return r.service(UserRepository.class); }
+    @Bean ApiTokenRepository apiTokenRepository(AgentRuntime r) { return r.service(ApiTokenRepository.class); }
+    @Bean UserToolRepository userToolRepository(AgentRuntime r) { return r.service(UserToolRepository.class); }
+    @Bean NotificationRepository notificationRepository(AgentRuntime r) { return r.service(NotificationRepository.class); }
+    @Bean PreferenceRepository preferenceRepository(AgentRuntime r) { return r.service(PreferenceRepository.class); }
+    @Bean UserService userService(AgentRuntime r) { return r.service(UserService.class); }
+    /** The zone each user lives in, for the profile page as for the runtime's prompt and tools. */
+    @Bean TimeZones timeZones(AgentRuntime r) { return r.service(TimeZones.class); }
+
+    /** Says what the start-up rewrite of earlier ciphertexts changed — nothing on every start after the first. */
+    private static void logRewritten(int records, String what) {
+        if (records > 0) log.info("{} {} rewritten from the earlier encryption scheme to AES-GCM", records, what);
     }
 
     /** The OAuth apps this installation can connect through — installation-wide. */
     @Bean
     ai.mindconnect.credentials.port.out.OAuthProviderRepository oAuthProviderRepository(
             Sql mindconnectSql,
-            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption) {
+            ObjectProvider<EncryptionHelper> encryption) {
         var rows = new ai.mindconnect.credentials.adapter.pg.PgOAuthProviderRepository(mindconnectSql).initSchema();
         var helper = encryption.getIfAvailable();
-        return helper == null ? rows
-                : new ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository(rows, helper);
-    }
-
-    /** The tools each user keeps in their own account — installation-wide. */
-    @Bean
-    ai.mindconnect.user.port.out.UserToolRepository userToolRepository(Sql mindconnectSql) {
-        return new ai.mindconnect.user.adapter.pg.PgUserToolRepository(mindconnectSql).initSchema();
+        if (helper == null) return rows;
+        var encrypting = new ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository(rows, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(), "OAuth provider(s)");
+        return encrypting;
     }
 
     /** The accounts users attached — installation-wide, and encrypted like their variables. */
     @Bean
     ai.mindconnect.credentials.port.out.ConnectionRepository connectionRepository(
             Sql mindconnectSql,
-            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption) {
+            ObjectProvider<EncryptionHelper> encryption, UserRepository users) {
         var rows = new ai.mindconnect.credentials.adapter.pg.PgConnectionRepository(mindconnectSql).initSchema();
         var helper = encryption.getIfAvailable();
         if (helper == null) {
             log.warn("No EncryptionHelper — connection credentials are stored unencrypted");
             return rows;
         }
-        return new ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository(rows, helper);
-    }
-
-    /** Installation-wide like the users they are addressed to, and not encrypted: a notice is not a secret. */
-    @Bean
-    ai.mindconnect.user.port.out.NotificationRepository notificationRepository(Sql mindconnectSql) {
-        return new ai.mindconnect.user.adapter.pg.PgNotificationRepository(mindconnectSql).initSchema();
-    }
-
-    /** What each user's screens remember; installation-wide like the users, and not a secret. */
-    @Bean
-    ai.mindconnect.user.port.out.PreferenceRepository preferenceRepository(Sql mindconnectSql) {
-        return new ai.mindconnect.user.adapter.pg.PgPreferenceRepository(mindconnectSql).initSchema();
+        var encrypting = new ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository(rows, helper);
+        logRewritten(encrypting.rewriteEarlierScheme(
+                users.findAll().stream().map(ai.mindconnect.user.domain.User::id).toList()), "connection(s)");
+        return encrypting;
     }
 
     // ── MCP gateway ─────────────────────────────────────────────────────────
@@ -157,9 +147,10 @@ public class PostgresPersistenceConfig {
         @Bean
         @ConditionalOnMissingBean(ai.mindconnect.mcp.gateway.local.McpStoreFactory.class)
         ai.mindconnect.mcp.gateway.local.McpStoreFactory mcpStoreFactory(
-                Sql mindconnectSql, @Value("${mindconnect.data.base-dir:data}") String baseDir) {
+                Sql mindconnectSql, @Value("${mindconnect.data.base-dir:data}") String baseDir,
+                JsonMapperFactory json) {
             return new ai.mindconnect.mcp.gateway.adapter.pg.PgMcpStoreFactory(mindconnectSql,
-                    java.nio.file.Path.of(baseDir));
+                    java.nio.file.Path.of(baseDir), json);
         }
     }
 }

@@ -22,6 +22,8 @@ used on its own — pull in just the one you need.
 | `mc-script-mini` | Minimal embeddable script runner |
 | `mc-jdbc` | Tiny JDBC helper: JSONB document tables, typed rows, transactions — no ORM |
 | `mc-file-repo` | The file counterpart: JSON documents read without locks, written atomically, one writer per file across the JVM |
+| `mc-scope` | Which namespace, and for whom, the current call works in — `Tenant`, `TenantScope`, `TenantMap`; no dependencies |
+| `mc-plugin` | Plugin kernel: plugins, the services and contributions they share, hook points any module declares — JDK and SLF4J only |
 
 ## Build
 

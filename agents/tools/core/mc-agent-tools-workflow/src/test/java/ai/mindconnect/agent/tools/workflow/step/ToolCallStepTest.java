@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -55,7 +56,7 @@ class ToolCallStepTest {
             return "3 results";
         });
 
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow("{\"query\": \"${topic}\", \"limit\": 3}"),
                         Map.of("topic", "spring boot"));
 
@@ -76,7 +77,7 @@ class ToolCallStepTest {
         // A map built upstream (e.g. by a code step) — contains characters that
         // would break JSON interpolation.
         Map<String, Object> prepared = Map.of("content", "line \"one\"\nline two");
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow("${writeArgs}"),
                         Map.of("topic", "unused", "writeArgs", prepared));
 
@@ -92,7 +93,7 @@ class ToolCallStepTest {
             return "ok";
         });
 
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow(null), Map.of("topic", "unused"));
 
         assertThat(result.isSuccess()).isTrue();
@@ -103,7 +104,7 @@ class ToolCallStepTest {
     void invalidArgumentJsonFailsDescriptively() {
         ToolInvokers.set((tool, args) -> "unused");
 
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow("not json"), Map.of("topic", "unused"));
 
         assertThat(result.isError()).isTrue();
@@ -117,7 +118,7 @@ class ToolCallStepTest {
         // (this is how file ingestion once "succeeded" with zero chunks).
         ToolInvokers.set((tool, args) -> "Error: no embeddings model configured");
 
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow("{}"), Map.of("topic", "unused"));
 
         assertThat(result.isError()).isTrue();
@@ -141,7 +142,7 @@ class ToolCallStepTest {
         wf.setResultFrom("hits");
         wf.addSteps(call);
 
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(wf, Map.of());
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getError())).isTrue();
@@ -168,7 +169,7 @@ class ToolCallStepTest {
             }
         });
         ToolCallScope alice = new ToolCallScope(UserId.of("alice"), SessionId.random(), null);
-        WorkflowExecutorService service = new WorkflowExecutorService(SpiWorkflowContextFactory.create());
+        WorkflowExecutorService service = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())));
 
         assertThat(service.executeWorkflow(workflow("{}"), Map.of("topic", "unused"),
                 Map.of(ToolCallScope.class.getName(), alice)).isSuccess()).isTrue();
@@ -179,7 +180,7 @@ class ToolCallStepTest {
 
     @Test
     void failsDescriptivelyWhenNoToolRuntimeIsAvailable() {
-        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+        WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())))
                 .executeWorkflow(workflow("{}"), Map.of("topic", "unused"));
 
         assertThat(result.isError()).isTrue();

@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,7 +28,7 @@ class PgWorkflowRepositoryFactoryTest {
     }
 
     private void writeWithFiles(String partition) {
-        var files = new FileWorkflowRepositoryFactory(dataDir, () -> partition);
+        var files = new FileWorkflowRepositoryFactory(dataDir, () -> partition, new JsonMapperFactory(List.of()));
         WorkflowData wf = new WorkflowData();
         wf.setName("approval");
         files.workflowDataRepository().save("approval", wf);
@@ -40,7 +42,7 @@ class PgWorkflowRepositoryFactoryTest {
     void importsTheDefinitionsAndTheRunsTheFileStoresKept() {
         writeWithFiles("acme");
 
-        var factory = new PgWorkflowRepositoryFactory(sql, () -> "acme", dataDir);
+        var factory = new PgWorkflowRepositoryFactory(sql, () -> "acme", dataDir, new JsonMapperFactory(List.of()));
 
         assertThat(factory.workflowDataRepository().listIds()).containsExactly("approval");
         assertThat(factory.workflowInstanceRepository().findByWorkflow("approval")).hasSize(1);
@@ -53,7 +55,7 @@ class PgWorkflowRepositoryFactoryTest {
     void withoutADataDirectoryNothingIsImported() {
         writeWithFiles("acme");
 
-        var factory = new PgWorkflowRepositoryFactory(sql, () -> "acme");
+        var factory = new PgWorkflowRepositoryFactory(sql, () -> "acme", new JsonMapperFactory(List.of()));
 
         assertThat(factory.workflowDataRepository().listIds()).isEmpty();
         assertThat(factory.workflowInstanceRepository().findAll()).isEmpty();
@@ -63,7 +65,7 @@ class PgWorkflowRepositoryFactoryTest {
     void anotherPartitionImportsOnlyItsOwnFiles() {
         writeWithFiles("acme");
 
-        var factory = new PgWorkflowRepositoryFactory(sql, () -> "globex", dataDir);
+        var factory = new PgWorkflowRepositoryFactory(sql, () -> "globex", dataDir, new JsonMapperFactory(List.of()));
 
         assertThat(factory.workflowDataRepository().listIds()).isEmpty();
         assertThat(factory.workflowInstanceRepository().findAll()).isEmpty();

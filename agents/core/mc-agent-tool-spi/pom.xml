@@ -25,10 +25,6 @@
     <dependencies>
         <!-- AgentTool carries Jackson annotations; nothing else of Jackson is needed here. -->
         <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-        </dependency>
-        <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-domain</artifactId>
         </dependency>

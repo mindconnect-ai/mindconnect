@@ -1,8 +1,8 @@
 package ai.mindconnect.namespace.service;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 
 import java.util.function.Supplier;
 

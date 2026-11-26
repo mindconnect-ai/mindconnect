@@ -1,6 +1,7 @@
 package ai.mindconnect.user.adapter.file;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.user.domain.Notification;
 import ai.mindconnect.user.domain.NotificationId;
 import ai.mindconnect.user.port.out.NotificationRepository;
@@ -25,10 +26,10 @@ public class FileNotificationRepository implements NotificationRepository {
     private final FileDocuments<Notification> notifications;
     private final Object lock = new Object();
 
-    public FileNotificationRepository(Path storageDir) {
+    public FileNotificationRepository(Path storageDir, JsonMapperFactory json) {
         Objects.requireNonNull(storageDir, "storageDir");
         this.notifications = new FileDocuments<>(
-                storageDir.resolve("system").resolve("notifications"), Notification.class);
+                storageDir.resolve("system").resolve("notifications"), Notification.class, json);
     }
 
     @Override

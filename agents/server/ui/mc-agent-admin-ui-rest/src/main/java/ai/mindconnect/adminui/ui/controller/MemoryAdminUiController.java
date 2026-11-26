@@ -3,13 +3,12 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
-import ai.mindconnect.agent.runtime.usermemory.MemoryReach;
-import ai.mindconnect.agent.runtime.usermemory.MemoryReadTool;
-import ai.mindconnect.agent.runtime.usermemory.MemoryWriteTool;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
+import ai.mindconnect.agent.tools.usermemory.MemoryReach;
+import ai.mindconnect.agent.tools.usermemory.MemoryReadTool;
+import ai.mindconnect.agent.tools.usermemory.MemoryWriteTool;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -63,15 +62,15 @@ public class MemoryAdminUiController {
 
     /** Null on a runtime without the memory. */
     private final UserMemoryService memory;
-    private final AgentDefinitionRepository agents;
+    private final AgentManagement agents;
 
     @Autowired
-    public MemoryAdminUiController(ObjectProvider<UserMemoryService> memory,
-                                   ObjectProvider<AgentDefinitionRepository> agents) {
-        this(memory.getIfAvailable(), agents.getIfAvailable());
+    public MemoryAdminUiController(ObjectProvider<ai.mindconnect.agent.sdk.AgentRuntime> runtime) {
+        this(runtime.stream().findFirst().flatMap(found -> found.find(UserMemoryService.class)).orElse(null),
+                runtime.stream().findFirst().flatMap(found -> found.find(AgentManagement.class)).orElse(null));
     }
 
-    MemoryAdminUiController(UserMemoryService memory, AgentDefinitionRepository agents) {
+    MemoryAdminUiController(UserMemoryService memory, AgentManagement agents) {
         this.memory = memory;
         this.agents = agents;
     }
@@ -125,10 +124,10 @@ public class MemoryAdminUiController {
      * of it are left from a time they did, so they can still be seen and
      * deleted. The shared memory is not here: it belongs to no agent.
      */
-    public Optional<UiNode> agentTab(AgentDefinition agent) {
-        if (memory == null || agent == null) return Optional.empty();
-        List<MemoryEntry> entries = ownEntries(agent.id());
-        boolean keepsOwn = reach(agent).map(MemoryReach::includesAgent).orElse(false);
+    public Optional<UiNode> agentTab(AgentId agentId, List<AgentTool> tools) {
+        if (memory == null) return Optional.empty();
+        List<MemoryEntry> entries = ownEntries(agentId);
+        boolean keepsOwn = reach(tools).map(MemoryReach::includesAgent).orElse(false);
         if (!keepsOwn && entries.isEmpty()) return Optional.empty();
         String help = keepsOwn
                 ? "What this agent keeps about each of its users in a memory of its own, across chats. No "
@@ -137,7 +136,7 @@ public class MemoryAdminUiController {
                   + "are left from before. The agent does not see them now.";
         return Optional.of(UiStack.of("agent-memory").gap(12)
                 .child(UiText.of("agent-memory-help", help))
-                .child(agentTable(agent.id(), entries)));
+                .child(agentTable(agentId, entries)));
     }
 
     private UiPage page(String user, String agent) {
@@ -186,14 +185,13 @@ public class MemoryAdminUiController {
     }
 
     /** The reach of the agent's memory tools — the write tool's binding decides, as in the prompt. */
-    private static Optional<MemoryReach> reach(AgentDefinition agent) {
-        if (agent.tools() == null) return Optional.empty();
-        Optional<AgentTool> write = binding(agent, MemoryWriteTool.NAME);
-        return write.or(() -> binding(agent, MemoryReadTool.NAME)).map(MemoryReach::of);
+    private static Optional<MemoryReach> reach(List<AgentTool> tools) {
+        Optional<AgentTool> write = binding(tools, MemoryWriteTool.NAME);
+        return write.or(() -> binding(tools, MemoryReadTool.NAME)).map(MemoryReach::of);
     }
 
-    private static Optional<AgentTool> binding(AgentDefinition agent, String name) {
-        return agent.tools().stream().filter(t -> t.enabled() && name.equals(t.name())).findFirst();
+    private static Optional<AgentTool> binding(List<AgentTool> tools, String name) {
+        return tools.stream().filter(t -> t.enabled() && name.equals(t.name())).findFirst();
     }
 
     /** The memory filter: all, the shared memory, or one agent's — every agent that keeps entries. */

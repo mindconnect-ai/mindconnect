@@ -4,17 +4,19 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.cli.agentclient.MemoryView;
+import ai.mindconnect.cli.agentclient.StreamEvent;
 import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalAgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.springframework.beans.factory.annotation.Value;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -29,28 +31,31 @@ public class CliRunner implements CommandLineRunner {
 
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
-    private static final com.fasterxml.jackson.databind.ObjectMapper PRETTY_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper()
-                    .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-                    .enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT)
-                    .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private final LocalClientFactory localFactory;
     private final RemoteClientFactory remoteFactory;
     private final InitialDataLoader initialDataLoader;
     private final CliStateStore stateStore;
     private final String userId;
+    private final com.fasterxml.jackson.databind.ObjectMapper prettyMapper;
+    private final com.fasterxml.jackson.databind.ObjectMapper plainMapper;
 
     public CliRunner(LocalClientFactory localFactory,
                      RemoteClientFactory remoteFactory,
                      InitialDataLoader initialDataLoader,
                      CliStateStore stateStore,
-                     @Value("${mindconnect.user.id:${user.name}}") String userId) {
+                     @Value("${mindconnect.user.id:${user.name}}") String userId,
+                     JsonMapperFactory json) {
         this.localFactory = localFactory;
         this.remoteFactory = remoteFactory;
         this.initialDataLoader = initialDataLoader;
         this.stateStore = stateStore;
         this.userId = userId;
+        this.prettyMapper = json.create()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT)
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        this.plainMapper = json.create();
     }
 
     @Override
@@ -84,12 +89,12 @@ public class CliRunner implements CommandLineRunner {
         Resume resume = resolveResume(stateStore.load(), userId, client);
 
         while (true) {
-            AgentDefinition selectedAgent = resume.agent != null
+            ManagedAgent selectedAgent = resume.agent != null
                     ? resume.agent
                     : selectAgent(scanner, client);
             if (selectedAgent == null) break;
 
-            AgentSession session;
+            ManagedSession session;
             if (resume.session != null) {
                 session = resume.session;
                 System.out.println("[Resumed session " + sessionLabel(session) + "]");
@@ -133,7 +138,7 @@ public class CliRunner implements CommandLineRunner {
                 }
 
                 if (input.equals("/sessions")) {
-                    AgentSession picked = pickSession(scanner, selectedAgent, userId, client);
+                    ManagedSession picked = pickSession(scanner, selectedAgent, userId, client);
                     if (picked != null) {
                         session = picked;
                         stateStore.save(CliState.activeSession(selectedAgent.id().value(), session.id().value()));
@@ -191,9 +196,9 @@ public class CliRunner implements CommandLineRunner {
                         continue;
                     }
                     try {
-                        java.util.List<String> dirs = new java.util.ArrayList<>(session.additionalDirs());
-                        dirs.add(DirectoryArgument.resolve(dir, session.workingDir()));
-                        session = client.changeWorkingDir(session.id(), session.workingDir(), dirs);
+                        java.util.List<String> dirs = new java.util.ArrayList<>(session.directories().additional());
+                        dirs.add(DirectoryArgument.resolve(dir, session.directories().working()));
+                        session = client.changeWorkingDir(session.id(), session.directories().working(), dirs);
                         printDirectories(session);
                     } catch (Exception e) {
                         System.out.println("[/add-dir failed: " + rootMessage(e) + "]");
@@ -210,9 +215,9 @@ public class CliRunner implements CommandLineRunner {
                     String dir = input.length() > 3 ? input.substring(3).trim() : "";
                     try {
                         session = client.changeWorkingDir(session.id(),
-                                dir.isEmpty() ? null : DirectoryArgument.resolve(dir, session.workingDir()));
-                        System.out.println(session.hasWorkingDir()
-                                ? "[Working directory: " + session.workingDir() + "]"
+                                dir.isEmpty() ? null : DirectoryArgument.resolve(dir, session.directories().working()));
+                        System.out.println((session.directories().working() != null)
+                                ? "[Working directory: " + session.directories().working() + "]"
                                 : "[Working directory cleared — the tools use the runtime's default.]");
                     } catch (Exception e) {
                         System.out.println("[/cd failed: " + rootMessage(e) + "]");
@@ -263,16 +268,16 @@ public class CliRunner implements CommandLineRunner {
         }
     }
 
-    private AgentSession pickOrStartSession(Scanner scanner, AgentDefinition agent,
+    private ManagedSession pickOrStartSession(Scanner scanner, ManagedAgent agent,
                                              UserId userId, AgentClient client) {
-        List<AgentSession> sessions = client.listSessions(agent.id(), userId);
+        List<ManagedSession> sessions = client.listSessions(agent.id(), userId);
         if (sessions.isEmpty()) {
             return client.startSession(agent.id(), userId, launchDir(client));
         }
 
         while (true) {
-            List<AgentSession> current = client.listSessions(agent.id(), userId);
-            System.out.println("\nSessions for " + agent.name() + ":");
+            List<ManagedSession> current = client.listSessions(agent.id(), userId);
+            System.out.println("\nSessions for " + agent.definition().name() + ":");
             System.out.println("  0) [New session]");
             for (int i = 0; i < current.size(); i++) {
                 System.out.println("  " + (i + 1) + ") " + sessionLabel(current.get(i)));
@@ -286,7 +291,7 @@ public class CliRunner implements CommandLineRunner {
                 try {
                     int idx = Integer.parseInt(input.substring("/delete ".length()).trim());
                     if (idx >= 1 && idx <= current.size()) {
-                        AgentSession toDelete = current.get(idx - 1);
+                        ManagedSession toDelete = current.get(idx - 1);
                         client.deleteSession(toDelete.id());
                         System.out.println("✓ Session " + idx + " deleted.");
                     } else {
@@ -311,15 +316,15 @@ public class CliRunner implements CommandLineRunner {
         }
     }
 
-    private AgentSession pickSession(Scanner scanner, AgentDefinition agent,
+    private ManagedSession pickSession(Scanner scanner, ManagedAgent agent,
                                       UserId userId, AgentClient client) {
-        List<AgentSession> sessions = client.listSessions(agent.id(), userId);
+        List<ManagedSession> sessions = client.listSessions(agent.id(), userId);
         if (sessions.isEmpty()) {
             System.out.println("[No sessions found.]");
             return null;
         }
 
-        System.out.println("\nSessions for " + agent.name() + ":");
+        System.out.println("\nSessions for " + agent.definition().name() + ":");
         for (int i = 0; i < sessions.size(); i++) {
             System.out.println("  " + (i + 1) + ") " + sessionLabel(sessions.get(i)));
         }
@@ -338,8 +343,8 @@ public class CliRunner implements CommandLineRunner {
         return null;
     }
 
-    private String sessionLabel(AgentSession session) {
-        String date = DATE_FMT.format(session.startedAt());
+    private String sessionLabel(ManagedSession session) {
+        String date = DATE_FMT.format(session.createdAt());
         String title = session.title() != null ? session.title() : "(untitled)";
         return title + "  [" + date + "]  " + session.id().value().substring(0, 8) + "…";
     }
@@ -360,25 +365,25 @@ public class CliRunner implements CommandLineRunner {
     }
 
     /** The session's directories, as the header and {@code /dirs} show them. */
-    private static void printDirectories(AgentSession session) {
-        if (session.hasWorkingDir()) {
-            System.out.println("[Working directory: " + session.workingDir() + " — change with /cd <dir>]");
-        } else if (!session.additionalDirs().isEmpty()) {
+    private static void printDirectories(ManagedSession session) {
+        if ((session.directories().working() != null)) {
+            System.out.println("[Working directory: " + session.directories().working() + " — change with /cd <dir>]");
+        } else if (!session.directories().additional().isEmpty()) {
             System.out.println("[No working directory — the tools use the runtime's default; set one with /cd <dir>]");
         }
-        if (!session.additionalDirs().isEmpty()) {
-            System.out.println("[Also reachable by absolute path: " + String.join(", ", session.additionalDirs())
+        if (!session.directories().additional().isEmpty()) {
+            System.out.println("[Also reachable by absolute path: " + String.join(", ", session.directories().additional())
                     + " — extend with /add-dir <dir>]");
         }
     }
 
-    private void printSessionHeader(AgentDefinition agent, AgentSession session) {
+    private void printSessionHeader(ManagedAgent agent, ManagedSession session) {
         System.out.println("\n[Session: " + sessionLabel(session) + "]");
         printDirectories(session);
         System.out.println("Type /back, /sessions, /tools, /tool-calls, /messages, /history, /memory, /compress, /quit or /help.");
     }
 
-    private void printHistory(AgentSession session, AgentClient client) {
+    private void printHistory(ManagedSession session, AgentClient client) {
         renderHistory(session, client, client.loadHistory(session.id()), null);
     }
 
@@ -390,8 +395,8 @@ public class CliRunner implements CommandLineRunner {
      *   <li>integer N      → only the last N CHAT pairs (each pair = user + agent)</li>
      * </ul>
      */
-    private void printHistoryWithArg(AgentSession session, AgentClient client, String arg) {
-        List<Message> all;
+    private void printHistoryWithArg(ManagedSession session, AgentClient client, String arg) {
+        List<ManagedMessage> all;
         try { all = client.loadHistory(session.id()); }
         catch (Exception e) {
             System.out.println("[Failed to load history: " + e.getMessage() + "]");
@@ -422,11 +427,11 @@ public class CliRunner implements CommandLineRunner {
      * (user + agent) are shown. The full message list is still passed in so that
      * tool-call counts attached to a kept agent message are computed correctly.
      */
-    private void renderHistory(AgentSession session, AgentClient client,
-                                List<Message> history, Integer pairLimit) {
+    private void renderHistory(ManagedSession session, AgentClient client,
+                                List<ManagedMessage> history, Integer pairLimit) {
         if (history.isEmpty()) {
-            String welcome = client.findAgent(session.agentDefinitionId())
-                    .map(AgentDefinition::welcomeMessage).orElse(null);
+            String welcome = session.agentId().flatMap(client::findAgent)
+                    .map(ManagedAgent::welcomeMessage).orElse(null);
             if (welcome != null && !welcome.isBlank()) {
                 System.out.println("\nAgent:\n" + welcome);
             } else {
@@ -441,12 +446,11 @@ public class CliRunner implements CommandLineRunner {
             // Walk backwards over CHAT messages, count user→agent pairs.
             int pairsCounted = 0;
             for (int k = history.size() - 1; k >= 0; k--) {
-                Message m = history.get(k);
-                if (m.type() != ai.mindconnect.message.domain.MessageType.CHAT) continue;
-                if (m.senderType() == ParticipantType.USER) {
+                ManagedMessage m = history.get(k);
+                if (isFromUser(m)) {
                     pairsCounted++;
                     if (pairsCounted >= pairLimit) {
-                        minSeqToShow = m.sequenceNum();
+                        minSeqToShow = m.sequence();
                         break;
                     }
                 }
@@ -463,23 +467,21 @@ public class CliRunner implements CommandLineRunner {
         System.out.println("\n── History" + headerSuffix + " ─────────────────────────────");
         int i = 0;
         while (i < history.size()) {
-            Message m = history.get(i);
-            if (m.type() == ai.mindconnect.message.domain.MessageType.CHAT
-                    && m.sequenceNum() >= minSeqToShow) {
-                String speaker = m.senderType() == ParticipantType.USER ? "You" : "Agent";
-                // Count any tool calls that follow this agent message before the next CHAT
+            ManagedMessage m = history.get(i);
+            if (isChat(m) && m.sequence() >= minSeqToShow) {
+                String speaker = isFromUser(m) ? "You" : "Agent";
+                // Count any tool calls that follow this agent message before the next one said
                 int toolCallCount = 0;
-                if (m.senderType() == ParticipantType.AGENT) {
+                if (!isFromUser(m)) {
                     int j = i + 1;
-                    while (j < history.size()
-                            && history.get(j).type() != ai.mindconnect.message.domain.MessageType.CHAT) {
-                        if (history.get(j).type() == ai.mindconnect.message.domain.MessageType.TOOL_CALL) {
+                    while (j < history.size() && !isChat(history.get(j))) {
+                        if (history.get(j).message().type() == TurnMessage.Type.TOOL_CALL) {
                             toolCallCount++;
                         }
                         j++;
                     }
                 }
-                System.out.print("\n" + speaker + ":\n" + m.content());
+                System.out.print("\n" + speaker + ":\n" + m.message().text());
                 if (toolCallCount > 0) {
                     System.out.print("\n\033[90m(" + toolCallCount
                             + " tool call" + (toolCallCount > 1 ? "s" : "") + " executed — use /tool-calls for details)\033[0m");
@@ -492,12 +494,12 @@ public class CliRunner implements CommandLineRunner {
         System.out.println("── End of history ───────────────────────");
     }
 
-    private AgentDefinition selectAgent(Scanner scanner, AgentClient client) {
-        List<AgentDefinition> agents = client.listAgents();
+    private ManagedAgent selectAgent(Scanner scanner, AgentClient client) {
+        List<ManagedAgent> agents = client.listAgents();
         System.out.println("\nAvailable agents:");
         for (int i = 0; i < agents.size(); i++) {
-            System.out.println("  " + (i + 1) + ") " + agents.get(i).name()
-                    + " — " + agents.get(i).description());
+            System.out.println("  " + (i + 1) + ") " + agents.get(i).definition().name()
+                    + " — " + agents.get(i).definition().description());
         }
         System.out.print("\nSelect agent (number) or /quit: ");
         String input = scanner.nextLine().trim();
@@ -516,7 +518,7 @@ public class CliRunner implements CommandLineRunner {
         return selectAgent(scanner, client);
     }
 
-    private void streamAgentResponse(AgentSession session, String userMessage, AgentClient client) {
+    private void streamAgentResponse(ManagedSession session, String userMessage, AgentClient client) {
         System.out.println("\nAgent: \033[90m(press q + enter to cancel)\033[0m");
         boolean[] inStatus = {false};       // true while a status line is being shown
         boolean[] textActive = {false};     // true while we are currently printing tokens on a line
@@ -529,7 +531,10 @@ public class CliRunner implements CommandLineRunner {
         // Lives only for the duration of this turn; stops itself when streamDone is set.
         java.util.concurrent.atomic.AtomicBoolean streamDone = new java.util.concurrent.atomic.AtomicBoolean(false);
         java.util.concurrent.atomic.AtomicBoolean cancelSent = new java.util.concurrent.atomic.AtomicBoolean(false);
-        Thread cancelWatcher = startCancelWatcher(session.id(), client, streamDone, cancelSent);
+        // The approval the turn waits for, while it waits: the watcher reads its answer from the keyboard.
+        java.util.concurrent.atomic.AtomicReference<StreamEvent.ApprovalRequested> asked =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Thread cancelWatcher = startCancelWatcher(session.id(), client, streamDone, cancelSent, asked);
         try {
             client.chat(session.id(), userMessage, event -> {
                 // After the user has pressed q, drop any further events. In the
@@ -673,8 +678,16 @@ public class CliRunner implements CommandLineRunner {
                     }
                     case StreamEvent.ApprovalRequested ar -> {
                         if (inStatus[0]) { System.out.print("\r\033[K"); inStatus[0] = false; }
-                        System.out.println("\n\033[33m⚠ approval required: tool '" + ar.toolName()
-                                + "' — answer the card in the web UI to continue\033[0m");
+                        if (client.answersApprovals()) {
+                            System.out.println("\n\033[33m⚠ approval required: tool '" + ar.toolName() + "' "
+                                    + ar.arguments() + "\033[0m");
+                            System.out.print("  allow? [y] once, [a] for this session, [n] deny, then enter: ");
+                            System.out.flush();
+                            asked.set(ar);
+                        } else {
+                            System.out.println("\n\033[33m⚠ approval required: tool '" + ar.toolName()
+                                    + "' — answer the card in the web UI to continue\033[0m");
+                        }
                     }
                     case StreamEvent.SubAgentError sErr -> {
                         endTextLine(textActive, streamedLines);
@@ -705,6 +718,8 @@ public class CliRunner implements CommandLineRunner {
      * Spawns a daemon thread that polls {@code System.in.available()} and
      * watches for a {@code q} character followed by a newline. On match, it
      * fires a single {@code cancelChat} to the server and sets {@code cancelSent}.
+     * While the turn waits for an approval, {@code y}, {@code a} or {@code n}
+     * answers it instead.
      * The thread exits as soon as {@code streamDone} flips to true (or it is
      * interrupted), discarding any non-{@code q} characters it consumed.
      * <p>
@@ -714,14 +729,25 @@ public class CliRunner implements CommandLineRunner {
      */
     private Thread startCancelWatcher(SessionId sessionId, AgentClient client,
                                        java.util.concurrent.atomic.AtomicBoolean streamDone,
-                                       java.util.concurrent.atomic.AtomicBoolean cancelSent) {
+                                       java.util.concurrent.atomic.AtomicBoolean cancelSent,
+                                       java.util.concurrent.atomic.AtomicReference<StreamEvent.ApprovalRequested> asked) {
         Thread t = new Thread(() -> {
             try {
                 while (!streamDone.get() && !Thread.currentThread().isInterrupted()) {
                     if (System.in.available() > 0) {
                         int b = System.in.read();
                         if (b == -1) return;
-                        if ((b == 'q' || b == 'Q') && !cancelSent.get()) {
+                        StreamEvent.ApprovalRequested waiting = asked.get();
+                        char key = Character.toLowerCase((char) b);
+                        if (waiting != null && (key == 'y' || key == 'a' || key == 'n')) {
+                            // The answer to the approval the turn waits for; the turn goes on in this chat call.
+                            asked.set(null);
+                            try {
+                                client.answerApproval(sessionId, waiting.callId(), key != 'n', key == 'a');
+                            } catch (Exception ex) {
+                                System.out.println("\n[Error: " + ex.getMessage() + "]");
+                            }
+                        } else if ((b == 'q' || b == 'Q') && !cancelSent.get()) {
                             try {
                                 client.cancelChat(sessionId);
                                 cancelSent.set(true);
@@ -752,9 +778,9 @@ public class CliRunner implements CommandLineRunner {
      * Prints a compact one-line context bar after each agent response, e.g.:
      *   ctx  [████████░░░░░░░░░░░░]  3,241 / 8,192  39.6%  — use /compress if > 80%
      */
-    private void printContextBar(AgentSession session, AgentClient client) {
+    private void printContextBar(ManagedSession session, AgentClient client) {
         try {
-            WorkingMemory stats = client.getWorkingMemory(session.id());
+            MemoryView stats = client.getWorkingMemory(session.id());
             if (stats.contextWindowTokens() == null) return;
             int used = stats.totalTokens();
             int max  = stats.contextWindowTokens();
@@ -864,7 +890,7 @@ public class CliRunner implements CommandLineRunner {
      * server's current history is loaded once via {@code client.loadHistory}.
      */
     private int[] parseDeleteMessageRange(String arg,
-                                           AgentSession session,
+                                           ManagedSession session,
                                            ai.mindconnect.cli.agentclient.AgentClient client) {
         if (arg == null || arg.isBlank()) return null;
         String s = arg.trim();
@@ -874,10 +900,8 @@ public class CliRunner implements CommandLineRunner {
         int[] cachedLast = {Integer.MIN_VALUE};
         java.util.function.IntSupplier lastSeq = () -> {
             if (cachedLast[0] == Integer.MIN_VALUE) {
-                java.util.List<ai.mindconnect.message.domain.Message> hist =
-                        client.loadHistory(session.id());
-                cachedLast[0] = hist.isEmpty() ? 0
-                        : hist.stream().mapToInt(ai.mindconnect.message.domain.Message::sequenceNum).max().orElse(0);
+                java.util.List<ManagedMessage> hist = client.loadHistory(session.id());
+                cachedLast[0] = hist.stream().mapToInt(ManagedMessage::sequence).max().orElse(0);
             }
             return cachedLast[0];
         };
@@ -969,8 +993,8 @@ public class CliRunner implements CommandLineRunner {
      *   <li>integer        → the last N tool calls</li>
      * </ul>
      */
-    private void printToolCallHistory(AgentSession session, AgentClient client, String arg) {
-        List<ai.mindconnect.message.domain.Message> history;
+    private void printToolCallHistory(ManagedSession session, AgentClient client, String arg) {
+        List<ManagedMessage> history;
         try {
             history = client.loadHistory(session.id());
         } catch (Exception e) {
@@ -982,55 +1006,35 @@ public class CliRunner implements CommandLineRunner {
             return;
         }
 
-        // Index TOOL_RESULTs by their toolCallId so we can match them with TOOL_CALL entries.
-        // The TOOL_RESULT content is JSON of the form {"toolCallId":"...","toolName":"...","result":"..."}.
-        java.util.Map<String, ai.mindconnect.message.domain.Message> resultsByCallId = new java.util.HashMap<>();
-        for (ai.mindconnect.message.domain.Message m : history) {
-            if (m.type() == ai.mindconnect.message.domain.MessageType.TOOL_RESULT) {
-                String id = extractJsonField(m.content(), "toolCallId");
-                if (id != null) resultsByCallId.put(id, m);
+        // Index the results by the call they answer, so each call is shown with its result.
+        java.util.Map<String, ManagedMessage> resultsByCallId = new java.util.HashMap<>();
+        for (ManagedMessage m : history) {
+            if (m.message().type() == TurnMessage.Type.TOOL_RESULT
+                    && m.message().metadata().get("callId") instanceof String id) {
+                resultsByCallId.put(id, m);
             }
         }
 
-        // Each TOOL_CALL message wraps {"toolCalls":[{id,name,arguments}, ...]}.
-        // Flatten into one entry per individual tool call, preserving conversation order.
-        record Entry(int seq, ai.mindconnect.message.domain.MessageId resultMessageId, String time, String toolName,
+        // One entry per tool call, in the order they were made.
+        record Entry(int seq, String resultMessageId, String time, String toolName,
                      java.util.Map<String, Object> arguments, String result, Long durationMs) {}
         java.util.List<Entry> entries = new java.util.ArrayList<>();
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        for (ai.mindconnect.message.domain.Message m : history) {
-            if (m.type() != ai.mindconnect.message.domain.MessageType.TOOL_CALL) continue;
-            try {
-                java.util.Map<String, Object> payload = mapper.readValue(m.content(),
-                        new com.fasterxml.jackson.core.type.TypeReference<>() {});
-                @SuppressWarnings("unchecked")
-                java.util.List<java.util.Map<String, Object>> calls =
-                        (java.util.List<java.util.Map<String, Object>>) payload.getOrDefault("toolCalls", java.util.List.of());
-                for (java.util.Map<String, Object> tc : calls) {
-                    String id = (String) tc.get("id");
-                    String name = (String) tc.get("name");
-                    @SuppressWarnings("unchecked")
-                    java.util.Map<String, Object> args =
-                            (java.util.Map<String, Object>) tc.getOrDefault("arguments", java.util.Map.of());
-                    ai.mindconnect.message.domain.Message resultMsg = id != null ? resultsByCallId.get(id) : null;
-                    String resultText = "(no result yet)";
-                    int seq = m.sequenceNum();
-                    ai.mindconnect.message.domain.MessageId resultMessageId = null;
-                    Long durationMs = null;
-                    if (resultMsg != null) {
-                        seq = resultMsg.sequenceNum();
-                        resultMessageId = resultMsg.id();
-                        durationMs = resultMsg.durationMs();
-                        String r = extractJsonField(resultMsg.content(), "result");
-                        if (r != null) resultText = r;
-                    }
-                    entries.add(new Entry(seq, resultMessageId,
-                            DATE_FMT.format(m.sentAt()),
-                            name != null ? name : "(unknown)",
-                            args, resultText, durationMs));
+        for (ManagedMessage m : history) {
+            for (TurnMessage.ToolCall call : m.message().toolCalls()) {
+                ManagedMessage resultMsg = call.callId() != null ? resultsByCallId.get(call.callId()) : null;
+                String resultText = "(no result yet)";
+                int seq = m.sequence();
+                String resultMessageId = null;
+                Long durationMs = null;
+                if (resultMsg != null) {
+                    seq = resultMsg.sequence();
+                    resultMessageId = resultMsg.id();
+                    durationMs = resultMsg.durationMillis();
+                    resultText = resultMsg.message().text();
                 }
-            } catch (Exception ignored) {
-                // Skip malformed TOOL_CALL payloads — no point spamming the CLI.
+                entries.add(new Entry(seq, resultMessageId, time(m),
+                        call.name() != null ? call.name() : "(unknown)",
+                        call.arguments() != null ? call.arguments() : java.util.Map.of(), resultText, durationMs));
             }
         }
 
@@ -1046,9 +1050,8 @@ public class CliRunner implements CommandLineRunner {
             // Default: tool calls executed for the current turn — i.e. since the
             // last USER chat message. If there's no user message yet, show all.
             int lastUserSeq = history.stream()
-                    .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER
-                              && m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
-                    .mapToInt(ai.mindconnect.message.domain.Message::sequenceNum)
+                    .filter(CliRunner::isFromUser)
+                    .mapToInt(ManagedMessage::sequence)
                     .max().orElse(0);
             shown = entries.stream().filter(e -> e.seq() >= lastUserSeq).toList();
             title = lastUserSeq > 0
@@ -1103,8 +1106,8 @@ public class CliRunner implements CommandLineRunner {
      *   <li>integer        → the last N messages</li>
      * </ul>
      */
-    private void printMessageList(AgentSession session, AgentClient client, String arg) {
-        List<ai.mindconnect.message.domain.Message> history;
+    private void printMessageList(ManagedSession session, AgentClient client, String arg) {
+        List<ManagedMessage> history;
         try {
             history = client.loadHistory(session.id());
         } catch (Exception e) {
@@ -1116,15 +1119,14 @@ public class CliRunner implements CommandLineRunner {
             return;
         }
 
-        java.util.List<ai.mindconnect.message.domain.Message> shown;
+        java.util.List<ManagedMessage> shown;
         String title;
         if (arg == null || arg.isEmpty()) {
             int lastUserSeq = history.stream()
-                    .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER
-                              && m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
-                    .mapToInt(ai.mindconnect.message.domain.Message::sequenceNum)
+                    .filter(CliRunner::isFromUser)
+                    .mapToInt(ManagedMessage::sequence)
                     .max().orElse(0);
-            shown = history.stream().filter(m -> m.sequenceNum() >= lastUserSeq).toList();
+            shown = history.stream().filter(m -> m.sequence() >= lastUserSeq).toList();
             title = lastUserSeq > 0
                     ? "Messages since last user message (seq ≥ " + lastUserSeq + ")"
                     : "Messages (no user message yet)";
@@ -1152,15 +1154,15 @@ public class CliRunner implements CommandLineRunner {
         }
 
         System.out.println("\n── " + title + " ───────────────────────────");
-        for (ai.mindconnect.message.domain.Message m : shown) {
-            String role = m.senderType().name();
-            String type = m.type().name();
-            String time = DATE_FMT.format(m.sentAt());
-            String tokens = m.tokenCount() != null ? m.tokenCount() + "t" : "—";
-            String dur = m.durationMs() != null ? "  (" + m.durationMs() + "ms)" : "";
-            String compressedTag = m.compressed() ? "  \033[33m[compressed]\033[0m" : "";
+        for (ManagedMessage m : shown) {
+            String role = isFromUser(m) ? "USER" : "AGENT";
+            String type = m.message().type().name();
+            String time = time(m);
+            String tokens = m.tokens() != null ? m.tokens() + "t" : "—";
+            String dur = m.durationMillis() != null ? "  (" + m.durationMillis() + "ms)" : "";
+            String compressedTag = shownAs(m) != null ? "  \033[33m[compressed]\033[0m" : "";
             System.out.printf("  seq=%-3d %-12s %-6s [%s]  %s%s%s%n",
-                    m.sequenceNum(), type, role, time, tokens, dur, compressedTag);
+                    m.sequence(), type, role, time, tokens, dur, compressedTag);
             String preview = previewFor(m);
             if (!preview.isEmpty()) {
                 System.out.println("    " + preview);
@@ -1174,47 +1176,30 @@ public class CliRunner implements CommandLineRunner {
      * content; TOOL_CALL summarises the tool name(s); TOOL_RESULT shows the result
      * field if parseable, or falls back to the raw content.
      */
-    private String previewFor(ai.mindconnect.message.domain.Message m) {
-        String content = m.content() != null ? m.content() : "";
-        switch (m.type()) {
-            case TOOL_CALL: {
-                try {
-                    com.fasterxml.jackson.databind.JsonNode node =
-                            new com.fasterxml.jackson.databind.ObjectMapper().readTree(content);
-                    com.fasterxml.jackson.databind.JsonNode calls = node.get("toolCalls");
-                    if (calls != null && calls.isArray() && calls.size() > 0) {
-                        StringBuilder sb = new StringBuilder("→ ");
-                        for (int i = 0; i < calls.size(); i++) {
-                            if (i > 0) sb.append(", ");
-                            com.fasterxml.jackson.databind.JsonNode c = calls.get(i);
-                            sb.append(c.path("name").asText("?"));
-                            com.fasterxml.jackson.databind.JsonNode args = c.path("arguments");
-                            if (args.isObject() && args.size() > 0) {
-                                sb.append("(");
-                                int k = 0;
-                                java.util.Iterator<String> fieldNames = args.fieldNames();
-                                while (fieldNames.hasNext() && k < 2) {
-                                    if (k > 0) sb.append(", ");
-                                    String f = fieldNames.next();
-                                    sb.append(f).append("=").append(truncate(args.path(f).asText(""), 40));
-                                    k++;
-                                }
-                                if (args.size() > 2) sb.append(", …");
-                                sb.append(")");
-                            }
-                        }
-                        return truncate(sb.toString(), 140);
+    private String previewFor(ManagedMessage m) {
+        TurnMessage message = m.message();
+        if (!message.toolCalls().isEmpty()) {
+            StringBuilder sb = new StringBuilder("→ ");
+            for (int i = 0; i < message.toolCalls().size(); i++) {
+                if (i > 0) sb.append(", ");
+                TurnMessage.ToolCall call = message.toolCalls().get(i);
+                sb.append(call.name() != null ? call.name() : "?");
+                java.util.Map<String, Object> args = call.arguments() != null ? call.arguments() : java.util.Map.of();
+                if (!args.isEmpty()) {
+                    sb.append("(");
+                    int k = 0;
+                    for (java.util.Iterator<String> names = args.keySet().iterator(); names.hasNext() && k < 2; k++) {
+                        if (k > 0) sb.append(", ");
+                        String f = names.next();
+                        sb.append(f).append("=").append(truncate(String.valueOf(args.get(f)), 40));
                     }
-                } catch (Exception ignored) {}
-                return truncate(content.replace('\n', ' '), 140);
+                    if (args.size() > 2) sb.append(", …");
+                    sb.append(")");
+                }
             }
-            case TOOL_RESULT: {
-                String r = extractJsonField(content, "result");
-                return truncate((r != null ? r : content).replace('\n', ' '), 140);
-            }
-            default:
-                return truncate(content.replace('\n', ' '), 140);
+            return truncate(sb.toString(), 140);
         }
+        return truncate(message.text().replace('\n', ' '), 140);
     }
 
     /**
@@ -1222,10 +1207,10 @@ public class CliRunner implements CommandLineRunner {
      * or {@code null} on parse error / missing field. Cheap one-shot extraction
      * using Jackson — we don't need a typed POJO for these one-off lookups.
      */
-    private static String extractJsonField(String json, String field) {
+    private String extractJsonField(String json, String field) {
         try {
             com.fasterxml.jackson.databind.JsonNode node =
-                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+                    plainMapper.readTree(json);
             com.fasterxml.jackson.databind.JsonNode v = node.get(field);
             return v != null && !v.isNull() ? v.asText() : null;
         } catch (Exception e) {
@@ -1237,22 +1222,22 @@ public class CliRunner implements CommandLineRunner {
         return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
-    private void printTools(AgentDefinition agent, AgentClient client) {
-        AgentDefinition fresh = client.findAgent(agent.id()).orElse(agent);
-        if (fresh.tools() == null || fresh.tools().isEmpty()) {
+    private void printTools(ManagedAgent agent, AgentClient client) {
+        ManagedAgent fresh = client.findAgent(agent.id()).orElse(agent);
+        if (fresh.definition().tools().isEmpty()) {
             System.out.println("[No tools configured for this agent.]");
             return;
         }
-        System.out.println("\nTools for " + fresh.name() + ":");
-        fresh.tools().stream()
-                .filter(t -> t.enabled())
-                .forEach(t -> System.out.println("  • " + t.name() + " — " + t.description()));
+        System.out.println("\nTools for " + fresh.definition().name() + ":");
+        // A tool the agent names is one it may use; the description is the one the agent gives it.
+        fresh.definition().tools().forEach(t -> System.out.println("  • " + t.name()
+                + (t.metadata().get("description") instanceof String description ? " — " + description : "")));
     }
 
-    private void printMemory(AgentSession session, AgentDefinition agent, AgentClient client) {
-        WorkingMemory stats = client.getWorkingMemory(session.id());
+    private void printMemory(ManagedSession session, ManagedAgent agent, AgentClient client) {
+        MemoryView stats = client.getWorkingMemory(session.id());
 
-        System.out.println("\n══ MEMORY / FULL CONTEXT  [counter: " + stats.tokenCounterName() + "] ══════════════════");
+        System.out.println("\n══ MEMORY / FULL CONTEXT ══════════════════");
 
         // System prompt
         System.out.println("\n── [SYSTEM PROMPT]  ~" + stats.systemPromptTokens() + "t ────────────────────────────────");
@@ -1261,11 +1246,9 @@ public class CliRunner implements CommandLineRunner {
         if (stats.messages().isEmpty()) {
             System.out.println("\n── [NO MESSAGES IN WINDOW] ──────────────────────────────────────");
         } else {
-            for (WorkingMemory.WorkingMemoryMessage m : stats.messages()) {
-                java.time.Instant sentAt = java.time.Instant.ofEpochMilli(m.sentAtMs());
+            for (MemoryView.Entry m : stats.messages()) {
                 String compressedTag = m.compressed() ? "  \033[33m[compressed]\033[0m" : "";
                 System.out.println("\n── [" + m.type() + " / " + m.role() + "]  seq=" + m.sequenceNum()
-                        + "  " + DATE_FMT.format(sentAt)
                         + "  ~" + m.tokens() + "t" + compressedTag + " ──");
                 if (m.compressed() && m.compressedContent() != null) {
                     System.out.println("\033[33m" + m.compressedContent() + "\033[0m");
@@ -1289,7 +1272,7 @@ public class CliRunner implements CommandLineRunner {
         }
     }
 
-    private void compressMemory(AgentSession session, AgentClient client) {
+    private void compressMemory(ManagedSession session, AgentClient client) {
         System.out.println("\n⏳ Compressing memory…");
         try {
             int compressed = client.compressMemory(session.id());
@@ -1310,14 +1293,32 @@ public class CliRunner implements CommandLineRunner {
         return "█".repeat(filled) + "░".repeat(width - filled);
     }
 
-    private void printMessage(AgentSession session, int sequenceNum, AgentClient client) {
-        List<Message> history = client.loadHistory(session.id());
-        Message msg = history.stream()
-                .filter(m -> m.sequenceNum() == sequenceNum)
+    /** Whether the message is something said — by the user or the agent — rather than a tool's part. */
+    private static boolean isChat(ManagedMessage m) {
+        return m.message().type() == TurnMessage.Type.USER || m.message().type() == TurnMessage.Type.ASSISTANT;
+    }
+
+    private static boolean isFromUser(ManagedMessage m) {
+        return m.message().type() == TurnMessage.Type.USER;
+    }
+
+    /** What the model is shown in place of the message; {@code null} when it is shown in full. */
+    private static String shownAs(ManagedMessage m) {
+        return m.message().metadata().get(SessionStore.COMPRESSED) instanceof String note ? note : null;
+    }
+
+    private static String time(ManagedMessage m) {
+        return m.sentAt() == null ? "—" : DATE_FMT.format(m.sentAt());
+    }
+
+    private void printMessage(ManagedSession session, int sequenceNum, AgentClient client) {
+        List<ManagedMessage> history = client.loadHistory(session.id());
+        ManagedMessage msg = history.stream()
+                .filter(m -> m.sequence() == sequenceNum)
                 .findFirst()
                 .orElse(null);
         if (msg == null) {
-            System.out.println("[No message with sequenceNum=" + sequenceNum + " in this session.]");
+            System.out.println("[No message with sequence=" + sequenceNum + " in this session.]");
             return;
         }
         try {
@@ -1325,30 +1326,29 @@ public class CliRunner implements CommandLineRunner {
 
             // Metadata header as pretty JSON (no content fields here)
             java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
-            meta.put("id",                   msg.id());
-            meta.put("conversationId",       msg.conversationId().value());
-            meta.put("senderId",             msg.senderId());
-            meta.put("senderType",           msg.senderType());
-            meta.put("recipientId",          msg.recipientId());
-            meta.put("type",                 msg.type());
-            meta.put("sequenceNum",          msg.sequenceNum());
-            meta.put("sentAt",               msg.sentAt().toString());
-            meta.put("tokenCount",           msg.tokenCount());
-            meta.put("compressed",           msg.compressed());
-            meta.put("compressedTokenCount", msg.compressedTokenCount());
-            if (msg.metadata() != null && !msg.metadata().isEmpty()) {
-                meta.put("metadata", msg.metadata());
+            meta.put("id",             msg.id());
+            meta.put("turnId",         msg.message().turnId());
+            meta.put("type",           msg.message().type());
+            meta.put("sequence",       msg.sequence());
+            meta.put("sentAt",         msg.sentAt() == null ? null : msg.sentAt().toString());
+            meta.put("tokens",         msg.tokens());
+            meta.put("durationMillis", msg.durationMillis());
+            if (!msg.message().toolCalls().isEmpty()) {
+                meta.put("toolCalls", msg.message().toolCalls());
             }
-            System.out.println(PRETTY_MAPPER.writeValueAsString(meta));
+            if (!msg.message().metadata().isEmpty()) {
+                meta.put("metadata", msg.message().metadata());
+            }
+            System.out.println(prettyMapper.writeValueAsString(meta));
 
             // Content — printed raw so \n renders as real newlines.
             // If it parses as JSON, pretty-print the JSON; otherwise print the string as-is.
             System.out.println("\n── content ──");
-            printFieldValue(msg.content());
+            printFieldValue(msg.message().text());
 
-            if (msg.compressedContent() != null) {
-                System.out.println("\n── compressedContent ──");
-                printFieldValue(msg.compressedContent());
+            if (shownAs(msg) != null) {
+                System.out.println("\n── shown to the model instead ──");
+                printFieldValue(shownAs(msg));
             }
 
             System.out.println("────────────────────────────────────────────────────────────");
@@ -1370,18 +1370,18 @@ public class CliRunner implements CommandLineRunner {
     @SuppressWarnings("unchecked")
     private void printFieldValue(String value) {
         try {
-            Object parsed = PRETTY_MAPPER.readValue(value, Object.class);
+            Object parsed = prettyMapper.readValue(value, Object.class);
             if (parsed instanceof java.util.Map<?, ?> map && map.containsKey("result")) {
                 // TOOL_RESULT envelope — print without the result field, then result separately
                 java.util.Map<String, Object> envelope = new java.util.LinkedHashMap<>((java.util.Map<String, Object>) map);
                 String result = (String) envelope.remove("result");
                 if (!envelope.isEmpty()) {
-                    System.out.println(PRETTY_MAPPER.writeValueAsString(envelope));
+                    System.out.println(prettyMapper.writeValueAsString(envelope));
                 }
                 System.out.println("\n── result ──");
                 System.out.println(result != null ? result : "(null)");
             } else {
-                System.out.println(PRETTY_MAPPER.writeValueAsString(parsed));
+                System.out.println(prettyMapper.writeValueAsString(parsed));
             }
         } catch (Exception ignored) {
             // Plain string — print as-is so \n renders as real newlines
@@ -1423,7 +1423,7 @@ public class CliRunner implements CommandLineRunner {
      * If only {@link #agent} is set the user lands in the session picker for that agent.
      * Both null = normal start at the agent list.
      */
-    private record Resume(AgentDefinition agent, AgentSession session) {
+    private record Resume(ManagedAgent agent, ManagedSession session) {
         static Resume none() { return new Resume(null, null); }
     }
 
@@ -1431,18 +1431,18 @@ public class CliRunner implements CommandLineRunner {
         if (state == null || state.view() == CliState.View.AGENT_LIST || state.lastAgentId() == null) {
             return Resume.none();
         }
-        Optional<AgentDefinition> agentOpt = client.findAgent(AgentId.of(state.lastAgentId()));
+        Optional<ManagedAgent> agentOpt = client.findAgent(AgentId.of(state.lastAgentId()));
         if (agentOpt.isEmpty()) {
             // Stale agent — reset and fall back to the main menu.
             stateStore.save(CliState.agentList());
             return Resume.none();
         }
-        AgentDefinition agent = agentOpt.get();
+        ManagedAgent agent = agentOpt.get();
         if (state.view() == CliState.View.SESSION_LIST || state.lastSessionId() == null) {
             return new Resume(agent, null);
         }
         String wantedId = state.lastSessionId();
-        AgentSession session = client.listSessions(agent.id(), userId).stream()
+        ManagedSession session = client.listSessions(agent.id(), userId).stream()
                 .filter(s -> s.id().value().equals(wantedId))
                 .findFirst()
                 .orElse(null);

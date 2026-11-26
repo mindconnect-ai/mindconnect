@@ -1,5 +1,6 @@
 package ai.mindconnect.webscraper.jsoup;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.webscraper.*;
 import com.microsoft.playwright.Page;
 import lombok.extern.slf4j.Slf4j;
@@ -11,13 +12,19 @@ import java.util.List;
 @Slf4j
 public class JsoupWebScraper extends AbstractWebScraper {
 
+    private final JsonMapperFactory json;
+
+    public JsoupWebScraper(JsonMapperFactory json) {
+        this.json = json;
+    }
+
     @Override
     public List<WebScraperResults> scrape(List<WebScraperOptions> options) {
 
         List<WebScraperResults> resultsList = new ArrayList<>(options.size());
 
         for (var option : options) {
-            JsoupWebScraperContext context = new JsoupWebScraperContext(option);
+            JsoupWebScraperContext context = new JsoupWebScraperContext(option, json);
             if (getSaveFunction() != null) {
                 context.setSaveFunction(this.saveFunction);
             }

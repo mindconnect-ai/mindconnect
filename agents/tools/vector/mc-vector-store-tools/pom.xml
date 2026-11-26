@@ -19,6 +19,14 @@
         agents only ever handle text. The ingestion pipeline itself is a workflow seed.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+        </dependency>
         <!-- FileWrites and PathLocks: registry files are written whole, one writer at a time. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
@@ -35,7 +43,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-gateway-core</artifactId>
+            <artifactId>mc-llm-gateway</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -67,6 +75,11 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-jackson</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

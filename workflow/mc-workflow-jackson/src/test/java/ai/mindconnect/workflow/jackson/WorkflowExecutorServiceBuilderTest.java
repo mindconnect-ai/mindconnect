@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.jackson;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.*;
 import ai.mindconnect.workflow.execution.*;
 import org.assertj.core.api.Assertions;
@@ -23,7 +24,7 @@ public class WorkflowExecutorServiceBuilderTest {
     @BeforeEach
     public void setup() {
         workflowContextFactory = new DefaultWorkflowContextFactory();
-        new JsonWorkflowConfigurer().configure(workflowContextFactory);
+        new JsonWorkflowConfigurer(new JsonMapperFactory(List.of())).configure(workflowContextFactory);
 
         // Wire Jackson-based json mapper and classpath registry
          service = new WorkflowExecutorService(workflowContextFactory);
@@ -161,7 +162,7 @@ public class WorkflowExecutorServiceBuilderTest {
         original.setResultFrom("joined");
 
         // Serialize to JSON and back
-        var mapper = WorkflowObjectMapperFactory.create();
+        var mapper = WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of()));
         var serializer = new JacksonWorkflowSerializer(mapper);
         String json = serializer.write(original);
         WorkflowData restored = serializer.read(json);

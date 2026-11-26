@@ -1,14 +1,15 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiTable;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -24,18 +25,18 @@ import java.util.Map;
  */
 public final class ToolTableComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentToolId selectedToolId;
+    private final ObjectMapper mapper;
 
-    public ToolTableComponent(AgentDefinition agent) {
-        this(agent, null);
+    public ToolTableComponent(ManagedAgent agent, JsonMapperFactory json) {
+        this(agent, null, json);
     }
 
-    public ToolTableComponent(AgentDefinition agent, AgentToolId selectedToolId) {
+    public ToolTableComponent(ManagedAgent agent, AgentToolId selectedToolId, JsonMapperFactory json) {
         this.agent = agent;
         this.selectedToolId = selectedToolId;
+        this.mapper = json.create();
     }
 
     @Override
@@ -47,30 +48,28 @@ public final class ToolTableComponent implements UiComponent {
     public UiTable render() {
         var table = UiTable.of(id(), "Tools").stackOnMobile(true)
                 .action(UiAction.primary("add-tool", "Add Tool").icon("add")
-                        .onClick(trigger(on(AgentUiController.class).newToolForm(agent.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).newToolForm(agent.id().value()))))
                 .action(UiAction.secondary("add-tools", "Add a group…").icon("add")
-                        .onClick(trigger(on(AgentUiController.class).newToolBundleForm(agent.id().value()))))
+                        .onClick(trigger(on(AgentToolUiController.class).newToolBundleForm(agent.id().value()))))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("description", "Description"))
                 .column(UiTable.Column.text("overrides", "Overrides"))
-                .column(UiTable.Column.text("enabled", "Enabled"))
                 .column(UiTable.Column.text("deferred", "Deferred"))
                 .column(UiTable.Column.text("needsApproval", "Approval"))
                 .rowAction(UiAction.secondary("view", "View").icon("show")
-                        .onClick(trigger(on(AgentUiController.class).viewTool(agent.id().value(), ROW_ID.toString()))))
+                        .onClick(trigger(on(AgentToolUiController.class).viewTool(agent.id().value(), ROW_ID.toString()))))
                 .rowAction(UiAction.secondary("edit", "Edit").icon("edit")
-                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id().value(), ROW_ID.toString()))))
+                        .onClick(trigger(on(AgentToolUiController.class).editToolForm(agent.id().value(), ROW_ID.toString()))))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this tool?")
-                        .onClick(trigger(on(AgentUiController.class).deleteTool(agent.id().value(), ROW_ID.toString(), null))));
+                        .onClick(trigger(on(AgentToolUiController.class).deleteTool(agent.id().value(), ROW_ID.toString(), null))));
 
-        for (AgentTool t : agent.tools()) {
+        for (AgentTool t : AgentSetting.tools(agent)) {
             table.row(Map.of(
                 "id",          t.id().value(),
                 "name",        t.name(),
                 "description", t.description() != null ? t.description() : "",
                 "overrides",   overridesSummary(t),
-                "enabled",     t.enabled() ? "✓" : "—",
                 "deferred",    t.deferred() ? "✓" : "—",
                 "needsApproval", t.needsApproval() ? "✓" : "—"
             ));
@@ -79,9 +78,9 @@ public final class ToolTableComponent implements UiComponent {
         return table;
     }
 
-    private static String overridesSummary(AgentTool t) {
+    private String overridesSummary(AgentTool t) {
         if (t.overrides() == null || t.overrides().isEmpty()) return "";
-        try { return MAPPER.writeValueAsString(t.overrides()); }
+        try { return mapper.writeValueAsString(t.overrides()); }
         catch (JsonProcessingException e) { return "…"; }
     }
 }

@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.admin.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpTarget;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,13 +27,14 @@ import java.util.Map;
  */
 final class McpTargetForm {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private final ObjectMapper mapper;
 
-    private McpTargetForm() {
+    McpTargetForm(JsonMapperFactory json) {
+        this.mapper = json.create();
     }
 
     /** Pretty JSON for the editor, or a starter skeleton when there is none. */
-    static String toJson(McpTarget target) {
+    String toJson(McpTarget target) {
         if (target == null) {
             return """
                     {
@@ -43,7 +45,7 @@ final class McpTargetForm {
                     }""";
         }
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(toNode(target));
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(toNode(target));
         } catch (Exception e) {
             return "{}";
         }
@@ -52,13 +54,13 @@ final class McpTargetForm {
     /**
      * @throws IllegalArgumentException with a message meant for the operator
      */
-    static McpTarget fromJson(String json) {
+    McpTarget fromJson(String json) {
         if (json == null || json.isBlank()) {
             throw new IllegalArgumentException("Target is required.");
         }
         JsonNode node;
         try {
-            node = MAPPER.readTree(json);
+            node = mapper.readTree(json);
         } catch (Exception e) {
             throw new IllegalArgumentException("Target is not valid JSON: " + e.getMessage());
         }
@@ -96,8 +98,8 @@ final class McpTargetForm {
         };
     }
 
-    private static ObjectNode toNode(McpTarget target) {
-        ObjectNode node = MAPPER.createObjectNode();
+    private ObjectNode toNode(McpTarget target) {
+        ObjectNode node = mapper.createObjectNode();
         switch (target) {
             case McpTarget.Docker docker -> {
                 node.put("type", "docker");

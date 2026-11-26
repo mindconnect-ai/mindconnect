@@ -1,0 +1,31 @@
+package ai.mindconnect.llm.providers.gemini;
+
+import ai.mindconnect.llm.providers.TestJson;
+import ai.mindconnect.llm.providers.LiveChatGatewayContract;
+import ai.mindconnect.llm.providers.LiveTestEnvironment;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
+import org.junit.jupiter.api.condition.EnabledIf;
+
+import java.util.Map;
+
+/** {@link GeminiGateway} against generativelanguage.googleapis.com — see {@link LiveTestEnvironment}. */
+@EnabledIf("enabled")
+class GeminiGatewayLiveTest extends LiveChatGatewayContract {
+
+    static boolean enabled() {
+        return LiveTestEnvironment.enabled("GEMINI_API_KEY");
+    }
+
+    @Override
+    protected LlmGateway gateway() {
+        return new GeminiGateway(httpClient(), TestJson.MAPPER);
+    }
+
+    @Override
+    protected LlmConfig config() {
+        return config(LlmProvider.GOOGLE_GEMINI, LiveTestEnvironment.geminiModel(), LiveTestEnvironment.apiKey("GEMINI_API_KEY"),
+                Map.of());
+    }
+}

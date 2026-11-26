@@ -1,8 +1,9 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
@@ -46,7 +47,6 @@ import java.util.stream.Stream;
 final class LegacyVectorStores {
 
     private static final Logger log = LoggerFactory.getLogger(LegacyVectorStores.class);
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     /** A chunk as the old stores wrote it. */
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -55,10 +55,13 @@ final class LegacyVectorStores {
     private final Path baseDir;
     /** Where the old {@code vs_*} tables may be; null on files. */
     private final DataSource database;
+    private final ObjectMapper json;
 
-    LegacyVectorStores(Path baseDir, DataSource database) {
+    /** @param json the runtime's mapper factory, to read the old stores' files */
+    LegacyVectorStores(Path baseDir, DataSource database, JsonMapperFactory json) {
         this.baseDir = baseDir;
         this.database = database;
+        this.json = json.create();
     }
 
     /**
@@ -166,9 +169,9 @@ final class LegacyVectorStores {
         return registry.registerInstance(candidate);
     }
 
-    private static List<LegacyChunk> readFile(Path file) {
+    private List<LegacyChunk> readFile(Path file) {
         List<LegacyChunk> chunks = new ArrayList<>();
-        try (MappingIterator<LegacyChunk> it = JSON.readerFor(LegacyChunk.class).readValues(file.toFile())) {
+        try (MappingIterator<LegacyChunk> it = json.readerFor(LegacyChunk.class).readValues(file.toFile())) {
             while (it.hasNext()) {
                 chunks.add(it.next());
             }

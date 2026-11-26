@@ -16,10 +16,18 @@
     <packaging>jar</packaging>
     <description>
         The filesystem adapter of the file store (ports in mc-file-store-core):Id-addressed file storage (OpenAI-Files-API-style): upload once, reference the id
-        from chats and vector stores. Backend SPI via ServiceLoader — filesystem ships built-in,
-        object storage (s3) or database backends slot in as sibling modules.</description>
+        from chats and vector stores. The runtime builds the filesystem store itself, with its mapper
+        factory; object storage (s3) or database backends slot in through the ServiceLoader SPI as sibling modules.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+        </dependency>
         <!-- AtomicFiles: stored files are written whole or not at all. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
@@ -40,6 +48,11 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-jackson</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

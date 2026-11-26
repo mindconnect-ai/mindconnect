@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.admin.ui.WorkflowAdminUiController;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -36,8 +37,8 @@ public class WorkflowAdminAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ai.mindconnect.workflow.admin.service.WorkflowAdminService workflowAdminService(
-            WorkflowDataRepository store, WorkflowInstanceRepository instances) {
-        return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances);
+            WorkflowDataRepository store, WorkflowInstanceRepository instances, JsonMapperFactory json) {
+        return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances, json);
     }
 
     @Bean
@@ -45,8 +46,9 @@ public class WorkflowAdminAutoConfiguration {
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     public WorkflowDataRepository workflowDataRepository(
             @Value("${mindconnect.data.base-dir:data}") String dir,
-            @Value("${mindconnect.namespace:local}") String partition) {
-        return new FileWorkflowDataRepository(Path.of(dir), () -> partition);
+            @Value("${mindconnect.namespace:local}") String partition,
+            JsonMapperFactory json) {
+        return new FileWorkflowDataRepository(Path.of(dir), () -> partition, json);
     }
 
     /**
@@ -60,7 +62,8 @@ public class WorkflowAdminAutoConfiguration {
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     public WorkflowInstanceRepository workflowInstanceRepository(
             @Value("${mindconnect.data.base-dir:data}") String dir,
-            @Value("${mindconnect.namespace:local}") String partition) {
-        return new FileWorkflowInstanceRepository(Path.of(dir), () -> partition);
+            @Value("${mindconnect.namespace:local}") String partition,
+            JsonMapperFactory json) {
+        return new FileWorkflowInstanceRepository(Path.of(dir), () -> partition, json);
     }
 }

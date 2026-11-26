@@ -2,10 +2,10 @@ package ai.mindconnect.channel.jdbc;
 
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelStore;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import javax.sql.DataSource;
@@ -31,15 +31,16 @@ public final class JdbcChannelStore<E> implements ChannelStore<E> {
 
     private final DataSource dataSource;
     private final Class<E> type;
-    private final ObjectMapper mapper = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .build();
+    private final ObjectMapper mapper;
 
-    public JdbcChannelStore(DataSource dataSource, Class<E> type) {
+    public JdbcChannelStore(DataSource dataSource, Class<E> type, JsonMapperFactory json) {
         this.dataSource = dataSource;
         this.type = type;
+        this.mapper = json.builder()
+                .addModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
     }
 
     /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */

@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.page;
 
-import ai.mindconnect.agent.Email;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.namespace.domain.Email;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.domain.NamespaceRole;
@@ -65,7 +65,8 @@ public final class NamespacesPage {
         root.child(UiText.of("namespaces-intro",
                 "A namespace holds everything: agents, LLM configs, skills, sessions, files, vector stores, "
                         + "workflows, MCP servers. You work in one at a time — pick it in the header. "
-                        + "A new namespace starts empty; fill it from the Registry."));
+                        + "A new namespace starts with the agents, LLM configs and skills the installation "
+                        + "brings; add more from the Registry."));
         UiStack head = UiStack.of("namespaces-actions").direction(UiStack.Direction.HORIZONTAL).gap(8);
         head.child(UiAction.primary("namespace-create", "New namespace").icon("add").dispatch("GET", API + "/new"));
         root.child(head);

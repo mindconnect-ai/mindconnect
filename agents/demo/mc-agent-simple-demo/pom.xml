@@ -22,25 +22,24 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-builder</artifactId>
+            <artifactId>mc-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-tools</artifactId>
+            <artifactId>mc-agent-scope</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-subagents</artifactId>
+            <artifactId>mc-agent-sdk</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
+            <artifactId>mc-agent-runtime-infrastructure</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <!-- Opt-in capabilities, exactly as a client would pick them: -->
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-vector-store-tools</artifactId>
-        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tools-web</artifactId>

@@ -1,7 +1,7 @@
 package ai.mindconnect.extension.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.extension.domain.InstalledSeed;
 import ai.mindconnect.jdbc.Sql;
 import org.junit.jupiter.api.BeforeEach;

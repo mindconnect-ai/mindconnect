@@ -1,13 +1,14 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.Email;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.namespace.domain.Email;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.service.UserService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashSet;
@@ -33,10 +34,14 @@ public class NamespaceMembers {
 
     private final NamespaceService namespaces;
     private final UserService users;
+    /** Told when a namespace is gone; absent on a host that seeds nothing. */
+    private final ObjectProvider<NamespaceSeeding> seeding;
 
-    public NamespaceMembers(NamespaceService namespaces, UserService users) {
+    public NamespaceMembers(NamespaceService namespaces, UserService users,
+                            ObjectProvider<NamespaceSeeding> seeding) {
         this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
         this.users = Objects.requireNonNull(users, "users");
+        this.seeding = seeding;
     }
 
     /**
@@ -93,6 +98,7 @@ public class NamespaceMembers {
     public void delete(Namespace namespace, UserId actor) {
         Set<Email> listed = namespaces.find(namespace).map(NamespaceMembers::everyone).orElse(Set.of());
         namespaces.delete(namespace, actor);
+        seeding.ifAvailable(seeded -> seeded.deleted(namespace));
         forget(namespace, listed);
     }
 

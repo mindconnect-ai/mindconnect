@@ -1,30 +1,14 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryConversationSummaryRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryTodoListRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.AgentRegistryService;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageStore;
-import ai.mindconnect.message.domain.ContentPart;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,8 +20,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -58,27 +40,38 @@ class AgentApiControllerOwnershipTest {
     Path dir;
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-    private final InMemoryAgentDefinitionRepository definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
-    private final UserChannels userChannels = new UserChannels();
+    private static final String AGENT = "a1";
 
-    private AgentSessionService sessionService;
-    private RecordingChatService chat;
-    private AgentDefinition agent;
+    private final ai.mindconnect.agentrest.SessionFixture sessions = new ai.mindconnect.agentrest.SessionFixture();
+    /** No turn runs in these tests: what reaches the services behind the controller is all that is looked at. */
+    private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns =
+            org.mockito.Mockito.mock(ai.mindconnect.agentrest.service.SessionTurns.class);
+    private final ai.mindconnect.agentrest.service.TurnFrameStream frameStream =
+            org.mockito.Mockito.mock(ai.mindconnect.agentrest.service.TurnFrameStream.class);
+    private final ai.mindconnect.agent.management.api.SessionManagement management = sessions.management();
+    private final ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction compaction =
+            org.mockito.Mockito.mock(ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        sessionService = new AgentSessionService(definitions, sessions,
-                new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
-                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
-                new InMemoryToolApprovalRepository(), userChannels);
-        chat = new RecordingChatService(sessionService);
-        agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
-        AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
-                sessionService, chat, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
-                new SessionAccess(sessions), new ObjectMapper(), null);
+        ai.mindconnect.agentrest.service.ChatOpening opener =
+                org.mockito.Mockito.mock(ai.mindconnect.agentrest.service.ChatOpening.class);
+        org.mockito.Mockito.when(opener.open(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call -> sessions.openOn(call.<ai.mindconnect.agent.AgentId>getArgument(0).value(),
+                        call.<UserId>getArgument(1).value()));
+        AgentApiController controller = new AgentApiController(
+                ai.mindconnect.agent.management.directory.WorkingDirPolicy.unrestricted(),
+                sessionTurns, frameStream, sessions.runtime(), compaction, opener,
+                new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule()))),
+                new SessionAccess(sessions.runtime()), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
+    }
+
+    private List<ai.mindconnect.agent.management.api.ManagedSession> sessionsOf(String user) {
+        return management.list(UserId.of(user));
     }
 
     @Test
@@ -86,22 +79,22 @@ class AgentApiControllerOwnershipTest {
         callers.actAs("alice");
 
         mvc.perform(post("/api/sessions").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"agentId\":\"" + agent.id().value() + "\",\"userId\":\"mallory\"}"))
+                        .content("{\"agentId\":\"" + AGENT + "\",\"userId\":\"mallory\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("alice"));
 
-        assertThat(sessionService.listSessions(agent.id(), UserId.of("alice"))).hasSize(1);
-        assertThat(sessionService.listSessions(agent.id(), UserId.of("mallory"))).isEmpty();
+        assertThat(sessionsOf("alice")).hasSize(1);
+        assertThat(sessionsOf("mallory")).isEmpty();
     }
 
     @Test
     void theSessionListHoldsOnlyTheCallersSessions() throws Exception {
-        String alices = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
-        sessionService.openChat(agent.id(), UserId.of("bob"));
+        String alices = sessions.openOn(AGENT, "alice").id().value();
+        sessions.openOn(AGENT, "bob");
         callers.actAs("alice");
 
         // A userId parameter from an older client changes nothing.
-        mvc.perform(get("/api/sessions").param("agentId", agent.id().value()).param("userId", "bob"))
+        mvc.perform(get("/api/sessions").param("agentId", AGENT).param("userId", "bob"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(alices));
@@ -109,15 +102,19 @@ class AgentApiControllerOwnershipTest {
 
     @Test
     void someoneElsesSessionIsNotFoundOnEveryEndpoint() throws Exception {
-        String bobs = sessionService.openChat(agent.id(), UserId.of("bob")).id().value();
+        String bobs = sessions.openOn(AGENT, "bob").id().value();
         callers.actAs("alice");
 
         for (MockHttpServletRequestBuilder request : sessionEndpoints(bobs)) {
             mvc.perform(request).andExpect(status().isNotFound());
         }
 
-        assertThat(chat.calls).as("nothing reached the chat service").isEmpty();
-        assertThat(sessions.findById(SessionId.of(bobs))).as("the session was not deleted").isPresent();
+        org.mockito.Mockito.verifyNoInteractions(sessionTurns, frameStream, compaction);
+        // Asked whose session it is, and nothing else.
+        org.mockito.Mockito.verify(management, org.mockito.Mockito.atLeastOnce())
+                .find(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoMoreInteractions(management);
+        assertThat(sessionsOf("bob")).as("the session was not deleted").hasSize(1);
     }
 
     @Test
@@ -131,7 +128,7 @@ class AgentApiControllerOwnershipTest {
 
     @Test
     void theOwnerReachesTheirSession() throws Exception {
-        String alices = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
+        String alices = sessions.openOn(AGENT, "alice").id().value();
         callers.actAs("alice");
 
         mvc.perform(get("/api/sessions/{id}/history", alices))
@@ -143,8 +140,36 @@ class AgentApiControllerOwnershipTest {
                 .andExpect(jsonPath("$.compressedMessages").value(0));
         mvc.perform(delete("/api/sessions/{id}", alices)).andExpect(status().isNoContent());
 
-        assertThat(chat.calls).containsExactly("openApprovals " + alices, "compressMemory " + alices);
-        assertThat(sessions.findById(SessionId.of(alices))).isEmpty();
+        org.mockito.Mockito.verify(sessionTurns).open(SessionId.of(alices));
+        org.mockito.Mockito.verify(compaction).compact(SessionId.of(alices));
+        assertThat(sessionsOf("alice")).isEmpty();
+    }
+
+    @Test
+    void theHistoryGivesEachMessageItsPlaceAndTheMessageAsTheTurnWroteIt() throws Exception {
+        String alices = sessions.openOn(AGENT, "alice").id().value();
+        sessions.store().append(SessionId.of(alices), List.of(
+                ai.mindconnect.agent.loop.domain.TurnMessage.user(List.of(
+                        new ai.mindconnect.agent.loop.domain.ContentPart.Text("What time is it?"))).inTurn("t1"),
+                ai.mindconnect.agent.loop.domain.TurnMessage.toolCalls(List.of(
+                        new ai.mindconnect.agent.loop.domain.TurnMessage.ToolCall("call_1", "clock", java.util.Map.of())))
+                        .inTurn("t1")));
+        callers.actAs("alice");
+
+        mvc.perform(get("/api/sessions/{id}/history", alices))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sequence").value(1))
+                .andExpect(jsonPath("$[0].message.type").value("USER"))
+                .andExpect(jsonPath("$[0].message.turnId").value("t1"))
+                .andExpect(jsonPath("$[0].message.content[0].kind").value("text"))
+                .andExpect(jsonPath("$[0].message.content[0].text").value("What time is it?"))
+                .andExpect(jsonPath("$[1].message.type").value("TOOL_CALL"))
+                .andExpect(jsonPath("$[1].message.toolCalls[0].callId").value("call_1"))
+                .andExpect(jsonPath("$[1].message.toolCalls[0].name").value("clock"));
+        mvc.perform(delete("/api/sessions/{id}/messages", alices).param("fromSeq", "2").param("toSeq", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedMessages").value(1));
+        assertThat(management.messages(SessionId.of(alices))).hasSize(1);
     }
 
     @Test
@@ -172,61 +197,5 @@ class AgentApiControllerOwnershipTest {
                 post("/api/sessions/{id}/approvals/{callId}", sessionId, "call-1").param("approved", "true"),
                 post("/api/sessions/{id}/approvals/{callId}/continue", sessionId, "call-1").param("approved", "true"),
                 delete("/api/sessions/{id}", sessionId));
-    }
-
-    /** A chat service that only records what reaches it — no turn runs in these tests. */
-    static class RecordingChatService extends AgentChatService {
-
-        final List<String> calls = new CopyOnWriteArrayList<>();
-
-        RecordingChatService(AgentSessionService sessions) {
-            super(sessions, null, null, null, null, null, null, null, null, null, null);
-        }
-
-        @Override
-        public ChatTurnHandle submitChat(SessionId sessionId, List<ContentPart> parts,
-                                         Consumer<StreamEvent> eventHandler) {
-            calls.add("submitChat " + sessionId.value());
-            throw new IllegalStateException("No turn runs in this test");
-        }
-
-        @Override
-        public boolean cancelChat(SessionId sessionId) {
-            calls.add("cancelChat " + sessionId.value());
-            return false;
-        }
-
-        @Override
-        public WorkingMemory memorySnapshot(SessionId sessionId) {
-            calls.add("memorySnapshot " + sessionId.value());
-            throw new IllegalStateException("No memory in this test");
-        }
-
-        @Override
-        public int compressMemory(SessionId sessionId) {
-            calls.add("compressMemory " + sessionId.value());
-            return 0;
-        }
-
-        @Override
-        public List<ToolApproval> openApprovals(SessionId rootSessionId) {
-            calls.add("openApprovals " + rootSessionId.value());
-            return List.of();
-        }
-
-        @Override
-        public boolean answerApproval(SessionId rootSessionId, String callId, boolean approved,
-                                      ApprovalScope scope) {
-            calls.add("answerApproval " + rootSessionId.value());
-            return false;
-        }
-
-        @Override
-        public java.util.Optional<ai.mindconnect.agent.runtime.port.in.ChatTurnHandle> approve(
-                SessionId rootSessionId, String callId, ApprovalScope scope,
-                java.util.function.Consumer<ai.mindconnect.agent.runtime.domain.StreamEvent> events) {
-            calls.add("approve " + rootSessionId.value());
-            return java.util.Optional.empty();
-        }
     }
 }

@@ -43,19 +43,17 @@ Your current plan:
 
 ## Where the variables come from
 
-Variables are contributed by **`PromptContextProvider`** beans. Each provider
-adds entries to the context map; they are discovered automatically by Spring, so
-adding a new variable means adding a provider class — no change to existing code.
+Variables are contributed by **`PromptVariableProvider`**s. Each one returns
+a map of entries for the agent and the session at hand; a
+[plugin](./embedding.md#writing-a-plugin) contributes one to the runtime, so
+adding a new variable means adding a provider — no change to existing code.
 
-Providers run in `priority()` order (ascending), so a later provider can
-override an earlier one. The built-in providers:
+What ships:
 
-| Provider | Variables |
-|----------|-----------|
-| `CurrentDateProvider` | `current_date`, `current_datetime`, `current_time`, `time_zone` — the date and time in the [user's time zone](#the-users-time-zone), `current_datetime` as a UTC instant |
-| `AgentMetadataProvider` | `agent_name`, `agent_id`, `user_id`, `session_id` |
-| `AgentToolsProvider` | `tools` |
-| `TodoListPromptContextProvider` | `todos`, `todo_list_md` |
+| Contributed by | Variables |
+|----------------|-----------|
+| `PromptPlugin` | `current_date`, `current_datetime`, `current_time`, `time_zone` — the date and time in the [user's time zone](#the-users-time-zone), `current_datetime` as a UTC instant; `agent_name`, `user_id`, `session_id`; `tools`, a list of `name` and `description` |
+| `TodoPlugin` | `todos`, `todo_list_md` |
 
 Use `snake_case` keys, prefer simple types (strings, numbers, lists, maps), and
 put `null` for absent values so `{% if x %}` blocks behave intuitively.
@@ -130,30 +128,33 @@ carrying a separator or `..` is refused rather than allowed to climb out.
 Contribute a provider and your variable is available to every agent's prompt:
 
 ```java
-@Component
-public class GreetingProvider implements PromptContextProvider {
+public final class GreetingPlugin implements Plugin {
     @Override
-    public void contribute(Map<String, Object> ctx, AgentDefinition def,
-                           AgentSession session, AuthenticationInfo auth) {
-        ctx.put("greeting", "Welcome back");
+    public String name() {
+        return "greeting";
+    }
+
+    @Override
+    public void install(PluginRegistry registry) {
+        registry.contribute(PromptVariableProvider.class,
+                (agent, session) -> Map.of("greeting", "Welcome back"));
     }
 }
 ```
+
+Hand the plugin to the builder, or define it as a bean in a Spring Boot
+application.
 
 ```text
 {{ greeting }}, {{ agent_name }}.
 ```
 
-Expensive providers (database or file-system reads) can return a higher
-`priority()` so they only do work when the prompt actually references their
-variable.
-
 ## Ad-hoc variables
 
-Some call sites inject extra variables for a single render — for example a
-response-reviewer sub-agent receives the user's message and the agent's draft
-answer. These are passed as an `extraVars` map to `render(...)` and override any
-value a provider produced for the same key.
+Some call sites add variables for a single render — a response reviewer's
+prompt receives the user's message, the agent's draft answer and the messages
+before it as `user_message`, `agent_response` and `last_messages`. They
+override any value a provider produced for the same key.
 
 ## The user's time zone
 
@@ -176,10 +177,10 @@ Where the zone comes from:
 
 It is a `TimeZones` port in `mc-agent-tool-spi` — `ZoneId zoneOf(UserId)` —
 which the Admin UI and the agent server fill from the user records. An
-embedding sets one with `AgentRuntimeBuilder.timeZones(TimeZones.fixed(zone))`;
-without one, the JVM's zone applies, as before. A tool reaches it with
+embedding hands the builder a `new PromptPlugin(clock, user -> zone)` in place
+of the builder's own; without one, the JVM's zone applies, as before. A tool reaches it with
 `TimeZones.of(env)` in `bind` and asks it per call with the scope's user — see
 [Creating a tool](./creating-a-tool.md).
 
-The section changes every minute, which is why it comes last: everything
-before it stays the same from one round to the next.
+The section changes once a day and comes last: everything before it stays
+the same from one round to the next.

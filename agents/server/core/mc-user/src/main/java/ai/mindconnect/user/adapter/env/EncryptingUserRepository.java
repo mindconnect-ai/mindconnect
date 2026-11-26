@@ -51,6 +51,24 @@ public class EncryptingUserRepository implements UserRepository {
         delegate.save(environment.isEmpty() ? user : user.withEnvironment(environment));
     }
 
+    /**
+     * Stores every user's variables in the current encryption scheme where an
+     * earlier one wrote them, and says how many records that changed. Once
+     * at start: a record nobody saves would otherwise keep its earlier
+     * ciphertext for good. A value this key does not read stays as it is.
+     */
+    public int rewriteEarlierScheme() {
+        int rewritten = 0;
+        for (User user : delegate.findAll()) {
+            Map<String, String> environment = encryption.reencryptValuesOfEarlierScheme(user.environment());
+            if (!environment.equals(user.environment())) {
+                delegate.save(user.withEnvironment(environment));
+                rewritten++;
+            }
+        }
+        return rewritten;
+    }
+
     private User decrypted(User user) {
         if (user.environment().isEmpty()) return user;
         return user.withEnvironment(encryption.decryptValues(user.environment(), "user '" + user.id().value() + "'"));

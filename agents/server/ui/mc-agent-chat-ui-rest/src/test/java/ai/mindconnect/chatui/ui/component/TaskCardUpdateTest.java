@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,7 +24,7 @@ class TaskCardUpdateTest {
     @Test
     void aFinishedToolSwapsItsSummaryAndBodyNotTheListItem() throws Exception {
         var done = TaskCardComponent.doneTool("task-tool-top-0-bash", "bash",
-                Map.of("command", "ls"), "a.txt", 12);
+                Map.of("command", "ls"), "a.txt", 12, null, new JsonMapperFactory(List.of()).create());
 
         var ops = done.updateInPlace();
 
@@ -32,10 +34,20 @@ class TaskCardUpdateTest {
         assertThat(json(ops)).doesNotContain("\"type\":\"list\"").contains("bash").contains("a.txt");
     }
 
+    @Test
+    void aLongOutputIsDrawnAsItsBeginningWithALinkToTheWholeOfIt() {
+        String body = TaskCardComponent.taskCardBody(null, "x".repeat(10_000) + "y".repeat(2_500),
+                "/chat/api/sessions/s1/tool-results/m7");
+
+        assertThat(body).contains("x".repeat(10_000)).doesNotContain("y")
+                .contains("… 2,500 more characters. [Download the full result](/chat/api/sessions/s1/tool-results/m7)");
+        assertThat(TaskCardComponent.taskCardBody(null, "short", "/anywhere")).doesNotContain("Download");
+    }
+
     /** The span a live update targets is on the card from the start. */
     @Test
     void theSummarySpanIsRenderedWithTheCard() throws Exception {
-        var running = TaskCardComponent.runningTool("task-tool-top-0-bash", "bash", Map.of());
+        var running = TaskCardComponent.runningTool("task-tool-top-0-bash", "bash", Map.of(), new JsonMapperFactory(List.of()).create());
 
         assertThat(json(running.render())).contains("\"collapseSummaryId\":\"task-tool-top-0-bash-summary\"");
     }

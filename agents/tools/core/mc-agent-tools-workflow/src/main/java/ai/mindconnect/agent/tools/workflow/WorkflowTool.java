@@ -11,6 +11,7 @@ import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.persist.WorkflowInstanceSnapshots;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,10 +46,12 @@ final class WorkflowTool implements Tool {
     private final String description;
     private final ToolCallScope scope;
     private final Supplier<Map<String, String>> environment;
+    private final JsonMapperFactory json;
 
     WorkflowTool(WorkflowDataRepository repository, String workflowId, WorkflowData snapshot,
-                 ToolCallScope scope, Supplier<Map<String, String>> environment) {
+                 ToolCallScope scope, Supplier<Map<String, String>> environment, JsonMapperFactory json) {
         this.environment = environment;
+        this.json = json;
         this.repository = repository;
         this.workflowId = workflowId;
         this.params = snapshot.getParams() != null ? snapshot.getParams() : Schema.object();
@@ -88,7 +91,7 @@ final class WorkflowTool implements Tool {
         }
 
         try {
-            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create()).withEnvironment(environment)
+            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(json)).withEnvironment(environment)
                     .executeWorkflow(wf, args,
                             scope == null ? Map.of() : Map.of(ToolCallScope.class.getName(), scope));
             if (result.isError()) {

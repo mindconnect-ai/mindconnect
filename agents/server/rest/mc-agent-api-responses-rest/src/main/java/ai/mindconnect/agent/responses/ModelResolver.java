@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.responses;
 
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 
 /**
  * Turns the {@code model} field of an incoming request into the agent that
@@ -46,11 +46,11 @@ public final class ModelResolver {
         }
     }
 
-    private final AgentDefinitionRepository agents;
+    private final AgentManagement agents;
     private final LlmConfigRepository llmConfigs;
     private final String defaultAgentName;
 
-    public ModelResolver(AgentDefinitionRepository agents, LlmConfigRepository llmConfigs, String defaultAgentName) {
+    public ModelResolver(AgentManagement agents, LlmConfigRepository llmConfigs, String defaultAgentName) {
         this.agents = agents;
         this.llmConfigs = llmConfigs;
         this.defaultAgentName = defaultAgentName;

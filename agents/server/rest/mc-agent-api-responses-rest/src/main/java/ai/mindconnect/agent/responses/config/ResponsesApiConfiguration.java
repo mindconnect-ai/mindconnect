@@ -1,15 +1,14 @@
 package ai.mindconnect.agent.responses.config;
 
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
 import ai.mindconnect.agent.responses.ModelResolver;
 import ai.mindconnect.agent.responses.ResponsesMapper;
 import ai.mindconnect.agent.responses.SessionBinder;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.message.port.in.ConversationManager;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -44,41 +43,35 @@ public class ResponsesApiConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    public AgentRuntimeBackend responsesRuntimeBackend(AgentChatService chat,
-                                                       AgentSessionService sessions,
-                                                       AgentDefinitionRepository agents,
-                                                       ConversationManager conversations,
-                                                       CurrentUsers currentUsers,
-                                                       org.springframework.beans.factory.ObjectProvider<ai.mindconnect.filestore.FileStore> fileStore,
+    public AgentRuntimeBackend responsesRuntimeBackend(AgentRuntime runtime, CurrentUsers currentUsers,
                                                        org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agentrest.service.SessionFileService> sessionFiles) {
-        var backend = new AgentRuntimeBackend(chat, sessions, agents, conversations, currentUsers::require);
-        var store = fileStore.getIfAvailable();
+        AgentRuntimeBackend backend = AgentRuntimeBackend.on(runtime, currentUsers::require);
+        var store = runtime.find(ai.mindconnect.filestore.FileStore.class);
         var attach = sessionFiles.getIfAvailable();
-        if (store != null && attach != null) {
-            backend.withFiles(store, (sessionId, stored) -> {
-                var result = attach.attach(sessionId, stored);
-                if (!result.success()) {
-                    throw new IllegalArgumentException(result.message());
-                }
-                return result.message();
-            });
+        if (store.isEmpty() || attach == null) {
+            return backend;
         }
-        return backend;
+        return backend.withFiles(store.get(), (sessionId, stored) -> {
+            var result = attach.attach(sessionId, stored);
+            if (!result.success()) {
+                throw new IllegalArgumentException(result.message());
+            }
+            return result.message();
+        });
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public ModelResolver responsesModelResolver(AgentDefinitionRepository agents,
-                                                LlmConfigRepository llmConfigs) {
-        return new ModelResolver(agents, llmConfigs, defaultAgent);
+    public ModelResolver responsesModelResolver(AgentRuntime runtime) {
+        return new ModelResolver(runtime.service(AgentManagement.class),
+                runtime.service(LlmConfigRepository.class), defaultAgent);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public SessionBinder responsesSessionBinder(AgentRuntimeBackend backend,
-                                                AgentSessionService sessions,
-                                                AgentDefinitionRepository agents) {
-        return new SessionBinder(backend, sessions, agents);
+    public SessionBinder responsesSessionBinder(AgentRuntimeBackend backend, AgentRuntime runtime) {
+        return new SessionBinder(backend, runtime.service(SessionManagement.class),
+                runtime.service(AgentManagement.class));
     }
 
     @Bean

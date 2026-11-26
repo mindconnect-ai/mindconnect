@@ -1,7 +1,9 @@
 package ai.mindconnect.arch;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaConstructorCall;
 import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
@@ -12,12 +14,18 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.freeze.FreezingArchRule;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
@@ -42,6 +50,12 @@ public final class McArchRules {
     private static final Set<String> SPRING_WIRING = Set.of(
         "Component", "Service", "Repository", "Controller", "RestController",
         "Configuration", "AutoConfiguration", "ControllerAdvice", "RestControllerAdvice");
+
+    private static final String PROJECT_PACKAGE = "ai.mindconnect.";
+
+    private static final String JSON_MAPPER_FACTORY = "ai.mindconnect.jackson.JsonMapperFactory";
+    private static final String OBJECT_MAPPER = "com.fasterxml.jackson.databind.ObjectMapper";
+    private static final String JSON_MAPPER = "com.fasterxml.jackson.databind.json.JsonMapper";
 
     private McArchRules() {
     }
@@ -83,6 +97,18 @@ public final class McArchRules {
             .should(notDependOnAdaptersOfOtherModules())
             .as("D2: an adapter does not import another module's adapter"));
 
+    /**
+     * D2: a module keeps things in memory, on files and in Postgres from one
+     * jar, and mc-jdbc is an optional dependency of it. A class outside the
+     * database packages that touched JDBC would fail at run time in an
+     * installation that has no database, where no compiler says so.
+     */
+    @ArchTest
+    static final ArchRule jdbcOnlyInDatabasePackages = FreezingArchRule.freeze(
+        noClasses().that().resideOutsideOfPackages("..pg..", "..jdbc..", "..pgvector..")
+            .should().dependOnClassesThat().resideInAnyPackage("ai.mindconnect.jdbc..", "java.sql..")
+            .as("D2: only a pg, jdbc or pgvector package uses JDBC"));
+
     /** D1: Spring wiring lives in springstarter/, an -app module or a REST/UI library, not in a library. */
     @ArchTest
     static final ArchRule springWiringOnlyAtTheEdge = FreezingArchRule.freeze(
@@ -90,11 +116,46 @@ public final class McArchRules {
             .should(McArchRules.be(IN_BOOT_MODULE))
             .as("D1: @Component, @Configuration, @RestController ... only in starters, apps, rest/ui modules and demos"));
 
-    /** D3: more than seven constructor parameters is more than one responsibility. */
+    /**
+     * D2: packages that need each other cannot be understood, tested or moved
+     * apart. One violation per package dependency that lies on a cycle, so that
+     * the store shrinks edge by edge while a cycle is being cut.
+     */
+    @ArchTest
+    static final ArchRule noPackageCycles = FreezingArchRule.freeze(
+        classes().should(notLieOnAPackageCycle())
+            .as("D2: no cycles between packages"));
+
+    /**
+     * D3: more than seven constructor parameters is more than one responsibility.
+     * A record is exempt: its constructor is its list of fields, and a value
+     * with nine fields is a value with nine fields, not a class doing nine things.
+     */
     @ArchTest
     static final ArchRule narrowConstructors = FreezingArchRule.freeze(
         classes().should(haveConstructorsWithAtMostParameters(7))
-            .as("D3: a constructor takes at most 7 parameters"));
+            .as("D3: a constructor takes at most 7 parameters (a record is exempt)"));
+
+    /**
+     * D3: a class with more than 30 methods has more than one responsibility. A
+     * record is exempt, its accessors come with its components. The message
+     * carries no count, so a frozen class does not fail again when it shrinks.
+     */
+    @ArchTest
+    static final ArchRule fewMethods = FreezingArchRule.freeze(
+        classes().that().areNotRecords()
+            .should(haveAtMostMethods(30))
+            .as("D3: a class has at most 30 methods"));
+
+    /**
+     * D3: a class that needs more than 25 others of the project is hard to
+     * change and hard to test. Nested classes count as their top-level class:
+     * a mapper over one family of nested DTOs depends on one thing.
+     */
+    @ArchTest
+    static final ArchRule lowFanOut = FreezingArchRule.freeze(
+        classes().should(dependOnAtMostProjectClasses(25))
+            .as("D3: a class depends on at most 25 other classes of the project"));
 
     /** D4: a suffix like Helper or Manager says the author did not find the role. */
     @ArchTest
@@ -127,6 +188,51 @@ public final class McArchRules {
     static final ArchRule slf4jOnly = FreezingArchRule.freeze(
         noClasses().should().dependOnClassesThat().resideInAPackage("java.util.logging..")
             .as("Conventions: SLF4J everywhere, never java.util.logging"));
+
+    /**
+     * Conventions: every ObjectMapper comes from JsonMapperFactory. A mapper
+     * built by hand misses the modules the installation announces — an id is
+     * then written as an object, and nothing fails.
+     */
+    @ArchTest
+    static final ArchRule mappersFromTheFactory = FreezingArchRule.freeze(
+        noClasses().that().doNotHaveFullyQualifiedName(JSON_MAPPER_FACTORY)
+            .should().callCodeUnitWhere(buildAMapper())
+            .as("Conventions: every ObjectMapper comes from JsonMapperFactory"));
+
+    /**
+     * Contracts: the agents' contracts know no Jackson. The ids, the scope, the
+     * tool SPI, the runtime API and the loop are what a library user builds on,
+     * and they are to bring no foreign jar along; how an id stands in JSON is
+     * mc-agent-jackson's. Named by package, so it holds when modules merge.
+     */
+    @ArchTest
+    static final ArchRule contractsKnowNoJackson = FreezingArchRule.freeze(
+        noClasses().that().resideInAPackage("ai.mindconnect.agent")
+            .or().resideInAnyPackage("ai.mindconnect.agent.scope..", "ai.mindconnect.agent.tool..",
+                "ai.mindconnect.agent.runtime.api..", "ai.mindconnect.agent.loop..")
+            .should().dependOnClassesThat().resideInAPackage("com.fasterxml..")
+            .as("Contracts: the agents' contracts know no Jackson"));
+
+    /**
+     * Conventions: no ObjectMapper is static. A static mapper is built before
+     * any runtime exists and so knows none of the modules its plugins
+     * contribute; a component gets its JsonMapperFactory through its constructor.
+     */
+    @ArchTest
+    static final ArchRule noStaticMapper = FreezingArchRule.freeze(
+        noFields().that().areStatic()
+            .should().haveRawType(JavaClass.Predicates.assignableTo(OBJECT_MAPPER))
+            .as("Conventions: no ObjectMapper is static"));
+
+    private static DescribedPredicate<JavaCall<?>> buildAMapper() {
+        return DescribedPredicate.describe("build an ObjectMapper themselves", call -> {
+            String owner = call.getTargetOwner().getFullName();
+            boolean mapperType = owner.equals(OBJECT_MAPPER) || owner.equals(JSON_MAPPER);
+            return mapperType && (call instanceof JavaConstructorCall
+                || owner.equals(JSON_MAPPER) && call.getName().equals("builder"));
+        });
+    }
 
     private static DescribedPredicate<JavaMethod> nameNoSupertypeDeclares() {
         return DescribedPredicate.describe("are not named by a supertype", method -> {
@@ -186,6 +292,9 @@ public final class McArchRules {
         return new ArchCondition<>("have constructors with at most " + max + " parameters") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
+                if (javaClass.isRecord()) {
+                    return;
+                }
                 for (JavaConstructor constructor : javaClass.getConstructors()) {
                     int count = constructor.getRawParameterTypes().size();
                     if (count > max) {
@@ -193,6 +302,81 @@ public final class McArchRules {
                             constructor.getFullName() + " takes " + count + " parameters"));
                     }
                 }
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> haveAtMostMethods(int max) {
+        return new ArchCondition<>("have at most " + max + " methods") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                long declared = javaClass.getMethods().stream()
+                    .filter(method -> !method.getModifiers().contains(JavaModifier.SYNTHETIC))
+                    .count();
+                if (declared > max) {
+                    events.add(SimpleConditionEvent.violated(javaClass,
+                        javaClass.getName() + " has more than " + max + " methods"));
+                }
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> dependOnAtMostProjectClasses(int max) {
+        return new ArchCondition<>("depend on at most " + max + " other classes of the project") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                String own = topLevelName(javaClass);
+                long others = javaClass.getDirectDependenciesFromSelf().stream()
+                    .map(dependency -> dependency.getTargetClass().getBaseComponentType())
+                    .filter(target -> target.getName().startsWith(PROJECT_PACKAGE))
+                    .map(McArchRules::topLevelName)
+                    .filter(target -> !target.equals(own))
+                    .distinct()
+                    .count();
+                if (others > max) {
+                    events.add(SimpleConditionEvent.violated(javaClass,
+                        javaClass.getName() + " depends on more than " + max + " other classes of the project"));
+                }
+            }
+        };
+    }
+
+    private static String topLevelName(JavaClass javaClass) {
+        String name = javaClass.getName();
+        int nested = name.indexOf('$');
+        return nested < 0 ? name : name.substring(0, nested);
+    }
+
+    private static ArchCondition<JavaClass> notLieOnAPackageCycle() {
+        return new ArchCondition<>("not lie on a package cycle") {
+            private final Map<String, Set<String>> dependencies = new TreeMap<>();
+
+            @Override
+            public void init(Collection<JavaClass> allClasses) {
+                dependencies.clear();
+            }
+
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                Set<String> targets = dependencies.computeIfAbsent(javaClass.getPackageName(), name -> new TreeSet<>());
+                javaClass.getDirectDependenciesFromSelf().forEach(dependency ->
+                    targets.add(dependency.getTargetClass().getBaseComponentType().getPackageName()));
+            }
+
+            @Override
+            public void finish(ConditionEvents events) {
+                dependencies.forEach((from, targets) -> targets.stream()
+                    .filter(to -> !to.equals(from) && leadsTo(to, from, new HashSet<>()))
+                    .forEach(to -> events.add(SimpleConditionEvent.violated(from,
+                        "package " + from + " depends on " + to + ", which leads back to it"))));
+            }
+
+            private boolean leadsTo(String from, String goal, Set<String> visited) {
+                if (from.equals(goal)) {
+                    return true;
+                }
+                return visited.add(from) && dependencies.getOrDefault(from, Set.of()).stream()
+                    .anyMatch(next -> leadsTo(next, goal, visited));
             }
         };
     }

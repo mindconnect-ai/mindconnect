@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin.api;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.admin.run.WorkflowRunService;
 import ai.mindconnect.workflow.admin.service.WorkflowAdminService;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -45,26 +46,29 @@ public class WorkflowApiController {
     public record InstanceInfo(String instanceId, String workflowName, String status,
                                long startedAt, long suspendedAt) {}
 
-    private static final ObjectMapper WORKFLOW_MAPPER = WorkflowObjectMapperFactory.create();
+    private final ObjectMapper workflowMapper;
 
     private final WorkflowAdminService service;
 
     /** What a run carries onto its worker thread: the host's, or nothing. */
     private final ai.mindconnect.workflow.admin.run.RunThreadContext runContext;
 
-    public WorkflowApiController(WorkflowAdminService service) {
-        this(service, ai.mindconnect.workflow.admin.run.RunThreadContext.NONE);
+    public WorkflowApiController(WorkflowAdminService service, JsonMapperFactory json) {
+        this(service, ai.mindconnect.workflow.admin.run.RunThreadContext.NONE, json);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public WorkflowApiController(WorkflowAdminService service,
-                                 org.springframework.beans.factory.ObjectProvider<ai.mindconnect.workflow.admin.run.RunThreadContext> runContext) {
-        this(service, runContext.getIfAvailable(() -> ai.mindconnect.workflow.admin.run.RunThreadContext.NONE));
+                                 org.springframework.beans.factory.ObjectProvider<ai.mindconnect.workflow.admin.run.RunThreadContext> runContext,
+                                 JsonMapperFactory json) {
+        this(service, runContext.getIfAvailable(() -> ai.mindconnect.workflow.admin.run.RunThreadContext.NONE), json);
     }
 
-    WorkflowApiController(WorkflowAdminService service, ai.mindconnect.workflow.admin.run.RunThreadContext runContext) {
+    WorkflowApiController(WorkflowAdminService service, ai.mindconnect.workflow.admin.run.RunThreadContext runContext,
+                          JsonMapperFactory json) {
         this.service = service;
         this.runContext = runContext;
+        this.workflowMapper = WorkflowObjectMapperFactory.create(json);
     }
 
     // ── Definitions ────────────────────────────────────────────────────────
@@ -81,7 +85,7 @@ public class WorkflowApiController {
     @GetMapping("/api/workflows/{id}")
     public ResponseEntity<JsonNode> get(@PathVariable String id) {
         return service.find(id)
-                .map(wf -> ResponseEntity.ok((JsonNode) WORKFLOW_MAPPER.valueToTree(wf)))
+                .map(wf -> ResponseEntity.ok((JsonNode) workflowMapper.valueToTree(wf)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -94,7 +98,7 @@ public class WorkflowApiController {
                                                                   @RequestBody JsonNode definition) {
         WorkflowData wf;
         try {
-            wf = WORKFLOW_MAPPER.treeToValue(definition, WorkflowData.class);
+            wf = workflowMapper.treeToValue(definition, WorkflowData.class);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
@@ -160,7 +164,7 @@ public class WorkflowApiController {
         var progress = new ai.mindconnect.workflow.execution.WorkflowEventListener() {
             private void send(String state, ai.mindconnect.workflow.execution.StepInstance<?> step, String error) {
                 try {
-                    var payload = WORKFLOW_MAPPER.createObjectNode()
+                    var payload = workflowMapper.createObjectNode()
                             .put("step", step.getConfig().getName())
                             .put("type", step.getConfig().getType())
                             .put("state", state);
@@ -185,7 +189,7 @@ public class WorkflowApiController {
                 WorkflowRunService.RunReport report = service.run(wf, params, progress, persist);
                 emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter
                         .event().name("result").data(
-                                WORKFLOW_MAPPER.writeValueAsString(toResult(report)),
+                                workflowMapper.writeValueAsString(toResult(report)),
                                 org.springframework.http.MediaType.APPLICATION_JSON));
                 emitter.complete();
             } catch (Exception e) {

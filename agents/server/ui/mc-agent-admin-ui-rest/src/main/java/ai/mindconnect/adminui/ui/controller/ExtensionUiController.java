@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.adminui.service.NamespaceSeeder;
 import ai.mindconnect.adminui.service.NamespaceSeeding;
 import ai.mindconnect.adminui.ui.page.ExtensionsPage;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.security.SecurityCurrentUserResolver;
 import ai.mindconnect.extension.adapter.classpath.ContributionChecker;

@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.controller;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.management.api.ManagedSession;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,19 +34,20 @@ final class ChatLanding {
      * @param used        whether a chat has been written in
      * @return the chat to open; empty when the user has none worth opening
      */
-    static Optional<SessionId> pick(List<? extends AgentSessionHeader> newestFirst, SessionId lastShown,
-                                    Predicate<AgentSessionHeader> used) {
-        if (lastShown != null && newestFirst.stream().anyMatch(chat -> lastShown.equals(chat.id()))) {
+    static Optional<SessionId> pick(List<ManagedSession> newestFirst, SessionId lastShown,
+                                    Predicate<ManagedSession> used) {
+        if (lastShown != null
+                && newestFirst.stream().anyMatch(chat -> lastShown.value().equals(chat.id().value()))) {
             return Optional.of(lastShown);
         }
         return newestFirst.stream().limit(MAX_LOOKS)
                 .filter(chat -> titled(chat) || used.test(chat))
-                .map(AgentSessionHeader::id)
+                .map(chat -> chat.id())
                 .findFirst();
     }
 
     /** A title comes with the first answer, or from the user: a titled chat was used, no need to look. */
-    private static boolean titled(AgentSessionHeader chat) {
+    private static boolean titled(ManagedSession chat) {
         return chat.title() != null && !chat.title().isBlank();
     }
 }

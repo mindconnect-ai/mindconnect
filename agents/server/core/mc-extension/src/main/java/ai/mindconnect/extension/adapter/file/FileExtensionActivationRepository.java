@@ -1,6 +1,6 @@
 package ai.mindconnect.extension.adapter.file;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.extension.domain.ExtensionActivation;
 import ai.mindconnect.extension.domain.ExtensionId;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;

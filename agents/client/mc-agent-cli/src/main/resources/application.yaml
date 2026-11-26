@@ -34,5 +34,3 @@ mindconnect:
   logging:
     level:
       ai.mindconnect: INFO
-      ai.mindconnect.message.adapter: WARN
-      ai.mindconnect.agent.runtime.adapter.token: INFO

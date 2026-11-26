@@ -26,6 +26,15 @@
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-scope</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Channel: the SSE bus's sequencing, replay buffer and fan-out.
              Reached transitively through the runtime today; named here because
@@ -36,6 +45,13 @@
             <version>${project.version}</version>
         </dependency>
         <!-- Agent platform — domain types plus the REST controllers the UI drives -->
+        <!-- Sessions are listed, renamed and deleted through the management API. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-management-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- The chat runs on the runtime on the plugin kernel; the bridge takes this page's calls there. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>

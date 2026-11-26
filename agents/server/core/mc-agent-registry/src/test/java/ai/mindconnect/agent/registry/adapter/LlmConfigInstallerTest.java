@@ -1,14 +1,16 @@
 package ai.mindconnect.agent.registry.adapter;
 
+import ai.mindconnect.llm.jackson.LlmJsonModule;
 import ai.mindconnect.agent.registry.adapter.installer.LlmConfigInstaller;
 import ai.mindconnect.agent.registry.domain.ImportMode;
 import ai.mindconnect.agent.registry.domain.ImportStatus;
 import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +43,7 @@ class LlmConfigInstallerTest {
     @BeforeEach
     void setUp() {
         repository = new FakeRepository();
-        installer = new LlmConfigInstaller(repository);
+        installer = new LlmConfigInstaller(repository, new JsonMapperFactory(List.of(new LlmJsonModule())));
     }
 
     @Test

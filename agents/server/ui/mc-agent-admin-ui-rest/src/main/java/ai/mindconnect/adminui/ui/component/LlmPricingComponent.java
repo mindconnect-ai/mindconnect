@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.domain.LlmPriceList;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.domain.LlmPriceList;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -45,7 +46,7 @@ public class SpiLookupTest {
     @Test
     public void javaScriptStepExecutesViaDiscoveredFactory() {
         WorkflowExecutorService service = new WorkflowExecutorService(
-                SpiWorkflowContextFactory.create());
+                SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())));
 
         CodeData step = new CodeData();
         step.setName("js");
@@ -66,7 +67,7 @@ public class SpiLookupTest {
     @Test
     public void groovyStepExecutesViaDiscoveredFactory() {
         WorkflowExecutorService service = new WorkflowExecutorService(
-                SpiWorkflowContextFactory.create());
+                SpiWorkflowContextFactory.create(new JsonMapperFactory(List.of())));
 
         CodeData step = new CodeData();
         step.setName("groovy");
@@ -87,7 +88,7 @@ public class SpiLookupTest {
     @Test
     public void customClassLoaderOverloadWorks() {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
-        WorkflowContextFactory factory = SpiWorkflowContextFactory.create(cl);
+        WorkflowContextFactory factory = SpiWorkflowContextFactory.create(cl, new JsonMapperFactory(List.of()));
         assertThat(factory).isNotNull();
         assertThat(factory.getStepInstanceFactory()).isNotNull();
     }

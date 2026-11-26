@@ -79,27 +79,29 @@ serializer, your own step type — ships:
 
 To apply every configurer on the classpath automatically, add the
 **`mc-workflow-spi-lookup`** module and build the factory with
-`SpiWorkflowContextFactory.create()`:
+`SpiWorkflowContextFactory.create(json)`, where `json` is your
+`JsonMapperFactory` (`new JsonMapperFactory(List.of())` in a standalone app):
 
 ```java
 import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
 
 // ServiceLoader finds every WorkflowConfigurer on the classpath and
 // calls configure() on a fresh DefaultWorkflowContextFactory — no manual calls.
-WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
+WorkflowContextFactory factory = SpiWorkflowContextFactory.create(json);
 WorkflowExecutorService service = new WorkflowExecutorService(factory);
 ```
 
 Adding a module to the classpath is all it takes; the SPI does the
 `configure(...)` for you. These modules ship a configurer out of the box:
-`mc-workflow-code-{javascript,groovy,beanshell,jython}`,
-`mc-workflow-jackson` and `mc-workflow-step-form`.
+`mc-workflow-code-{javascript,groovy,beanshell,jython}` and
+`mc-workflow-step-form`. The JSON support of `mc-workflow-jackson` is applied
+by `create(json)` itself, with the mapper factory you hand in.
 
-Need extra setup on top of discovery? Take the factory `create()` returns and
+Need extra setup on top of discovery? Take the factory `create(json)` returns and
 modify it before building the executor:
 
 ```java
-WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
+WorkflowContextFactory factory = SpiWorkflowContextFactory.create(json);
 factory.getStepInstanceFactory().register(MyData.class, MyStep::new);
 WorkflowExecutorService service = new WorkflowExecutorService(factory);
 ```

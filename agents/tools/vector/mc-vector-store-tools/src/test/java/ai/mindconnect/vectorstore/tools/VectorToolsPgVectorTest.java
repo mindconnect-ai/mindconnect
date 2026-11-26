@@ -1,13 +1,13 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolEnvironment;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +21,8 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -44,7 +46,7 @@ class VectorToolsPgVectorTest {
     /** Where every store's chunks live: the embedding index, one table for all namespaces. */
     private static final String TABLE = "mc_embedding";
 
-    private static final LlmEmbeddings FAKE_EMBEDDINGS = (config, texts) -> texts.stream()
+    private static final LlmEmbedding FAKE_EMBEDDINGS = (config, texts) -> texts.stream()
             .map(t -> {
                 if (t.contains("container")) return new float[]{1f, 0f, 0f};
                 if (t.contains("finance")) return new float[]{0f, 1f, 0f};
@@ -75,7 +77,8 @@ class VectorToolsPgVectorTest {
         env = new ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
-                if (type == LlmEmbeddings.class) return Optional.of((T) FAKE_EMBEDDINGS);
+                if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
+                if (type == LlmEmbedding.class) return Optional.of((T) FAKE_EMBEDDINGS);
                 if (type == LlmConfigRepository.class) return Optional.of((T) FAKE_CONFIGS);
                 if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(NS));
                 return Optional.empty();

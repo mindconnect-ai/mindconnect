@@ -1,0 +1,3 @@
+ai.mindconnect.llm.management.api.domain.LlmConfig has 2 constructors
+ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk$ToolCallDelta has 2 constructors
+ai.mindconnect.llm.runtime.api.domain.ToolCall has 2 constructors

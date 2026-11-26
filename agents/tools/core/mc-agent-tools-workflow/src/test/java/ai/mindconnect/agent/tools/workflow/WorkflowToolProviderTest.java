@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -71,13 +72,14 @@ class WorkflowToolProviderTest {
 
     @BeforeEach
     void setUp() {
-        repository = new FileWorkflowDataRepository(dir, () -> "test");
+        repository = new FileWorkflowDataRepository(dir, () -> "test", new JsonMapperFactory(List.of()));
         repository.save("greeting", greeting());
         repository.save("halting", halting());
 
         provider = new WorkflowToolProvider();
         provider.bind(MapToolEnvironment.builder()
                 .service(WorkflowDataRepository.class, repository)
+                .service(JsonMapperFactory.class, new JsonMapperFactory(List.of()))
                 .build());
     }
 
@@ -213,6 +215,7 @@ class WorkflowToolProviderTest {
         };
         provider.bind(MapToolEnvironment.builder()
                 .service(WorkflowDataRepository.class, repository)
+                .service(JsonMapperFactory.class, new JsonMapperFactory(List.of()))
                 .service(ai.mindconnect.common.env.EnvVarResolver.class, ai.mindconnect.common.env.EnvVarResolver.chain(
                         personal, ai.mindconnect.common.env.EnvVarResolver.of(Map.of("PROBE", "namespace-value"))))
                 .build());

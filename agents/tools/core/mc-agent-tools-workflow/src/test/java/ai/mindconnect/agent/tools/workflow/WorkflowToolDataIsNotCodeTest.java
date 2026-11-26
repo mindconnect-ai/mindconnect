@@ -20,6 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,10 +45,11 @@ class WorkflowToolDataIsNotCodeTest {
 
     @BeforeEach
     void setUp() {
-        repository = new FileWorkflowDataRepository(dir, () -> "test");
+        repository = new FileWorkflowDataRepository(dir, () -> "test", new JsonMapperFactory(List.of()));
         provider = new WorkflowToolProvider();
         provider.bind(MapToolEnvironment.builder()
                 .service(WorkflowDataRepository.class, repository)
+                .service(JsonMapperFactory.class, new JsonMapperFactory(List.of()))
                 .build());
     }
 

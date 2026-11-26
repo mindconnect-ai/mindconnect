@@ -1,14 +1,11 @@
 package ai.mindconnect.agent;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EntityIdTest {
-
-    record Holder(SessionId session, AgentId agent, UserId user) { }
 
     @Test
     void aUuidStringIsAValidValue() {
@@ -29,16 +26,5 @@ class EntityIdTest {
                     .as("value '%s'", bad)
                     .isInstanceOf(IllegalArgumentException.class);
         }
-    }
-
-    @Test
-    void inJsonAnIdIsItsValue() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-        Holder holder = new Holder(SessionId.of("s-1"), AgentId.of("web-researcher"), UserId.of("David"));
-
-        String json = mapper.writeValueAsString(holder);
-
-        assertThat(json).isEqualTo("{\"session\":\"s-1\",\"agent\":\"web-researcher\",\"user\":\"David\"}");
-        assertThat(mapper.readValue(json, Holder.class)).isEqualTo(holder);
     }
 }

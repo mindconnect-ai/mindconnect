@@ -48,7 +48,6 @@ the finished report:
 |--------|---------|
 | `mc-agent-runtime` | Execution engine: sessions, memory, tool dispatch, sub-agent calls |
 | `mc-llm-gateway` | LLM abstraction — streaming chat, model routing |
-| `mc-message-repository` | Conversation & message storage |
 | `mc-file-store-core` / `mc-file-store` | The runtime's uploads, id-addressed: ports / filesystem backend |
 | `mc-agent-tool-spi` | What a tool is: `Tool`, `ToolFactory`, `MultiToolProvider`, the registry, and where file tools read and write |
 
@@ -136,7 +135,6 @@ example: [`doc/registry-example/`](doc/registry-example/).
 | Module | Purpose |
 |--------|---------|
 | `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres — one JSONB document per config, via `mc-jdbc` |
-| `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres — paged by `created_at` / `seq` |
 | `postgres/mc-agent-runtime-pg` | The runtime's seven ports on Postgres — definitions, sessions, LLM traces, todo lists, summaries, working memory |
 | `postgres/mc-file-store-pg` | `FileStore` on Postgres — uploads as `bytea` rows |
 

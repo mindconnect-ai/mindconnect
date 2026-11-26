@@ -1,8 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 
@@ -41,14 +41,14 @@ public final class ChatSettingsComponent implements UiComponent {
 
     private final SessionId sessionId;
     private final List<LlmConfig> llmConfigs;
-    private final List<AgentDefinition> agents;
+    private final List<ManagedAgent> agents;
     private final String currentLlmConfigName;
     private final AgentId currentAgentId;
     /** What this chat runs on today — the agent's prompt, or its own override. */
     private final String currentSystemPrompt;
 
     public ChatSettingsComponent(SessionId sessionId, List<LlmConfig> llmConfigs,
-                                 List<AgentDefinition> agents,
+                                 List<ManagedAgent> agents,
                                  String currentLlmConfigName, AgentId currentAgentId,
                                  String currentSystemPrompt) {
         this.sessionId = sessionId;
@@ -74,17 +74,17 @@ public final class ChatSettingsComponent implements UiComponent {
      * What the model and the prompt field show once an agent is picked in the
      * dialog, so they say what Apply will do: a different agent takes over
      * with its own model and prompt; the chat's current agent shows what the
-     * chat runs on now, its own overrides included; no agent keeps what the
-     * fields hold, since those two then are the chat.
+     * chat runs on now; the chat's own settings keep what the fields hold,
+     * since those two then are the chat's.
      *
      * @param picked    the agent picked, {@code null} for none
      * @param current   the chat's own values today
      * @param submitted what the fields held when the pick changed
      */
-    public static Values valuesFor(AgentDefinition picked, AgentId currentAgentId, Values current, Values submitted) {
+    public static Values valuesFor(ManagedAgent picked, AgentId currentAgentId, Values current, Values submitted) {
         if (picked == null) return submitted;
-        if (picked.id().equals(currentAgentId)) return current;
-        return new Values(picked.llmConfigName(), picked.systemPrompt());
+        if (ChatAgent.id(picked).equals(currentAgentId)) return current;
+        return new Values(ChatAgent.model(picked), picked.definition().instructions());
     }
 
     @Override
@@ -108,12 +108,13 @@ public final class ChatSettingsComponent implements UiComponent {
 
     /**
      * The agent, first because it overrules the other two: picking a different
-     * one hands the chat over completely. Staying on the one it has leaves the
-     * two fields below acting as this chat's own overrides.
+     * one hands the chat over completely. A chat that changed anything runs on
+     * settings of its own and is shown on the first entry: there is no agent
+     * it still follows.
      */
     private UiField agentField() {
         List<UiField.Option> options = new ArrayList<>();
-        options.add(UiField.Option.of("", "— no agent: the model and prompt below —"));
+        options.add(UiField.Option.of("", "— this chat's own settings: the model and prompt below —"));
         agents.forEach(a -> options.add(UiField.Option.of(a.id().value(), label(a))));
         return UiField.select("agentId", "Agent",
                         currentAgentId == null ? "" : currentAgentId.value(), options)
@@ -123,21 +124,22 @@ public final class ChatSettingsComponent implements UiComponent {
                 .onChange(trigger(on(ChatUiController.class)
                         .settingsAgentPicked(sessionId.value(), null, null), id()))
                 .hint("An agent brings its own prompt, model and tools. Switch to a different "
-                        + "one and it takes over; stay on this one and the two fields below "
-                        + "override it for this chat alone");
+                        + "one and it takes over. Change the model or the prompt below and this "
+                        + "chat keeps its own settings: what is changed on the agent later no "
+                        + "longer reaches it");
     }
 
     /** An agent reads as what it is for, not just what it is called. */
-    private static String label(AgentDefinition agent) {
-        String description = agent.description();
+    private static String label(ManagedAgent agent) {
+        String description = agent.definition().description();
         if (description == null || description.isBlank()) {
-            return agent.name();
+            return agent.definition().name();
         }
         String trimmed = description.strip();
         if (trimmed.length() > 70) {
             trimmed = trimmed.substring(0, 69).strip() + "…";
         }
-        return agent.name() + " — " + trimmed;
+        return agent.definition().name() + " — " + trimmed;
     }
 
     private UiField modelField() {

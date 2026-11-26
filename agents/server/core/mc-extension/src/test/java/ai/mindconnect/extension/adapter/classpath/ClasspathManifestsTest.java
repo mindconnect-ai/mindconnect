@@ -5,6 +5,7 @@ import ai.mindconnect.extension.domain.ExtensionId;
 import ai.mindconnect.extension.domain.ExtensionManifest;
 import ai.mindconnect.extension.domain.ExtensionRegistry;
 import ai.mindconnect.extension.domain.ExtensionRuntime;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -12,6 +13,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,7 +21,7 @@ class ClasspathManifestsTest {
 
     @Test
     void reads_the_manifest_on_the_test_classpath_and_ignores_what_it_does_not_know() {
-        ExtensionRegistry registry = ClasspathManifests.load(getClass().getClassLoader());
+        ExtensionRegistry registry = ClasspathManifests.load(getClass().getClassLoader(), new JsonMapperFactory(List.of()));
 
         Extension extension = registry.find(ExtensionId.of("test-extension")).orElseThrow();
         ExtensionManifest manifest = extension.manifest();
@@ -47,7 +49,7 @@ class ClasspathManifestsTest {
         Files.createDirectories(manifest.getParent());
         Files.writeString(manifest, "{ \"id\": \"Broken Id\" }");
         try (var loader = new URLClassLoader(new URL[]{dir.resolve("broken").toUri().toURL()}, null)) {
-            ExtensionRegistry registry = ClasspathManifests.load(loader);
+            ExtensionRegistry registry = ClasspathManifests.load(loader, new JsonMapperFactory(List.of()));
 
             assertThat(registry.isEmpty()).isTrue();
             assertThat(registry.problems()).singleElement().satisfies(problem -> {

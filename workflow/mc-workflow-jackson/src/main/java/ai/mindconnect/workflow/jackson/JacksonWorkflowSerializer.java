@@ -19,7 +19,7 @@ import java.nio.file.Path;
  * <p>Example:
  * <pre>{@code
  * JacksonWorkflowSerializer serializer = new JacksonWorkflowSerializer(
- *         WorkflowObjectMapperFactory.create());
+ *         WorkflowObjectMapperFactory.create(json));
  *
  * // Deserialize
  * WorkflowData wd = serializer.read(path);

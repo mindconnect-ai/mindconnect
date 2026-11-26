@@ -1,5 +1,6 @@
 package ai.mindconnect.webscraper;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.webscraper.jsoup.JsoupWebScraper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -27,10 +28,10 @@ public class WebScraperMain {
         options.setRemoveHtml(true);
         options.setSaveToDirectory("/Users/dbe/Insync/deep_tc/gdrive/Business/Coderepo/mindconnect/mc-java/core/mc-webscraper/src/main/resources/export");
 
-        JsoupWebScraper scraper = new JsoupWebScraper();
+        JsoupWebScraper scraper = new JsoupWebScraper(new JsonMapperFactory(List.of()));
         var results = scraper.scrape(List.of(options));
 
-//        ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+//        ObjectMapper mapper = JsonMapperFactory.create().enable(SerializationFeature.INDENT_OUTPUT);
 //        Map<String, Object> map = new HashMap<>();
 //        //File file = new File("community-fiber-help.json");
 //        File file = new File("placetel.json");

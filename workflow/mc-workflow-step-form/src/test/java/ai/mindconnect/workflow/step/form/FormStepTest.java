@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.step.form;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiNode;
@@ -47,7 +48,7 @@ class FormStepTest {
         wf.setName("form-wf");
         wf.setSteps(new ArrayList<>(List.of(formStep())));
 
-        ObjectMapper mapper = WorkflowObjectMapperFactory.create();
+        ObjectMapper mapper = WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of()));
         String json = mapper.writeValueAsString(wf);
         WorkflowData restored = mapper.readValue(json, WorkflowData.class);
 

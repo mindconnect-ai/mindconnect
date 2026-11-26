@@ -1,6 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AttachedFile;
+import ai.mindconnect.agent.management.api.SessionAttachment;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatFilesUiController;
 
@@ -52,12 +52,12 @@ public final class ChatAttachmentsComponent {
         }
 
         /** Whether a file belongs in this panel. */
-        public boolean holds(AttachedFile file) {
+        public boolean holds(SessionAttachment file) {
             return (this == IMAGES) == file.isImage();
         }
 
         /** The files of this kind, in attach order. */
-        public List<AttachedFile> of(List<AttachedFile> files) {
+        public List<SessionAttachment> of(List<SessionAttachment> files) {
             return files.stream().filter(this::holds).toList();
         }
     }
@@ -69,7 +69,7 @@ public final class ChatAttachmentsComponent {
      * @param files  the session's attached files, in attach order — all of them; the kind picks its own
      * @param chunks attached file's id → searchable chunks, for the files that were indexed
      */
-    public static UiNode node(SessionId sessionId, Kind kind, List<AttachedFile> files, Map<String, Long> chunks) {
+    public static UiNode node(SessionId sessionId, Kind kind, List<SessionAttachment> files, Map<String, Long> chunks) {
         var panel = UiStack.of(kind.panelId()).gap(4);
         files = kind.of(files);
         if (files.isEmpty()) {
@@ -83,7 +83,7 @@ public final class ChatAttachmentsComponent {
                         .confirm("Remove this file from the conversation?")
                         .onClick(trigger(on(ChatFilesUiController.class)
                                 .remove(sessionId.value(), ROW_ID.toString(), null))));
-        for (AttachedFile f : files) {
+        for (SessionAttachment f : files) {
             table.row(Map.of(
                     "id", java.net.URLEncoder.encode(f.name(), java.nio.charset.StandardCharsets.UTF_8),
                     "file", f.name(),
@@ -94,14 +94,14 @@ public final class ChatAttachmentsComponent {
         return panel;
     }
 
-    private static String kind(AttachedFile f) {
+    private static String kind(SessionAttachment f) {
         if (f.isImage()) return "image";
         if (f.isPdf()) return "PDF";
         return f.mediaType() != null && !f.mediaType().isBlank() ? f.mediaType() : "file";
     }
 
     /** How the file reaches the model — with the next message, or through vector_search. */
-    private static String reach(AttachedFile f, long chunks) {
+    private static String reach(SessionAttachment f, long chunks) {
         if (f.isImage()) return "image with the next message";
         String search = chunks + (chunks == 1 ? " searchable chunk" : " searchable chunks");
         return f.isPdf() ? "document with the next message · " + search : search;

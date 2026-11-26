@@ -19,6 +19,7 @@ import ai.mindconnect.workflow.execution.WorkflowExecutorService;
 import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -70,13 +71,17 @@ public class VectorStoreService {
     private final Path uploadBase;
     /** Where a call works — every store call names the namespace. */
     private final ai.mindconnect.common.env.EnvVarResolver environment;
+    /** The host's mapper factory, for an ingest workflow's JSON support. */
+    private final JsonMapperFactory json;
 
     public VectorStoreService(ObjectProvider<VectorStores> storesProvider,
                               ObjectProvider<FileStore> fileStoreProvider,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}")
                               String toolsBaseDir,
-                              ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
+                              ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment,
+                              JsonMapperFactory json) {
+        this.json = json;
         this.storesProvider = storesProvider;
         this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStoreProvider = fileStoreProvider;
@@ -118,7 +123,10 @@ public class VectorStoreService {
     /** Saves an index definition; a missing password keeps the one stored under that name. */
     public IndexInfo saveIndex(IndexDefinition index) {
         VectorStores vs = stores();
-        if (index.password() == null || "***".equals(index.password())) {
+        // A password belongs to a database of the index's own: without a URL there is none to keep.
+        if (index.url() == null) {
+            index = index.withPassword(null);
+        } else if (index.password() == null || "***".equals(index.password())) {
             String name = index.name();
             String kept = vs.indexes().stream().filter(i -> i.name().equals(name))
                     .map(IndexDefinition::password).filter(java.util.Objects::nonNull).findFirst().orElse(null);
@@ -139,6 +147,25 @@ public class VectorStoreService {
         return true;
     }
 
+    /**
+     * Opens the index and says where it is.
+     *
+     * @throws RuntimeException when it cannot be opened — a wrong URL, a database without pgvector
+     */
+    public String indexLocation(String name) {
+        return stores().indexLocation(name);
+    }
+
+    /** The index a store's chunks are kept in. */
+    public String indexOf(VectorStoreInstance instance) {
+        return stores().indexOf(instance);
+    }
+
+    /** Where the application's own database is; empty when it runs without one. */
+    public Optional<String> systemDatabase() {
+        return stores().systemDatabase();
+    }
+
     private String location(VectorStores vs, String name) {
         try {
             return vs.indexLocation(name);
@@ -155,6 +182,11 @@ public class VectorStoreService {
 
     public Optional<VectorStoreInstance> instance(String name) {
         return stores().registry().instance(name);
+    }
+
+    /** The settings a store works with, registered or not. */
+    public VectorStoreInstance settings(String storeName) {
+        return stores().store(storeName).settings();
     }
 
     /** Registers (and creates on first use) a GLOBAL store from a template. */
@@ -203,7 +235,7 @@ public class VectorStoreService {
                 .toList();
     }
 
-    private static Entry entry(IndexedEntity e) {
+    static Entry entry(IndexedEntity e) {
         return new Entry(e.ref().type().value(), e.ref().source(), e.ref().container(), e.ref().id(),
                 e.owner() == null ? null : e.owner().value(), e.version(), e.chunks());
     }
@@ -301,7 +333,7 @@ public class VectorStoreService {
             if (stored != null) {
                 params.put("file_id", stored.id().value());
             }
-            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create(json))
                     .withEnvironment(environment.shared()::asMap)
                     .executeWorkflow(workflow, params);
             return safeName + ": " + summarize(result);

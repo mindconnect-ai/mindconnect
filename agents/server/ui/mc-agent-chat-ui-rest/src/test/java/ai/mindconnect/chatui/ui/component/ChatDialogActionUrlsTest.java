@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AttachedFile;
+import ai.mindconnect.agent.management.api.SessionAttachment;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -119,7 +119,7 @@ class ChatDialogActionUrlsTest {
                 .contains("\"id\":\"chat-attachments-images\"");
     }
 
-    private static final List<AttachedFile> FILES = List.of(
-            new AttachedFile("f-1", "a.pdf", "application/pdf", 10),
-            new AttachedFile("f-2", "photo.png", "image/png", 20));
+    private static final List<SessionAttachment> FILES = List.of(
+            new SessionAttachment("f-1", "a.pdf", "application/pdf", 10, null),
+            new SessionAttachment("f-2", "photo.png", "image/png", 20, null));
 }

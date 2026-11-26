@@ -254,8 +254,8 @@ class BrandingPropertiesTest {
 
         assertThat(branded.namespace()).as("the entry's own name is the id").isEqualTo("acme");
         assertThat(branded.namespaceAdmins()).containsExactly(
-                ai.mindconnect.agent.Email.of("chief@acme.example"),
-                ai.mindconnect.agent.Email.of("david@acme.example"));
+                ai.mindconnect.namespace.domain.Email.of("chief@acme.example"),
+                ai.mindconnect.namespace.domain.Email.of("david@acme.example"));
         assertThat(branded.hasNamespace()).isTrue();
     }
 
@@ -266,8 +266,8 @@ class BrandingPropertiesTest {
         namespace.setAdmins(java.util.List.of("chief@acme.example", " ", "david@acme.example"));
 
         assertThat(namespace.addresses()).containsExactly(
-                ai.mindconnect.agent.Email.of("david@acme.example"),
-                ai.mindconnect.agent.Email.of("chief@acme.example"));
+                ai.mindconnect.namespace.domain.Email.of("david@acme.example"),
+                ai.mindconnect.namespace.domain.Email.of("chief@acme.example"));
     }
 
     @Test

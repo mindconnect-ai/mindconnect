@@ -1,17 +1,18 @@
 package ai.mindconnect.adminui.namespaces;
 
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import java.util.function.UnaryOperator;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillId;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.domain.LlmPriceId;
-import ai.mindconnect.llm.port.out.LlmPriceRepository;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillId;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.domain.LlmPriceId;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpProbeResult;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -38,35 +39,50 @@ public final class GuardedRepositories {
     private GuardedRepositories() {
     }
 
-    /** Agents: created, renamed, given tools and deleted by admins. */
-    public record Agents(AgentDefinitionRepository delegate, NamespaceWriteGuard guard)
-            implements AgentDefinitionRepository {
+    /**
+     * The agents as the agent pages reach them, through the runtime: the
+     * same question at the same writes, or going that way would go round it.
+     */
+    public record ManagedAgents(AgentManagement delegate, NamespaceWriteGuard guard) implements AgentManagement {
 
         @Override
-        public AgentDefinition save(AgentDefinition definition) {
+        public ManagedAgent create(ManagedAgent agent) {
             guard.requireAdmin("an agent");
-            return delegate.save(definition);
+            return delegate.create(agent);
         }
 
         @Override
-        public void deleteById(AgentId id) {
+        public ManagedAgent update(AgentId id, long expectedVersion,
+                                   UnaryOperator<ManagedAgent> change) {
             guard.requireAdmin("an agent");
-            delegate.deleteById(id);
+            return delegate.update(id, expectedVersion, change);
         }
 
         @Override
-        public Optional<AgentDefinition> findById(AgentId id) {
-            return delegate.findById(id);
+        public ManagedAgent copy(AgentId id) {
+            guard.requireAdmin("an agent");
+            return delegate.copy(id);
         }
 
         @Override
-        public Optional<AgentDefinition> findByName(String name) {
+        public void delete(AgentId id) {
+            guard.requireAdmin("an agent");
+            delegate.delete(id);
+        }
+
+        @Override
+        public List<ManagedAgent> list() {
+            return delegate.list();
+        }
+
+        @Override
+        public Optional<ManagedAgent> find(AgentId id) {
+            return delegate.find(id);
+        }
+
+        @Override
+        public Optional<ManagedAgent> findByName(String name) {
             return delegate.findByName(name);
-        }
-
-        @Override
-        public List<AgentDefinition> findAll() {
-            return delegate.findAll();
         }
     }
 

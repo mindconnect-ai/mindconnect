@@ -1,6 +1,7 @@
 package ai.mindconnect.mail.index;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mail.Location;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,18 +44,19 @@ public final class FileMailIndexStore implements MailIndexStore {
     private final java.util.concurrent.ConcurrentHashMap<Path, java.util.concurrent.locks.ReentrantLock> locks =
             new java.util.concurrent.ConcurrentHashMap<>();
 
-    public FileMailIndexStore(Path dataDir, String namespace) {
-        this(() -> dataDir, () -> namespace);
+    public FileMailIndexStore(Path dataDir, String namespace, JsonMapperFactory json) {
+        this(() -> dataDir, () -> namespace, json);
     }
 
     /**
      * Resolved per call: a server binds the namespace per request, and a
      * store built at start-up has no request to ask.
      */
-    public FileMailIndexStore(java.util.function.Supplier<Path> dataDir, java.util.function.Supplier<String> namespace) {
+    public FileMailIndexStore(java.util.function.Supplier<Path> dataDir, java.util.function.Supplier<String> namespace,
+                              JsonMapperFactory json) {
         this.dataDir = Objects.requireNonNull(dataDir, "dataDir");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
-        this.json = new ObjectMapper()
+        this.json = json.create()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);

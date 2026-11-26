@@ -6,9 +6,11 @@ import ai.mindconnect.agent.protocol.Session;
 import ai.mindconnect.agent.protocol.api.ResponseRequest;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,7 +30,7 @@ class OpenAiSubAgentsExampleTest {
     }
 
     private final OpenAiResponsesBackend backend =
-            new OpenAiResponsesBackend(TestOpenAi.apiKey())
+            new OpenAiResponsesBackend(TestOpenAi.apiKey(), new JsonMapperFactory(List.of()))
                     .register(PseudoAgent.of("poet", TestOpenAi.model(),
                             "You write exactly one two-line rhyme about the given topic."))
                     .register(PseudoAgent.of("lead", TestOpenAi.model(),

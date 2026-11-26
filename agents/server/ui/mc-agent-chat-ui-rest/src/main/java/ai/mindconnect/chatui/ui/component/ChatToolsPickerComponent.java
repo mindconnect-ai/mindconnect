@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;
@@ -110,10 +110,10 @@ public final class ChatToolsPickerComponent {
     }
 
     /** Where each tool the agent binds stands: on, or left for tool search. */
-    public static Map<String, ToolState> states(AgentDefinition agent) {
+    public static Map<String, ToolState> states(ManagedAgent agent) {
         var states = new LinkedHashMap<String, ToolState>();
-        if (agent == null || agent.tools() == null) return states;
-        agent.tools().forEach(t ->
+        if (agent == null) return states;
+        agent.definition().tools().forEach(t ->
                 states.putIfAbsent(t.name(), t.deferred() ? ToolState.SEARCH : ToolState.ON));
         return states;
     }
@@ -137,7 +137,7 @@ public final class ChatToolsPickerComponent {
      *
      * @param offered every tool name the registry can hand out
      */
-    public static int onCount(AgentDefinition agent, Collection<String> offered) {
+    public static int onCount(ManagedAgent agent, Collection<String> offered) {
         return (int) count(offered, states(agent), ToolState.ON);
     }
 

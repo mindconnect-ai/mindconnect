@@ -1,6 +1,7 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import java.nio.file.Path;
 
@@ -21,16 +22,16 @@ public interface McpStoreFactory {
      * Both as files under {@code <storageRoot>/<namespace>/system} —
      * {@code mcp-servers} and {@code mcp-schema-cache}.
      */
-    static McpStoreFactory files(Path storageRoot) {
+    static McpStoreFactory files(Path storageRoot, JsonMapperFactory json) {
         return new McpStoreFactory() {
             @Override
             public McpServerRepository serverRepository(ScopeSupplier scope) {
-                return new FileMcpServerRepository(storageRoot, scope);
+                return new FileMcpServerRepository(storageRoot, scope, json);
             }
 
             @Override
             public McpDiscoveryStore discoveryStore(ScopeSupplier scope) {
-                return new FileMcpDiscoveryStore(storageRoot, scope);
+                return new FileMcpDiscoveryStore(storageRoot, scope, json);
             }
         };
     }

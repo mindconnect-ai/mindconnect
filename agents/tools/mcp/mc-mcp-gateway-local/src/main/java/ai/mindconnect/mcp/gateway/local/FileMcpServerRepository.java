@@ -1,7 +1,8 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.util.AtomicFiles;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,14 +40,14 @@ public final class FileMcpServerRepository implements McpServerRepository {
 
     private static final Logger log = LoggerFactory.getLogger(FileMcpServerRepository.class);
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     private final Path storageDir;
     private final ScopeSupplier scope;
+    private final ObjectMapper mapper;
 
-    public FileMcpServerRepository(Path storageDir, ScopeSupplier scope) {
+    public FileMcpServerRepository(Path storageDir, ScopeSupplier scope, JsonMapperFactory json) {
         this.storageDir = storageDir.toAbsolutePath();
         this.scope = scope;
+        this.mapper = json.create();
     }
 
     /** Where the registrations of the namespace the current call works in live — and where bundled ones are seeded. */
@@ -101,7 +102,7 @@ public final class FileMcpServerRepository implements McpServerRepository {
     public void save(McpServerRegistration registration) {
         Path file = fileFor(registration.id());
         try {
-            AtomicFiles.write(file, out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out,
+            AtomicFiles.write(file, out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out,
                     McpRegistrationJson.write(registration, JsonNodeFactory.instance)));
             log.info("MCP registration '{}' saved to {}", registration.id(), file);
         } catch (IOException e) {
@@ -154,7 +155,7 @@ public final class FileMcpServerRepository implements McpServerRepository {
 
     private Optional<McpServerRegistration> read(Path file) {
         try {
-            return Optional.of(McpRegistrationJson.read(MAPPER.readTree(file.toFile()), file.toString()));
+            return Optional.of(McpRegistrationJson.read(mapper.readTree(file.toFile()), file.toString()));
         } catch (IOException | RuntimeException e) {
             log.warn("MCP registration {} is unusable and was skipped: {}", file, e.toString());
             return Optional.empty();

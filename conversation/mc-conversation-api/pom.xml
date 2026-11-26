@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-java-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-java-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-conversation-api</artifactId>
+    <name>mc-conversation-api</name>
+    <packaging>jar</packaging>
+    <description>
+        The conversation area's API: conversations, their participants and
+        messages as plain domain types, ConversationManager and the ports a
+        store or a channel implements (ConversationRepository,
+        MessageRepository, ConversationChannel). No implementation — depend
+        on this to speak the domain or to write a store or channel of your
+        own; the service lives in mc-conversation, the stores in
+        mc-conversation, mc-conversation-file and mc-conversation-pg.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Only the annotations: ContentPart is polymorphic and names its
+             kinds itself, so every adapter's mapper reads it back correctly. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- ConversationStoreContract, for the stores in mc-conversation, mc-conversation-file and mc-conversation-pg. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

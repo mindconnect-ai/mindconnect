@@ -6,11 +6,13 @@ import ai.mindconnect.agent.SessionId;
 
 import ai.mindconnect.agent.AgentId;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectories;
+import ai.mindconnect.agent.management.format.AgentJson;
+import ai.mindconnect.cli.agentclient.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnMessageConverter;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,6 +35,7 @@ public class RemoteAgentClient implements AgentClient {
     private final String baseUrl;
     private final OkHttpClient http;
     private final ObjectMapper mapper;
+    private static final TurnMessageConverter MESSAGES = new TurnMessageConverter();
     /**
      * Active chat SSE calls keyed by sessionId. Lets {@link #cancelChat} abort
      * the local stream immediately rather than waiting for the server's
@@ -51,26 +54,47 @@ public class RemoteAgentClient implements AgentClient {
     // the read/list/chat/memory surface of AgentClient.
 
     @Override
-    public Optional<AgentDefinition> findAgent(AgentId agentId) {
+    public Optional<ManagedAgent> findAgent(AgentId agentId) {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/agents/" + agentId.value())
                 .get().build();
         try (Response resp = http.newCall(req).execute()) {
             if (resp.code() == 404) return Optional.empty();
             assertOk(resp);
-            return Optional.of(mapper.readValue(resp.body().string(), AgentDefinition.class));
+            return Optional.of(new AgentJson(mapper).read(resp.body().string()));
         } catch (Exception e) {
             throw new RuntimeException("Remote call failed: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public List<AgentDefinition> listAgents() {
+    public List<ManagedAgent> listAgents() {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/agents")
                 .get().build();
-        return execute(req, new TypeReference<>() {
-        });
+        AgentJson files = new AgentJson(mapper);
+        List<ManagedAgent> agents = new java.util.ArrayList<>();
+        execute(req, JsonNode.class).forEach(agent -> agents.add(files.read(agent.toString())));
+        return agents;
+    }
+
+    /** The session as the server answers with it. */
+    private static ManagedSession sessionOf(JsonNode session) {
+        List<String> additional = new java.util.ArrayList<>();
+        session.path("additionalDirs").forEach(dir -> additional.add(dir.asText()));
+        String agentId = text(session, "agentId");
+        return new ManagedSession(SessionId.of(session.path("id").asText()),
+                text(session, "userId") == null ? null : UserId.of(text(session, "userId")),
+                text(session, "parentId") == null ? null : SessionId.of(text(session, "parentId")),
+                null, text(session, "title"), text(session, "type"),
+                text(session, "status") == null ? null : ManagedSession.Status.valueOf(text(session, "status")),
+                new SessionDirectories(text(session, "workingDir"), additional),
+                text(session, "createdAt") == null ? null : java.time.Instant.parse(text(session, "createdAt")),
+                agentId == null ? Map.of() : Map.of(ManagedSession.AGENT_ID, agentId));
+    }
+
+    private static String text(JsonNode node, String field) {
+        return node.hasNonNull(field) ? node.get(field).asText() : null;
     }
 
     // --- RunSessionUseCase ---
@@ -80,53 +104,65 @@ public class RemoteAgentClient implements AgentClient {
      * {@code userId} — the owner in local mode — is not sent.
      */
     @Override
-    public AgentSession startSession(AgentId agentDefinitionId, UserId userId) {
-        return startSession(agentDefinitionId, userId, null);
+    public ManagedSession startSession(AgentId agentId, UserId userId) {
+        return startSession(agentId, userId, null);
     }
 
     @Override
-    public AgentSession startSession(AgentId agentDefinitionId, UserId userId, String workingDir) {
+    public ManagedSession startSession(AgentId agentId, UserId userId, String workingDir) {
         Map<String, Object> fields = new java.util.LinkedHashMap<>();
-        fields.put("agentId", agentDefinitionId.value());
+        fields.put("agentId", agentId.value());
         if (workingDir != null) fields.put("workingDir", workingDir);
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions")
                 .post(RequestBody.create(toJson(fields), JSON)).build();
-        return execute(req, AgentSession.class);
+        return sessionOf(execute(req, JsonNode.class));
     }
 
     @Override
-    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir) {
+    public ManagedSession changeWorkingDir(SessionId sessionId, String workingDir) {
         return changeWorkingDir(sessionId, workingDir, null);
     }
 
     @Override
-    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
+    public ManagedSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
         Map<String, Object> fields = new java.util.LinkedHashMap<>();
         fields.put("workingDir", workingDir);
         if (additionalDirs != null) fields.put("additionalDirs", additionalDirs);
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions/" + sessionId.value() + "/working-dir")
                 .put(RequestBody.create(toJson(fields), JSON)).build();
-        return execute(req, AgentSession.class);
+        return sessionOf(execute(req, JsonNode.class));
     }
 
     /** The authenticated user's sessions; {@code userId} is not sent, as for {@link #startSession}. */
     @Override
-    public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
-        String url = baseUrl + "/api/sessions?agentId=" + agentDefinitionId.value();
+    public List<ManagedSession> listSessions(AgentId agentId, UserId userId) {
+        String url = baseUrl + "/api/sessions?agentId=" + agentId.value();
         Request req = new Request.Builder().url(url).get().build();
-        return execute(req, new TypeReference<>() {
-        });
+        List<ManagedSession> sessions = new java.util.ArrayList<>();
+        execute(req, JsonNode.class).forEach(session -> sessions.add(sessionOf(session)));
+        return sessions;
     }
 
     @Override
-    public List<Message> loadHistory(SessionId sessionId) {
+    public List<ManagedMessage> loadHistory(SessionId sessionId) {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions/" + sessionId.value() + "/history")
                 .get().build();
-        return execute(req, new TypeReference<>() {
-        });
+        List<ManagedMessage> history = new java.util.ArrayList<>();
+        execute(req, JsonNode.class).forEach(entry -> history.add(managedMessage(entry)));
+        return history;
+    }
+
+    /** A message of the history as the server writes it: the message in the runtime's own JSON. */
+    private ManagedMessage managedMessage(JsonNode entry) {
+        Map<String, Object> message = mapper.convertValue(entry.get("message"), new TypeReference<>() { });
+        return new ManagedMessage(entry.path("id").asText(null), entry.path("sequence").asInt(),
+                entry.hasNonNull("sentAt") ? java.time.Instant.parse(entry.get("sentAt").asText()) : null,
+                MESSAGES.fromJson(message),
+                entry.hasNonNull("durationMillis") ? entry.get("durationMillis").asLong() : null,
+                entry.hasNonNull("tokens") ? entry.get("tokens").asInt() : null);
     }
 
     @Override
@@ -245,7 +281,8 @@ public class RemoteAgentClient implements AgentClient {
             case "sub_agent_done" -> {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");
-                SessionId subSessionId = SessionId.of(node.path("subSessionId").asText());
+                SessionId subSessionId =
+                        SessionId.of(node.path("subSessionId").asText());
                 String finalText = node.path("finalText").isMissingNode()
                         || node.path("finalText").isNull()
                         ? null : node.path("finalText").asText();
@@ -302,11 +339,11 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public WorkingMemory getWorkingMemory(SessionId sessionId) {
+    public MemoryView getWorkingMemory(SessionId sessionId) {
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions/" + sessionId.value() + "/memory")
                 .get().build();
-        return execute(req, WorkingMemory.class);
+        return execute(req, MemoryView.class);
     }
 
     @Override

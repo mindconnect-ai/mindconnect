@@ -2,6 +2,7 @@ package ai.mindconnect.agent.tools.document;
 
 import ai.mindconnect.agent.tools.document.DocumentModel;
 import ai.mindconnect.agent.tools.document.DocumentReader;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,7 +117,7 @@ class DocumentSectionToolsTest {
 
     @Test
     void sectionsToolReturnsStrictJson() throws Exception {
-        DocumentSectionsTool tool = new DocumentSectionsTool(dir, new DocumentReader());
+        DocumentSectionsTool tool = new DocumentSectionsTool(dir, new DocumentReader(), new JsonMapperFactory(List.of()));
 
         String json = tool.execute(Map.of("path", "spec.docx"));
         JsonNode root = new ObjectMapper().readTree(json);
@@ -127,7 +129,7 @@ class DocumentSectionToolsTest {
 
     @Test
     void sectionsToolCanOmitContent() throws Exception {
-        DocumentSectionsTool tool = new DocumentSectionsTool(dir, new DocumentReader());
+        DocumentSectionsTool tool = new DocumentSectionsTool(dir, new DocumentReader(), new JsonMapperFactory(List.of()));
 
         String json = tool.execute(Map.of("path", "spec.docx", "include_content", false));
         JsonNode root = new ObjectMapper().readTree(json);

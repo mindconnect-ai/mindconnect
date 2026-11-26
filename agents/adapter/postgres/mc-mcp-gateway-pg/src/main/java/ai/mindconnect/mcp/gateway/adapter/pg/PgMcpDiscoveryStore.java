@@ -1,6 +1,7 @@
 package ai.mindconnect.mcp.gateway.adapter.pg;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
@@ -31,14 +32,16 @@ public final class PgMcpDiscoveryStore implements McpDiscoveryStore {
 
     private final ScopeSupplier scope;
     private final DocumentTable<ObjectNode> discoveries;
+    private final McpDiscoveryJson json;
 
-    public PgMcpDiscoveryStore(DataSource dataSource, ScopeSupplier scope) {
-        this(Sql.of(dataSource), scope);
+    public PgMcpDiscoveryStore(DataSource dataSource, ScopeSupplier scope, JsonMapperFactory json) {
+        this(Sql.of(dataSource), scope, json);
     }
 
     /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
-    public PgMcpDiscoveryStore(Sql sql, ScopeSupplier scope) {
+    public PgMcpDiscoveryStore(Sql sql, ScopeSupplier scope, JsonMapperFactory json) {
         this.scope = Objects.requireNonNull(scope, "scope");
+        this.json = new McpDiscoveryJson(json);
         this.discoveries = DocumentTable.of(ObjectNode.class)
                 .table("mc_mcp_schema_cache")
                 .partitionKey("namespace", "TEXT", d -> scope.namespace().value())
@@ -55,7 +58,7 @@ public final class PgMcpDiscoveryStore implements McpDiscoveryStore {
     @Override
     public Optional<McpDiscovery> find(McpServerId server) {
         try {
-            return discoveries.findById(scope.namespace().value(), server.value()).map(McpDiscoveryJson::read);
+            return discoveries.findById(scope.namespace().value(), server.value()).map(json::read);
         } catch (RuntimeException e) {
             log.warn("MCP discovery cache for '{}' in namespace '{}' unreadable: {}",
                     server, scope.namespace().value(), e.toString());
@@ -65,7 +68,7 @@ public final class PgMcpDiscoveryStore implements McpDiscoveryStore {
 
     @Override
     public void save(McpServerId server, McpDiscovery discovery) {
-        ObjectNode document = McpDiscoveryJson.write(discovery, JsonNodeFactory.instance);
+        ObjectNode document = json.write(discovery, JsonNodeFactory.instance);
         document.put("serverId", server.value());
         try {
             discoveries.save(document);

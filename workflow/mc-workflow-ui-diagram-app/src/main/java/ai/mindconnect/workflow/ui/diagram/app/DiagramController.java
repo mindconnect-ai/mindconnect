@@ -7,6 +7,7 @@ import ai.mindconnect.ui.ext.diagram.UiDiagramNode;
 import ai.mindconnect.workflow.domain.StepData;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.ui.diagram.WorkflowDiagramBuilder;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -62,7 +63,7 @@ public class DiagramController {
     // Workflow-aware ObjectMapper — same one WorkflowStore uses for save —
     // so polymorphic StepData round-trips cleanly through GET/PUT.
     private final com.fasterxml.jackson.databind.ObjectMapper workflowMapper =
-        ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory.create();
+        ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of()));
 
     // -----------------------------------------------------------------------
     // Listing + reading

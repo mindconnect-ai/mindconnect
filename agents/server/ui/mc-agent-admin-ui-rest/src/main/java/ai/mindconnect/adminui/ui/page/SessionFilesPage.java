@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.service.SessionDirectories;
+import ai.mindconnect.agent.management.directory.SessionFileBrowser;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
@@ -44,7 +44,7 @@ import java.util.UUID;
  *
  * <p>A file opens in a viewer that takes the tree's place until it is closed,
  * so the tree keeps its open folders: text of up to
- * {@link SessionDirectories#MAX_EDIT_BYTES} in an editor, images scaled to fit, PDFs in a
+ * {@link SessionFileBrowser#MAX_EDIT_BYTES} in an editor, images scaled to fit, PDFs in a
  * frame, anything else — Office documents among them — as a download only.
  * Files and folders can be deleted, a folder with everything in it.
  */
@@ -70,11 +70,11 @@ public class SessionFilesPage extends AdminPage {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 
     private final SessionId sessionId;
-    private final SessionDirectories directories;
+    private final SessionFileBrowser directories;
     /** Entries rendered so far — the budget for filling folders up front. */
     private int rendered;
 
-    public SessionFilesPage(SessionId sessionId, SessionDirectories directories) {
+    public SessionFilesPage(SessionId sessionId, SessionFileBrowser directories) {
         this.sessionId = sessionId;
         this.directories = directories;
     }
@@ -117,7 +117,7 @@ public class SessionFilesPage extends AdminPage {
      * tree while the viewer has content. A hide or show patch would redraw the tree from the model
      * it was first rendered with and lose every save and delete since.
      */
-    public UiPatch opened(String root, SessionDirectories.Preview preview) {
+    public UiPatch opened(String root, SessionFileBrowser.Preview preview) {
         return UiPatch.of().patch(UiPatch.Operation.replace(VIEWER_ID, viewer(root, preview)));
     }
 
@@ -127,7 +127,7 @@ public class SessionFilesPage extends AdminPage {
     }
 
     /** A saved file: its row in the tree shows the new size and time. */
-    public UiPatch saved(String root, SessionDirectories.Entry entry) {
+    public UiPatch saved(String root, SessionFileBrowser.Entry entry) {
         UiTreeNode node = file(root, entry);
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace(node.getId(), node))
@@ -148,7 +148,7 @@ public class SessionFilesPage extends AdminPage {
         if (depth > EAGER_DEPTH || rendered >= EAGER_ENTRIES) {
             return notLoaded(node, root, path);
         }
-        Optional<SessionDirectories.Listing> found = directories.list(root, path);
+        Optional<SessionFileBrowser.Listing> found = directories.list(root, path);
         if (found.isEmpty()) {
             return node.content(muted(nodeId("gone", root, path), "Not found — the folder is gone."));
         }
@@ -156,7 +156,7 @@ public class SessionFilesPage extends AdminPage {
         if (listing.entries().isEmpty()) {
             return node.content(muted(nodeId("empty", root, path), "(empty)"));
         }
-        for (SessionDirectories.Entry entry : listing.entries()) {
+        for (SessionFileBrowser.Entry entry : listing.entries()) {
             rendered++;
             node.child(entry.directory()
                     ? folder(root, entry.path(), false, depth + 1)
@@ -164,7 +164,7 @@ public class SessionFilesPage extends AdminPage {
         }
         if (listing.truncated()) {
             node.child(UiTreeNode.of(nodeId("more", root, path),
-                    "… only the first " + SessionDirectories.MAX_ENTRIES + " entries are shown"));
+                    "… only the first " + SessionFileBrowser.MAX_ENTRIES + " entries are shown"));
         }
         return node;
     }
@@ -202,7 +202,7 @@ public class SessionFilesPage extends AdminPage {
         return column(nodeId("root-label", root, ""), name, muted(nodeId("root-path", root, ""), root));
     }
 
-    private UiTreeNode file(String root, SessionDirectories.Entry entry) {
+    private UiTreeNode file(String root, SessionFileBrowser.Entry entry) {
         String id = entry.path();
         String open = base() + "/view?root=" + encode(root) + "&path=" + encode(entry.path());
         var text = column(nodeId("text", root, id),
@@ -222,8 +222,8 @@ public class SessionFilesPage extends AdminPage {
     }
 
     /** The viewer for one file: a bar with its name and actions, then its text, a frame or a note. */
-    private UiNode viewer(String root, SessionDirectories.Preview preview) {
-        SessionDirectories.Entry entry = preview.entry();
+    private UiNode viewer(String root, SessionFileBrowser.Preview preview) {
+        SessionFileBrowser.Entry entry = preview.entry();
         String path = entry.path();
         var title = column("files-viewer-title",
                 UiText.of("files-viewer-name", entry.name()).withCssClass("session-files-name"),
@@ -261,7 +261,7 @@ public class SessionFilesPage extends AdminPage {
                             .dispatch("POST", save, EDITOR_FORM_ID))
                     .withCssClass("session-files-editor");
         } else {
-            body = muted("files-viewer-none", entry.size() > SessionDirectories.MAX_EDIT_BYTES && isText(ext)
+            body = muted("files-viewer-none", entry.size() > SessionFileBrowser.MAX_EDIT_BYTES && isText(ext)
                     ? "Too large to show here (" + humanSize(entry.size()) + "). Download it to open it."
                     : "No preview for this kind of file. Download it to open it.");
         }
@@ -291,7 +291,7 @@ public class SessionFilesPage extends AdminPage {
         return ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.label(root, sessionId);
     }
 
-    private static String meta(SessionDirectories.Entry entry) {
+    private static String meta(SessionFileBrowser.Entry entry) {
         return humanSize(entry.size()) + " · " + MODIFIED.format(entry.modified());
     }
 

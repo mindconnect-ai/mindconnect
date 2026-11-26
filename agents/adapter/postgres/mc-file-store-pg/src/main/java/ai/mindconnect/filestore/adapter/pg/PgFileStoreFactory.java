@@ -1,6 +1,6 @@
 package ai.mindconnect.filestore.adapter.pg;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.FileStoreFactory;
 import ai.mindconnect.jdbc.Sql;

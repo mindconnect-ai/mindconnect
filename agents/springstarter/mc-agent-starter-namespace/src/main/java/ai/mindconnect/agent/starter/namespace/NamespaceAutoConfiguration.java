@@ -1,29 +1,26 @@
 package ai.mindconnect.agent.starter.namespace;
 
-import ai.mindconnect.agent.Email;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.namespace.domain.Email;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.namespace.adapter.env.EncryptingNamespaceRepository;
-import ai.mindconnect.namespace.adapter.env.NamespaceEnvVarResolver;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.namespace.adapter.pg.PgNamespacePurge;
+import ai.mindconnect.namespace.runtime.FileNamespacePlugin;
+import ai.mindconnect.namespace.runtime.NamespacePlugin;
+import ai.mindconnect.namespace.runtime.pg.PgNamespacePlugin;
 import ai.mindconnect.namespace.port.out.NamespacePurge;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
-import ai.mindconnect.user.adapter.env.UserEnvVarResolver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import ai.mindconnect.user.port.out.UserRepository;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import ai.mindconnect.namespace.adapter.file.FileNamespacePurge;
-import ai.mindconnect.namespace.adapter.file.FileNamespaceRepository;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.namespace.port.out.UserEmails;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -46,7 +43,9 @@ import java.nio.file.Path;
  * <p>Auto-configured ahead of the persistence starters so that the scope
  * supplier defined here is the one they route by. The namespace repository
  * follows {@code mindconnect.persistence} like every other store, but is
- * installation-wide: it is the store that says which namespaces exist.
+ * installation-wide: it is the store that says which namespaces exist. It
+ * lives in the runtime, as a {@link NamespacePlugin}, because the runtime
+ * resolves a namespace's variables; the beans here hand its services out.
  *
  * <p>Two servlet filters: {@link NamespacePathFilter} runs before Spring
  * Security and rewrites {@code /ns/{namespace}/…}; {@link ScopeBindingFilter}
@@ -57,8 +56,6 @@ import java.nio.file.Path;
                 "ai.mindconnect.agent.starter.file.FilePersistenceAutoConfiguration",
                 "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig"})
 public class NamespaceAutoConfiguration {
-
-    private static final Logger log = LoggerFactory.getLogger(NamespaceAutoConfiguration.class);
 
     /**
      * Where this server works: a {@link Scope} bound per request by the
@@ -80,24 +77,32 @@ public class NamespaceAutoConfiguration {
         return ThreadBoundScopeSupplier.strict();
     }
 
-    /** The namespaces of the installation under {@code <mindconnect.data.base-dir>/system/namespaces}. */
+    /**
+     * The namespaces of the installation under {@code <mindconnect.data.base-dir>/system/namespaces},
+     * installed into the runtime: the runtime resolves a namespace's variables, so it holds the store.
+     */
     @Bean
-    @ConditionalOnMissingBean(NamespaceRepository.class)
+    @ConditionalOnMissingBean(NamespacePlugin.class)
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    NamespaceRepository fileNamespaceRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                                ObjectMapper objectMapper,
-                                                ObjectProvider<EncryptionHelper> encryption) {
-        return encrypting(new FileNamespaceRepository(Path.of(baseDir), objectMapper), encryption);
+    FileNamespacePlugin fileNamespacePlugin(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                            ObjectProvider<EncryptionHelper> encryption,
+                                            @Value("${mindconnect.namespace:local}") String defaultNamespace,
+                                            @Value("${mindconnect.email-domain:}") String emailDomain,
+                                            @Value("${mindconnect.namespace-admins:}") List<String> defaultAdmins,
+                                            UserEmails emails, ObjectProvider<NamespacePurge> purges) {
+        return new FileNamespacePlugin(Path.of(baseDir), encryption.getIfAvailable(),
+                new Namespace(defaultNamespace), emailDomain, admins(defaultAdmins, emailDomain), emails,
+                () -> purges.orderedStream().toList());
     }
 
-    /** A namespace's variables are secrets — {@code enc:} at rest when the application has a key, like LLM credentials. */
-    static NamespaceRepository encrypting(NamespaceRepository repository, ObjectProvider<EncryptionHelper> encryption) {
-        EncryptionHelper helper = encryption.getIfAvailable();
-        if (helper == null) {
-            log.warn("No EncryptionHelper — a namespace's variables are stored unencrypted");
-            return repository;
-        }
-        return new EncryptingNamespaceRepository(repository, helper);
+    /**
+     * Who shapes the default namespace is {@code mindconnect.namespace-admins} — and naming
+     * anybody there closes it: an installation that lists its people has said that being signed
+     * in is not the same as being let in. Unset it stays open to every signed-in user, which is
+     * what a single-user installation, the dev mode and the tests work with.
+     */
+    static List<Email> admins(List<String> defaultAdmins, String emailDomain) {
+        return defaultAdmins.stream().map(entry -> Email.qualified(entry, emailDomain)).toList();
     }
 
     /** Deleting a namespace removes {@code <mindconnect.data.base-dir>/<namespace>} — everything of it. */
@@ -108,76 +113,46 @@ public class NamespaceAutoConfiguration {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(name = "ai.mindconnect.namespace.adapter.pg.PgNamespaceRepository")
+    @ConditionalOnClass(name = "ai.mindconnect.namespace.runtime.pg.PgNamespacePlugin")
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
     static class Postgres {
-        /** One row per namespace in {@code mc_namespace}, on the persistence starter's {@code Sql}. */
+        /** One row per namespace in {@code mc_namespace}, on the runtime's {@code Sql}. */
         @Bean
-        @ConditionalOnMissingBean(NamespaceRepository.class)
-        NamespaceRepository pgNamespaceRepository(ai.mindconnect.jdbc.Sql mindconnectSql,
-                                                  ObjectProvider<EncryptionHelper> encryption) {
-            return encrypting(new ai.mindconnect.namespace.adapter.pg.PgNamespaceRepository(mindconnectSql).initSchema(),
-                    encryption);
+        @ConditionalOnMissingBean(NamespacePlugin.class)
+        PgNamespacePlugin pgNamespacePlugin(ObjectProvider<EncryptionHelper> encryption,
+                                            @Value("${mindconnect.namespace:local}") String defaultNamespace,
+                                            @Value("${mindconnect.email-domain:}") String emailDomain,
+                                            @Value("${mindconnect.namespace-admins:}") List<String> defaultAdmins,
+                                            UserEmails emails, ObjectProvider<NamespacePurge> purges) {
+            return new PgNamespacePlugin(encryption.getIfAvailable(), new Namespace(defaultNamespace), emailDomain,
+                    admins(defaultAdmins, emailDomain), emails, () -> purges.orderedStream().toList());
         }
 
         /** Deleting a namespace removes its rows from every namespaced table and drops its pgvector tables. */
         @Bean
-        NamespacePurge pgNamespacePurge(ai.mindconnect.jdbc.Sql mindconnectSql) {
-            return new ai.mindconnect.namespace.adapter.pg.PgNamespacePurge(mindconnectSql);
+        NamespacePurge pgNamespacePurge(Sql mindconnectSql) {
+            return new PgNamespacePurge(mindconnectSql);
         }
     }
 
-    /**
-     * The default namespace is {@code mindconnect.namespace}, like the fallback
-     * above. Who shapes it is {@code mindconnect.namespace-admins} — and naming
-     * anybody there closes it: an installation that lists its people has said
-     * that being signed in is not the same as being let in. Unset it stays open
-     * to every signed-in user, which is what a single-user installation, the dev
-     * mode and the tests work with.
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    NamespaceService namespaceService(NamespaceRepository namespaces,
-                                      @Value("${mindconnect.namespace:local}") String defaultNamespace,
-                                      ObjectProvider<NamespacePurge> purges,
-                                      UserEmails emails,
-                                      @Value("${mindconnect.email-domain:}") String emailDomain,
-                                      @Value("${mindconnect.namespace-admins:}") List<String> defaultAdmins) {
-        return new NamespaceService(namespaces, new Namespace(defaultNamespace), java.time.Clock.systemUTC(),
-                purges.orderedStream().toList(), emails, emailDomain,
-                defaultAdmins.stream().map(entry -> Email.qualified(entry, emailDomain)).toList());
-    }
+    /** The runtime's namespaces, for the application's own beans. */
+    @Bean NamespaceRepository namespaceRepository(AgentRuntime r) { return r.service(NamespaceRepository.class); }
+    @Bean NamespaceService namespaceService(AgentRuntime r) { return r.service(NamespaceService.class); }
 
     /**
      * Namespaces list people by e-mail; a request carries a user id. The
-     * addresses come from the user store; without one — a library host, a test
-     * — nobody has a stored address and the service falls back to the id at
+     * addresses come from the user store, asked per call — the user service is
+     * the runtime's, made after this; without one — a library host, a test —
+     * nobody has a stored address and the service falls back to the id at
      * {@code mindconnect.email-domain}.
      */
     @Bean
     @ConditionalOnMissingBean
     UserEmails userEmails(ObjectProvider<UserService> users) {
-        UserService userService = users.getIfAvailable();
-        if (userService == null) return UserEmails.none();
-        return id -> userService.find(id).map(User::email).flatMap(ai.mindconnect.agent.Email::parse);
-    }
-
-    /**
-     * Where {@code ${VAR}} placeholders — an LLM config's API key, say — get their
-     * values on this server: what the user behind the work stored for themselves,
-     * else what the namespace they work in stores, else the process environment.
-     * A host that resolves differently defines its own {@link EnvVarResolver}.
-     */
-    @Bean
-    @ConditionalOnMissingBean(EnvVarResolver.class)
-    EnvVarResolver envVarResolver(ScopeSupplier scope, NamespaceRepository namespaces,
-                                  ObjectProvider<UserRepository> users) {
-        List<EnvVarResolver> sources = new ArrayList<>();
-        UserRepository userRepository = users.getIfAvailable();
-        if (userRepository != null) sources.add(new UserEnvVarResolver(userRepository, scope));
-        sources.add(new NamespaceEnvVarResolver(namespaces, scope));
-        sources.add(EnvVarResolver.system());
-        return EnvVarResolver.chain(sources);
+        return id -> Optional.ofNullable(users.getIfAvailable())
+                .flatMap(userService -> userService.find(id))
+                .map(User::email)
+                .flatMap(Email::parse);
     }
 
     /** Before Spring Security ({@code -100}): matchers must see the path without the prefix. */

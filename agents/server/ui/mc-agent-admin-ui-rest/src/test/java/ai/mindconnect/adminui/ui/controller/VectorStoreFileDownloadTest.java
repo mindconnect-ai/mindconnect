@@ -1,12 +1,15 @@
 package ai.mindconnect.adminui.ui.controller;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -38,8 +41,8 @@ class VectorStoreFileDownloadTest {
 
     @Test
     void theSignedInUserDownloadsTheirOwnFilesButNotSomebodyElses() throws Exception {
-        FilesystemFileStore store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
-        VectorStoreUiController controller = new VectorStoreUiController(null, null, store, null, currentUsers(), null, null);
+        FilesystemFileStore store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule())));
+        StoredFileUiController controller = new StoredFileUiController(store, currentUsers(), null, null);
         StoredFile alices = store.save("notes.txt", "text/plain", text("hello"), UserId.of("alice"));
         StoredFile legacy = store.save("old.txt", "text/plain", text("before creators"), null);
 

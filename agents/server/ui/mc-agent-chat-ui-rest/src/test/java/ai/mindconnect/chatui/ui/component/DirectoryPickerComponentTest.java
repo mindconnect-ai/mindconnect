@@ -1,11 +1,9 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.service.WorkingDirBrowser;
-import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.chatui.ChatFixture;
+import ai.mindconnect.agent.management.directory.WorkingDirBrowser;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.message.domain.ConversationId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -27,10 +25,8 @@ class DirectoryPickerComponentTest {
         return new ObjectMapper().writeValueAsString(node);
     }
 
-    private static AgentSession session() {
-        return AgentSession.start(AgentId.random(), UserId.of("u"), ConversationId.random())
-                .withWorkingDir("/srv/users/u/app")
-                .withAdditionalDirs(List.of("/srv/users/u/lib"));
+    private static ManagedSession session() {
+        return ChatFixture.session("u", null, "/srv/users/u/app", List.of("/srv/users/u/lib"));
     }
 
     @Test
@@ -77,7 +73,7 @@ class DirectoryPickerComponentTest {
         var listing = new WorkingDirBrowser.Listing(null, "/home/u", "/home", List.of("/home/u/a"), true);
 
         String out = json(DirectoryPickerComponent.form(SESSION,
-                AgentSession.start(AgentId.random(), UserId.of("u"), ConversationId.random()), listing));
+                ChatFixture.session("u", null, null, List.of()), listing));
 
         assertThat(out).contains("Only the first " + WorkingDirBrowser.MAX_ENTRIES + " folders are shown")
                 .contains("None yet. Step into a folder above")

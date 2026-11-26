@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.jackson;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.StepData;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +23,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
  *
  * <p>Usage:
  * <pre>{@code
- * ObjectMapper mapper = WorkflowObjectMapperFactory.create();
+ * ObjectMapper mapper = WorkflowObjectMapperFactory.create(json);
  * }</pre>
  */
 public class WorkflowObjectMapperFactory {
@@ -30,11 +31,11 @@ public class WorkflowObjectMapperFactory {
     private WorkflowObjectMapperFactory() {}
 
     /**
-     * Creates a new {@link ObjectMapper} with all workflow mixins registered
-     * and pretty-printing enabled.
+     * Creates a new {@link ObjectMapper} from {@code json} with all workflow
+     * mixins registered and pretty-printing enabled.
      */
-    public static ObjectMapper create() {
-        ObjectMapper mapper = new ObjectMapper();
+    public static ObjectMapper create(JsonMapperFactory json) {
+        ObjectMapper mapper = json.create();
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
         registerMixins(mapper);
         return mapper;

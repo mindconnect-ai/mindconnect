@@ -1,16 +1,16 @@
 package ai.mindconnect.adminui.service;
 
+import ai.mindconnect.llm.jackson.LlmJsonModule;
 import ai.mindconnect.adminui.namespaces.GuardedRepositories;
 import ai.mindconnect.adminui.namespaces.NamespaceWriteGuard;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.extension.adapter.memory.InMemoryExtensionActivationRepository;
 import ai.mindconnect.extension.adapter.memory.InMemoryInstalledSeedRepository;
 import ai.mindconnect.extension.domain.Extension;
@@ -22,8 +22,9 @@ import ai.mindconnect.extension.domain.InstalledSeed;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
@@ -64,12 +65,12 @@ class NamespaceSeedingTest {
             "llm-config:seed-test-llm", "agent:host-helper", "agent:crm-assistant", "agent:crm-checker",
             "skill:crm-notes", "workflow:crm-flow");
 
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule())
+    private final ObjectMapper mapper = new ObjectMapper().registerModule(new LlmJsonModule()).registerModule(new JavaTimeModule())
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     /** What is stored, per namespace — outlives a "restart", which only builds the scope and the seeding anew. */
     private final Map<Namespace, InMemoryLlmConfigRepository> llmStores = new ConcurrentHashMap<>();
-    private final Map<Namespace, InMemoryAgentDefinitionRepository> agentStores = new ConcurrentHashMap<>();
+    private final Map<Namespace, AgentManagement> agentStores = new ConcurrentHashMap<>();
     private final Map<Namespace, InMemorySkillRepository> skillStores = new ConcurrentHashMap<>();
     private final Map<Namespace, InMemoryWorkflowDataRepository> workflowStores = new ConcurrentHashMap<>();
     private final Map<Namespace, InMemoryInstalledSeedRepository> ledgers = new ConcurrentHashMap<>();
@@ -110,9 +111,9 @@ class NamespaceSeedingTest {
                 new NamespaceService(new InMemoryNamespaceRepository(), LOCAL), scope);
         LlmConfigRepository llm = new GuardedRepositories.LlmConfigs(perNamespace(LlmConfigRepository.class,
                 ns -> llmStores.computeIfAbsent(ns, n -> new InMemoryLlmConfigRepository(ScopeSupplier.local()))), guard);
-        AgentDefinitionRepository agents = new GuardedRepositories.Agents(perNamespace(
-                AgentDefinitionRepository.class,
-                ns -> agentStores.computeIfAbsent(ns, n -> new InMemoryAgentDefinitionRepository(ScopeSupplier.local()))), guard);
+        AgentManagement agents = new GuardedRepositories.ManagedAgents(perNamespace(
+                AgentManagement.class,
+                ns -> agentStores.computeIfAbsent(ns, n -> agentStore())), guard);
         SkillRepository skills = new GuardedRepositories.Skills(perNamespace(SkillRepository.class,
                 ns -> skillStores.computeIfAbsent(ns, n -> new InMemorySkillRepository(ScopeSupplier.local()))), guard);
         WorkflowDataRepository workflows = new GuardedRepositories.Workflows(perNamespace(
@@ -124,7 +125,7 @@ class NamespaceSeedingTest {
                 ns -> decisions.computeIfAbsent(ns, n -> new InMemoryExtensionActivationRepository()));
         ExtensionService extensions = new ExtensionService(new ExtensionRegistry(List.of(crmExtension())), activations);
 
-        NamespaceSeeder seeder = new NamespaceSeeder(new BundledSeeds(mapper, "classpath*:seed-test/"),
+        NamespaceSeeder seeder = new NamespaceSeeder(new BundledSeeds(mapper, "classpath*:seed-test/", new JsonMapperFactory(List.of(new LlmJsonModule()))),
                 llm, agents, skills, workflows, installed, extensions) {
             @Override
             public Report installMissing(Namespace namespace) {
@@ -169,8 +170,12 @@ class NamespaceSeedingTest {
     }
 
     private List<String> agentNames(Namespace namespace) {
-        return agentStores.getOrDefault(namespace, new InMemoryAgentDefinitionRepository(ScopeSupplier.local())).findAll().stream()
-                .map(AgentDefinition::name).sorted().toList();
+        return agentStores.getOrDefault(namespace, agentStore()).list().stream()
+                .map(agent -> agent.definition().name()).sorted().toList();
+    }
+
+    private static AgentManagement agentStore() {
+        return new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test"))));
     }
 
     private List<String> ledger(Namespace namespace) {
@@ -199,12 +204,14 @@ class NamespaceSeedingTest {
 
     @Test
     void a_record_that_is_there_is_left_as_it_is_and_counted_as_got() {
-        AgentDefinition mine = AgentDefinition.create("crm-assistant", "Our own, edited", "Be terse.", null, "x");
-        agentStores.computeIfAbsent(ERNI, n -> new InMemoryAgentDefinitionRepository(ScopeSupplier.local())).save(mine);
+        agentStores.computeIfAbsent(ERNI, n -> agentStore()).create(ManagedAgent.of(
+                new ai.mindconnect.agent.runtime.api.domain.AgentDefinition("crm-assistant", "Our own, edited",
+                        "Be terse.", ai.mindconnect.agent.runtime.api.domain.ModelSettings.ofModel("x"), List.of(), 10,
+                        Map.of())));
 
         use(ERNI);
 
-        assertThat(agentStores.get(ERNI).findByName("crm-assistant").orElseThrow().description())
+        assertThat(agentStores.get(ERNI).findByName("crm-assistant").orElseThrow().definition().description())
                 .isEqualTo("Our own, edited");
         assertThat(agentNames(ERNI)).containsExactly("crm-assistant", "crm-checker", "host-helper");
         assertThat(ledger(ERNI)).contains("agent:crm-assistant");
@@ -214,8 +221,8 @@ class NamespaceSeedingTest {
     void a_deleted_record_does_not_come_back() {
         use(ERNI);
         in(ERNI, () -> {
-            AgentDefinition gone = agentStores.get(ERNI).findByName("crm-assistant").orElseThrow();
-            agentStores.get(ERNI).deleteById(gone.id());
+            ManagedAgent gone = agentStores.get(ERNI).findByName("crm-assistant").orElseThrow();
+            agentStores.get(ERNI).delete(gone.id());
             return null;
         });
 
@@ -232,7 +239,7 @@ class NamespaceSeedingTest {
         use(ERNI);
         // An older version shipped everything but crm-checker: the namespace never got it.
         ledgers.put(ERNI, new InMemoryInstalledSeedRepository());
-        agentStores.get(ERNI).deleteById(agentStores.get(ERNI).findByName("crm-checker").orElseThrow().id());
+        agentStores.get(ERNI).delete(agentStores.get(ERNI).findByName("crm-checker").orElseThrow().id());
         ledgers.get(ERNI).record(EVERYTHING.stream().filter(key -> !key.equals("agent:crm-checker"))
                 .map(key -> InstalledSeed.of(key.substring(0, key.indexOf(':')), key.substring(key.indexOf(':') + 1), null))
                 .toList());
@@ -278,6 +285,31 @@ class NamespaceSeedingTest {
         seeding.ensure(ERNI);
 
         assertThat(runs).as("erni once, local once").hasValue(2);
+    }
+
+    @Test
+    void a_namespace_created_again_under_a_deleted_ones_name_is_seeded_like_a_new_one() {
+        use(ERNI);
+        assertThat(runs).hasValue(1);
+
+        seeding.deleted(ERNI);
+        use(ERNI);
+
+        assertThat(runs).as("seeded again on the first use after the delete").hasValue(2);
+    }
+
+    @Test
+    void a_namespace_bound_while_it_did_not_exist_is_seeded_once_it_is_created() {
+        namespaces = new NamespaceService(new InMemoryNamespaceRepository(), LOCAL);
+        restart();
+        // A request that outlived a delete: the namespace is bound, and is not there.
+        use(ERNI);
+        assertThat(agentStores).doesNotContainKey(ERNI);
+
+        namespaces.create("erni", "ERNI", UserId.of("plain-user"));
+        use(ERNI);
+
+        assertThat(agentNames(ERNI)).contains("host-helper");
     }
 
     @Test

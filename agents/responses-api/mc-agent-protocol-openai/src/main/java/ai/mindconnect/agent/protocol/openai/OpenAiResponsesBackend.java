@@ -17,6 +17,7 @@ import ai.mindconnect.agent.protocol.api.Subscription;
 import ai.mindconnect.agent.protocol.event.ResponseEvent;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -39,7 +40,7 @@ import java.util.function.Consumer;
  * — agents are {@link PseudoAgent}s registered locally.
  *
  * <pre>
- * var backend = new OpenAiResponsesBackend(apiKey)
+ * var backend = new OpenAiResponsesBackend(apiKey, json)
  *         .register(PseudoAgent.of("assistant", "gpt-5-mini", "Be brief.")
  *                 .withHostedTool("web_search"));
  * Session s = backend.openSessionForAgent("assistant");
@@ -64,6 +65,7 @@ public final class OpenAiResponsesBackend {
     private record ResponseMeta(String sessionId, String agentName, Set<String> functionToolNames) { }
 
     private final OpenAiHttp http;
+    private final OpenAiMapper mapper;
     private final Map<String, PseudoAgent> agents = new ConcurrentHashMap<>();
     private final Map<String, SessionState> sessions = new ConcurrentHashMap<>();
     private final Map<String, ResponseMeta> responseMeta = new ConcurrentHashMap<>();
@@ -74,12 +76,13 @@ public final class OpenAiResponsesBackend {
     private static final int MAX_DELEGATION_ROUNDS = 8;
     private static final int MAX_DEPTH = 3;
 
-    public OpenAiResponsesBackend(String apiKey) {
-        this(apiKey, "https://api.openai.com/v1");
+    public OpenAiResponsesBackend(String apiKey, JsonMapperFactory json) {
+        this(apiKey, "https://api.openai.com/v1", json);
     }
 
-    public OpenAiResponsesBackend(String apiKey, String baseUrl) {
-        this.http = new OpenAiHttp(baseUrl, apiKey);
+    public OpenAiResponsesBackend(String apiKey, String baseUrl, JsonMapperFactory json) {
+        this.http = new OpenAiHttp(baseUrl, apiKey, json);
+        this.mapper = new OpenAiMapper(json);
     }
 
     /** Registers a pseudo agent; fluent so setup reads like a builder. */
@@ -143,7 +146,7 @@ public final class OpenAiResponsesBackend {
         JsonNode n = http.get("/responses/" + responseId);
         ResponseMeta meta = responseMeta.getOrDefault(responseId,
                 new ResponseMeta(null, null, Set.of()));
-        return Optional.of(OpenAiMapper.response(n, meta.sessionId(), meta.agentName(),
+        return Optional.of(mapper.response(n, meta.sessionId(), meta.agentName(),
                 meta.functionToolNames()));
     }
 
@@ -162,7 +165,7 @@ public final class OpenAiResponsesBackend {
         }
         // includeChildren: no sub-agents on this backend — nothing to merge.
         AutoCloseable handle = http.stream(path.toString(), node ->
-                OpenAiMapper.event(node, request.responseId()).ifPresent(consumer));
+                mapper.event(node, request.responseId()).ifPresent(consumer));
         return () -> {
             try {
                 handle.close();
@@ -206,7 +209,7 @@ public final class OpenAiResponsesBackend {
             seq++;
             if (seq <= afterSeq) continue;
             result.add(new ConversationItemRecord(itemNode.path("id").asText("item-" + seq), seq,
-                    OpenAiMapper.outputItem(itemNode)));
+                    mapper.outputItem(itemNode)));
         }
         return result;
     }
@@ -242,7 +245,7 @@ public final class OpenAiResponsesBackend {
         for (int round = 0; round < MAX_DELEGATION_ROUNDS; round++) {
             JsonNode res = postRound(state, agent, input, request.clientTools(),
                     request.background(), depth > 0, functionNames);
-            last = OpenAiMapper.response(res, state.session().id(), agent.name(), functionNames);
+            last = mapper.response(res, state.session().id(), agent.name(), functionNames);
             if (logicalId == null) logicalId = last.id();
             usage = usage.plus(last.usage());
             for (ConversationItemRecord e : last.output()) {

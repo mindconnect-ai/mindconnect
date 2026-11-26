@@ -1,10 +1,9 @@
 package ai.mindconnect.adminui.ui.controller;
 
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -28,9 +27,8 @@ class SkillUiControllerTest {
     private static SkillUiController controller(SkillRepository repository) {
         var beans = new StaticListableBeanFactory();
         beans.addBean("skillRepository", repository);
-        beans.addBean("skillCatalog", SkillCatalog.of(repository, SkillCatalog.OFF));
         return new SkillUiController(beans.getBeanProvider(SkillRepository.class),
-                beans.getBeanProvider(SkillCatalog.class));
+                ai.mindconnect.agent.runtime.infrastructure.UserSkillDirectory.of("off"));
     }
 
     private static Skill stored(String name, boolean enabled) {

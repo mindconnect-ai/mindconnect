@@ -1,5 +1,7 @@
 package ai.mindconnect.workflow.test;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 import ai.mindconnect.workflow.execution.DefaultWorkflowContextFactory;
 import ai.mindconnect.workflow.execution.WorkflowContextFactory;
 import ai.mindconnect.workflow.execution.WorkflowExecutorService;
@@ -37,7 +39,7 @@ public final class WorkflowTestHelper {
 
     /** ObjectMapper aware of all step types registered in this test module. */
     public static ObjectMapper objectMapper() {
-        return WorkflowObjectMapperFactory.create();
+        return WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of()));
     }
 
     /** Programmatic (no-JSON) executor with all step types and resolvers. */

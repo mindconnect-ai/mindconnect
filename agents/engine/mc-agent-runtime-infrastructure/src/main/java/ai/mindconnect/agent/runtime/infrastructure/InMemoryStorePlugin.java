@@ -1,0 +1,84 @@
+package ai.mindconnect.agent.runtime.infrastructure;
+
+import java.nio.file.Path;
+import java.time.Clock;
+
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
+import ai.mindconnect.agent.management.port.out.AgentRepository;
+import ai.mindconnect.agent.runtime.store.InMemorySessionRepository;
+import ai.mindconnect.agent.runtime.store.SessionRepository;
+import ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository;
+import ai.mindconnect.agent.runtime.store.SessionMessageRepository;
+import ai.mindconnect.agent.skill.adapter.InMemorySkillRepository;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.agent.tool.ToolRepository;
+import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
+import ai.mindconnect.agent.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.tools.usermemory.adapter.InMemoryUserMemoryRepository;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryRepository;
+import ai.mindconnect.agent.trace.adapter.InMemoryLlmCallTraceRepository;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.llm.adapter.memory.InMemoryLlmRepositoryFactory;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
+import ai.mindconnect.workflow.persistence.memory.InMemoryWorkflowRepositoryFactory;
+import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
+import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
+import ai.mindconnect.plugin.PluginRegistry;
+
+/** Everything in memory, gone with the process: a test, a demo. */
+public final class InMemoryStorePlugin extends StorePlugin {
+
+    private final Path sideDirectory;
+    private final int maxTracesPerSession;
+
+    /** @param sideDirectory where the few things that are files anyway go — a workflow's own files */
+    public InMemoryStorePlugin(Path sideDirectory, int maxTracesPerSession) {
+        this.sideDirectory = sideDirectory;
+        this.maxTracesPerSession = maxTracesPerSession;
+    }
+
+    @Override
+    protected SessionMessageRepository sessionMessages(PluginRegistry registry, ScopeSupplier namespaces) {
+        return new InMemorySessionMessageRepository(namespaces, Clock.systemUTC());
+    }
+
+    @Override
+    protected boolean keepsToolSettings() {
+        return false;
+    }
+
+    @Override
+    protected Stores stores(PluginRegistry registry) {
+        ScopeSupplier scope = registry.get(ScopeSupplier.class);
+        InMemoryLlmRepositoryFactory llm = new InMemoryLlmRepositoryFactory(() -> scope.namespace().value());
+        InMemoryWorkflowRepositoryFactory workflows =
+                new InMemoryWorkflowRepositoryFactory(sideDirectory, () -> scope.namespace().value(),
+                        registry.get(JsonMapperFactory.class));
+        return new Stores() {
+            @Override public LlmConfigRepository llmConfigs() { return llm.llmConfigRepository(); }
+            @Override public LlmPriceRepository llmPrices() { return llm.llmPriceRepository(); }
+            @Override public SessionRepository sessions(ScopeSupplier namespaces) {
+                return new InMemorySessionRepository(namespaces);
+            }
+            @Override public AgentRepository agents(ScopeSupplier namespaces) {
+                return new InMemoryAgentRepository(namespaces);
+            }
+            @Override public SkillRepository skills() { return new InMemorySkillRepository(scope); }
+            @Override public LlmCallTraceRepository traces() {
+                return new InMemoryLlmCallTraceRepository(maxTracesPerSession, scope);
+            }
+            @Override public TodoListRepository todoLists() { return new InMemoryTodoListRepository(scope); }
+            @Override public UserMemoryRepository userMemory() { return new InMemoryUserMemoryRepository(scope); }
+            @Override public WorkflowDataRepository workflows() { return workflows.workflowDataRepository(); }
+            @Override public WorkflowInstanceRepository workflowInstances() {
+                return workflows.workflowInstanceRepository();
+            }
+            @Override public ToolRepository toolSettings() {
+                throw new UnsupportedOperationException("No tool settings are kept here");
+            }
+        };
+    }
+}

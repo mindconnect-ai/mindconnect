@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 /**
  * The whole point, end to end: a workflow halts, everything in memory is thrown
@@ -49,14 +50,14 @@ public class FileWorkflowInstanceRepositoryTest {
                 .executeWorkflow(wf, Map.of());
         Assertions.assertThat(halted.isHalted()).isTrue();
 
-        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, () -> "test");
+        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, () -> "test", new JsonMapperFactory(List.of()));
         String instanceId = repository.save(
                 WorkflowInstanceSnapshots.capture(halted.getInstance(), 1_700_000_000_000L));
 
         // --- the process dies here -------------------------------------------
 
         // --- pass two: nothing survives but the file --------------------------
-        FileWorkflowInstanceRepository reopened = new FileWorkflowInstanceRepository(baseDir, () -> "test");
+        FileWorkflowInstanceRepository reopened = new FileWorkflowInstanceRepository(baseDir, () -> "test", new JsonMapperFactory(List.of()));
         WorkflowInstanceSnapshot loaded = reopened.findById(instanceId).orElseThrow();
 
         Assertions.assertThat(loaded.getWorkflowName()).isEqualTo("approval");
@@ -112,13 +113,13 @@ public class FileWorkflowInstanceRepositoryTest {
                 .executeWorkflow(wf, Map.of());
         Assertions.assertThat(halted.isHalted()).isTrue();
 
-        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, () -> "test");
+        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, () -> "test", new JsonMapperFactory(List.of()));
         String id = repository.save(WorkflowInstanceSnapshots.capture(halted.getInstance(), 1L));
 
         // --- the process dies; the user replies some time later ---------------
 
         WorkflowInstanceSnapshot loaded =
-                new FileWorkflowInstanceRepository(baseDir, () -> "test").findById(id).orElseThrow();
+                new FileWorkflowInstanceRepository(baseDir, () -> "test", new JsonMapperFactory(List.of())).findById(id).orElseThrow();
 
         // The suspension can say what it is waiting for, without being rebuilt.
         Assertions.assertThat(WorkflowInstanceSnapshots.pendingHalt(wf, loaded))
@@ -139,7 +140,7 @@ public class FileWorkflowInstanceRepositoryTest {
 
     @Test
     public void listsSuspendedInstancesNewestFirst() {
-        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, () -> "test");
+        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, () -> "test", new JsonMapperFactory(List.of()));
         repository.save(snapshot("a", 1_000L));
         repository.save(snapshot("b", 3_000L));
         repository.save(snapshot("a", 2_000L));
@@ -158,7 +159,7 @@ public class FileWorkflowInstanceRepositoryTest {
             // it back as the same thing — which is the honest problem here.
         });
 
-        Assertions.assertThatThrownBy(() -> new FileWorkflowInstanceRepository(baseDir, () -> "test").save(snapshot))
+        Assertions.assertThatThrownBy(() -> new FileWorkflowInstanceRepository(baseDir, () -> "test", new JsonMapperFactory(List.of())).save(snapshot))
                 .isInstanceOf(SnapshotSerializer.UnwritableSnapshotException.class)
                 .hasMessageContaining("handle")
                 .hasMessageContaining("cannot be written to JSON");

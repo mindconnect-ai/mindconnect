@@ -1,6 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiNode;
 
@@ -46,11 +46,11 @@ public final class TokenUsageComponent implements UiComponent {
     private ai.mindconnect.ui.model.UiNode tokenUsageBar(WorkingMemory memory) {
         if (memory == null) return null;
         int used = memory.totalTokens();
-        Integer max = memory.contextWindowTokens();
+        int max = memory.contextWindowTokens().orElse(0);
         var label = ai.mindconnect.ui.model.UiText
                 .of(idPrefix + ":tok-label", tokenUsageSuffix(memory).replace("  —  ", ""))
                 .withCssClass("chat-token-text");
-        if (max == null || max <= 0) {
+        if (max <= 0) {
             return used > 0 ? label : null;
         }
         double pct = 100.0 * used / max;
@@ -70,8 +70,8 @@ public final class TokenUsageComponent implements UiComponent {
     private String tokenUsageSuffix(WorkingMemory memory) {
         if (memory == null) return "";
         int used = memory.totalTokens();
-        Integer max = memory.contextWindowTokens();
-        if (max == null || max <= 0) {
+        int max = memory.contextWindowTokens().orElse(0);
+        if (max <= 0) {
             return used > 0 ? String.format("  —  %,d tok", used) : "";
         }
         double pct = 100.0 * used / max;

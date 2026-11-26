@@ -9,7 +9,7 @@ import ai.mindconnect.agentrest.service.TranscriptionEvent;
 import ai.mindconnect.agentrest.service.TranscriptionJobService;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.Subscription;
-import ai.mindconnect.llm.domain.TranscriptionResult;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;

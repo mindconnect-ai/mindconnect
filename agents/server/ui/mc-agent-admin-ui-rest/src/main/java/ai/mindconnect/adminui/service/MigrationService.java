@@ -1,14 +1,17 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.workflow.domain.WorkflowData;
+import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,9 +59,6 @@ import java.util.Set;
 public class MigrationService {
 
     private static final Logger log = LoggerFactory.getLogger(MigrationService.class);
-
-    /** Workflows carry {@code @class} type info — diffed and merged with the workflow stores' mapper. */
-    private static final ObjectMapper WORKFLOW_MAPPER = BundledSeeds.WORKFLOW_MAPPER;
 
     /** Whether a stored record is absent (NEW) or present-but-different (CHANGED). */
     public enum Status { NEW, CHANGED }
@@ -108,30 +108,34 @@ public class MigrationService {
     }
 
     private final LlmConfigRepository llmConfigRepository;
-    private final AgentDefinitionRepository agentDefinitionRepository;
+    private final AgentManagement agents;
     private final SkillRepository skillRepository;
     private final WorkflowDataRepository workflowDataRepository;
     private final ObjectMapper objectMapper;
     private final EncryptionHelper encryption;
     private final BundledSeeds seeds;
+    /** Workflows carry {@code @class} type info — diffed and merged with the workflow stores' mapper. */
+    private final ObjectMapper workflowMapper;
 
     /**
      * @param encryption decrypts stored {@code enc:} keys for the diff; without
      *                   it such keys cannot be compared and always count as different
      */
     public MigrationService(LlmConfigRepository llmConfigRepository,
-                            AgentDefinitionRepository agentDefinitionRepository,
+                            AgentManagement agents,
                             SkillRepository skillRepository,
                             WorkflowDataRepository workflowDataRepository,
                             ObjectMapper objectMapper,
-                            Optional<EncryptionHelper> encryption) {
+                            Optional<EncryptionHelper> encryption,
+                            JsonMapperFactory json) {
         this.llmConfigRepository = llmConfigRepository;
-        this.agentDefinitionRepository = agentDefinitionRepository;
+        this.agents = agents;
         this.skillRepository = skillRepository;
         this.workflowDataRepository = workflowDataRepository;
         this.objectMapper = objectMapper;
         this.encryption = encryption.orElseGet(EncryptionHelper::noEncryption);
-        this.seeds = new BundledSeeds(objectMapper);
+        this.seeds = new BundledSeeds(objectMapper, json);
+        this.workflowMapper = WorkflowObjectMapperFactory.create(json);
     }
 
     // ── Read: pending list ──────────────────────────────────────────────────────
@@ -160,10 +164,10 @@ public class MigrationService {
 
     private List<PendingMigration> pendingAgents() {
         List<PendingMigration> result = new ArrayList<>();
-        for (BundledSeeds.Seed<AgentDefinition> seed : seeds.agents()) {
-            AgentDefinition incoming = seed.record();
-            Optional<AgentDefinition> existing = agentDefinitionRepository.findByName(incoming.name());
-            pendingFor(EntityType.AGENT, incoming.name(), existing.orElse(null), incoming, objectMapper)
+        for (BundledSeeds.Seed<ManagedAgent> seed : seeds.agents()) {
+            Optional<ManagedAgent> existing = agents.findByName(seed.name());
+            pendingFor(EntityType.AGENT, seed.name(), existing.map(this::fieldsOf).orElse(null),
+                    fieldsOf(seed.record()), objectMapper)
                     .ifPresent(result::add);
         }
         return result;
@@ -190,7 +194,7 @@ public class MigrationService {
         for (BundledSeeds.Seed<WorkflowData> seed : seeds.workflows()) {
             String id = seed.name();
             Optional<WorkflowData> existing = workflowDataRepository.findById(id);
-            pendingFor(EntityType.WORKFLOW, id, existing.orElse(null), seed.record(), WORKFLOW_MAPPER)
+            pendingFor(EntityType.WORKFLOW, id, existing.orElse(null), seed.record(), workflowMapper)
                     .ifPresent(result::add);
         }
         return result;
@@ -247,9 +251,15 @@ public class MigrationService {
     }
 
     private boolean applyAgent(String name) {
-        Optional<AgentDefinition> incoming = bundledAgent(name);
+        Optional<ManagedAgent> incoming = bundledAgent(name);
         if (incoming.isEmpty()) return false;
-        agentDefinitionRepository.save(incoming.get());
+        Optional<ManagedAgent> stored = agents.findByName(name);
+        if (stored.isEmpty()) {
+            agents.create(incoming.get());
+        } else {
+            ObjectNode fields = fieldsOf(incoming.get());
+            agents.update(stored.get().id(), stored.get().version(), current -> withFields(current, fields));
+        }
         log.info("Applied migration for agent '{}'", name);
         return true;
     }
@@ -301,14 +311,16 @@ public class MigrationService {
                     .map(merged -> { llmConfigRepository.save(merged); return true; })
                     .orElse(false);
             case AGENT -> bundledAgent(name)
-                    .flatMap(incoming -> agentDefinitionRepository.findByName(name)
-                            .flatMap(stored -> mergeField(stored, incoming, field, AgentDefinition.class, objectMapper)))
-                    .map(merged -> { agentDefinitionRepository.save(merged); return true; })
-                    .orElse(false);
+                    .flatMap(incoming -> agents.findByName(name)
+                            .flatMap(stored -> mergeField(fieldsOf(stored), fieldsOf(incoming), field,
+                                    ObjectNode.class, objectMapper)
+                                    .map(merged -> agents.update(stored.id(), stored.version(),
+                                            current -> withFields(current, merged)))))
+                    .isPresent();
             case SKILL -> false; // only ever NEW: nothing stored to merge into
             case WORKFLOW -> bundledWorkflow(name)
                     .flatMap(incoming -> workflowDataRepository.findById(name)
-                            .flatMap(stored -> mergeField(stored, incoming, field, WorkflowData.class, WORKFLOW_MAPPER)))
+                            .flatMap(stored -> mergeField(stored, incoming, field, WorkflowData.class, workflowMapper)))
                     .map(merged -> { workflowDataRepository.save(name, merged); return true; })
                     .orElse(false);
         };
@@ -341,8 +353,75 @@ public class MigrationService {
         return seeds.llmConfig(name);
     }
 
-    private Optional<AgentDefinition> bundledAgent(String name) {
+    private Optional<ManagedAgent> bundledAgent(String name) {
         return seeds.agent(name);
+    }
+
+    // ── agents as fields ────────────────────────────────────────────────────────
+
+    /** Metadata of a stored definition that says nothing about how the agent works. */
+    private static final Set<String> NOT_COMPARED = Set.of(ManagedAgent.AGENT_ID, "earlier.definition");
+
+    /**
+     * An agent as the fields an admin compares and takes one by one: what the
+     * definition and the agent say, side by side, and every setting a
+     * capability reads under its own name. Without the id, the times and the
+     * version: they tell two installations apart, not two versions of an agent.
+     */
+    private ObjectNode fieldsOf(ManagedAgent agent) {
+        ObjectNode fields = objectMapper.valueToTree(agent.definition());
+        ObjectNode metadata = (ObjectNode) fields.remove("metadata");
+        fields.put("group", agent.group());
+        fields.put("icon", agent.icon());
+        fields.put("welcomeMessage", agent.welcomeMessage());
+        fields.put("status", agent.status().name());
+        metadata.fields().forEachRemaining(entry -> {
+            // No reviewers is no reviewers, whether the agent says so with an empty list or not at all.
+            boolean noReviewers = ResponseReviewPlugin.REVIEWERS.equals(entry.getKey()) && entry.getValue().isEmpty();
+            if (!NOT_COMPARED.contains(entry.getKey()) && !noReviewers) {
+                fields.set(entry.getKey(), entry.getValue());
+            }
+        });
+        return fields;
+    }
+
+    /** The stored agent with these fields; it stays the agent it is. */
+    private ManagedAgent withFields(ManagedAgent stored, ObjectNode fields) {
+        ObjectNode definition = fields.deepCopy();
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put(ManagedAgent.AGENT_ID, stored.id().value());
+        for (String field : List.of("group", "icon", "welcomeMessage", "status")) {
+            definition.remove(field);
+        }
+        for (String field : List.copyOf(fieldNames(definition))) {
+            if (!DEFINITION_FIELDS.contains(field)) {
+                metadata.set(field, definition.remove(field));
+            }
+        }
+        definition.set("metadata", metadata);
+        try {
+            return new ManagedAgent(stored.id(),
+                    objectMapper.treeToValue(definition, ai.mindconnect.agent.runtime.api.domain.AgentDefinition.class),
+                    text(fields, "group"), text(fields, "icon"), text(fields, "welcomeMessage"),
+                    ManagedAgent.Status.valueOf(fields.get("status").asText()),
+                    stored.createdAt(), stored.updatedAt(), stored.version());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalArgumentException("Not an agent: " + e.getOriginalMessage(), e);
+        }
+    }
+
+    /** What an agent's definition has a field of its own for; everything else of it is metadata. */
+    private static final Set<String> DEFINITION_FIELDS =
+            Set.of("name", "description", "instructions", "modelSettings", "tools", "maxRounds");
+
+    private static List<String> fieldNames(ObjectNode node) {
+        List<String> names = new ArrayList<>();
+        node.fieldNames().forEachRemaining(names::add);
+        return names;
+    }
+
+    private static String text(ObjectNode fields, String field) {
+        return fields.hasNonNull(field) ? fields.get(field).asText() : null;
     }
 
     private Optional<WorkflowData> bundledWorkflow(String id) {

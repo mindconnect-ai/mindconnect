@@ -1,0 +1,124 @@
+package ai.mindconnect.agent.runtime.capabilities.subagent;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+
+import ai.mindconnect.agent.loop.domain.ContentPart;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
+import ai.mindconnect.agent.runtime.api.domain.ToolCall;
+import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
+import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
+import ai.mindconnect.agent.runtime.api.port.in.SessionService;
+import ai.mindconnect.agent.runtime.api.port.out.Tool;
+
+/**
+ * Hands one task to one of the agents the caller names as its sub-agents.
+ * The engine runs the task as a turn of its own, and that turn's answer is
+ * the call's result.
+ */
+final class RunAgentTool implements Tool {
+
+    static final String NAME = "run_agent";
+    static final String AGENT = "name";
+    static final String MESSAGE = "message";
+
+    private static final String DESCRIPTION = "Delegates a task to a specialist agent and returns its answer. "
+            + "Each starts with no memory of this chat, so put everything it needs in the message. NOT for "
+            + "reading a file attached to this chat (vector_search) or a file you already have a path for "
+            + "(file_read / document tools).";
+
+    private static final Map<String, Object> PARAMETERS = Map.of(
+            "type", "object",
+            "properties", Map.of(
+                    AGENT, Map.of("type", "string",
+                            "description", "The name of the agent to call, e.g. \"web-researcher\" or \"file-finder\""),
+                    MESSAGE, Map.of("type", "string",
+                            "description", "The task or question to send to the agent")),
+            "required", List.of(AGENT, MESSAGE));
+
+    private final Roster roster;
+    private final Supplier<SessionService> sessions;
+    private final Predicate<String> inherited;
+    private final int maxDepth;
+
+    RunAgentTool(Roster roster, Supplier<SessionService> sessions, Predicate<String> inherited, int maxDepth) {
+        this.roster = roster;
+        this.sessions = sessions;
+        this.inherited = inherited;
+        this.maxDepth = maxDepth;
+    }
+
+    /** As a catalog shows it: for no caller, so without names. */
+    static final ToolDefinition CATALOGUED = new ToolDefinition(NAME, DESCRIPTION, PARAMETERS);
+
+    /** With the names in it: a model reads a tool's description far more reliably than it calls list_agents. */
+    static ToolDefinition definition(List<String> names) {
+        return new ToolDefinition(NAME, DESCRIPTION + " Available to you: " + String.join(", ", names) + ".",
+                PARAMETERS);
+    }
+
+    @Override
+    public ToolDefinition definition() {
+        return definition(roster.namedByCaller());
+    }
+
+    @Override
+    public ToolOutput execute(ToolCall call, Session session) {
+        try {
+            return ToolOutput.delegate(request(call.arguments(), call, session));
+        } catch (IllegalArgumentException e) {
+            return ToolOutput.failed("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * The turn that does one task, in a session of its own: the sub-agent
+     * starts from the task alone, and its messages do not land in the
+     * caller's history. Of the caller's metadata it takes over what the
+     * application said a sub-agent shares, and it names the call that
+     * opened it.
+     *
+     * @throws IllegalArgumentException for a task without an agent or a
+     *         message, for an agent the caller may not call, and for a
+     *         caller that is as deep as sub-agents may go
+     */
+    TurnRequest request(Map<?, ?> task, ToolCall call, Session session) {
+        if (!(task.get(AGENT) instanceof String name) || name.isBlank()
+                || !(task.get(MESSAGE) instanceof String message) || message.isBlank()) {
+            throw new IllegalArgumentException("a task needs the agent's \"name\" and a \"message\"");
+        }
+        AgentDefinition agent = roster.find(name, session).orElseThrow(() -> new IllegalArgumentException(
+                "there is no agent named " + name + " you can call. Available to you: "
+                        + String.join(", ", roster.names(session))));
+        if (depthOf(session) + 1 > maxDepth) {
+            throw new IllegalArgumentException("Sub-agent depth limit (" + maxDepth + ") exceeded");
+        }
+        Map<String, Object> metadata = new HashMap<>();
+        session.metadata().forEach((key, value) -> {
+            if (inherited.test(key)) {
+                metadata.put(key, value);
+            }
+        });
+        metadata.put(SubAgentPlugin.OPENED_BY_CALL, call.callId());
+        Session child = sessions.get().open(new SessionSpec(session.userId(), session.id(), agent, metadata));
+        return new TurnRequest(child.id(), List.of(new ContentPart.Text(message)), Map.of());
+    }
+
+    /** How many sessions stand above this one: 0 for a session nobody opened for a task. */
+    private int depthOf(Session session) {
+        int depth = 0;
+        Session above = session;
+        // Never further than the limit: a chain cannot be deeper, and a broken one must not loop.
+        while (above != null && above.parentId() != null && depth <= maxDepth) {
+            depth++;
+            above = sessions.get().find(above.parentId()).orElse(null);
+        }
+        return depth;
+    }
+}

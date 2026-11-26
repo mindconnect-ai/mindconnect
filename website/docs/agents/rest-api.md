@@ -45,9 +45,69 @@ the request. In Swagger UI, **Authorize** takes the token. See
 | `POST /api/sessions` | start a session for the caller — body `{agentId, workingDir?, additionalDirs?}`; without `workingDir` the session works in its own directory under the user's home |
 | `PUT /api/sessions/{id}/working-dir` | change them — body `{workingDir, additionalDirs?}`; a null or blank `workingDir` clears it, an absent `additionalDirs` keeps the current ones, an empty list clears them |
 | `GET /api/directories?path=` | one level of the tree the caller may work in: `{root, current, parent, subdirs, truncated}` — the root without `path` |
-| `GET /api/sessions?agentId=` | the caller's sessions for one agent |
+| `GET /api/sessions?agentId=` | the caller's sessions for one agent; each with `turnId` and `turnStatus` of the turn underway (`QUEUED`, `RUNNING`, `WAITING`: busy; `INTERRUPTED`: waits for an answer), both `null` when idle |
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
+
+The history is a list of the session's messages, oldest first, each with its
+place in the session and the message as the turn wrote it:
+
+```json
+[
+  {
+    "id": "f4e1…", "sequence": 2, "sentAt": "2026-11-25T10:49:00.031Z",
+    "message": {
+      "id": "f4e1…", "turnId": "t1", "type": "TOOL_CALL",
+      "content": [],
+      "toolCalls": [ { "callId": "call_1", "name": "get_current_datetime", "arguments": {} } ],
+      "metadata": { "callIds": ["call_1"] }
+    },
+    "durationMillis": null, "tokens": null
+  }
+]
+```
+
+`type` is `USER`, `ASSISTANT`, `TOOL_CALL`, `TOOL_DISPATCHED` or `TOOL_RESULT`. A
+content part names its kind: `{"kind": "text", "text": "…"}`, or
+`{"kind": "image", "source": {…}, "detail": "AUTO"}`. A tool result carries its
+text in `content` and `callId`, `toolName` and `failed` in `metadata`.
+`sequence` is what `DELETE /api/sessions/{id}/messages?fromSeq=&toSeq=` removes
+by.
+
+An agent is answered, and read from a file, in one shape — the agent as it is
+stored:
+
+```json
+{
+  "id": "…",
+  "definition": {
+    "name": "researcher",
+    "description": "Looks things up.",
+    "instructions": "You research …",
+    "modelSettings": { "model": "agent-default" },
+    "tools": [ { "name": "web_search", "deferred": false, "metadata": { "needsApproval": true } } ],
+    "maxRounds": 10,
+    "metadata": { "subAgents": ["url-reader"], "skills": ["weekly-report"], "memory": { "strategy": "compact" } }
+  },
+  "group": "assistants", "icon": "telescope", "welcomeMessage": "…",
+  "status": "ACTIVE", "createdAt": "…", "updatedAt": "…", "version": 3
+}
+```
+
+`definition` is what the runtime runs; its `metadata` holds what a capability
+reads under its own key: `subAgents`, `callableByAgents` (`false`: no other
+agent may call it; absent: yes), `responseReviewers`, `skills` (absent:
+every skill, an empty list: none), `memory`. A seed file or a registry entry
+written before 1.0 — fields flat, `systemPrompt`, `llmConfigName`,
+`memoryConfig` — is still read, and stored in the shape above. `POST` and `PUT`
+take the flat fields they always took (`name`, `description`, `systemPrompt`,
+`welcomeMessage`, `llmConfigName`, and on `PUT` also `maxIterations`,
+`responseReviewers`, `callableAgents`, `skills` as `{mode, names}`, `version`).
+
+A session is answered as `{id, userId, parentId, agentId, title, type, status,
+workingDir, additionalDirs, createdAt}`. `status` says what goes on in it right
+now — `IDLE`, `BUSY` or `WAITING` — and is read from its turn whenever the
+session is asked for.
 
 A server serves any number of namespaces. A call names the one it works in
 in the address — `/ns/{namespace}/api/…`, so an OpenAI-compatible client
@@ -207,7 +267,9 @@ coordinates:
 Three rules make a client robust:
 
 **Remember `seq`.** It is what you hand back as `afterSeq` after a
-disconnect. Everything after it is replayed.
+disconnect. Everything after it is replayed. The numbers grow but have gaps:
+they count everything that happens in the session, and not all of it is a
+frame.
 
 **Check for a gap.** The buffer is finite. If `firstBufferedSeq` is greater
 than your `afterSeq + 1`, events were evicted before you came back — reload
@@ -226,30 +288,36 @@ someone that an agent is waiting for them — needs the opposite: little about
 every session, without attaching to any of them. That is the user stream:
 
 ```bash
-curl -N "http://localhost:8080/api/users/me/stream?afterSeq=0"
+curl -N "http://localhost:8080/api/users/me/stream"
 ```
 
 The path names the caller: `me`, or the caller's own user id. Any other user
-answers 404. The first frame is the `attached` frame with the buffer bounds
-(`firstBufferedSeq`, `latestSeq`); then the buffered events after `afterSeq`
-replay and the stream continues live. Every frame is one JSON object with a
-`seq` and a `type`, and the `sessionId` it is about:
+answers 404. The first frame is `{"type":"attached"}`; from then on every
+frame is one JSON object with a `type` and the `sessionId` it is about:
 
 | type | carries |
 |---|---|
 | `session_started` | `agentDefinitionId`, `sessionType` — a top-level session was opened (sub-agent sessions do not announce themselves); `sessionType` is `chat` for a chat and another word for a session a feature opened for itself, which a chat history leaves out |
-| `session_titled` | `title` — the session got its generated title after the first exchange |
-| `turn_started` | `turnId` |
-| `turn_finished` | `turnId`, `outcome` — `completed`, `failed` or `cancelled` |
-| `approval_requested` | `callId`, `toolName` — a tool waits for a human; `sessionId` is the **root** session whose chat shows the card, even when a sub-agent asked |
-| `approval_answered` | `callId`, `approved` — the question was answered, from whichever client |
+| `session_titled` | `title` — the session was renamed, or got its generated title after the first exchange |
+| `session_status` | `status` — what goes on in the session now: `BUSY` (a turn runs), `WAITING` (a turn stopped to ask and waits for an answer) or `IDLE`; for a question a sub-agent raises it is the session you see that waits |
+| `session_deleted` | — |
 
-The tokens of a turn are not here. A client that sees `turn_started` for a
-session it is showing attaches to that session's stream for the rest; one
-that is not showing it updates a badge. The reconnect rules are the session
-stream's: remember `seq`, check `firstBufferedSeq` for a gap (the truth to
-reload from is `GET /api/sessions` and `GET /api/sessions/{id}/approvals`),
-and reattach with the last seen `seq` when the connection drops.
+What a turn says is not here, and neither is what it asks. A client that
+sees a session turn `BUSY` attaches to that session's stream if it shows it,
+and updates a badge if not; one that sees `WAITING` reads the question from
+`GET /api/sessions/{id}/approvals`.
+
+The stream tells what changes from the moment it is attached; nothing is
+replayed. A client that was away reads `GET /api/sessions` anew — every
+session carries its `status` — and attaches again.
+
+:::caution One node
+Streams are told live by the server process that runs the turn. Behind a load
+balancer over several nodes, a client attached to another node hears neither
+the session's stream nor the user stream: run one node, or pin a client to
+its node. `turnId` and `turnStatus` of a session are read from the turn and
+are right on every node.
+:::
 
 ## Approvals
 

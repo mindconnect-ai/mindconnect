@@ -24,9 +24,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class TaskMonitorUiController {
 
     private final TaskMonitor monitor;
-    private final ai.mindconnect.agent.ScopeSupplier scope;
+    private final ai.mindconnect.agent.scope.ScopeSupplier scope;
 
-    public TaskMonitorUiController(TaskMonitor monitor, ai.mindconnect.agent.ScopeSupplier scope) {
+    public TaskMonitorUiController(TaskMonitor monitor, ai.mindconnect.agent.scope.ScopeSupplier scope) {
         this.monitor = monitor;
         this.scope = scope;
     }

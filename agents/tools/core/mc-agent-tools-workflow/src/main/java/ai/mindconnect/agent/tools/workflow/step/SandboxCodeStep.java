@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.workflow.step;
 
 import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.execution.BaseStepInstance;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,8 +34,13 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
     /** How much of a failed program's output an error message quotes. */
     private static final int ERROR_EXCERPT = 2_000;
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern EXIT_CODE = Pattern.compile("^exit code: (-?\\d+)", Pattern.MULTILINE);
+
+    private final ObjectMapper mapper;
+
+    public SandboxCodeStep(JsonMapperFactory json) {
+        this.mapper = json.create();
+    }
 
     @Override
     public void execute() {
@@ -75,7 +81,7 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
             String name = entry.getKey();
             if (name == null || name.isBlank() || ENV_VARIABLE.equals(name) || !isIdentifier(name)) continue;
             try {
-                MAPPER.writeValueAsString(entry.getValue());
+                mapper.writeValueAsString(entry.getValue());
                 inputs.put(name, entry.getValue());
             } catch (Exception e) {
                 logDebug("variable %s is not JSON — not passed to the sandbox", name);
@@ -93,7 +99,7 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
      * the tool reports an error, the exit code is not zero, or the line never
      * came — fails the step with what it printed.
      */
-    static Map<String, Object> parse(String step, String output) {
+    Map<String, Object> parse(String step, String output) {
         String text = output == null ? "" : output;
         if (text.stripLeading().startsWith("Error:")) {
             throw new IllegalStateException("code step '" + step + "': " + excerpt(text.strip()));
@@ -111,7 +117,7 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
         int end = text.indexOf('\n', at);
         String line = text.substring(at + MARKER.length(), end < 0 ? text.length() : end).strip();
         try {
-            return MAPPER.readValue(line, new TypeReference<LinkedHashMap<String, Object>>() { });
+            return mapper.readValue(line, new TypeReference<LinkedHashMap<String, Object>>() { });
         } catch (Exception e) {
             throw new IllegalStateException("code step '" + step + "' returned variables that are not JSON: "
                     + e.getMessage(), e);
@@ -122,9 +128,9 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
         return text.length() <= ERROR_EXCERPT ? text : "…" + text.substring(text.length() - ERROR_EXCERPT);
     }
 
-    private static String json(Object value) {
+    private String json(Object value) {
         try {
-            return MAPPER.writeValueAsString(value);
+            return mapper.writeValueAsString(value);
         } catch (Exception e) {
             throw new IllegalStateException("variables could not be written as JSON: " + e.getMessage(), e);
         }

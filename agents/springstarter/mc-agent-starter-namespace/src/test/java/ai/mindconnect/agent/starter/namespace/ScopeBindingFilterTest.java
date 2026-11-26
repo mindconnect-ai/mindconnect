@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.starter.namespace;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
@@ -213,7 +213,7 @@ class ScopeBindingFilterTest {
     void anInstallationThatClosedItsDefaultNamespaceRefusesSomebodyItListsNowhere() throws Exception {
         NamespaceService closed = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT,
                 java.time.Clock.systemUTC(), List.of(), id -> java.util.Optional.empty(), "local",
-                List.of(ai.mindconnect.agent.Email.of("chief@example.com")));
+                List.of(ai.mindconnect.namespace.domain.Email.of("chief@example.com")));
         ScopeBindingFilter guarded = new ScopeBindingFilter(bound, closed);
         signIn("stranger");
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/agents");
@@ -229,7 +229,7 @@ class ScopeBindingFilterTest {
     void whoeverIsListedInTheClosedDefaultNamespaceWorksThereAsBefore() throws Exception {
         NamespaceService closed = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT,
                 java.time.Clock.systemUTC(), List.of(), id -> java.util.Optional.empty(), "example.com",
-                List.of(ai.mindconnect.agent.Email.of("chief@example.com")));
+                List.of(ai.mindconnect.namespace.domain.Email.of("chief@example.com")));
         ScopeBindingFilter guarded = new ScopeBindingFilter(bound, closed);
         signIn("chief");
 
@@ -353,7 +353,7 @@ class ScopeBindingFilterTest {
     void thePageThatSaysWhyTheyCannotGetInAnswersAnyway() throws Exception {
         NamespaceService closed = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT,
                 java.time.Clock.systemUTC(), List.of(), id -> java.util.Optional.empty(), "local",
-                List.of(ai.mindconnect.agent.Email.of("chief@example.com")));
+                List.of(ai.mindconnect.namespace.domain.Email.of("chief@example.com")));
         ScopeBindingFilter guarded = new ScopeBindingFilter(bound, closed);
         signIn("stranger");
 

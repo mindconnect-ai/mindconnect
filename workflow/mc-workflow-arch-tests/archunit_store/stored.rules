@@ -1,12 +1,19 @@
 #
-#Thu Oct 15 14:06:14 CEST 2026
+#Wed Nov 25 14:25:54 CET 2026
+Contracts\:\ the\ agents'\ contracts\ know\ no\ Jackson=8ee06ada-b1bb-483f-8d79-df2753bc23ff
 Conventions\:\ SLF4J\ everywhere,\ never\ java.util.logging=a93c072a-3273-4634-919b-0b4f2d78cffd
+Conventions\:\ every\ ObjectMapper\ comes\ from\ JsonMapperFactory=3ba6aa47-7551-462c-bacc-591e376581c1
+Conventions\:\ no\ ObjectMapper\ is\ static=d6396bb5-0b0f-40ed-91a1-f89657d158c1
 Conventions\:\ one\ constructor\ per\ class=fc2f2e97-0fe6-467d-872f-55c02c513d74
 D1\:\ -core\ modules\ and\ engines\ know\ no\ framework=f1e0149c-faf0-4be2-878d-68a2b233ff05
 D1\:\ @Component,\ @Configuration,\ @RestController\ ...\ only\ in\ starters,\ apps,\ rest/ui\ modules\ and\ demos=8b966d40-af7d-4171-b6bd-292f058b040f
 D1\:\ a\ -core\ module\ holds\ domain\ and\ ports,\ adapters\ live\ in\ the\ sibling=b6fd7353-53bd-4a41-8168-876d32f725d9
 D2\:\ an\ adapter\ does\ not\ import\ another\ module's\ adapter=c65b37b4-3007-45cc-b9c7-51edda4ed70c
 D2\:\ domain\ <-\ port\ <-\ service\ <-\ adapter=90ef3b20-ba33-487b-9dc9-d745da3e2566
-D3\:\ a\ constructor\ takes\ at\ most\ 7\ parameters=0e42aaf7-3251-4b53-b080-293a534cfbf1
+D2\:\ no\ cycles\ between\ packages=977b6c66-96d8-448a-94a6-3347a73fcb83
+D2\:\ only\ a\ pg,\ jdbc\ or\ pgvector\ package\ uses\ JDBC=8aac4e48-f410-4821-b6a8-abee2e8d3ac6
+D3\:\ a\ class\ depends\ on\ at\ most\ 25\ other\ classes\ of\ the\ project=fc2e8fac-b092-46cf-a0eb-a29b70bd1186
+D3\:\ a\ class\ has\ at\ most\ 30\ methods=4e2e3d68-29ae-4da3-976c-f476a2ba47c7
+D3\:\ a\ constructor\ takes\ at\ most\ 7\ parameters\ (a\ record\ is\ exempt)=4ac65482-3db7-4aee-b070-dd357f9e53c9
 D4\:\ a\ class\ name\ says\ what\ the\ thing\ is\ for\ (no\ Helper,\ Util,\ Support,\ Commons,\ Holder,\ Manager)=ca592fc9-1915-4a74-a39f-d800d5f60db8
 D4\:\ a\ method\ name\ says\ what\ it\ does\ (no\ process,\ handle,\ do)=77c754ec-7161-4914-b6d3-05960e187e2f

@@ -1,6 +1,7 @@
 package ai.mindconnect.mail.index;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mail.Fetched;
 import ai.mindconnect.mail.Location;
 import ai.mindconnect.mail.MailAttachment;
@@ -161,7 +162,7 @@ class MailIndexTest {
 
     @Test
     void changes_written_through_at_once_are_all_kept(@TempDir Path dir) throws Exception {
-        FileMailIndexStore files = new FileMailIndexStore(dir, "local");
+        FileMailIndexStore files = new FileMailIndexStore(dir, "local", new JsonMapperFactory(List.of()));
         MailIndex onDisk = new MailIndex(files, clock, 300, MailIndex.TTL);
         onDisk.page(ME, mail, INBOX, 0, 10, null);
 
@@ -186,7 +187,7 @@ class MailIndexTest {
 
     @Test
     void a_window_survives_the_file_store_whole(@TempDir Path dir) {
-        FileMailIndexStore files = new FileMailIndexStore(dir, "local");
+        FileMailIndexStore files = new FileMailIndexStore(dir, "local", new JsonMapperFactory(List.of()));
         MailIndex onDisk = new MailIndex(files, clock, 300, MailIndex.TTL);
         onDisk.page(ME, mail, new Location("email.privat", "Kunden/2026 & Co"), 0, 10, null);
 

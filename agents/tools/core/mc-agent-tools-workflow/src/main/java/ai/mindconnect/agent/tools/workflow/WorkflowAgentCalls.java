@@ -3,15 +3,14 @@ package ai.mindconnect.agent.tools.workflow;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
-import ai.mindconnect.agent.runtime.domain.TurnResult;
-import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.tool.ToolCallScope;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
@@ -40,9 +39,29 @@ public final class WorkflowAgentCalls {
     /** The type of an agent-call step's session — kept out of the chat's history. */
     public static final String SESSION_TYPE = "workflow";
 
+    /** The turn a step has sent its message into and waits for. */
+    public interface PendingAnswer {
+
+        /** What the turn came to first; fails when the turn failed. */
+        CompletableFuture<Outcome> outcome();
+
+        void cancel();
+    }
+
+    /**
+     * @param text         the agent's answer; {@code null} when the turn stopped to ask instead
+     * @param toolsWaiting the tools the turn asks an approval for; empty when it answered
+     */
+    public record Outcome(String text, List<String> toolsWaiting) {
+
+        public Outcome {
+            toolsWaiting = List.copyOf(toolsWaiting);
+        }
+    }
+
     private final Function<String, Optional<AgentId>> agents;
     private final BiFunction<AgentId, UserId, SessionId> open;
-    private final BiFunction<SessionId, String, ChatTurnHandle> submit;
+    private final BiFunction<SessionId, String, PendingAnswer> submit;
     private final Duration timeout;
 
     /**
@@ -52,7 +71,7 @@ public final class WorkflowAgentCalls {
      * @param timeout how long a step waits for the turn
      */
     public WorkflowAgentCalls(Function<String, Optional<AgentId>> agents, BiFunction<AgentId, UserId, SessionId> open,
-                       BiFunction<SessionId, String, ChatTurnHandle> submit, Duration timeout) {
+                       BiFunction<SessionId, String, PendingAnswer> submit, Duration timeout) {
         this.agents = Objects.requireNonNull(agents, "agents");
         this.open = Objects.requireNonNull(open, "open");
         this.submit = Objects.requireNonNull(submit, "submit");
@@ -69,8 +88,8 @@ public final class WorkflowAgentCalls {
         AgentId agent = agents.apply(agentName)
                 .orElseThrow(() -> new IllegalArgumentException("No agent named '" + agentName + "'"));
         SessionId session = open.apply(agent, caller());
-        ChatTurnHandle handle = submit.apply(session, message);
-        TurnResult result;
+        PendingAnswer handle = submit.apply(session, message);
+        Outcome result;
         try {
             result = handle.outcome().get(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
@@ -85,9 +104,9 @@ public final class WorkflowAgentCalls {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             throw new RuntimeException("Agent call to '" + agentName + "' failed: " + cause.getMessage(), cause);
         }
-        if (result.isIncomplete()) {
+        if (result.text() == null) {
             handle.cancel();
-            String tools = result.pendingApprovals().stream().map(ToolApproval::toolName).distinct()
+            String tools = result.toolsWaiting().stream().distinct()
                     .reduce((a, b) -> a + ", " + b).orElse("a tool");
             throw new RuntimeException("Agent '" + agentName + "' stopped to ask for approval of " + tools
                     + ", which a workflow step cannot give. Let the agent run " + tools

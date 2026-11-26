@@ -1,5 +1,6 @@
 package ai.mindconnect.taskqueue.jdbc;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.taskqueue.SharedStateStore;
 import ai.mindconnect.taskqueue.TaskQueueException;
 
@@ -20,9 +21,11 @@ import java.util.Optional;
 public final class JdbcSharedStateStore implements SharedStateStore {
 
     private final DataSource dataSource;
+    private final Json json;
 
-    public JdbcSharedStateStore(DataSource dataSource) {
+    public JdbcSharedStateStore(DataSource dataSource, JsonMapperFactory json) {
         this.dataSource = dataSource;
+        this.json = new Json(json);
     }
 
     /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */
@@ -47,7 +50,7 @@ public final class JdbcSharedStateStore implements SharedStateStore {
                     + "ON CONFLICT DO NOTHING")) {
                 ps.setString(1, id);
                 ps.setString(2, key);
-                ps.setString(3, Json.write(value));
+                ps.setString(3, json.write(value));
                 return ps.executeUpdate() > 0;
             }
         });
@@ -61,7 +64,7 @@ public final class JdbcSharedStateStore implements SharedStateStore {
                     + "ON CONFLICT (id, key) DO UPDATE SET value = EXCLUDED.value")) {
                 ps.setString(1, id);
                 ps.setString(2, key);
-                ps.setString(3, Json.write(value));
+                ps.setString(3, json.write(value));
                 ps.executeUpdate();
                 return null;
             }
@@ -76,7 +79,7 @@ public final class JdbcSharedStateStore implements SharedStateStore {
                 ps.setString(1, id);
                 ps.setString(2, key);
                 try (ResultSet rs = ps.executeQuery()) {
-                    return rs.next() ? Optional.of(Json.readValue(rs.getString(1))) : Optional.empty();
+                    return rs.next() ? Optional.of(json.readValue(rs.getString(1))) : Optional.empty();
                 }
             }
         });
@@ -90,7 +93,7 @@ public final class JdbcSharedStateStore implements SharedStateStore {
                 ps.setString(1, id);
                 try (ResultSet rs = ps.executeQuery()) {
                     Map<String, Object> all = new LinkedHashMap<>();
-                    while (rs.next()) all.put(rs.getString(1), Json.readValue(rs.getString(2)));
+                    while (rs.next()) all.put(rs.getString(1), json.readValue(rs.getString(2)));
                     return all;
                 }
             }

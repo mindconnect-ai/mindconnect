@@ -1,6 +1,6 @@
 package ai.mindconnect.namespace.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.filerepo.FileRepo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

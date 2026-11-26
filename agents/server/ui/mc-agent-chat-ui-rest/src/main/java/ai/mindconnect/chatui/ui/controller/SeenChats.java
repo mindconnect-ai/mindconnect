@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.controller;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.management.api.ManagedSession;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -40,11 +40,11 @@ record SeenChats(Instant since, Set<String> shown) implements Serializable {
     }
 
     /** The chats started after this browser session began that it has not had on screen. */
-    Set<SessionId> unseen(List<? extends AgentSessionHeader> chats) {
+    Set<SessionId> unseen(List<ManagedSession> chats) {
         return chats.stream()
-                .filter(chat -> chat.startedAt() != null && chat.startedAt().isAfter(since))
+                .filter(chat -> chat.createdAt() != null && chat.createdAt().isAfter(since))
                 .filter(chat -> !shown.contains(chat.id().value()))
-                .map(AgentSessionHeader::id)
+                .map(chat -> chat.id())
                 .collect(Collectors.toUnmodifiableSet());
     }
 }

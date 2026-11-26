@@ -1,8 +1,8 @@
 package ai.mindconnect.namespace.adapter.env;
 
-import ai.mindconnect.agent.Email;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.namespace.domain.Email;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
@@ -11,7 +11,11 @@ import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 import org.junit.jupiter.api.Test;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,6 +29,29 @@ class NamespaceEnvVarResolverTest {
 
     private final InMemoryNamespaceRepository store = new InMemoryNamespaceRepository();
     private final NamespaceRepository namespaces = new EncryptingNamespaceRepository(store, ENCRYPTION);
+
+    /** A stored value as the scheme before AES-GCM wrote it: {@code enc:} and the Base64 of AES/ECB. */
+    private static String writtenByTheEarlierScheme(String plain) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec("0123456789abcdef".getBytes(StandardCharsets.UTF_8), "AES"));
+        return EncryptionHelper.ENC + Base64.getEncoder().encodeToString(cipher.doFinal(plain.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void at_start_a_value_of_the_earlier_scheme_is_stored_in_the_current_one_and_nothing_else_is_touched() throws Exception {
+        String stale = new EncryptionHelper("fedcba9876543210").encryptTagged("w");
+        store.save(acme(Map.of("EARLIER", writtenByTheEarlierScheme("sk-acme"), "STALE", stale)));
+        EncryptingNamespaceRepository encrypting = new EncryptingNamespaceRepository(store, ENCRYPTION);
+
+        assertThat(encrypting.rewriteEarlierScheme()).isEqualTo(1);
+
+        Map<String, String> stored = store.findById(ACME).orElseThrow().environment();
+        assertThat(stored.get("EARLIER")).startsWith("enc:v2:");
+        assertThat(stored.get("STALE")).isEqualTo(stale);
+        assertThat(namespaces.findById(ACME)).get().extracting(NamespaceDefinition::environment).isEqualTo(Map.of("EARLIER", "sk-acme"));
+        assertThat(encrypting.rewriteEarlierScheme()).as("a second start finds nothing to do").isZero();
+        assertThat(store.findById(ACME).orElseThrow().environment()).isEqualTo(stored);
+    }
 
     private static NamespaceDefinition acme(Map<String, String> environment) {
         return new NamespaceDefinition(ACME, "ACME", Email.of("david@local"), Instant.parse("2026-09-15T12:00:00Z"),

@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.tool.ToolBundles;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
@@ -23,10 +23,10 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
  */
 public final class ToolBundleFormComponent implements UiComponent {
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final ToolBundles bundles;
 
-    public ToolBundleFormComponent(AgentDefinition agent, ToolBundles bundles) {
+    public ToolBundleFormComponent(ManagedAgent agent, ToolBundles bundles) {
         this.agent = agent;
         this.bundles = bundles;
     }
@@ -54,7 +54,7 @@ public final class ToolBundleFormComponent implements UiComponent {
                 .field(UiField.bool("deferred", "Deferred (via tool search only)", false).asEditable()
                         .hint("Not offered to the LLM up front — the agent finds them with tool_search."))
                 .action(UiAction.primary("save", "Add").icon("add")
-                        .onClick(trigger(on(AgentUiController.class).addToolBundle(agent.id().value(), null, null), id())))
+                        .onClick(trigger(on(AgentToolUiController.class).addToolBundle(agent.id().value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel").dispatch("GET", backHref))
                 .link(UiLink.of("back", backHref, "← Back to Agent"));
     }

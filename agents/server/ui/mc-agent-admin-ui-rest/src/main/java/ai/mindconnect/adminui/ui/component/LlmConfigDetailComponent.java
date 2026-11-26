@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -100,7 +100,7 @@ public final class LlmConfigDetailComponent implements UiComponent {
         var effective = config.effectiveCapabilities();
         if (effective.isEmpty()) return config.declaresCapabilities() ? "none (declared)" : "—";
         String labels = effective.stream()
-                .map(ai.mindconnect.llm.domain.LlmCapability::label)
+                .map(ai.mindconnect.llm.management.api.domain.LlmCapability::label)
                 .collect(java.util.stream.Collectors.joining(", "));
         return config.declaresCapabilities() ? labels : labels + " (" + config.provider() + " default)";
     }

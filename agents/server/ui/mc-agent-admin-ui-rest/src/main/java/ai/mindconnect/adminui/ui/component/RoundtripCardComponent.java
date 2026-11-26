@@ -1,20 +1,19 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
+import ai.mindconnect.agent.trace.domain.LlmCallTrace;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiSection;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 import static ai.mindconnect.chatui.ui.SessionUiCommons.codeBlock;
 
 /**
@@ -38,11 +37,13 @@ public final class RoundtripCardComponent implements UiComponent {
     private static final int TOOL_RESULT_MAX_CHARS = 5_000;
 
     private final LlmCallTrace trace;
-    private final Map<String, Message> resultsByCallId;
+    private final Map<String, ManagedMessage> resultsByCallId;
+    private final ObjectMapper json;
 
-    public RoundtripCardComponent(LlmCallTrace trace, Map<String, Message> resultsByCallId) {
+    public RoundtripCardComponent(LlmCallTrace trace, Map<String, ManagedMessage> resultsByCallId, ObjectMapper json) {
         this.trace = trace;
         this.resultsByCallId = resultsByCallId;
+        this.json = json;
     }
 
     @Override
@@ -96,8 +97,8 @@ public final class RoundtripCardComponent implements UiComponent {
         var sb = new StringBuilder();
         if (ctx != null) {
             if (ctx.agentName() != null) sb.append("**").append(ctx.agentName()).append("** · ");
-            if (ctx.turnId() != null) sb.append("turn `").append(ctx.turnId().value()).append("` · ");
-            if (ctx.parentTurnId() != null) sb.append("parent turn `").append(ctx.parentTurnId().value()).append("` · ");
+            if (ctx.turnId() != null) sb.append("turn `").append(ctx.turnId()).append("` · ");
+            if (ctx.parentTurnId() != null) sb.append("parent turn `").append(ctx.parentTurnId()).append("` · ");
             if (ctx.sessionId() != null) sb.append("session `").append(ctx.sessionId().value()).append("` · ");
         }
         if (trace.llmConfigName() != null) sb.append("config `").append(trace.llmConfigName()).append("` · ");
@@ -106,20 +107,18 @@ public final class RoundtripCardComponent implements UiComponent {
     }
 
     /**
-     * Indexes persisted TOOL_RESULT messages by their {@code toolCallId}
-     * so the response tab can show each tool call together with its own
+     * Indexes a session's tool results by the call they answer
+     * ({@code callId} in their metadata) so the response tab can show each tool call together with its own
      * result block.
      */
-    public static Map<String, Message> indexToolResults(List<Message> history) {
-        Map<String, Message> out = new HashMap<>();
+    public static Map<String, ManagedMessage> indexToolResults(List<ManagedMessage> history) {
+        Map<String, ManagedMessage> out = new HashMap<>();
         if (history == null) return out;
-        for (Message m : history) {
-            if (m.type() != MessageType.TOOL_RESULT) continue;
-            try {
-                JsonNode node = MAPPER.readTree(m.content());
-                String id = node.path("toolCallId").asText("");
-                if (!id.isBlank()) out.put(id, m);
-            } catch (Exception ignored) { /* skip malformed entries */ }
+        for (ManagedMessage m : history) {
+            if (m.message().type() == TurnMessage.Type.TOOL_RESULT
+                    && m.message().metadata().get("callId") instanceof String id && !id.isBlank()) {
+                out.put(id, m);
+            }
         }
         return out;
     }
@@ -156,7 +155,7 @@ public final class RoundtripCardComponent implements UiComponent {
                                 "`" + tc.name() + "` (id `" + tc.id() + "`)"));
                 String argsJson;
                 try {
-                    argsJson = MAPPER.writerWithDefaultPrettyPrinter()
+                    argsJson = json.writerWithDefaultPrettyPrinter()
                             .writeValueAsString(tc.arguments());
                 } catch (Exception e) {
                     argsJson = "{}";
@@ -183,20 +182,14 @@ public final class RoundtripCardComponent implements UiComponent {
      * a marker so the dialog stays scrollable. Collapsed by default —
      * operators scanning a call don't need every result body open at once.
      */
-    private void appendToolResult(UiSection stack, String tcId, Message resultMsg) {
+    private void appendToolResult(UiSection stack, String tcId, ManagedMessage resultMsg) {
         if (resultMsg == null) {
             stack.section(tcId + "-result-missing", null,
                     UiMarkdown.of(tcId + "-result-missing-md",
                             "_(no recorded tool result for this call)_"));
             return;
         }
-        String resultText;
-        try {
-            JsonNode node = MAPPER.readTree(resultMsg.content());
-            resultText = node.path("result").asText("");
-        } catch (Exception e) {
-            resultText = resultMsg.content() != null ? resultMsg.content() : "";
-        }
+        String resultText = resultMsg.message().text();
         boolean trimmed = resultText.length() > TOOL_RESULT_MAX_CHARS;
         int originalLength = resultText.length();
         if (trimmed) {
@@ -204,7 +197,7 @@ public final class RoundtripCardComponent implements UiComponent {
                     + "\n\n[trimmed " + (originalLength - TOOL_RESULT_MAX_CHARS) + " chars]";
         }
 
-        Long durationMs = resultMsg.durationMs();
+        Long durationMs = resultMsg.durationMillis();
         String summary = "Tool result"
                 + (durationMs != null ? " · " + durationMs + "ms" : "")
                 + (trimmed ? " · " + originalLength + " chars total" : "");

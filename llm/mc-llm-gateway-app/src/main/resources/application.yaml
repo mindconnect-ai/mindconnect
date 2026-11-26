@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: mc-llm-gateway-app
+  # A Postgres of its own: podman run -d --name mc-llm-gateway-pg -p 5435:5432
+  #   -e POSTGRES_PASSWORD=gateway -e POSTGRES_DB=llm_gateway postgres:17
+  datasource:
+    url: ${MC_LLM_GATEWAY_DB_URL:jdbc:postgresql://localhost:5435/llm_gateway}
+    username: ${MC_LLM_GATEWAY_DB_USER:postgres}
+    password: ${MC_LLM_GATEWAY_DB_PASSWORD:gateway}
+
+server:
+  port: ${MC_LLM_GATEWAY_PORT:8095}
+
+mindconnect:
+  llm:
+    # postgres, or memory for a run without a database
+    store: postgres
+    # where the OpenAI chat, embedding and transcription configs are seeded
+    seed-namespace: default
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

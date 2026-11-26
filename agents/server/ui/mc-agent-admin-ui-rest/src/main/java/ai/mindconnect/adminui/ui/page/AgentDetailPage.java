@@ -4,8 +4,9 @@ import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.AgentDetailComponent;
 import ai.mindconnect.adminui.ui.component.SessionTableComponent;
 import ai.mindconnect.adminui.ui.component.ToolTableComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 
@@ -21,26 +22,28 @@ import ai.mindconnect.ui.model.UiPatch;
  */
 public final class AgentDetailPage extends AdminPage {
 
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final String userId;
-    private final AgentSessionRepository sessionRepository;
+    private final SessionManagement sessions;
     private final String initialSection;
     private final String selectedRowId;
+    private final JsonMapperFactory json;
     private ai.mindconnect.ui.model.UiNode memoryTab;
 
-    public AgentDetailPage(AgentDefinition agent, String userId,
-                           AgentSessionRepository sessionRepository) {
-        this(agent, userId, sessionRepository, null, null);
+    public AgentDetailPage(ManagedAgent agent, String userId,
+                           SessionManagement sessions, JsonMapperFactory json) {
+        this(agent, userId, sessions, null, null, json);
     }
 
-    public AgentDetailPage(AgentDefinition agent, String userId,
-                           AgentSessionRepository sessionRepository,
-                           String initialSection, String selectedRowId) {
+    public AgentDetailPage(ManagedAgent agent, String userId,
+                           SessionManagement sessions,
+                           String initialSection, String selectedRowId, JsonMapperFactory json) {
         this.agent = agent;
         this.userId = userId;
-        this.sessionRepository = sessionRepository;
+        this.sessions = sessions;
         this.initialSection = initialSection;
         this.selectedRowId = selectedRowId;
+        this.json = json;
     }
 
     /** The "Memory" tab — what this agent keeps about its users; {@code null} leaves it out. */
@@ -51,8 +54,8 @@ public final class AgentDetailPage extends AdminPage {
 
     @Override
     public UiPage render() {
-        var detail = new AgentDetailComponent(agent, userId, sessionRepository,
-                initialSection, selectedRowId).memoryTab(memoryTab);
+        var detail = new AgentDetailComponent(agent, userId, sessions,
+                initialSection, selectedRowId, json).memoryTab(memoryTab);
         return UiPage.of("/admin/agents/" + agent.id().value(), detail.render());
     }
 
@@ -62,7 +65,8 @@ public final class AgentDetailPage extends AdminPage {
      * detail page.
      */
     public UiPatch refreshSessions() {
-        var table = new SessionTableComponent(agent, userId, sessionRepository);
+        var table = new SessionTableComponent(agent.id(), userId,
+                sessions);
         return patch(UiPatch.Operation.replace(table.id(), table.render()));
     }
 
@@ -70,7 +74,7 @@ public final class AgentDetailPage extends AdminPage {
      * REPLACE patch for the Tools table — called after a tool delete.
      */
     public UiPatch refreshTools() {
-        var table = new ToolTableComponent(agent);
+        var table = new ToolTableComponent(agent, json);
         return patch(UiPatch.Operation.replace(table.id(), table.render()));
     }
 }

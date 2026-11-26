@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.service.NamespaceMembers;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.starter.namespace.NamespaceSelection;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
@@ -40,7 +40,7 @@ class NamespaceUiControllerTest {
     private final UserService users = new UserService(userStore);
     private final NamespaceService namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
     private final NamespaceUiController controller = new NamespaceUiController(namespaces, userStore, users,
-            new NamespaceMembers(namespaces, users), ScopeSupplier.fixed(Namespace.DEFAULT));
+            new NamespaceMembers(namespaces, users, new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class)), ScopeSupplier.fixed(Namespace.DEFAULT));
 
     @Test
     void aMemberSwitchesAndTheChoiceIsRememberedOnSessionAndUser() {
@@ -74,7 +74,7 @@ class NamespaceUiControllerTest {
 
         assertThat(created.getStatusCode().value()).isEqualTo(303);
         assertThat(namespaces.find(ACME)).get().satisfies(ns -> {
-            assertThat(ns.createdBy()).isEqualTo(ai.mindconnect.agent.Email.of("alice@local"));
+            assertThat(ns.createdBy()).isEqualTo(ai.mindconnect.namespace.domain.Email.of("alice@local"));
             assertThat(ns.label()).isEqualTo("ACME");
         });
         assertThat(NamespaceSelection.selected(request)).contains(ACME);

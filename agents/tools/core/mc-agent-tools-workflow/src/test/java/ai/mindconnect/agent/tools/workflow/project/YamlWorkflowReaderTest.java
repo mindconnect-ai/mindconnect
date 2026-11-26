@@ -3,6 +3,7 @@ package ai.mindconnect.agent.tools.workflow.project;
 import ai.mindconnect.agent.tools.workflow.step.AgentCallData;
 import ai.mindconnect.agent.tools.workflow.step.SandboxCodeData;
 import ai.mindconnect.agent.tools.workflow.step.ToolCallData;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.AssignVariablesData;
 import ai.mindconnect.workflow.domain.ForEachData;
 import ai.mindconnect.workflow.domain.IfData;
@@ -12,14 +13,17 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class YamlWorkflowReaderTest {
 
+    private static final JsonMapperFactory JSON = new JsonMapperFactory(List.of());
+
     private static WorkflowData parse(String yaml) throws Exception {
-        return YamlWorkflowReader.parse("wf", yaml, null).workflow();
+        return YamlWorkflowReader.parse("wf", yaml, null, JSON).workflow();
     }
 
     @Test
@@ -48,7 +52,7 @@ class YamlWorkflowReaderTest {
                       - set: {note: many, count: 2}
                     else:
                       - set: {note: few}
-                """, null);
+                """, null, JSON);
 
         WorkflowData wf = read.workflow();
         assertThat(read.description()).isEqualTo("Summarises sections");
@@ -160,7 +164,7 @@ class YamlWorkflowReaderTest {
         WorkflowData wf = YamlWorkflowReader.parse("report", """
                 steps:
                   - code: {file: transform.js}
-                """, wfDir).workflow();
+                """, wfDir, JSON).workflow();
         SandboxCodeData code = (SandboxCodeData) wf.getSteps().get(0);
         assertThat(code.getCode()).isEqualTo("var y = 2;");
         assertThat(code.getLanguage()).isEqualTo("node");
@@ -168,13 +172,13 @@ class YamlWorkflowReaderTest {
         assertThatThrownBy(() -> YamlWorkflowReader.parse("report", """
                 steps:
                   - code: {file: ../secret.txt}
-                """, wfDir)).hasMessageContaining("outside the workflow's directory");
+                """, wfDir, JSON)).hasMessageContaining("outside the workflow's directory");
 
         // A symlink beside the workflow counts where it points.
         Files.createSymbolicLink(wfDir.resolve("leak.py"), dir.resolve("secret.txt"));
         assertThatThrownBy(() -> YamlWorkflowReader.parse("report", """
                 steps:
                   - code: {file: leak.py}
-                """, wfDir)).hasMessageContaining("outside the workflow's directory");
+                """, wfDir, JSON)).hasMessageContaining("outside the workflow's directory");
     }
 }

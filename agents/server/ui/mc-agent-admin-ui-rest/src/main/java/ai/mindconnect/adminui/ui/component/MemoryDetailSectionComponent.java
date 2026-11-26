@@ -1,13 +1,16 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+
+import java.util.Map;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiSection;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 
 /**
  * Detail pane of the working-memory inspector — two tabs:
@@ -21,9 +24,9 @@ import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
  * </ul>
  *
  * <p>The {@code seq} parameter selects the entry. {@link
- * MemoryMasterListComponent#SYS_PROMPT_SEQ} picks the system prompt;
- * any other value selects the windowed message with that
- * {@code sequenceNum}.
+ * MemoryMasterListComponent#SYS_PROMPT_SEQ} picks the system prompt,
+ * {@link MemoryMasterListComponent#SUMMARY_SEQ} the summary; any other
+ * value the message at that place in the session, counted from one.
  *
  * <p>DOM ids stay stable across replacements so the JS tab handler
  * keeps working after detail-pane swaps.
@@ -36,10 +39,12 @@ public final class MemoryDetailSectionComponent implements UiComponent {
 
     private final WorkingMemory memory;
     private final int seq;
+    private final ObjectMapper json;
 
-    public MemoryDetailSectionComponent(WorkingMemory memory, int seq) {
+    public MemoryDetailSectionComponent(WorkingMemory memory, int seq, ObjectMapper json) {
         this.memory = memory;
         this.seq = seq;
+        this.json = json;
     }
 
     @Override
@@ -55,43 +60,33 @@ public final class MemoryDetailSectionComponent implements UiComponent {
         String title;
 
         if (seq == MemoryMasterListComponent.SYS_PROMPT_SEQ) {
-            // System prompt: raw view is the record-shape JSON; LLM view
-            // is the literal prompt text the model will see at the top.
-            try {
-                rawJson = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(
-                        new SystemPromptView(memory.systemPrompt(), memory.systemPromptTokens()));
-            } catch (Exception e) {
-                rawJson = "{\"error\":\"" + e.getMessage() + "\"}";
-            }
-            llmText = memory.systemPrompt();
+            // Raw view is the record-shape JSON; LLM view is the literal
+            // text the model will see at the top.
+            rawJson = json(new SystemPromptView(memory.instructions(), memory.instructionTokens()));
+            llmText = memory.instructions();
             llmJsonContent = null;
-            title = "System prompt · " + memory.systemPromptTokens() + " tok";
+            title = "System prompt · " + memory.instructionTokens() + " tok";
+        } else if (seq == MemoryMasterListComponent.SUMMARY_SEQ) {
+            llmText = memory.summary().orElse("(no summary)");
+            rawJson = json(Map.of("summary", llmText));
+            llmJsonContent = null;
+            title = "Summary of what is not sent any more";
+        } else if (seq < 1 || seq > memory.messages().size()) {
+            rawJson = "{\"error\":\"no such message\",\"sequenceNum\":" + seq + "}";
+            llmText = "(no such message)";
+            llmJsonContent = null;
+            title = "#" + seq + " — not found";
         } else {
-            WorkingMemory.WorkingMemoryMessage msg = memory.messages().stream()
-                    .filter(m -> m.sequenceNum() == seq).findFirst().orElse(null);
-            if (msg == null) {
-                rawJson = "{\"error\":\"message not found in window\",\"sequenceNum\":" + seq + "}";
-                llmText = "(not in window)";
-                llmJsonContent = null;
-                title = "#" + seq + " — not found";
-            } else {
-                try {
-                    rawJson = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(msg);
-                } catch (Exception e) {
-                    rawJson = "{\"error\":\"" + e.getMessage() + "\"}";
-                }
-                String content = msg.compressed() ? msg.compressedContent() : msg.content();
-                if (isJsonContentType(msg.type())) {
-                    llmText = null;
-                    llmJsonContent = content;
-                } else {
-                    llmText = content;
-                    llmJsonContent = null;
-                }
-                title = "#" + msg.sequenceNum() + " · " + msg.role() + " · " + msg.type()
-                        + " · " + msg.tokens() + " tok"
-                        + (msg.compressed() ? " · (compressed)" : "");
-            }
+            WorkingMemory.Entry entry = memory.messages().get(seq - 1);
+            TurnMessage message = entry.message();
+            rawJson = json(message);
+            String content = !entry.sent() ? "(not sent to the model)"
+                    : entry.sentAs() != null ? entry.sentAs() : message.text();
+            boolean ofATool = message.type() == TurnMessage.Type.TOOL_CALL;
+            // A tool call has no text of its own: the model reads the calls.
+            llmJsonContent = entry.sent() && ofATool ? json(message.toolCalls()) : null;
+            llmText = llmJsonContent == null ? content : null;
+            title = MemoryMasterListComponent.label(seq, entry);
         }
 
         UiNode rawNode = UiJsonViewer.of(RAW_ID + "-json", rawJson)
@@ -109,13 +104,12 @@ public final class MemoryDetailSectionComponent implements UiComponent {
                 .section(LLM_ID, "LLM View", llmNode);
     }
 
-    /**
-     * Whether a {@link WorkingMemory.WorkingMemoryMessage#type()} value
-     * holds JSON-shaped content (so it deserves a folded viewer rather
-     * than a plain code-fence).
-     */
-    private static boolean isJsonContentType(String type) {
-        return "TOOL_CALL".equals(type) || "TOOL_RESULT".equals(type);
+    private String json(Object value) {
+        try {
+            return json.writerWithDefaultPrettyPrinter().writeValueAsString(value);
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
     }
 
     private static String nullSafe(String s) { return s == null ? "" : s; }

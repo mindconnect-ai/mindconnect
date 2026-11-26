@@ -143,7 +143,9 @@ public class SessionFilesApiController {
 
     /** The session's id, once it is known to be the caller's; a 404 for the request otherwise. */
     private SessionId owned(String sessionId, UserId caller) {
-        return sessionAccess.requireOwned(SessionId.of(sessionId), caller).id();
+        SessionId id = SessionId.of(sessionId);
+        sessionAccess.requireOwned(id, caller);
+        return id;
     }
 
     private static Map<String, Object> toResponse(

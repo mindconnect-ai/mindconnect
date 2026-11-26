@@ -1,14 +1,14 @@
 package ai.mindconnect.agentrest.service;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.TranscriptionRequest;
-import ai.mindconnect.llm.domain.TranscriptionResult;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.in.LlmTranscription;
-import ai.mindconnect.llm.service.RoutingLlmChatService;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
+import ai.mindconnect.llm.gateway.service.RoutingLlmChatService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +33,11 @@ public class LlmConfigTestService {
     private static final Logger log = LoggerFactory.getLogger(LlmConfigTestService.class);
 
     private final RoutingLlmChatService chatService;
-    private final ObjectProvider<LlmEmbeddings> embeddingsProvider;
+    private final ObjectProvider<LlmEmbedding> embeddingsProvider;
     private final ObjectProvider<LlmTranscription> transcriptionProvider;
 
     public LlmConfigTestService(RoutingLlmChatService chatService,
-                                ObjectProvider<LlmEmbeddings> embeddingsProvider,
+                                ObjectProvider<LlmEmbedding> embeddingsProvider,
                                 ObjectProvider<LlmTranscription> transcriptionProvider) {
         this.chatService = chatService;
         this.embeddingsProvider = embeddingsProvider;
@@ -99,12 +99,12 @@ public class LlmConfigTestService {
      */
     private Result testEmbedding(LlmConfig config, String message) {
         long t0 = System.currentTimeMillis();
-        LlmEmbeddings embeddings = embeddingsProvider.getIfAvailable();
+        LlmEmbedding embeddings = embeddingsProvider.getIfAvailable();
         if (embeddings == null) {
             return Result.error("No embeddings gateway configured in this application", 0);
         }
         try {
-            float[] vector = embeddings.embed(config, List.of(message)).get(0);
+            float[] vector = embeddings.embed(config.name(), List.of(message)).get(0);
             long durMs = System.currentTimeMillis() - t0;
             StringBuilder preview = new StringBuilder();
             for (int i = 0; i < Math.min(8, vector.length); i++) {

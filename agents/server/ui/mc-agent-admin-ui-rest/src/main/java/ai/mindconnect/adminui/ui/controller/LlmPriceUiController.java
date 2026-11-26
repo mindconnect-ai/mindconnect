@@ -1,16 +1,18 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.llm.adapter.env.LlmConfigResolver;
+
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent.Draft;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.domain.LlmPriceId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmPriceRepository;
-import ai.mindconnect.llm.service.LlmPriceService;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.domain.LlmPriceId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
+import ai.mindconnect.llm.gateway.service.LlmPriceService;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPatch;
@@ -82,7 +84,7 @@ public class LlmPriceUiController {
     static String currentModel(LlmConfig config, EnvVarResolver environment) {
         if (config.isAlias() || config.model() == null) return null;
         try {
-            String model = config.resolvedModel(environment);
+            String model = LlmConfigResolver.resolvedModel(config, environment);
             return model == null || model.isBlank() ? null : model.strip();
         } catch (RuntimeException e) {
             return null;

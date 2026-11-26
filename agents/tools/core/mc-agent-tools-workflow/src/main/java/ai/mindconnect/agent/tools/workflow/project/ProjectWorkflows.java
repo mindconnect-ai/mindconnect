@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.tools.workflow.project;
 
-import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,23 +40,24 @@ final class ProjectWorkflows {
         }
     }
 
-    static List<ProjectWorkflow> list(String workingDir) {
+    static List<ProjectWorkflow> list(String workingDir, JsonMapperFactory json) {
         List<ProjectWorkflow> out = new ArrayList<>();
         for (ProjectWorkflowFiles.WorkflowFile file : ProjectWorkflowFiles.list(workingDir)) {
-            out.add(read(workingDir, file));
+            out.add(read(workingDir, file, json));
         }
         return out;
     }
 
-    static Optional<ProjectWorkflow> find(String workingDir, String name) {
+    static Optional<ProjectWorkflow> find(String workingDir, String name, JsonMapperFactory json) {
         if (name == null || name.isBlank()) return Optional.empty();
         return ProjectWorkflowFiles.list(workingDir).stream()
                 .filter(f -> f.name().equalsIgnoreCase(name.strip()))
                 .findFirst()
-                .map(file -> read(workingDir, file));
+                .map(file -> read(workingDir, file, json));
     }
 
-    private static ProjectWorkflow read(String workingDir, ProjectWorkflowFiles.WorkflowFile file) {
+    private static ProjectWorkflow read(String workingDir, ProjectWorkflowFiles.WorkflowFile file,
+                                        JsonMapperFactory json) {
         try {
             // A symlink in the project must not make a file outside it a "workflow":
             // its content would come back in the error the model is shown.
@@ -66,7 +67,7 @@ final class ProjectWorkflows {
             if (Files.size(file.file()) > MAX_BYTES) {
                 return new ProjectWorkflow(file.name(), null, null, "the file is too large to be a workflow");
             }
-            YamlWorkflowReader.Read read = YamlWorkflowReader.read(file.name(), file.file());
+            YamlWorkflowReader.Read read = YamlWorkflowReader.read(file.name(), file.file(), json);
             return new ProjectWorkflow(file.name(), read.workflow(), read.description(), null);
         } catch (Exception e) {
             log.debug("Project workflow {} does not read: {}", file.file(), e.toString());

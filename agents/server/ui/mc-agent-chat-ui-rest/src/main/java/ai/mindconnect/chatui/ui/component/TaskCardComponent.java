@@ -1,6 +1,5 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.chatui.ui.SessionUiCommons;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiLink;
@@ -9,6 +8,7 @@ import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiText;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -156,19 +156,20 @@ public final class TaskCardComponent implements UiComponent {
     // ── Factory helpers for tool-call cards ────────────────────────────────
 
     /** Card representing a tool call that has just started. */
-    public static TaskCardComponent runningTool(String nodeId, String toolName, Object arguments) {
+    public static TaskCardComponent runningTool(String nodeId, String toolName, Object arguments, ObjectMapper json) {
         return new TaskCardComponent(nodeId,
                 runningToolHeader(toolName),
-                taskCardBody(prettyJson(arguments), null),
+                taskCardBody(prettyJson(arguments, json), null),
                 true);
     }
 
     /** Card representing a tool call that finished successfully. */
     public static TaskCardComponent doneTool(String nodeId, String toolName,
-                                             Object arguments, String result, long durationMs) {
+                                             Object arguments, String result, long durationMs,
+                                             String fullResultUrl, ObjectMapper json) {
         return new TaskCardComponent(nodeId,
                 doneToolHeader(toolName, durationMs),
-                taskCardBody(prettyJson(arguments), result),
+                taskCardBody(prettyJson(arguments, json), result, fullResultUrl),
                 false);
     }
 
@@ -196,10 +197,11 @@ public final class TaskCardComponent implements UiComponent {
 
     /** Card representing a tool call that failed. */
     public static TaskCardComponent failedTool(String nodeId, String toolName,
-                                               Object arguments, String error, long durationMs) {
+                                               Object arguments, String error, long durationMs,
+                                               String fullResultUrl, ObjectMapper json) {
         return new TaskCardComponent(nodeId,
                 failedToolHeader(toolName, durationMs),
-                taskCardBody(prettyJson(arguments), error),
+                taskCardBody(prettyJson(arguments, json), error, fullResultUrl),
                 false);
     }
 
@@ -450,22 +452,49 @@ public final class TaskCardComponent implements UiComponent {
      * are null.
      */
     public static String taskCardBody(String inputJsonOrText, String output) {
+        return taskCardBody(inputJsonOrText, output, null);
+    }
+
+    /**
+     * How much of a tool's output a card draws. A session keeps what a tool
+     * returned however long it is; a page that drew all of it would carry
+     * megabytes for a card nobody opens.
+     */
+    static final int SHOWN_OUTPUT_CHARS = 10_000;
+
+    /**
+     * The same, for an output that may be long: the card draws its beginning
+     * and says how much more there is.
+     *
+     * @param fullOutputUrl where the whole output is downloaded; {@code null}
+     *                      when there is nowhere, and the card only says that
+     *                      it was shortened
+     */
+    public static String taskCardBody(String inputJsonOrText, String output, String fullOutputUrl) {
         StringBuilder md = new StringBuilder();
         if (inputJsonOrText != null && !inputJsonOrText.isBlank()) {
             md.append("**Input**\n\n").append(MarkdownText.fenced(inputJsonOrText)).append("\n\n");
         }
-        if (output != null && !output.isBlank()) {
+        if (output != null && output.length() > SHOWN_OUTPUT_CHARS) {
+            md.append("**Output**\n\n").append(MarkdownText.fenced(output.substring(0, SHOWN_OUTPUT_CHARS)))
+                    .append("\n\n… ").append(String.format(java.util.Locale.ROOT, "%,d",
+                            output.length() - SHOWN_OUTPUT_CHARS)).append(" more characters.");
+            if (fullOutputUrl != null) {
+                md.append(" [Download the full result](").append(fullOutputUrl).append(")");
+            }
+            md.append("\n");
+        } else if (output != null && !output.isBlank()) {
             md.append("**Output**\n\n").append(MarkdownText.fenced(output)).append("\n");
         }
         if (md.length() == 0) md.append("_(no input/output)_");
         return md.toString();
     }
 
-    /** Pretty-prints arguments map as JSON; falls back to toString on errors. */
-    public static String prettyJson(Object value) {
+    /** Pretty-prints arguments map as JSON with {@code json}; falls back to toString on errors. */
+    public static String prettyJson(Object value, ObjectMapper json) {
         if (value == null) return "";
         try {
-            return SessionUiCommons.MAPPER.writerWithDefaultPrettyPrinter()
+            return json.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(value);
         } catch (Exception e) {
             return String.valueOf(value);

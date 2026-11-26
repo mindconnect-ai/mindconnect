@@ -1,7 +1,7 @@
 package ai.mindconnect.vectorstore.pgvector;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -76,7 +77,7 @@ class PgEmbeddingIndexTest {
         dataSource.setUser(USER);
         dataSource.setPassword(PASSWORD);
         namespace = new Namespace("it-" + UUID.randomUUID().toString().substring(0, 8));
-        index = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace));
+        index = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace), new JsonMapperFactory(List.of()));
     }
 
     @AfterEach
@@ -257,7 +258,7 @@ class PgEmbeddingIndexTest {
     void anotherNamespaceSeesNothing() {
         index.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", 1f, 0f, 0f)));
 
-        EmbeddingIndex other = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(new Namespace(namespace.value() + "-other")));
+        EmbeddingIndex other = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(new Namespace(namespace.value() + "-other")), new JsonMapperFactory(List.of()));
 
         assertThat(other.search(EmbeddingQuery.of(MODEL, Set.of(FILE_A)), vec(1f, 0f, 0f), 10)).isEmpty();
         assertThat(other.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).anyOwner(), vec(1f, 0f, 0f), 10)).isEmpty();
@@ -416,7 +417,7 @@ class PgEmbeddingIndexTest {
     @Test
     void anIndexInAnotherTableIsAnIndexOfItsOwn() throws Exception {
         String table = "mc_embedding_it_" + UUID.randomUUID().toString().substring(0, 8).replace("-", "");
-        EmbeddingIndex chats = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace), table);
+        EmbeddingIndex chats = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace), table, new JsonMapperFactory(List.of()));
         try {
             chats.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", 1f, 0f, 0f)));
             MetadataField only = new MetadataField(EntityType.MAIL, "only_" + table, MetadataField.Kind.NUMBER);
@@ -426,7 +427,7 @@ class PgEmbeddingIndexTest {
             assertThat(index.chunkCount(FILE_A, MODEL)).as("the default table has nothing of it").isZero();
             assertThat(chats.fields()).contains(only);
             assertThat(index.fields()).as("fields are declared per table").doesNotContain(only);
-            assertThatThrownBy(() -> new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace), "Robert'); DROP TABLE x;--"))
+            assertThatThrownBy(() -> new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace), "Robert'); DROP TABLE x;--", new JsonMapperFactory(List.of())))
                     .isInstanceOf(IllegalArgumentException.class);
         } finally {
             try (var c = dataSource.getConnection(); var st = c.createStatement()) {

@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.starter.registry;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.adapter.github.GitHubRegistryClient;
 import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
@@ -14,10 +14,11 @@ import ai.mindconnect.agent.registry.port.out.RegistryClient;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.agent.registry.service.RegistryService;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.StartupScope;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
@@ -68,7 +69,8 @@ import java.util.function.Consumer;
  */
 @AutoConfiguration(afterName = {
         "ai.mindconnect.agent.starter.file.FilePersistenceAutoConfiguration",
-        "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig"})
+        "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig",
+        "ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration"})
 @ConditionalOnProperty(prefix = "mindconnect.registry", name = "enabled",
         havingValue = "true", matchIfMissing = true)
 public class RegistryAutoConfiguration {
@@ -83,13 +85,14 @@ public class RegistryAutoConfiguration {
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
             @Value("${mindconnect.registry.default-source:}") String defaultSource,
             ObjectProvider<ScopeSupplier> scope,
-            @Value("${mindconnect.namespace:local}") String defaultNamespace) {
+            @Value("${mindconnect.namespace:local}") String defaultNamespace,
+            JsonMapperFactory json) {
         // Fixed to the namespace start-up works in, until registry sources work per namespace like the stores.
         ScopeSupplier current = scope.getIfAvailable(() -> ScopeSupplier.fixed(new Namespace(defaultNamespace)));
         Namespace startup = StartupScope.call(current, new Namespace(defaultNamespace), current::namespace);
         FileRegistrySourceRepository repository = new FileRegistrySourceRepository(
-                Path.of(dataBaseDir), ScopeSupplier.fixed(startup));
-        InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
+                Path.of(dataBaseDir), ScopeSupplier.fixed(startup), json);
+        InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION, json);
         seed(repository, defaultSource);
         return repository;
     }
@@ -113,13 +116,14 @@ public class RegistryAutoConfiguration {
                 @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
                 @Value("${mindconnect.registry.default-source:}") String defaultSource,
                 ObjectProvider<ScopeSupplier> scope,
-                @Value("${mindconnect.namespace:local}") String defaultNamespace) {
+                @Value("${mindconnect.namespace:local}") String defaultNamespace,
+                JsonMapperFactory json) {
             Path storage = Path.of(dataBaseDir);
             ScopeSupplier current = scope.getIfAvailable(() -> ScopeSupplier.fixed(new Namespace(defaultNamespace)));
             Consumer<Namespace> prepare = ns -> {
                 var repository = new PgRegistrySourceRepository(mindconnectSql, ScopeSupplier.fixed(ns));
                 repository.importFiles(FileRegistrySourceRepository.directory(storage, ns));
-                InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
+                InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION, json);
                 seed(repository, defaultSource);
             };
             PgRegistrySourceRepository repository = new PgRegistrySourceRepository(mindconnectSql, current).initSchema();
@@ -164,22 +168,23 @@ public class RegistryAutoConfiguration {
     @ConditionalOnMissingBean
     public RegistryClient registryClient(
             @Value("${mindconnect.registry.cache-ttl:PT10M}") Duration cacheTtl,
-            @Value("${mindconnect.registry.timeout:PT20S}") Duration timeout) {
-        return new GitHubRegistryClient(cacheTtl, timeout);
+            @Value("${mindconnect.registry.timeout:PT20S}") Duration timeout,
+            JsonMapperFactory json) {
+        return new GitHubRegistryClient(cacheTtl, timeout, json);
     }
 
     @Bean
     @ConditionalOnBean(LlmConfigRepository.class)
     @ConditionalOnMissingBean
-    public LlmConfigInstaller llmConfigRegistryInstaller(LlmConfigRepository repository) {
-        return new LlmConfigInstaller(repository);
+    public LlmConfigInstaller llmConfigRegistryInstaller(LlmConfigRepository repository, JsonMapperFactory json) {
+        return new LlmConfigInstaller(repository, json);
     }
 
     @Bean
-    @ConditionalOnBean(AgentDefinitionRepository.class)
+    @ConditionalOnBean(AgentManagement.class)
     @ConditionalOnMissingBean
-    public AgentDefinitionInstaller agentDefinitionRegistryInstaller(AgentDefinitionRepository repository) {
-        return new AgentDefinitionInstaller(repository);
+    public AgentDefinitionInstaller agentDefinitionRegistryInstaller(AgentManagement agents, JsonMapperFactory json) {
+        return new AgentDefinitionInstaller(agents, json);
     }
 
     /**

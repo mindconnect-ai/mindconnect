@@ -1,17 +1,15 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
-import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.agent.loop.domain.ContentPart;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,26 +19,24 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MessageListCancelledTurnTest {
 
-    private static final ConversationId CONVERSATION = new ConversationId(java.util.UUID.randomUUID().toString());
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final AgentDefinition AGENT = new AgentDefinition(AgentId.random(), "coder", null, null, null, null, null,
-            "cfg", 5, null, null, List.of(), List.of(), List.of(), null, null, null);
+    private static final ai.mindconnect.agent.management.api.ManagedAgent AGENT =
+            ai.mindconnect.chatui.ChatFixture.agent("coder", "", "", "cfg");
 
     @Test
     void theToolCardOfACancelledTurnIsDrawnAboveTheNextQuestionAsFailed() throws Exception {
-        Message question = chat(ParticipantType.USER, "Run sleep 25", 1);
-        Message call = Message.of(CONVERSATION, "agent", ParticipantType.AGENT, MessageType.TOOL_CALL,
-                "{\"toolCalls\":[{\"name\":\"bash\",\"arguments\":{\"command\":\"sleep 25\"},\"id\":\"call_1\"}]}", 2);
-        Message stub = Message.of(CONVERSATION, "agent", ParticipantType.AGENT, MessageType.TOOL_RESULT,
-                        "{\"toolCallId\":\"call_1\",\"result\":\"Cancelled by user before the tool finished\",\"toolName\":\"bash\"}", 3)
-                .withMetadata(Map.of("callId", "call_1", "failed", true, "toolName", "bash"));
-        Message followUp = chat(ParticipantType.USER, "What happened?", 4);
-        Message answer = chat(ParticipantType.AGENT, "The command was cancelled.", 5);
+        ManagedMessage question = stored(1, TurnMessage.user(List.of(new ContentPart.Text("Run sleep 25"))));
+        ManagedMessage call = stored(2, TurnMessage.toolCalls(List.of(
+                new TurnMessage.ToolCall("call_1", "bash", Map.of("command", "sleep 25")))));
+        ManagedMessage stub = stored(3, TurnMessage.toolResult("call_1", "bash",
+                "Cancelled by user before the tool finished", true));
+        ManagedMessage followUp = stored(4, TurnMessage.user(List.of(new ContentPart.Text("What happened?"))));
+        ManagedMessage answer = stored(5, TurnMessage.assistant("The command was cancelled."));
 
         String page = JSON.writeValueAsString(new MessageListComponent(
-                new SessionId("s-1"), AGENT, List.of(question, call, stub, followUp, answer), null).render());
+                new SessionId("s-1"), AGENT, List.of(question, call, stub, followUp, answer), null, new JsonMapperFactory(List.of()).create()).render());
 
-        String cardId = "task-hist-" + stub.id().value();
+        String cardId = "task-hist-" + stub.id();
         assertThat(page).contains(cardId);
         assertThat(page.indexOf(cardId)).isBetween(page.indexOf("Run sleep 25"), page.indexOf("What happened?"));
         assertThat(page).contains(TaskCardComponent.failedToolHeader("bash", 0));
@@ -48,8 +44,8 @@ class MessageListCancelledTurnTest {
         assertThat(page.split(java.util.regex.Pattern.quote("\"" + cardId + "\""), -1)).hasSize(2);
     }
 
-    private static Message chat(ParticipantType sender, String text, int seq) {
-        return Message.of(CONVERSATION, sender == ParticipantType.USER ? "user" : "agent", sender,
-                MessageType.CHAT, text, seq);
+    private static ManagedMessage stored(int sequence, TurnMessage message) {
+        return new ManagedMessage(java.util.UUID.randomUUID().toString(), sequence, java.time.Instant.now(),
+                message, null, null);
     }
 }

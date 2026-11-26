@@ -1,0 +1,60 @@
+package ai.mindconnect.agent.skill.adapter;
+
+import ai.mindconnect.agent.scope.NamespaceMap;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillId;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.common.Versions;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Skills in memory — for tests and for an embedding that wants the feature
+ * without a store on disk. Same version check as the file and Postgres
+ * stores, so a test that relies on it behaves the same here.
+ */
+public class InMemorySkillRepository implements SkillRepository {
+
+    private final ScopeSupplier scope;
+    private final NamespaceMap<Map<SkillId, Skill>> skills;
+
+    public InMemorySkillRepository(ScopeSupplier scope) {
+        this.scope = scope;
+        this.skills = new NamespaceMap<>(ConcurrentHashMap::new);
+    }
+
+    @Override
+    public List<Skill> findAll() {
+        return skills.of(scope.namespace()).values().stream().sorted(Comparator.comparing(Skill::name)).toList();
+    }
+
+    @Override
+    public Optional<Skill> findById(SkillId id) {
+        return Optional.ofNullable(skills.of(scope.namespace()).get(id));
+    }
+
+    @Override
+    public Optional<Skill> findByName(String name) {
+        if (name == null) return Optional.empty();
+        return findAll().stream()
+                .filter(skill -> skill.name().equalsIgnoreCase(name.strip()))
+                .findFirst();
+    }
+
+    @Override
+    public Skill save(Skill skill) {
+        Skill valid = skill.validated();
+        return skills.of(scope.namespace()).compute(valid.id(), (id, current) -> valid.withVersion(Versions.next(
+                current == null ? null : current.version(), valid.version(), "Skill", id.value())));
+    }
+
+    @Override
+    public void deleteById(SkillId id) {
+        skills.of(scope.namespace()).remove(id);
+    }
+}

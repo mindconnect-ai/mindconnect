@@ -1,30 +1,27 @@
 package ai.mindconnect.demo.agent.simple;
 
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.builder.AgentRuntime;
-import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
-import ai.mindconnect.agent.runtime.feature.subagents.SubAgentsFeature;
-import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
-import ai.mindconnect.agent.tool.AgentTool;
-
 import java.util.List;
+import java.util.Map;
+
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.loop.domain.TurnStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionStreamEvent;
+import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 
 /**
- * One agent delegating to another, embedded: an orchestrator with the inline
- * {@code run_agent} tool hands research off to a {@code web-researcher}
- * sub-agent equipped with the web tools ({@code web_read}; plus
- * {@code web_search} when a Tavily API key is found — via {@link McEnv} from
- * the repository's {@code mc.env} or the process environment). Both agents
- * are defined in code — no JSON, no Spring.
+ * One agent delegating to another, embedded: an orchestrator that names a
+ * {@code web-researcher} as its sub-agent — which is what gives it the
+ * {@code run_agent} tool — hands research off to it; the researcher has the
+ * web tools ({@code web_read}; plus {@code web_search} when a Tavily API key
+ * is found — via {@link McEnv} from the repository's {@code mc.env} or the
+ * process environment). Both agents are defined in code — no JSON, no Spring.
  *
- * <p>This runtime is the core plus two features: {@link ToolsFeature} brings
- * the tool registry over the {@code mc-agent-tools-web} module on the
- * classpath, and {@link SubAgentsFeature} is what lets an agent's roster turn
- * into the {@code run_agent} tool at all.
+ * <p>The web tools come from the {@code mc-agent-tools-web} module on the
+ * classpath, through the runtime's tool registry.
  */
 public class AgentDelegationMain {
 
@@ -36,56 +33,49 @@ public class AgentDelegationMain {
                 : "Tavily key found - researcher gets web_search + web_read.");
 
         // Sub-agent: fetches and reads web pages.
-        AgentDefinition researcher = AgentDefinition.create("web-researcher",
+        AgentDefinition researcher = new AgentDefinition("web-researcher",
                 "Reads web pages and reports what they say.",
                 "You are a web researcher. For open questions, use web_search first, "
                         + "then web_read on the most promising result. Be brief and cite "
                         + "the URLs you used.",
-                null, "demo-llm");
-        List<AgentTool> researcherTools = tavilyKey.isBlank()
-                ? List.of(AgentTool.of("web_read"))
-                : List.of(AgentTool.of("web_read"), AgentTool.of("web_search"));
+                ModelSettings.ofModel("demo-llm"),
+                tavilyKey.isBlank() ? ToolBinding.allOf("web_read") : ToolBinding.allOf("web_read", "web_search"),
+                10, Map.of());
 
-        // Orchestrator: no web access of its own — it must delegate. Its
-        // roster is what gives it run_agent: naming the researcher is the whole grant.
-        AgentDefinition orchestrator = AgentDefinition.create("orchestrator",
+        // Orchestrator: no web access of its own — it must delegate. Naming
+        // the researcher as its sub-agent is the whole grant.
+        AgentDefinition orchestrator = new AgentDefinition("orchestrator",
                 "Coordinates work by delegating to specialist agents.",
                 "You coordinate specialist agents. You have NO web access yourself — "
                         + "for anything on the web, call the run_agent tool with "
                         + "name \"web-researcher\" and a precise, self-contained task. "
                         + "Then summarize the researcher's findings for the user.",
-                null, "demo-llm");
+                ModelSettings.ofModel("demo-llm"), List.of(), 10,
+                Map.of(SubAgentPlugin.SUB_AGENTS, List.of("web-researcher")));
 
-        AgentRuntimeBuilder builder = AgentRuntimeBuilder.of(Persistence.inMemory())
-                .install(new ToolsFeature())                 // the web tools come from the classpath
-                .install(new SubAgentsFeature())              // … and this is what makes the roster callable
-                .property("tavilyApiKey", tavilyKey)         // a plain setting the web_search tool reads
-                .llmConfigFromClasspath("demo-llm-config.json");
-        builder.feature(CoreFeature.class)                   // the same feature the shortcut above configured
-                .defaultLlmConfigName("demo-llm")
-                .agentDefinition(researcher.withTools(researcherTools))
-                .agentDefinition(orchestrator.withCallableAgents(List.of("web-researcher")));
+        // tavilyApiKey: a plain setting the web_search tool reads.
+        try (AgentRuntime runtime = DemoRuntime.build(Map.of("tavilyApiKey", tavilyKey))) {
+            DemoRuntime.llmConfigFromClasspath(runtime, "demo-llm-config.json");
+            DemoRuntime.agent(runtime, researcher);
+            DemoRuntime.agent(runtime, orchestrator);
 
-        try (AgentRuntime runtime = builder.build()) {
             String question = args.length > 0 ? String.join(" ", args)
                     : "What is the latest stable OpenJDK release and when was it published? "
                             + "Search the web for current information.";
             System.out.println("Q: " + question);
-            String answer = runtime.ask("orchestrator", UserId.of("demo-user"), question,
+
+            String answer = DemoRuntime.ask(runtime, "orchestrator", "demo-user", question,
                     AgentDelegationMain::printEvent);
             System.out.println("A: " + answer);
         }
     }
 
     /** Makes the delegation visible: which agent runs, which tools it calls. */
-    private static void printEvent(StreamEvent event) {
-        if (event instanceof StreamEvent.SubAgentEvent sub) {
-            if (sub.inner() instanceof StreamEvent.Token) {
-                return;   // sub-agent text streams token by token — too noisy here
-            }
-            System.out.println("  [web-researcher] " + sub.inner().getClass().getSimpleName());
-        } else if (!(event instanceof StreamEvent.Token)) {
-            System.out.println("  [orchestrator] " + event.getClass().getSimpleName());
+    private static void printEvent(SessionEvent event) {
+        switch (event.known()) {
+            case SessionStreamEvent.SubAgentStarted started -> System.out.println("  [" + started.agentName() + "] turn started");
+            case TurnStreamEvent.ToolCallStarted call -> System.out.println("  tool call: " + call.toolName());
+            default -> { }
         }
     }
 }

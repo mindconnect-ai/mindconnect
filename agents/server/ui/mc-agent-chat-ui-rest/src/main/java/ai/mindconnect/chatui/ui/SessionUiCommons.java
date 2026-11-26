@@ -1,7 +1,5 @@
 package ai.mindconnect.chatui.ui;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
@@ -13,17 +11,11 @@ import java.time.format.DateTimeFormatter;
  * a dedicated assembler or in a domain helper.
  *
  * <p>Made public (with public members) so the components package can
- * share the same Jackson instance and time formatter without each
- * component carrying its own copy.
+ * share the same time formatter without each component carrying its own
+ * copy. The JSON mapper is not shared here: it is built from the runtime's
+ * mapper factory and handed to each component by the controller that builds it.
  */
 public final class SessionUiCommons {
-
-    /**
-     * Single Jackson instance shared across the assemblers. None of them
-     * mutate it, and Jackson's {@link ObjectMapper} is documented as
-     * thread-safe for read/write of normal records.
-     */
-    public static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** Time formatter used in conversation, memory and trace headers. */
     public static final DateTimeFormatter DT_FMT =

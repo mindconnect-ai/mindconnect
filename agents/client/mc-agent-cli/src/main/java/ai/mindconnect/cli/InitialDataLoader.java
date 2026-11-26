@@ -1,9 +1,10 @@
 package ai.mindconnect.cli;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.format.AgentJson;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -41,16 +42,16 @@ public class InitialDataLoader {
     }
 
     private final LlmConfigRepository llmConfigRepository;
-    private final AgentDefinitionRepository agentDefinitionRepository;
-    private final ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository;
+    private final AgentManagement agents;
+    private final ai.mindconnect.agent.skill.port.out.SkillRepository skillRepository;
     private final ObjectMapper objectMapper;
 
     public InitialDataLoader(LlmConfigRepository llmConfigRepository,
-                             AgentDefinitionRepository agentDefinitionRepository,
-                             ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository,
+                             AgentManagement agents,
+                             ai.mindconnect.agent.skill.port.out.SkillRepository skillRepository,
                              ObjectMapper objectMapper) {
         this.llmConfigRepository = llmConfigRepository;
-        this.agentDefinitionRepository = agentDefinitionRepository;
+        this.agents = agents;
         this.skillRepository = skillRepository;
         this.objectMapper = objectMapper;
     }
@@ -91,8 +92,8 @@ public class InitialDataLoader {
             try {
                 String content = new String(resource.getInputStream().readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
-                var incoming = ai.mindconnect.agent.runtime.skill.Skill.fromMarkdown(fallback, content,
-                        ai.mindconnect.agent.runtime.skill.SkillSource.MANAGED, null);
+                var incoming = ai.mindconnect.agent.skill.domain.Skill.fromMarkdown(fallback, content,
+                        ai.mindconnect.agent.skill.domain.SkillSource.MANAGED, null);
                 if (incoming == null) {
                     log.warn("Initial skill {} has no instructions, or a name that is not lower-case "
                             + "letters, digits and dashes — skipping", fileName);
@@ -137,27 +138,44 @@ public class InitialDataLoader {
     // ── Agent definitions ─────────────────────────────────────────────────────
 
     private void loadAgentDefinitions(ConfirmOverwrite confirm) {
+        AgentJson files = new AgentJson(objectMapper);
         for (Resource resource : scan("classpath*:initial-data/agent-definitions/*.json")) {
             try {
-                AgentDefinition incoming = readSeed(resource, AgentDefinition.class);
-                agentDefinitionRepository.findByName(incoming.name()).ifPresentOrElse(existing -> {
-                    String diff = diffJson(existing, incoming);
+                ManagedAgent incoming = files.read(new String(resource.getInputStream().readAllBytes(),
+                        java.nio.charset.StandardCharsets.UTF_8));
+                String name = incoming.definition().name();
+                agents.findByName(name).ifPresentOrElse(existing -> {
+                    String diff = diffJson(comparable(existing), comparable(incoming));
                     if (diff == null) {
-                        log.debug("Agent '{}' is up to date — skipping", incoming.name());
-                    } else if (confirm.confirm("agent", incoming.name(), diff)) {
-                        agentDefinitionRepository.save(incoming);
-                        log.info("Updated agent '{}'", incoming.name());
+                        log.debug("Agent '{}' is up to date — skipping", name);
+                    } else if (confirm.confirm("agent", name, diff)) {
+                        // It stays the agent it is: its id, and so what refers to it, is kept.
+                        agents.update(existing.id(), existing.version(), stored -> incoming);
+                        log.info("Updated agent '{}'", name);
                     } else {
-                        log.debug("Agent '{}' update skipped by user", incoming.name());
+                        log.debug("Agent '{}' update skipped by user", name);
                     }
                 }, () -> {
-                    agentDefinitionRepository.save(incoming);
-                    log.info("Imported agent '{}'", incoming.name());
+                    agents.create(incoming);
+                    log.info("Imported agent '{}'", name);
                 });
             } catch (Exception e) {
                 log.warn("Failed to load agent definition from {}: {}", resource.getFilename(), e.getMessage());
             }
         }
+    }
+
+    /**
+     * An agent as two versions of it are compared: without what tells two
+     * installations apart — the id, also where the definition repeats it.
+     */
+    private com.fasterxml.jackson.databind.node.ObjectNode comparable(ManagedAgent agent) {
+        com.fasterxml.jackson.databind.node.ObjectNode node = objectMapper.valueToTree(agent);
+        node.remove("id");
+        if (node.path("definition").path("metadata") instanceof com.fasterxml.jackson.databind.node.ObjectNode metadata) {
+            metadata.remove(ManagedAgent.AGENT_ID);
+        }
+        return node;
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

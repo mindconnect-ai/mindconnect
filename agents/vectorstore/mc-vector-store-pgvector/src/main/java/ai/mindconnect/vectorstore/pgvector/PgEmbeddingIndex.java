@@ -1,9 +1,10 @@
 package ai.mindconnect.vectorstore.pgvector;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChecks;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
@@ -72,7 +73,6 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
 
     private static final java.util.regex.Pattern TABLE_NAME = java.util.regex.Pattern.compile("[a-z_][a-z0-9_]{0,47}");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, String>> META = new TypeReference<>() {};
 
     /** Serialises concurrent first uses across JVMs; any constant key will do. */
@@ -85,6 +85,8 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
 
     private final Sql sql;
     private final ScopeSupplier scope;
+    /** Writes a chunk's metadata as the runtime's mapper factory makes mappers. */
+    private final ObjectMapper json;
     /** This index's table, and beside it {@code <table>_field} for the declared fields. */
     private final String table;
     private final String fieldsTable;
@@ -93,12 +95,12 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
 
     private volatile boolean schemaReady;
 
-    public PgEmbeddingIndex(DataSource dataSource, ScopeSupplier scope) {
-        this(Sql.of(dataSource), scope, DEFAULT_TABLE);
+    public PgEmbeddingIndex(DataSource dataSource, ScopeSupplier scope, JsonMapperFactory json) {
+        this(Sql.of(dataSource), scope, DEFAULT_TABLE, json);
     }
 
-    public PgEmbeddingIndex(Sql sql, ScopeSupplier scope) {
-        this(sql, scope, DEFAULT_TABLE);
+    public PgEmbeddingIndex(Sql sql, ScopeSupplier scope, JsonMapperFactory json) {
+        this(sql, scope, DEFAULT_TABLE, json);
     }
 
     /**
@@ -107,9 +109,10 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
      *
      * @throws IllegalArgumentException for a table name that is not lower case letters, digits and '_'
      */
-    public PgEmbeddingIndex(Sql sql, ScopeSupplier scope, String table) {
+    public PgEmbeddingIndex(Sql sql, ScopeSupplier scope, String table, JsonMapperFactory json) {
         this.sql = Objects.requireNonNull(sql, "sql");
         this.scope = Objects.requireNonNull(scope, "scope");
+        this.json = json.create();
         if (table == null || !TABLE_NAME.matcher(table).matches()) {
             throw new IllegalArgumentException("A table name is lower case letters, digits and '_', at most 48: '"
                     + table + "'");
@@ -118,8 +121,8 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
         this.fieldsTable = table + "_field";
     }
 
-    public PgEmbeddingIndex(DataSource dataSource, ScopeSupplier scope, String table) {
-        this(Sql.of(dataSource), scope, table);
+    public PgEmbeddingIndex(DataSource dataSource, ScopeSupplier scope, String table, JsonMapperFactory json) {
+        this(Sql.of(dataSource), scope, table, json);
     }
 
     /** The namespace of the current call, as its rows carry it. */
@@ -479,9 +482,9 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
         return all;
     }
 
-    private static String json(Map<String, String> map) {
+    private String json(Map<String, String> map) {
         try {
-            return MAPPER.writeValueAsString(map);
+            return json.writeValueAsString(map);
         } catch (Exception e) {
             throw new IllegalArgumentException("Metadata is not serialisable: " + e.getMessage(), e);
         }

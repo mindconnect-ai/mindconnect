@@ -7,9 +7,9 @@ sidebar_position: 9
 
 Tools are the capabilities you grant to an agent. Most ship in a
 `mc-agent-tools-*` module and register via the `ToolFactory` SPI — add the
-module to the runtime and the tool is available to assign. Some live in
-`mc-agent-runtime-core` itself (the todo tools, `tool_search`, `skill`, and the inline
-`run_agent`/`run_agents`), and dynamic bundles like Gmail or workflow tools use
+module to the runtime and the tool is available to assign. Some come with a
+capability of the runtime in `mc-agent-runtime-capabilities` (`tool_search`,
+`skill`, `fetch_tool_result`, and `run_agent`/`run_agents`), and dynamic bundles like Gmail or workflow tools use
 the second SPI, `MultiToolProvider`. This page lists the built-in tools, what
 they do, and any configuration or environment keys they need.
 
@@ -34,9 +34,9 @@ Always available; no API keys required.
 | `file_list` | Lists files and directories under a path. | Working dir |
 | `glob` | Finds files by name pattern, newest first. | Working dir |
 | `grep` | Searches file contents for a regular expression under a directory or in one file, `file:line: text`, with `glob`, `ignore_case`, `context`, `files_only` and a result cap; binary files and build directories skipped. | Working dir |
-| `fetch_tool_result` | Reloads the full content of a tool result evicted from the live context. | — |
+| `fetch_tool_result` | Reads again a tool result that [memory](./memory.md#how-a-history-is-made-to-fit) replaced with a note, by the id the note names. | — |
 
-## Orchestration tools (`mc-agent-runtime-core`)
+## Orchestration tools (`mc-agent-runtime-capabilities`)
 
 | Tool | Description | Needs |
 |------|-------------|-------|
@@ -81,6 +81,12 @@ session to a project, the session's own directory stays reachable as an
 additional directory. On a server a working directory must lie under
 `mindconnect.tools.working-dir-root`, by default the user's home; the CLI
 sets that root to `/` and works where it was launched.
+
+Deleting a session leaves its directory on disk: what an agent wrote there
+is not removed with the chat. A server where the directories would pile up
+sets `mindconnect.sessions.delete-directory: true`: a session's own directory
+then goes with it — never one the user chose. A host that assembles the
+runtime itself contributes a `SessionDirectoryCleanup` as a `SessionCleanup`.
 
 A session with no directory at all — one written before 0.5.2, a runtime
 without a users' home — falls back to the tool's own `baseDir` override,
@@ -145,7 +151,7 @@ Every persisted workflow is exposed as its own tool, `workflow_<id>`, with
 parameters generated from the workflow's input schema — the bridge between the
 agents and the [workflow engine](/workflow/overview).
 
-## Todo tools (`mc-agent-runtime-core`)
+## Todo tools (`mc-agent-tools-todo`)
 
 A session-scoped planning list the LLM maintains while it works. No keys
 required.

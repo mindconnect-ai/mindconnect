@@ -1,7 +1,7 @@
 package ai.mindconnect.vectorstore.pgvector;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex.EmbeddingHit;
@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -110,7 +111,7 @@ class PgEmbeddingIndexNomicTest {
         dataSource.setUser(DB_USER);
         dataSource.setPassword(DB_PASSWORD);
         namespace = new Namespace("it-nomic-" + UUID.randomUUID().toString().substring(0, 8));
-        index = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace));
+        index = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace), new JsonMapperFactory(List.of()));
 
         for (var pool : POOLS.values()) {
             for (var file : pool.entrySet()) {

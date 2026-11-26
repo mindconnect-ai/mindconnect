@@ -1,16 +1,16 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,6 +20,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.agent.jackson.IdJsonModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,7 +39,7 @@ class VectorToolsTest {
     Path dir;
 
     /** Maps known texts to fixed vectors so ranking is predictable. */
-    private static final LlmEmbeddings FAKE_EMBEDDINGS = (config, texts) -> texts.stream()
+    private static final LlmEmbedding FAKE_EMBEDDINGS = (config, texts) -> texts.stream()
             .map(t -> {
                 if (t.contains("container")) return new float[]{1f, 0f, 0f};
                 if (t.contains("finance")) return new float[]{0f, 1f, 0f};
@@ -63,11 +65,12 @@ class VectorToolsTest {
         env = environment(FAKE_EMBEDDINGS, FAKE_CONFIGS);
     }
 
-    private ToolEnvironment environment(LlmEmbeddings embeddings, LlmConfigRepository configs) {
+    private ToolEnvironment environment(LlmEmbedding embeddings, LlmConfigRepository configs) {
         return new ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
-                if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
+                if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
+                if (type == LlmEmbedding.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) configs);
                 if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(new Namespace("test")));
                 return Optional.empty();
@@ -321,12 +324,12 @@ class VectorToolsTest {
         // alias record names no model, URL or key; handed to the endpoint as
         // it is, every upload failed while testing its target succeeded.
         List<String> embeddedWith = new java.util.ArrayList<>();
-        LlmEmbeddings concreteOnly = (config, texts) -> {
-            if (config.isAlias()) {
-                throw new IllegalStateException("embedded with the alias itself: " + config.name());
+        LlmEmbedding concreteOnly = (configName, texts) -> {
+            if (configName.equals("embeddings")) {
+                throw new IllegalStateException("embedded with the alias itself: " + configName);
             }
-            embeddedWith.add(config.name());
-            return FAKE_EMBEDDINGS.embed(config, texts);
+            embeddedWith.add(configName);
+            return FAKE_EMBEDDINGS.embed(configName, texts);
         };
         LlmConfigRepository aliased = new LlmConfigRepository() {
             @Override public Optional<LlmConfig> findById(LlmConfigId id) { return Optional.empty(); }

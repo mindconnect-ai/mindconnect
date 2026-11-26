@@ -36,14 +36,14 @@ final class McpServerFormView {
     private final McpDiscovery discovery;
 
     McpServerFormView(McpServerDraft draft, boolean isNew,
-                      McpProbeResult probe, String error, McpCatalogEntry origin) {
-        this(draft, isNew, probe, error, origin, null);
+                      McpProbeResult probe, String error, McpCatalogEntry origin, McpTargetForm targets) {
+        this(draft, isNew, probe, error, origin, null, targets);
     }
 
     McpServerFormView(McpServerDraft draft, boolean isNew,
                       McpProbeResult probe, String error, McpCatalogEntry origin,
-                      McpDiscovery discovery) {
-        this.draft = draft == null ? McpServerDraft.empty() : draft;
+                      McpDiscovery discovery, McpTargetForm targets) {
+        this.draft = draft == null ? McpServerDraft.empty(targets) : draft;
         this.isNew = isNew;
         this.probe = probe;
         this.error = error;

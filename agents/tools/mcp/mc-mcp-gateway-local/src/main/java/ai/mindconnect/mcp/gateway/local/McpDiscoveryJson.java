@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpTool;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -32,15 +33,16 @@ import java.util.Map;
  */
 public final class McpDiscoveryJson {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     private static final TypeReference<LinkedHashMap<String, Object>> SCHEMA = new TypeReference<>() { };
 
-    private McpDiscoveryJson() {
+    private final ObjectMapper mapper;
+
+    public McpDiscoveryJson(JsonMapperFactory json) {
+        this.mapper = json.create();
     }
 
     /** The JSON form of {@code discovery}, in the shape {@link #read} expects. */
-    public static ObjectNode write(McpDiscovery discovery, JsonNodeFactory nodes) {
+    public ObjectNode write(McpDiscovery discovery, JsonNodeFactory nodes) {
         ObjectNode root = nodes.objectNode();
         root.put("fetchedAt", discovery.fetchedAt() == null ? null : discovery.fetchedAt().toString());
         ArrayNode tools = root.putArray("tools");
@@ -48,7 +50,7 @@ public final class McpDiscoveryJson {
             ObjectNode t = tools.addObject();
             t.put("name", tool.name());
             t.put("description", tool.description());
-            t.set("inputSchema", MAPPER.valueToTree(tool.inputSchema()));
+            t.set("inputSchema", mapper.valueToTree(tool.inputSchema()));
         }
         return root;
     }
@@ -58,14 +60,14 @@ public final class McpDiscoveryJson {
      *
      * @throws IllegalArgumentException when a tool has no name or the timestamp is unreadable
      */
-    public static McpDiscovery read(JsonNode node) {
+    public McpDiscovery read(JsonNode node) {
         Instant fetchedAt = node.hasNonNull("fetchedAt") ? Instant.parse(node.get("fetchedAt").asText()) : null;
         List<McpTool> tools = new ArrayList<>();
         for (JsonNode t : node.path("tools")) {
             JsonNode schema = t.get("inputSchema");
             Map<String, Object> inputSchema = schema == null || !schema.isObject()
                     ? Map.of()
-                    : MAPPER.convertValue(schema, SCHEMA);
+                    : mapper.convertValue(schema, SCHEMA);
             tools.add(new McpTool(t.path("name").asText(null), t.path("description").asText(null), inputSchema));
         }
         return new McpDiscovery(fetchedAt, tools);

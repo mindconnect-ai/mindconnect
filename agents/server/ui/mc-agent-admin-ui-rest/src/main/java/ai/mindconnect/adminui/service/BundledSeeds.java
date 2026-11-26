@@ -1,9 +1,11 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillSource;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.format.AgentJson;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillSource;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +29,7 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>{@code llm-configs/*.json} — an {@link LlmConfig}, identified by its {@code name};</li>
- *   <li>{@code agent-definitions/*.json} — an {@link AgentDefinition}, by its {@code name};</li>
+ *   <li>{@code agent-definitions/*.json} — a {@link ManagedAgent}, by its name;</li>
  *   <li>{@code skills/*.md} — a {@code SKILL.md}, by the name in its front matter
  *       (the file name when it has none);</li>
  *   <li>{@code workflows/*.json} — a {@link WorkflowData}, by its file name without
@@ -42,12 +44,6 @@ public final class BundledSeeds {
 
     /** Where the seeds are: every jar's {@code initial-data/}. */
     public static final String CLASSPATH = "classpath*:initial-data/";
-
-    /**
-     * Workflows carry {@code @class} type info and legacy shapes a plain mapper
-     * cannot read — same mapper the workflow stores use.
-     */
-    static final ObjectMapper WORKFLOW_MAPPER = WorkflowObjectMapperFactory.create();
 
     /** The kinds of seed, with the slug the Migrations screen and the installed-seed records use. */
     public enum Kind {
@@ -85,19 +81,25 @@ public final class BundledSeeds {
 
     private final ObjectMapper objectMapper;
     private final String location;
+    /**
+     * Workflows carry {@code @class} type info and legacy shapes a plain mapper
+     * cannot read — same mapper the workflow stores use.
+     */
+    private final ObjectMapper workflowMapper;
 
     /** The seeds of {@code initial-data/} on the classpath. */
-    public BundledSeeds(ObjectMapper objectMapper) {
-        this(objectMapper, CLASSPATH);
+    public BundledSeeds(ObjectMapper objectMapper, JsonMapperFactory json) {
+        this(objectMapper, CLASSPATH, json);
     }
 
     /**
      * @param location where the kind folders are, ending in {@code /} —
      *                 {@code classpath*:initial-data/}, or another root a test ships
      */
-    public BundledSeeds(ObjectMapper objectMapper, String location) {
+    public BundledSeeds(ObjectMapper objectMapper, String location, JsonMapperFactory json) {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
         this.location = location.endsWith("/") ? location : location + "/";
+        this.workflowMapper = WorkflowObjectMapperFactory.create(json);
     }
 
     /** Every seed of every kind, LLM configs first — agents refer to them. */
@@ -119,11 +121,18 @@ public final class BundledSeeds {
         return seeds;
     }
 
-    public List<Seed<AgentDefinition>> agents() {
-        List<Seed<AgentDefinition>> seeds = new ArrayList<>();
+    /** Shipped agents, in the stored form or the one the earlier runtime wrote, see {@link AgentJson}. */
+    public List<Seed<ManagedAgent>> agents() {
+        AgentJson files = new AgentJson(objectMapper);
+        List<Seed<ManagedAgent>> seeds = new ArrayList<>();
         for (Resource resource : scan(Kind.AGENT)) {
-            read(resource, AgentDefinition.class, objectMapper)
-                    .ifPresent(agent -> seeds.add(new Seed<>(Kind.AGENT, agent.name(), agent)));
+            try {
+                ManagedAgent agent = files.read(
+                        new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+                seeds.add(new Seed<>(Kind.AGENT, agent.definition().name(), agent));
+            } catch (Exception e) {
+                log.warn("Failed to read an agent from {}: {}", resource.getFilename(), e.getMessage());
+            }
         }
         return seeds;
     }
@@ -159,7 +168,7 @@ public final class BundledSeeds {
         for (Resource resource : scan(Kind.WORKFLOW)) {
             String id = fileId(resource);
             if (id == null) continue;
-            read(resource, WorkflowData.class, WORKFLOW_MAPPER)
+            read(resource, WorkflowData.class, workflowMapper)
                     .ifPresent(workflow -> seeds.add(new Seed<>(Kind.WORKFLOW, id, workflow)));
         }
         return seeds;
@@ -169,13 +178,13 @@ public final class BundledSeeds {
         return llmConfigs().stream().filter(seed -> seed.name().equals(name)).map(Seed::record).findFirst();
     }
 
-    public Optional<AgentDefinition> agent(String name) {
+    public Optional<ManagedAgent> agent(String name) {
         return agents().stream().filter(seed -> seed.name().equals(name)).map(Seed::record).findFirst();
     }
 
     public Optional<WorkflowData> workflow(String id) {
         for (Resource resource : scan(Kind.WORKFLOW)) {
-            if (id.equals(fileId(resource))) return read(resource, WorkflowData.class, WORKFLOW_MAPPER);
+            if (id.equals(fileId(resource))) return read(resource, WorkflowData.class, workflowMapper);
         }
         return Optional.empty();
     }

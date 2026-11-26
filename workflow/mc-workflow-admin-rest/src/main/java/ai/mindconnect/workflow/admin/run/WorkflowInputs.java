@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin.run;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.schema.Schema;
 import ai.mindconnect.workflow.admin.ui.ParamCoercion;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -21,7 +22,12 @@ import java.util.Map;
  */
 public final class WorkflowInputs {
 
-    private WorkflowInputs() {}
+    private final ParamCoercion coercion;
+
+    /** @param json the host's mapper factory, which an array or object param is read with */
+    public WorkflowInputs(JsonMapperFactory json) {
+        this.coercion = new ParamCoercion(json);
+    }
 
     /**
      * @param workflow     the workflow to be run
@@ -32,8 +38,8 @@ public final class WorkflowInputs {
      * @return the params to run with
      * @throws IllegalArgumentException naming the required params that have no value
      */
-    public static Map<String, Object> prepare(WorkflowData workflow, Map<String, Object> submitted,
-                                              boolean declaredOnly) {
+    public Map<String, Object> prepare(WorkflowData workflow, Map<String, Object> submitted,
+                                       boolean declaredOnly) {
         Schema params = workflow.getParams();
         Map<String, Schema> declared = params == null || params.getProperties() == null
                 ? Map.of() : params.getProperties();
@@ -43,7 +49,7 @@ public final class WorkflowInputs {
                 if (value != null && (!declaredOnly || declared.containsKey(name))) in.put(name, value);
             });
         }
-        Map<String, Object> out = ParamCoercion.coerce(params, in);
+        Map<String, Object> out = coercion.coerce(params, in);
         declared.forEach((name, schema) -> {
             if (!out.containsKey(name) && schema != null && schema.getDefaultValue() != null) {
                 out.put(name, schema.getDefaultValue());

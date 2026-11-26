@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.Email;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.namespace.domain.Email;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.domain.NamespaceRole;
@@ -27,7 +27,7 @@ class NamespaceMembersTest {
     private static final UserId MALLORY = UserId.of("mallory");
 
     private final NamespaceService namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
-    private final NamespaceMembers members = new NamespaceMembers(namespaces, new UserService(new InMemoryUserRepository()));
+    private final NamespaceMembers members = new NamespaceMembers(namespaces, new UserService(new InMemoryUserRepository()), new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(ai.mindconnect.adminui.service.NamespaceSeeding.class));
 
     NamespaceMembersTest() {
         namespaces.create("acme", "ACME", ALICE);

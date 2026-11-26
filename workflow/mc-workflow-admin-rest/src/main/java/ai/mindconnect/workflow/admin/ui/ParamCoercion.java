@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.admin.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.schema.Schema;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -23,12 +24,14 @@ import java.util.Map;
  */
 public final class ParamCoercion {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private final ObjectMapper json;
 
-    private ParamCoercion() {}
+    public ParamCoercion(JsonMapperFactory json) {
+        this.json = json.create();
+    }
 
     /** Coerces every submitted value whose param the schema types. */
-    public static Map<String, Object> coerce(Schema schema, Map<String, Object> submitted) {
+    public Map<String, Object> coerce(Schema schema, Map<String, Object> submitted) {
         Map<String, Object> out = new LinkedHashMap<>(submitted);
         if (schema == null || schema.getProperties() == null) {
             return out;
@@ -41,7 +44,7 @@ public final class ParamCoercion {
         return out;
     }
 
-    private static Object coerceValue(Schema prop, Object value) {
+    private Object coerceValue(Schema prop, Object value) {
         if (!(value instanceof String text) || text.isBlank()) {
             return value; // already typed, or nothing to coerce
         }
@@ -51,7 +54,7 @@ public final class ParamCoercion {
                 case INTEGER -> Long.parseLong(s);
                 case NUMBER -> Double.parseDouble(s);
                 case BOOLEAN -> Boolean.parseBoolean(s);
-                case ARRAY, OBJECT -> JSON.readValue(s, Object.class); // JSON text -> list/map
+                case ARRAY, OBJECT -> json.readValue(s, Object.class); // JSON text -> list/map
                 default -> value;
             };
         } catch (Exception malformed) {

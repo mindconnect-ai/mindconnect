@@ -6,16 +6,18 @@ import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.workspace.WorkspaceProvider;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.service.SessionDirectories;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.management.directory.SessionFileBrowser;
+import ai.mindconnect.agent.management.directory.UserHome;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
 import ai.mindconnect.chatui.ui.component.DirectoryPickerComponent;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -73,23 +75,17 @@ public class SessionFilesUiController {
             Map.entry("js", "text/plain;charset=UTF-8"), Map.entry("ts", "text/plain;charset=UTF-8"),
             Map.entry("sh", "text/plain;charset=UTF-8"), Map.entry("sql", "text/plain;charset=UTF-8"));
 
-    private final AgentSessionService sessionService;
-    private final AgentSessionRepository sessions;
+    private final AgentRuntime runtime;
     private final CurrentUsers currentUsers;
+    private final UserHome userHome;
     /** Where the tools keep a session's files when not on this machine — a virtual environment server. */
     private final ObjectProvider<WorkspaceProvider> workspaces;
 
-    public SessionFilesUiController(AgentSessionService sessionService, AgentSessionRepository sessions,
-                                    CurrentUsers currentUsers) {
-        this(sessionService, sessions, currentUsers, null);
-    }
-
-    @Autowired
-    public SessionFilesUiController(AgentSessionService sessionService, AgentSessionRepository sessions,
-                                    CurrentUsers currentUsers, ObjectProvider<WorkspaceProvider> workspaces) {
-        this.sessionService = sessionService;
-        this.sessions = sessions;
+    public SessionFilesUiController(AgentRuntime runtime, CurrentUsers currentUsers, UserHome userHome,
+                                    ObjectProvider<WorkspaceProvider> workspaces) {
+        this.runtime = runtime;
         this.currentUsers = currentUsers;
+        this.userHome = userHome;
         this.workspaces = workspaces;
     }
 
@@ -98,7 +94,7 @@ public class SessionFilesUiController {
     public ResponseEntity<?> browse(@PathVariable("sessionId") String sessionIdValue,
                                     @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        Optional<SessionFileBrowser> directories = directoriesOfOwned(sessionId);
         if (directories.isEmpty()) return ResponseEntity.notFound().build();
         UiPage page = new SessionFilesPage(sessionId, directories.get()).render();
         return dialog ? SessionUiController.sessionDialog(sessionId, "Files", page) : ResponseEntity.ok(page);
@@ -110,7 +106,7 @@ public class SessionFilesUiController {
                                           @RequestParam("root") String root,
                                           @RequestParam(value = "path", defaultValue = "") String path) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        Optional<SessionFileBrowser> directories = directoriesOfOwned(sessionId);
         if (directories.isEmpty() || directories.get().list(root, path).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -124,8 +120,8 @@ public class SessionFilesUiController {
                                                        @RequestParam("path") String path,
                                                        @RequestParam(value = "download", defaultValue = "false") boolean download)
             throws IOException {
-        Optional<SessionDirectories> directories = directoriesOfOwned(SessionId.of(sessionIdValue));
-        Optional<SessionDirectories.Content> file = directories.isEmpty() ? Optional.empty()
+        Optional<SessionFileBrowser> directories = directoriesOfOwned(SessionId.of(sessionIdValue));
+        Optional<SessionFileBrowser.Content> file = directories.isEmpty() ? Optional.empty()
                 : directories.get().open(root, path);
         if (file.isEmpty()) return ResponseEntity.notFound().build();
         String name = file.get().name();
@@ -150,8 +146,8 @@ public class SessionFilesUiController {
                                         @RequestParam("root") String root,
                                         @RequestParam("path") String path) throws IOException {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
-        Optional<SessionDirectories.Preview> preview = directories.isEmpty() ? Optional.empty()
+        Optional<SessionFileBrowser> directories = directoriesOfOwned(sessionId);
+        Optional<SessionFileBrowser.Preview> preview = directories.isEmpty() ? Optional.empty()
                 : directories.get().preview(root, path);
         if (preview.isEmpty()) {
             return ResponseEntity.ok(SessionFilesPage.closed().toast(UiToast.error("The file is gone.")));
@@ -166,15 +162,15 @@ public class SessionFilesUiController {
                                         @RequestParam("path") String path,
                                         @RequestBody Map<String, Object> raw) throws IOException {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        Optional<SessionFileBrowser> directories = directoriesOfOwned(sessionId);
         if (directories.isEmpty()) return ResponseEntity.notFound().build();
         Object content = raw.get("content");
-        Optional<SessionDirectories.Entry> saved;
+        Optional<SessionFileBrowser.Entry> saved;
         try {
             saved = directories.get().write(root, path, content == null ? "" : String.valueOf(content));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.ok(UiPatch.of().toast(UiToast.error("Not saved: the text is larger than "
-                    + SessionFilesPage.humanSize(SessionDirectories.MAX_EDIT_BYTES) + ".")));
+                    + SessionFilesPage.humanSize(SessionFileBrowser.MAX_EDIT_BYTES) + ".")));
         }
         if (saved.isEmpty()) {
             return ResponseEntity.ok(UiPatch.of().toast(UiToast.error("Not saved: the file is gone.")));
@@ -187,7 +183,7 @@ public class SessionFilesUiController {
     public ResponseEntity<UiPatch> delete(@PathVariable("sessionId") String sessionIdValue,
                                           @RequestParam("root") String root,
                                           @RequestParam("path") String path) throws IOException {
-        Optional<SessionDirectories> directories = directoriesOfOwned(SessionId.of(sessionIdValue));
+        Optional<SessionFileBrowser> directories = directoriesOfOwned(SessionId.of(sessionIdValue));
         if (directories.isEmpty()) return ResponseEntity.notFound().build();
         if (!directories.get().delete(root, path)) {
             return ResponseEntity.ok(UiPatch.of().toast(UiToast.error("Nothing to delete there.")));
@@ -206,10 +202,10 @@ public class SessionFilesUiController {
                     @RequestParam(value = "path", defaultValue = "") String path,
                     HttpServletResponse response) throws IOException {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        Optional<SessionFileBrowser> directories = directoriesOfOwned(sessionId);
         // A directory is named the way the dialog shows it: the chat's own is not its session id.
         String name = path.isBlank() ? DirectoryPickerComponent.label(root, sessionId) : null;
-        Optional<SessionDirectories.Archive> archive = directories.isEmpty() ? Optional.empty()
+        Optional<SessionFileBrowser.Archive> archive = directories.isEmpty() ? Optional.empty()
                 : directories.get().archive(root, path, name);
         if (archive.isEmpty()) {
             response.sendError(HttpStatus.NOT_FOUND.value());
@@ -217,8 +213,8 @@ public class SessionFilesUiController {
         }
         if (archive.get().tooLarge()) {
             response.sendError(HttpStatus.PAYLOAD_TOO_LARGE.value(), "The folder is too large to download as a zip "
-                    + "(at most " + SessionDirectories.MAX_ARCHIVE_FILES + " files and "
-                    + SessionFilesPage.humanSize(SessionDirectories.MAX_ARCHIVE_BYTES) + ").");
+                    + "(at most " + SessionFileBrowser.MAX_ARCHIVE_FILES + " files and "
+                    + SessionFilesPage.humanSize(SessionFileBrowser.MAX_ARCHIVE_BYTES) + ").");
             return;
         }
         response.setContentType("application/zip");
@@ -230,24 +226,31 @@ public class SessionFilesUiController {
     }
 
     /** The session's directories, when the session exists and is the caller's. */
-    private Optional<SessionDirectories> directoriesOfOwned(SessionId sessionId) {
+    private Optional<SessionFileBrowser> directoriesOfOwned(SessionId sessionId) {
         var caller = currentUsers.current().orElse(null);
         if (caller == null) return Optional.empty();
-        return sessions.findById(sessionId)
-                .filter(session -> caller.equals(session.userId()))
+        return runtime.service(SessionManagement.class)
+                .find(sessionId)
+                .filter(session -> session.userId() != null && caller.value().equals(session.userId().value()))
                 .map(session -> {
-                    WorkspaceProvider provider = workspaces == null ? null : workspaces.getIfAvailable();
-                    if (provider == null) return sessionService.directories(sessionId);
+                    WorkspaceProvider provider = workspaces.getIfAvailable();
+                    if (provider == null) return SessionFileBrowser.of(session, userHome);
                     // With an environment server the session's files are its workspace there: bash and
                     // code_execute write into it, and the uploads are copied into it (files() does that
                     // now). It is the only directory shown, under the path the tools and the container use.
-                    ToolCallScope scope = new ToolCallScope(session.userId(), session.id(), session.agentDefinitionId(),
-                            session.parentSessionId() == null ? session.id() : session.parentSessionId(),
-                            session.workingDir(), session.additionalDirs());
-                    var files = provider.files(scope, AgentTool.of("file_read"),
-                            FileRoots.of(Path.of(session.hasWorkingDir() ? session.workingDir() : ".")));
-                    return new SessionDirectories(List.of(), Map.of(files.roots().base().toString(), files));
+                    String working = session.directories().working();
+                    var files = provider.files(scope(session), AgentTool.of("file_read"),
+                            FileRoots.of(Path.of(working == null || working.isBlank() ? "." : working)));
+                    return new SessionFileBrowser(List.of(), Map.of(files.roots().base().toString(), files));
                 });
+    }
+
+    private static ToolCallScope scope(ManagedSession session) {
+        SessionId id = session.id();
+        return new ToolCallScope(session.userId(), id,
+                session.agentId().orElse(null),
+                session.parentId() == null ? id : session.parentId(),
+                session.directories().working(), session.directories().additional());
     }
 
     private static String extension(String name) {

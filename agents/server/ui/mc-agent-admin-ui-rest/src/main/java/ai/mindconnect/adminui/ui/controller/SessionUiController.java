@@ -1,34 +1,33 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryCompaction;
+import ai.mindconnect.agent.runtime.capabilities.memory.MemoryInspection;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.adminui.ui.page.MemoryPage;
 import ai.mindconnect.adminui.ui.page.TodosPage;
 import ai.mindconnect.adminui.ui.page.TracesPage;
 import ai.mindconnect.adminui.ui.component.RoundtripCardComponent;
 import ai.mindconnect.adminui.ui.component.TraceTableComponent;
-import ai.mindconnect.agent.runtime.domain.TraceId;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
-import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
+import ai.mindconnect.agent.trace.domain.TraceId;
+import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
+import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
+import ai.mindconnect.agent.management.api.ManagedMessage;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/admin/api")
@@ -39,50 +38,27 @@ public class SessionUiController {
 
     private static final Logger log = LoggerFactory.getLogger(SessionUiController.class);
 
-    private final AgentSessionService sessionService;
-    private final AgentChatService chatService;
-    private final AgentDefinitionRepository agentRepository;
-    private final AgentSessionRepository sessionRepository;
+    /** The runtime's: the dialogs keep no way of their own to the sessions. */
+    private final AgentRuntime runtime;
+    private final SessionManagement sessions;
     private final TodoListService todoListService;
-    private final ObjectMapper objectMapper;
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
-    private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
+    private final ObjectMapper json;
 
-    private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
-    private final ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory;
-    private final ToolApprovalRepository approvalStore;
-    /**
-     * The session tools (memory, traces, todos) have to resolve the
-     * agent the same way the run does. A chat with an inline session agent has
-     * no entry in the registry, and looking it up there answered 404 for every
-     * one of these dialogs.
-     */
-    private final SessionAgentResolver agentResolver;
-
-    public SessionUiController(AgentSessionService sessionService,
-                             AgentChatService chatService,
-                             AgentDefinitionRepository agentRepository,
-                             AgentSessionRepository sessionRepository,
+    public SessionUiController(AgentRuntime runtime,
                              TodoListService todoListService,
-                             ObjectMapper objectMapper,
-                             LlmCallTraceRepository traceRepository,
-                             ai.mindconnect.chatui.service.ActiveStreams activeStreams,
-                             ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
-                             ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory,
-                             ToolApprovalRepository approvalStore) {
-        this.sessionService = sessionService;
-        this.sessionFiles = sessionFiles;
-        this.chatService = chatService;
-        this.agentRepository = agentRepository;
-        this.sessionRepository = sessionRepository;
+                             LlmCallTraceRepository traceRepository) {
+        this.runtime = runtime;
+        this.sessions = runtime.service(SessionManagement.class);
         this.todoListService = todoListService;
-        this.objectMapper = objectMapper;
         this.traceRepository = traceRepository;
-        this.activeStreams = activeStreams;
-        this.layoutFactory = layoutFactory;
-        this.approvalStore = approvalStore;
-        this.agentResolver = new SessionAgentResolver(agentRepository);
+        this.json = runtime.service(ObjectMapper.class);
+    }
+
+    /** The agent the session runs as, for a dialog's heading; a session without one is still shown. */
+    private String agentNameOf(ManagedSession session) {
+        return sessions.agentOf(session.id()).map(AgentDefinition::name).orElse("(no agent)");
     }
 
     /**
@@ -107,10 +83,10 @@ public class SessionUiController {
      * replaces only the detail pane (clicked from the master list).
      */
 
-    /** Working memory, or null when the snapshot cannot be built. */
+    /** What the session's agent would be sent now, or null when that cannot be told. */
     private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
-            return chatService.memorySnapshot(sessionId);
+            return runtime.service(MemoryInspection.class).inspect(sessionId);
         } catch (Exception e) {
             log.warn("Failed to load working memory for session {}: {}", sessionId, e.getMessage());
             return null;
@@ -122,34 +98,29 @@ public class SessionUiController {
                                         @RequestParam(value = "seq", required = false) Integer seq,
                                         @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        var memory = safeMemorySnapshot(sessionId);
-        if (memory == null) {
-            return ResponseEntity.status(503).body("Working memory unavailable for this session");
-        }
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> {
-                            var page = new MemoryPage(session, agent, memory);
-                            if (seq != null) return ResponseEntity.ok(page.selectEntry(seq));
-                            if (dialog) return sessionDialog(sessionId, "Working Memory", page.render());
-                            return ResponseEntity.ok(page.render());
-                        }))
-                .orElse(ResponseEntity.notFound().build());
+        return sessions.find(sessionId).<ResponseEntity<?>>map(session -> {
+            var memory = safeMemorySnapshot(sessionId);
+            if (memory == null) {
+                return ResponseEntity.status(503).body("Working memory unavailable for this session");
+            }
+            var page = new MemoryPage(session.id(), agentNameOf(session), memory, json);
+            if (seq != null) return ResponseEntity.ok(page.selectEntry(seq));
+            if (dialog) return sessionDialog(sessionId, "Working Memory", page.render());
+            return ResponseEntity.ok(page.render());
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     /**
-     * Compresses unsummarized messages via the configured memory strategy and
-     * re-renders the working-memory page with the new (smaller) snapshot, so
-     * the operator immediately sees the effect of the compression — fewer
-     * tokens, freshly-marked {@code (compressed)} entries, etc. Returns a
-     * full UiPage so the front-end's existing data-action handler swaps the
-     * page in place.
+     * Summarises what no summary covers yet and re-renders the
+     * working-memory page, so the operator immediately sees the effect —
+     * fewer tokens, a summary row. Returns a full UiPage so the front-end's
+     * existing data-action handler swaps the page in place.
      */
     @PostMapping("/sessions/{sessionId}/memory/compress")
     public ResponseEntity<?> compressMemory(@PathVariable("sessionId") String sessionIdValue) {
         SessionId sessionId = SessionId.of(sessionIdValue);
         try {
-            chatService.compressMemory(sessionId);
+            runtime.service(MemoryCompaction.class).compact(sessionId);
         } catch (Exception e) {
             log.warn("Failed to compress memory for session {}: {}", sessionId, e.getMessage());
             return ResponseEntity.status(500).body("Compression failed: " + e.getMessage());
@@ -158,9 +129,9 @@ public class SessionUiController {
         if (memory == null) {
             return ResponseEntity.status(503).body("Working memory unavailable after compression");
         }
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> ResponseEntity.ok(new MemoryPage(session, agent, memory).render())))
+        return sessions.find(sessionId)
+                .<ResponseEntity<?>>map(session ->
+                        ResponseEntity.ok(new MemoryPage(session.id(), agentNameOf(session), memory, json).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -177,13 +148,12 @@ public class SessionUiController {
             return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
         }
         List<LlmCallTraceHeader> traces = loadTraceHeaders(sessionId);
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> {
-                            var page = new TracesPage(session, agent, traces);
-                            if (dialog) return sessionDialog(sessionId, "Traces", page.render());
-                            return ResponseEntity.ok(page.render());
-                        }))
+        return sessions.find(sessionId)
+                .<ResponseEntity<?>>map(session -> {
+                    var page = new TracesPage(sessionId, agentNameOf(session), traces);
+                    if (dialog) return sessionDialog(sessionId, "Traces", page.render());
+                    return ResponseEntity.ok(page.render());
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -220,20 +190,16 @@ public class SessionUiController {
     }
 
     /**
-     * Walks the session tree directly via parentSessionId: top-level
-     * session + every sub-agent session (transitively) it spawned. For
-     * each session we know the conversationId, so we read the headers
-     * straight from those known paths — no scanning every conversation
-     * directory on disk.
+     * Walks the session tree: the session and every sub-agent session
+     * (transitively) it spawned. Each session says which conversation its
+     * traces are filed under, so the headers are read straight from there —
+     * no scanning every conversation directory on disk.
      */
     private List<LlmCallTraceHeader> loadTraceHeaders(SessionId sessionId) {
         List<LlmCallTraceHeader> traces = new java.util.ArrayList<>();
         for (SessionId sid : collectSessionTree(sessionId)) {
             try {
-                ConversationId convId = sessionRepository.findById(sid)
-                        .map(s -> s.conversationId()).orElse(null);
-                if (convId == null) continue;
-                traces.addAll(traceRepository.findHeadersByConversation(convId));
+                traces.addAll(traceRepository.findHeadersBySession(sid));
             } catch (Exception e) {
                 log.warn("Failed to load traces for session {}: {}", sid, e.getMessage());
             }
@@ -258,15 +224,15 @@ public class SessionUiController {
                 .map(trace -> {
                     SessionId owner = trace.context() != null && trace.context().sessionId() != null
                             ? trace.context().sessionId() : SessionId.of(sessionIdValue);
-                    List<Message> history;
+                    List<ManagedMessage> history;
                     try {
-                        history = sessionService.loadHistory(owner);
+                        history = sessions.messages(owner);
                     } catch (Exception e) {
                         log.warn("Failed to load history for session {}: {}", owner, e.getMessage());
                         history = List.of();
                     }
                     var card = new RoundtripCardComponent(trace,
-                            RoundtripCardComponent.indexToolResults(history));
+                            RoundtripCardComponent.indexToolResults(history), json);
                     var dlg = UiDialog.of(card.title(), null, card.render());
                     dlg.setId(TRACE_DIALOG_ID);
                     dlg.withCssClass("sui-dialog--wide");
@@ -287,14 +253,13 @@ public class SessionUiController {
     public ResponseEntity<?> getTodos(@PathVariable("sessionId") String sessionIdValue,
                                       @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> {
-                            var list = todoListService.load(sessionId);
-                            var page = new TodosPage(session, agent, list).render();
-                            if (dialog) return sessionDialog(sessionId, "Todos", page);
-                            return ResponseEntity.<UiPage>ok(page);
-                        }))
+        return sessions.find(sessionId)
+                .<ResponseEntity<?>>map(session -> {
+                    var list = todoListService.load(sessionId);
+                    var page = new TodosPage(sessionId, agentNameOf(session), list).render();
+                    if (dialog) return sessionDialog(sessionId, "Todos", page);
+                    return ResponseEntity.<UiPage>ok(page);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -310,9 +275,8 @@ public class SessionUiController {
 
     /**
      * Walks the parent/child session tree rooted at {@code rootSessionId}
-     * via {@link AgentSessionRepository#findByParentSession(SessionId)} and
-     * returns every session id encountered (root first, then BFS through
-     * sub-agents). Stays cheap because session.json files are tiny.
+     * and returns every session id encountered (root first, then BFS through
+     * sub-agents).
      */
     private List<SessionId> collectSessionTree(SessionId rootSessionId) {
         List<SessionId> ordered = new java.util.ArrayList<>();
@@ -324,7 +288,7 @@ public class SessionUiController {
             if (!visited.add(current)) continue;
             ordered.add(current);
             try {
-                for (var sub : sessionRepository.findByParentSession(current)) {
+                for (ManagedSession sub : sessions.children(current)) {
                     frontier.add(sub.id());
                 }
             } catch (Exception e) {

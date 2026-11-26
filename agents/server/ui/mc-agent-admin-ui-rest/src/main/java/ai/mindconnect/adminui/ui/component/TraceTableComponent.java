@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.ui.controller.SessionUiController;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
+import ai.mindconnect.agent.trace.domain.LlmCallTraceHeader;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiColumn;
@@ -212,7 +212,7 @@ public final class TraceTableComponent implements UiComponent {
         var ctx = t.context();
         int depth = ctx != null ? ctx.depth() : 0;
         String agent = ctx != null && ctx.agentName() != null ? ctx.agentName() : "";
-        String turnId = ctx != null && ctx.turnId() != null ? ctx.turnId().value() : "";
+        String turnId = ctx != null && ctx.turnId() != null ? ctx.turnId() : "";
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", t.id() != null ? t.id().value() : "");
         row.put("n", n);

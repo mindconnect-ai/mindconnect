@@ -6,9 +6,10 @@ import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,9 +44,9 @@ public class LlmConfigInstaller implements RegistryInstaller {
     private final LlmConfigRepository repository;
     private final ObjectMapper objectMapper;
 
-    public LlmConfigInstaller(LlmConfigRepository repository) {
+    public LlmConfigInstaller(LlmConfigRepository repository, JsonMapperFactory json) {
         this.repository = repository;
-        this.objectMapper = new ObjectMapper()
+        this.objectMapper = json.create()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 

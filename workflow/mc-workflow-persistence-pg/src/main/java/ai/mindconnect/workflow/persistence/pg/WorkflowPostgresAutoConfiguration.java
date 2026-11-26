@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.pg;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
@@ -58,15 +59,19 @@ public class WorkflowPostgresAutoConfiguration {
     @ConditionalOnMissingBean(WorkflowDataRepository.class)
     WorkflowDataRepository workflowDataRepository(DataSource dataSource,
                                                   @Value("${mindconnect.namespace:local}") String partition,
-                                                  @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), () -> partition, Path.of(baseDir)).workflowDataRepository();
+                                                  @Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                                  JsonMapperFactory json) {
+        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), () -> partition, Path.of(baseDir), json)
+                .workflowDataRepository();
     }
 
     @Bean
     @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
     WorkflowInstanceRepository workflowInstanceRepository(DataSource dataSource,
                                                           @Value("${mindconnect.namespace:local}") String partition,
-                                                          @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), () -> partition, Path.of(baseDir)).workflowInstanceRepository();
+                                                          @Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                                          JsonMapperFactory json) {
+        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), () -> partition, Path.of(baseDir), json)
+                .workflowInstanceRepository();
     }
 }

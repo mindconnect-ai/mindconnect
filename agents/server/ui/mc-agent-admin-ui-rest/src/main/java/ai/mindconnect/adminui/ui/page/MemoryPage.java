@@ -3,14 +3,14 @@ package ai.mindconnect.adminui.ui.page;
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.MemoryDetailSectionComponent;
 import ai.mindconnect.adminui.ui.component.MemoryMasterListComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.capabilities.memory.WorkingMemory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiSection;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Working-memory inspector page. Master-detail layout:
@@ -29,26 +29,28 @@ import ai.mindconnect.ui.model.UiSection;
  */
 public final class MemoryPage extends AdminPage {
 
-    private final AgentSession session;
-    private final AgentDefinition agent;
+    private final SessionId sessionId;
+    private final String agentName;
     private final WorkingMemory memory;
-
     private final MemoryMasterListComponent master;
+    private final ObjectMapper json;
 
-    public MemoryPage(AgentSession session, AgentDefinition agent, WorkingMemory memory) {
-        this.session = session;
-        this.agent = agent;
+    /** @param agentName the agent the session runs as */
+    public MemoryPage(SessionId sessionId, String agentName, WorkingMemory memory, ObjectMapper json) {
+        this.sessionId = sessionId;
+        this.agentName = agentName;
         this.memory = memory;
-        this.master = new MemoryMasterListComponent(session.id(), memory);
+        this.json = json;
+        this.master = new MemoryMasterListComponent(sessionId, memory);
     }
 
     @Override
     public UiPage render() {
-        String sessionId = session.id().value();
+        String sessionId = this.sessionId.value();
 
         UiList masterUi = master.render();
         var detail = new MemoryDetailSectionComponent(
-                memory, MemoryMasterListComponent.SYS_PROMPT_SEQ).render();
+                memory, MemoryMasterListComponent.SYS_PROMPT_SEQ, json).render();
 
         // CSS class on the wrapper targets a two-column grid layout in
         // index.html so master + detail sit side by side.
@@ -67,7 +69,7 @@ public final class MemoryPage extends AdminPage {
         masterUi.action(compressAction);
 
         var section = UiSection.of("memory-session-" + sessionId,
-                        "Working Memory — " + agent.name() + tokenUsageSuffix(memory))
+                        "Working Memory — " + agentName + tokenUsageSuffix(memory))
                 .section("memory", "Memory", inner);
 
         return UiPage.of("/admin/sessions/" + sessionId + "/memory", section);
@@ -79,19 +81,17 @@ public final class MemoryPage extends AdminPage {
      * MemoryMasterListComponent#SYS_PROMPT_SEQ} renders the system prompt.
      */
     public UiPatch selectEntry(int seq) {
-        var detail = new MemoryDetailSectionComponent(memory, seq);
+        var detail = new MemoryDetailSectionComponent(memory, seq, json);
         return patch(UiPatch.Operation.replace(MemoryDetailSectionComponent.DETAIL_ID, detail.render()));
     }
 
-    /** " — 1,234 / 200,000 tok (0.6%)" or empty when no memory snapshot. */
+    /** " — 1,234 / 200,000 tok (0.6%)"; without the second figure for a model whose window is not known. */
     private static String tokenUsageSuffix(WorkingMemory memory) {
-        if (memory == null) return "";
         int used = memory.totalTokens();
-        Integer max = memory.contextWindowTokens();
-        if (max == null || max <= 0) {
+        if (memory.contextWindowTokens().isEmpty() || memory.contextWindowTokens().getAsInt() <= 0) {
             return used > 0 ? String.format("  —  %,d tok", used) : "";
         }
-        double pct = 100.0 * used / max;
-        return String.format("  —  %,d / %,d tok (%.1f%%)", used, max, pct);
+        int max = memory.contextWindowTokens().getAsInt();
+        return String.format("  —  %,d / %,d tok (%.1f%%)", used, max, 100.0 * used / max);
     }
 }

@@ -25,6 +25,10 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+        </dependency>
         <!-- Core workflow engine — the only required dependency -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

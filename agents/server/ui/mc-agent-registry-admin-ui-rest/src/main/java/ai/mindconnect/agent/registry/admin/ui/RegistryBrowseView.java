@@ -197,7 +197,8 @@ final class RegistryBrowseView {
                     .icon("refresh")
                     .confirm("Replace what is here with '" + entry.name() + "' from "
                             + source.coordinates() + "? Entities of the same name are "
-                            + "overwritten, keeping their local ids.")
+                            + "overwritten, keeping their local ids. What it requires and is "
+                            + "already here stays as it is.")
                     .dispatch("POST", install + "OVERWRITE", FORM_ID));
         } else {
             // No dialog in front of it: this mode overwrites nothing, and the

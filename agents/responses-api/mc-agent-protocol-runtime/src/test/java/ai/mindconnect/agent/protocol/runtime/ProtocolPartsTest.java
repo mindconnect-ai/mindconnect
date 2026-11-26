@@ -1,0 +1,58 @@
+package ai.mindconnect.agent.protocol.runtime;
+
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.protocol.item.ContentPart;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.protocol.item.ConversationItem;
+import ai.mindconnect.agent.protocol.item.Role;
+import ai.mindconnect.filestore.FileId;
+import ai.mindconnect.filestore.StoredFile;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ProtocolPartsTest {
+
+    @Test
+    void aStoredImageBecomesAnImagePartReferencingItsId() {
+        StoredFile stored = new StoredFile(FileId.of("f-1"), "photo.png", "image/png", 240, Instant.now());
+
+        assertThat(ProtocolParts.image(stored))
+                .isEqualTo(new ai.mindconnect.agent.loop.domain.ContentPart.Image(
+                        new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId("f-1"),
+                        ai.mindconnect.agent.loop.domain.ContentPart.Image.Detail.AUTO, "photo.png"));
+    }
+
+    @Test
+    void aMessageOfASessionReadsBackPartForPart() {
+        TurnMessage m = TurnMessage.user(List.of(
+                new ai.mindconnect.agent.loop.domain.ContentPart.Text("what is this?"),
+                new ai.mindconnect.agent.loop.domain.ContentPart.Image(
+                        new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId("f-1"),
+                        ai.mindconnect.agent.loop.domain.ContentPart.Image.Detail.AUTO, "photo.png"),
+                new ai.mindconnect.agent.loop.domain.ContentPart.Document(
+                        new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId("f-2"), "spec.pdf")));
+
+        ConversationItem.Message item = ProtocolParts.message(Role.USER, m);
+
+        assertThat(item.role()).isEqualTo(Role.USER);
+        assertThat(item.content()).containsExactly(
+                new ContentPart.Text("what is this?"),
+                ContentPart.Image.of(new ContentPart.MediaSource.FileId("f-1")),
+                new ContentPart.Document(new ContentPart.MediaSource.FileId("f-2"), "spec.pdf"));
+    }
+
+    @Test
+    void aTextMessageIsOneTextPart_theNoteShownInItsPlaceWhenThereIsOne() {
+        TurnMessage m = TurnMessage.assistant("long");
+
+        assertThat(ProtocolParts.message(Role.ASSISTANT, m).content())
+                .containsExactly(new ContentPart.Text("long"));
+        assertThat(ProtocolParts.message(Role.ASSISTANT, m.with(SessionStore.COMPRESSED, "[stub]")).content())
+                .containsExactly(new ContentPart.Text("[stub]"));
+    }
+}

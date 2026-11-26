@@ -5,16 +5,20 @@ import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseStatus;
 import ai.mindconnect.agent.protocol.event.ResponseEvent;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Offline: maps captured OpenAI wire JSON — no network involved. */
 class OpenAiMapperTest {
+
+    private static final OpenAiMapper MAPPER = new OpenAiMapper(new JsonMapperFactory(List.of()));
 
     private static final ObjectMapper JSON = new ObjectMapper();
     @Test
@@ -29,7 +33,7 @@ class OpenAiMapperTest {
                  "usage":{"input_tokens":100,"output_tokens":20}}
                 """);
 
-        Response r = OpenAiMapper.response(node, "sess_1", "assistant", Set.of());
+        Response r = MAPPER.response(node, "sess_1", "assistant", Set.of());
 
         assertThat(r.status()).isEqualTo(ResponseStatus.COMPLETED);
         assertThat(r.outputText()).isEqualTo("Lisbon is sunny.");
@@ -52,7 +56,7 @@ class OpenAiMapperTest {
                  "usage":{"input_tokens":50,"output_tokens":10}}
                 """);
 
-        Response r = OpenAiMapper.response(node, "sess_1", "assistant", Set.of("get_weather"));
+        Response r = MAPPER.response(node, "sess_1", "assistant", Set.of("get_weather"));
 
         // … but only DECLARED names flip the status:
         assertThat(r.status()).isEqualTo(ResponseStatus.INCOMPLETE);
@@ -73,7 +77,7 @@ class OpenAiMapperTest {
                  "usage":{}}
                 """);
 
-        Response r = OpenAiMapper.response(node, null, null, Set.of("get_weather"));
+        Response r = MAPPER.response(node, null, null, Set.of("get_weather"));
 
         assertThat(r.status()).isEqualTo(ResponseStatus.COMPLETED);
     }
@@ -84,7 +88,7 @@ class OpenAiMapperTest {
                 {"type":"response.output_text.delta","sequence_number":7,
                  "item_id":"msg_1","delta":"Lis"}
                 """);
-        var event = OpenAiMapper.event(node, "resp_1").orElseThrow();
+        var event = MAPPER.event(node, "resp_1").orElseThrow();
 
         assertThat(event).isInstanceOf(ResponseEvent.OutputTextDelta.class);
         var delta = (ResponseEvent.OutputTextDelta) event;

@@ -1,5 +1,7 @@
 package ai.mindconnect.workflow.admin.run;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.domain.StepData;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.edit.WorkflowMutator;
@@ -148,18 +150,36 @@ public class WorkflowRunService {
     /** What a run's {@code env} variable holds — see {@link WorkflowExecutorService#withEnvironment}. */
     private final Supplier<Map<String, String>> environment;
 
-    public WorkflowRunService() {
-        this(null);
+    /**
+     * Plain records in, plain records out — a mapper of its own, with none of the
+     * settings the application's shared mapper carries, so the trace format does
+     * not drift with them.
+     */
+    private final com.fasterxml.jackson.databind.ObjectMapper traceJson;
+    /** The workflow store's mapper: a step's definition shows as it sits on disk. */
+    private final com.fasterxml.jackson.databind.ObjectMapper stepJson;
+    /** Hands the runs' contexts the host's modules for their JSON support. */
+    private final JsonMapperFactory json;
+
+    public WorkflowRunService(JsonMapperFactory json) {
+        this(null, json);
     }
 
-    public WorkflowRunService(WorkflowInstanceRepository instances) {
-        this(instances, WorkflowExecutorService::processEnvironment);
+    public WorkflowRunService(WorkflowInstanceRepository instances, JsonMapperFactory json) {
+        this(instances, WorkflowExecutorService::processEnvironment, json);
     }
 
-    /** @param environment what a run's {@code env} variable holds; the process environment when null */
-    public WorkflowRunService(WorkflowInstanceRepository instances, Supplier<Map<String, String>> environment) {
+    /**
+     * @param environment what a run's {@code env} variable holds; the process environment when null
+     * @param json        the host's mapper factory, which the trace and the step views are written with
+     */
+    public WorkflowRunService(WorkflowInstanceRepository instances, Supplier<Map<String, String>> environment,
+                              JsonMapperFactory json) {
         this.instances = instances;
         this.environment = environment != null ? environment : WorkflowExecutorService::processEnvironment;
+        this.traceJson = json.create();
+        this.stepJson = WorkflowObjectMapperFactory.create(json);
+        this.json = json;
     }
 
     /** Runs a workflow from the start. */
@@ -204,7 +224,7 @@ public class WorkflowRunService {
         Recorder recorder = new Recorder(wf);
         // SPI factory wires every WorkflowConfigurer on the classpath — so the
         // json:, javascript:, … resolvers are all active during the run.
-        WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
+        WorkflowContextFactory factory = SpiWorkflowContextFactory.create(json);
         WorkflowExecutorService service = new WorkflowExecutorService(factory).withEnvironment(environment);
         service.addEventListener(recorder);
         if (extraListener != null) {
@@ -235,7 +255,7 @@ public class WorkflowRunService {
                             Map<String, Object> params,
                             ai.mindconnect.workflow.execution.WorkflowEventListener extraListener) {
         Recorder recorder = new Recorder(wf);
-        WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
+        WorkflowContextFactory factory = SpiWorkflowContextFactory.create(json);
         WorkflowContext context = factory.instantiate(wf.getName());
         // The listener has to go on the instance's own context: continueWorkflow
         // only builds a context for an instance that has none, and a restored one
@@ -307,7 +327,7 @@ public class WorkflowRunService {
      * for a finished run a frame-less record — same id as before when resuming,
      * status and full trace always.
      */
-    private static WorkflowInstanceSnapshot snapshotFor(WorkflowData wf, Outcome outcome,
+    private WorkflowInstanceSnapshot snapshotFor(WorkflowData wf, Outcome outcome,
                                                         WorkflowResult result, RunReport report,
                                                         WorkflowInstanceSnapshot prior,
                                                         long startedAt) {
@@ -339,20 +359,12 @@ public class WorkflowRunService {
     // -----------------------------------------------------------------------
 
     /**
-     * Plain records in, plain records out — a dedicated mapper so the trace
-     * format does not drift with whatever modules the application's mapper
-     * happens to carry.
-     */
-    private static final com.fasterxml.jackson.databind.ObjectMapper TRACE_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
-
-    /**
      * The run a stored instance describes. This is how history is read back:
      * the report renders exactly like the run that produced it. An instance
      * from before traces existed yields an empty trace with the right outcome —
      * still resumable, just without the step list.
      */
-    public static RunReport traceReport(WorkflowInstanceSnapshot snap) {
+    public RunReport traceReport(WorkflowInstanceSnapshot snap) {
         WorkflowInstanceSnapshot.Status status =
                 snap.getStatus() == null ? WorkflowInstanceSnapshot.Status.HALTED : snap.getStatus();
         Outcome outcome = switch (status) {
@@ -367,11 +379,11 @@ public class WorkflowRunService {
                 stored.roots(), stored.steps(), stored.scope(), snap.getInstanceId());
     }
 
-    private static String writeTrace(RunReport report) {
+    private String writeTrace(RunReport report) {
         try {
             // Without the id: the store may not have assigned one yet, and the
             // reader takes it from the snapshot it came out of anyway.
-            return TRACE_MAPPER.writeValueAsString(new RunReport(report.outcome(),
+            return traceJson.writeValueAsString(new RunReport(report.outcome(),
                     report.result(), report.error(), report.roots(), report.steps(),
                     report.scope(), null));
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
@@ -379,15 +391,15 @@ public class WorkflowRunService {
         }
     }
 
-    private static RunReport readReport(String json) {
+    private RunReport readReport(String json) {
         try {
-            return TRACE_MAPPER.readValue(json, RunReport.class);
+            return traceJson.readValue(json, RunReport.class);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new IllegalStateException("Cannot read a stored run trace", e);
         }
     }
 
-    private static Trace readTrace(String json) {
+    private Trace readTrace(String json) {
         RunReport stored = readReport(json);
         return new Trace(stored.roots(), stored.steps());
     }
@@ -538,7 +550,7 @@ public class WorkflowRunService {
     // Snapshotting — all of this runs inside the step's own event callback
     // -----------------------------------------------------------------------
 
-    private static Captured capture(WorkflowData wf, StepInstance<?> instance, Exception error) {
+    private Captured capture(WorkflowData wf, StepInstance<?> instance, Exception error) {
         StepData cfg = instance.getConfig();
         String name = cfg.getName() == null ? "(unnamed)" : cfg.getName();
         String state = instance.getState() == null ? "?" : instance.getState().name();
@@ -557,7 +569,7 @@ public class WorkflowRunService {
                 info == null ? 0L : info.getDurationInMs(),
                 logsOf(instance),
                 scopeOf(instance),
-                RunInstanceJson.of(instance, error));
+                RunInstanceJson.of(instance, error, stepJson));
     }
 
     /**

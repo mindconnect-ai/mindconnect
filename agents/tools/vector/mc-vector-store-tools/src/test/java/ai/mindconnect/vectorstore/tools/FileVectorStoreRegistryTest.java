@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import ai.mindconnect.jackson.JsonMapperFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,7 +30,7 @@ class FileVectorStoreRegistryTest {
         List<Future<VectorStoreInstance>> futures = new ArrayList<>();
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < 50; i++) {
-                FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
+                FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"), new JsonMapperFactory(List.of()));
                 VectorStoreInstance candidate = new VectorStoreInstance("session-s1", "chat-uploads",
                         "embeddings", null, Map.of("attempt", Integer.toString(i)),
                         VectorStoreInstance.Scope.SESSION, "s1", "alice", Instant.now());
@@ -41,7 +42,7 @@ class FileVectorStoreRegistryTest {
         for (Future<VectorStoreInstance> future : futures) {
             assertThat(future.get()).isEqualTo(first);
         }
-        FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
+        FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"), new JsonMapperFactory(List.of()));
         assertThat(registry.instance("session-s1")).contains(first);
         try (var files = Files.list(dir.resolve("vector-stores/instances"))) {
             assertThat(files).hasSize(1);
@@ -50,7 +51,7 @@ class FileVectorStoreRegistryTest {
 
     @Test
     void templatesAndInstancesRoundTrip(@TempDir Path dir) {
-        FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
+        FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"), new JsonMapperFactory(List.of()));
         VectorStoreTemplate template = new VectorStoreTemplate("Chat Uploads", "embeddings", null, Map.of("description", "per chat"));
 
         VectorStoreTemplate saved = registry.saveTemplate(template);
@@ -67,7 +68,7 @@ class FileVectorStoreRegistryTest {
 
     @Test
     void membersAreListedRemovedAndGoWithTheStore(@TempDir Path dir) {
-        VectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
+        VectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"), new JsonMapperFactory(List.of()));
         EntityRef file = EntityRef.of(EntityType.FILE, EntityRef.FILE_STORE, "file-1");
         EntityRef doc = EntityRef.of(EntityType.DOCUMENT, "kb", "notes.md");
         registry.registerInstance(VectorStoreInstance.fromTemplate("kb",
@@ -93,7 +94,7 @@ class FileVectorStoreRegistryTest {
 
     @Test
     void indexDefinitionsRoundTrip(@TempDir Path dir) {
-        VectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
+        VectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"), new JsonMapperFactory(List.of()));
         IndexDefinition big = new IndexDefinition("big-kb", "pgvector", "mc_embedding_big", null, null, null, null, "large");
 
         registry.saveIndex(big);

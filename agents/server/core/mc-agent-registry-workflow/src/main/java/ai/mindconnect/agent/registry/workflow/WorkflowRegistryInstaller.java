@@ -6,6 +6,7 @@ import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -39,15 +40,16 @@ public class WorkflowRegistryInstaller implements RegistryInstaller {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowRegistryInstaller.class);
     /** Reads a serialised workflow as a plain tree, to search it for references. */
-    private static final ObjectMapper TREE_READER = new ObjectMapper();
+    private final ObjectMapper treeReader;
 
     private final WorkflowDataRepository repository;
     private final JacksonWorkflowSerializer serializer;
 
     public WorkflowRegistryInstaller(WorkflowDataRepository repository,
-                                     JacksonWorkflowSerializer serializer) {
+                                     JacksonWorkflowSerializer serializer, JsonMapperFactory json) {
         this.repository = repository;
         this.serializer = serializer;
+        this.treeReader = json.create();
     }
 
     @Override
@@ -78,7 +80,7 @@ public class WorkflowRegistryInstaller implements RegistryInstaller {
             try {
                 Optional<WorkflowData> workflow = repository.findById(id);
                 if (workflow.isPresent()
-                        && refersTo(TREE_READER.readTree(serializer.write(workflow.get())), type, name)) {
+                        && refersTo(treeReader.readTree(serializer.write(workflow.get())), type, name)) {
                     referring.add(id);
                 }
             } catch (Exception unreadable) {

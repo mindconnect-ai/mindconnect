@@ -1,6 +1,6 @@
 package ai.mindconnect.mail.view;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.mail.Location;
 import ai.mindconnect.mail.MailMessage;
 import ai.mindconnect.mail.Outcome;

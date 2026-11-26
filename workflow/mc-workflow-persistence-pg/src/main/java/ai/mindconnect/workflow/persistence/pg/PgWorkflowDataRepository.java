@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.pg;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Jsonb;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -45,12 +46,13 @@ public final class PgWorkflowDataRepository implements WorkflowDataRepository {
     private final JacksonWorkflowSerializer serializer;
     private final Supplier<String> partition;
 
-    public PgWorkflowDataRepository(DataSource dataSource, Supplier<String> partition) {
-        this(Sql.of(dataSource), partition);
+    public PgWorkflowDataRepository(DataSource dataSource, Supplier<String> partition, JsonMapperFactory json) {
+        this(Sql.of(dataSource), partition, json);
     }
 
-    public PgWorkflowDataRepository(Sql sql, Supplier<String> partition) {
-        this(sql, partition, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
+    /** @param json the host's mapper factory, so a definition's JSON knows the host's modules */
+    public PgWorkflowDataRepository(Sql sql, Supplier<String> partition, JsonMapperFactory json) {
+        this(sql, partition, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create(json)));
     }
 
     public PgWorkflowDataRepository(Sql sql, Supplier<String> partition, JacksonWorkflowSerializer serializer) {

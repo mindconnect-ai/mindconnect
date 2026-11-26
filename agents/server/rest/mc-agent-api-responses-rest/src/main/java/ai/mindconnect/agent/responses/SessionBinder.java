@@ -1,12 +1,13 @@
 package ai.mindconnect.agent.responses;
 
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.protocol.Session;
 import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
 import ai.mindconnect.agent.responses.wire.CreateResponseRequest;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
 
 
 /**
@@ -23,11 +24,10 @@ import ai.mindconnect.agent.runtime.service.AgentSessionService;
 public final class SessionBinder {
 
     private final AgentRuntimeBackend backend;
-    private final AgentSessionService sessions;
-    private final AgentDefinitionRepository agents;
+    private final SessionManagement sessions;
+    private final AgentManagement agents;
 
-    public SessionBinder(AgentRuntimeBackend backend, AgentSessionService sessions,
-                         AgentDefinitionRepository agents) {
+    public SessionBinder(AgentRuntimeBackend backend, SessionManagement sessions, AgentManagement agents) {
         this.backend = backend;
         this.sessions = sessions;
         this.agents = agents;
@@ -71,12 +71,14 @@ public final class SessionBinder {
      * agents it may call, and only the model moves.
      */
     private void applyModelOverride(Session session, ModelResolver.Resolution resolution) {
-        var definition = agents.findByName(resolution.agentName()).orElseThrow(
+        AgentDefinition definition = agents.findByName(resolution.agentName()).orElseThrow(
                 () -> new IllegalStateException("The default agent '" + resolution.agentName()
-                        + "' does not exist; a request naming an llm-config has nothing to run on."));
-
-        sessions.replaceSessionAgent(SessionId.of(session.id()),
-                new SessionAgentRef(definition.id(), true, definition.name(),
-                        resolution.llmConfigOverride(), null, null, null));
+                        + "' does not exist; a request naming an llm-config has nothing to run on."))
+                .definition();
+        // The session keeps a definition of its own from here on: the default agent, on the model asked for.
+        sessions.changeAgent(SessionId.of(session.id()), new AgentDefinition(definition.name(),
+                definition.description(), definition.instructions(),
+                ModelSettings.ofModel(resolution.llmConfigOverride()).over(definition.modelSettings()),
+                definition.tools(), definition.maxRounds(), definition.metadata()));
     }
 }

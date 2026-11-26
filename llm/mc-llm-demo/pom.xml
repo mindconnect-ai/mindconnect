@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-java-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-java-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-llm-demo</artifactId>
+    <name>mc-llm-demo</name>
+    <packaging>jar</packaging>
+    <description>
+        How a library user calls a model through the LLM gateway: with our providers, and
+        with a provider of their own built on the official OpenAI Java SDK.
+    </description>
+
+    <properties>
+        <!-- A demo, not a library anyone consumes: stays out of Maven Central. -->
+        <skipPublishing>true</skipPublishing>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <openai-java.version>4.100.0</openai-java.version>
+    </properties>
+
+    <!-- Only what this user really needs. Every dependency added here is part of the design. -->
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-provider-spi</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openai</groupId>
+            <artifactId>openai-java</artifactId>
+            <version>${openai-java.version}</version>
+        </dependency>
+        <!-- McEnv: the demos read the real key from mc.env. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Calling through LlmChat: routing, retry and the in-memory config store. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-gateway</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Our providers, for the two demos that use them. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-providers</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- The providers expect a mapper that knows the LLM types; they leave the choice to the caller,
+             and every mapper comes from JsonMapperFactory. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jackson</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-jackson</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

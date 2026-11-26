@@ -1,16 +1,16 @@
 package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
-import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,14 +40,14 @@ class SessionFilesApiControllerOwnershipTest {
     Path dir;
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
+    private final ai.mindconnect.agentrest.SessionFixture sessions = new ai.mindconnect.agentrest.SessionFixture();
     private FileStore store;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
-        var controller = new SessionFilesApiController(store, null, new SessionAccess(sessions));
+        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule())));
+        var controller = new SessionFilesApiController(store, null, new SessionAccess(sessions.runtime()));
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }
 
@@ -85,8 +85,6 @@ class SessionFilesApiControllerOwnershipTest {
     }
 
     private String session(String owner) {
-        AgentSession session = sessions.create(AgentSession.start(AgentId.of("default-chat"), UserId.of(owner),
-                ConversationId.random()));
-        return session.id().value();
+        return sessions.open(owner, null).id().value();
     }
 }

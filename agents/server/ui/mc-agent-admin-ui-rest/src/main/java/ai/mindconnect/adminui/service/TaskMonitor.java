@@ -1,16 +1,12 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
-import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
-import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.runtime.engine.service.RuntimeTask;
+import ai.mindconnect.agent.sdk.AgentRuntime;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.Subscription;
@@ -57,7 +53,7 @@ import java.util.function.Consumer;
  *       shares the user's stream instead of holding a connection of its
  *       own.</li>
  *   <li><b>Ownership.</b> A task belongs to whoever owns the session it runs
- *       for ({@code payload.sessionId} → {@link AgentSession#userId()}); a
+ *       for ({@code payload.sessionId} → {@link ManagedSession#userId()}); a
  *       sub-agent's session inherits its parent's user, so a whole task tree
  *       has one owner. Cancel is allowed for that user only.</li>
  * </ul>
@@ -80,8 +76,8 @@ public class TaskMonitor implements TaskListener {
     public record TaskView(TaskRecord task, String label, String detail, String owner, SessionId sessionId) {
         public String id() { return task.id(); }
         /** The namespace the task was submitted in; empty for a task nobody stamped. */
-        public Optional<ai.mindconnect.agent.Namespace> namespace() {
-            return ScopeTaskAdvisor.scopeIfAny(task).map(ai.mindconnect.agent.Scope::namespace);
+        public Optional<ai.mindconnect.agent.scope.Namespace> namespace() {
+            return namespaceOf(task);
         }
         public TaskStatus status() { return task.status(); }
         public boolean active() { return !task.status().terminal(); }
@@ -90,7 +86,7 @@ public class TaskMonitor implements TaskListener {
     /** The whole board at one instant. */
     public record Snapshot(List<TaskView> active, List<TaskView> recent, Instant at) {
         /** The board as one namespace sees it: its own tasks, plus any nobody stamped. */
-        public Snapshot in(ai.mindconnect.agent.Namespace namespace) {
+        public Snapshot in(ai.mindconnect.agent.scope.Namespace namespace) {
             if (namespace == null) return this;
             return new Snapshot(
                     active.stream().filter(v -> v.namespace().map(namespace::equals).orElse(true)).toList(),
@@ -121,8 +117,7 @@ public class TaskMonitor implements TaskListener {
     public enum CancelResult { CANCELLED, NOT_OWNER, ALREADY_FINISHED, UNKNOWN }
 
     private final LocalTaskQueue queue;
-    private final AgentSessionRepository sessions;
-    private final AgentDefinitionRepository definitions;
+    private final AgentRuntime runtime;
 
     private final Channel<Snapshot> channel = new ChannelRegistry().channel(CHANNEL_ID);
     private final AtomicBoolean pending = new AtomicBoolean();
@@ -143,29 +138,24 @@ public class TaskMonitor implements TaskListener {
     private final NamespaceService namespaces;
 
     /** A host without namespaces — lookups run wherever the repositories are bound. */
-    public TaskMonitor(LocalTaskQueue queue,
-                       AgentSessionRepository sessions,
-                       AgentDefinitionRepository definitions) {
-        this(queue, sessions, definitions, (ScopeSupplier) null, (NamespaceService) null);
+    public TaskMonitor(LocalTaskQueue queue, AgentRuntime runtime) {
+        this(queue, runtime, (ScopeSupplier) null, (NamespaceService) null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public TaskMonitor(LocalTaskQueue queue,
-                       AgentSessionRepository sessions,
-                       AgentDefinitionRepository definitions,
+                       AgentRuntime runtime,
                        org.springframework.beans.factory.ObjectProvider<ScopeSupplier> scope,
                        org.springframework.beans.factory.ObjectProvider<NamespaceService> namespaces) {
-        this(queue, sessions, definitions, scope.getIfAvailable(), namespaces.getIfAvailable());
+        this(queue, runtime, scope.getIfAvailable(), namespaces.getIfAvailable());
     }
 
     TaskMonitor(LocalTaskQueue queue,
-                AgentSessionRepository sessions,
-                AgentDefinitionRepository definitions,
+                AgentRuntime runtime,
                 ScopeSupplier scope,
                 NamespaceService namespaces) {
         this.queue = queue;
-        this.sessions = sessions;
-        this.definitions = definitions;
+        this.runtime = runtime;
         this.scope = scope;
         this.namespaces = namespaces;
         queue.addListener(this);
@@ -218,28 +208,32 @@ public class TaskMonitor implements TaskListener {
     }
 
     /** The badge's numbers as one namespace sees them; null counts everything. */
-    public Counts counts(ai.mindconnect.agent.Namespace namespace) {
+    public Counts counts(ai.mindconnect.agent.scope.Namespace namespace) {
         int running = countIn(TaskStatus.RUNNING, namespace);
         int waiting = countIn(TaskStatus.QUEUED, namespace) + countIn(TaskStatus.SUSPENDED, namespace);
         return new Counts(running, waiting);
     }
 
-    private int countIn(TaskStatus status, ai.mindconnect.agent.Namespace namespace) {
+    private int countIn(TaskStatus status, ai.mindconnect.agent.scope.Namespace namespace) {
         List<TaskRecord> records = queue.byStatus(status, QUERY_LIMIT);
         if (namespace == null) return records.size();
         return (int) records.stream().filter(task -> inNamespace(task, namespace)).count();
     }
 
     /** Whether {@code task} belongs to {@code namespace} — or to nobody, which every namespace sees. */
-    static boolean inNamespace(TaskRecord task, ai.mindconnect.agent.Namespace namespace) {
-        return ScopeTaskAdvisor.scopeIfAny(task).map(s -> s.namespace().equals(namespace)).orElse(true);
+    static boolean inNamespace(TaskRecord task, ai.mindconnect.agent.scope.Namespace namespace) {
+        return namespaceOf(task).map(namespace::equals).orElse(true);
+    }
+
+    /** The namespace the task was submitted in; empty for a task that carries none. */
+    private static Optional<ai.mindconnect.agent.scope.Namespace> namespaceOf(TaskRecord task) {
+        return RuntimeTask.of(task).map(RuntimeTask::namespace).map(ai.mindconnect.agent.scope.Namespace::new);
     }
 
     /** The board right now — for the dialog; the stream sends the same. */
     public Snapshot snapshot() {
-        Map<SessionId, Optional<AgentSession>> sessionCache = new HashMap<>();
-        Map<AgentId, Optional<AgentDefinition>> definitionCache = new HashMap<>();
-        Map<ai.mindconnect.agent.Namespace, Boolean> existing = new HashMap<>();
+        Map<SessionId, Optional<ManagedSession>> sessionCache = new HashMap<>();
+        Map<ai.mindconnect.agent.scope.Namespace, Boolean> existing = new HashMap<>();
 
         List<TaskRecord> active = new ArrayList<>();
         active.addAll(queue.byStatus(TaskStatus.RUNNING, QUERY_LIMIT));
@@ -255,50 +249,46 @@ public class TaskMonitor implements TaskListener {
         if (finished.size() > RECENT_LIMIT) finished = finished.subList(0, RECENT_LIMIT);
 
         return new Snapshot(
-                active.stream().map(t -> view(t, sessionCache, definitionCache, existing)).toList(),
-                finished.stream().map(t -> view(t, sessionCache, definitionCache, existing)).toList(),
+                active.stream().map(t -> view(t, sessionCache, existing)).toList(),
+                finished.stream().map(t -> view(t, sessionCache, existing)).toList(),
                 Instant.now());
     }
 
     private TaskView view(TaskRecord task,
-                          Map<SessionId, Optional<AgentSession>> sessionCache,
-                          Map<AgentId, Optional<AgentDefinition>> definitionCache,
-                          Map<ai.mindconnect.agent.Namespace, Boolean> existing) {
-        SessionId sessionId = sessionIdOf(task);
-        // The session and the agent live in the task's namespace: look them up there, whatever
-        // namespace the monitor's own thread is in. The caches stay correct because a session
-        // id is a UUID — the same id in two namespaces is not a case worth a compound key.
-        // A task of a namespace deleted since shows without them: no owner, agent or title.
-        Optional<AgentSession> session = sessionId == null
+                          Map<SessionId, Optional<ManagedSession>> sessionCache,
+                          Map<ai.mindconnect.agent.scope.Namespace, Boolean> existing) {
+        Optional<RuntimeTask> known = RuntimeTask.of(task);
+        SessionId sessionId = sessionIdOf(known);
+        // The session lives in the task's namespace: look it up there, whatever namespace the
+        // monitor's own thread is in. The cache stays correct because a session id is a UUID —
+        // the same id in two namespaces is not a case worth a compound key.
+        // A task of a namespace deleted since shows without it: no owner, agent or title.
+        Optional<ManagedSession> session = sessionId == null
                 ? Optional.empty()
                 : sessionCache.computeIfAbsent(sessionId, id -> inScopeOf(task, existing, () -> findSession(id)));
-        Optional<AgentDefinition> agent = session
-                .map(AgentSession::agentDefinitionId)
-                .flatMap(id -> definitionCache.computeIfAbsent(id,
-                        aid -> inScopeOf(task, existing, () -> findDefinition(aid))));
 
-        String agentName = agent.map(AgentDefinition::name).orElse(null);
         String label;
         String detail;
-        if (AgentTurnWorker.TYPE.equals(task.type())) {
-            label = agentName == null ? "Agent turn" : agentName;
-            detail = describeTurn(task, session.orElse(null));
-        } else if (ToolCallWorker.TYPE.equals(task.type())) {
-            Object toolName = task.payload().get(ToolCallWorker.TOOL_NAME);
-            label = toolName == null ? "Tool call" : String.valueOf(toolName);
-            detail = agentName == null ? "tool call" : "tool call by " + agentName;
-        } else {
+        if (known.isEmpty()) {
             label = task.type();
             detail = null;
+        } else if (known.get().kind() == RuntimeTask.Kind.TURN) {
+            String agentName = known.get().agentName();
+            label = agentName == null ? "Agent turn" : agentName;
+            detail = describeTurn(task, session.orElse(null));
+        } else {
+            String agentName = session.flatMap(found -> inScopeOf(task, existing, () -> agentNameOf(found)))
+                    .orElse(null);
+            label = known.get().toolName() == null ? "Tool call" : known.get().toolName();
+            detail = agentName == null ? "tool call" : "tool call by " + agentName;
         }
-        String owner = session.map(AgentSession::userId).map(UserId::value).orElse(null);
+        String owner = session.map(ManagedSession::userId).map(user -> user.value()).orElse(null);
         return new TaskView(task, label, detail, owner, sessionId);
     }
 
-    private static String describeTurn(TaskRecord task, AgentSession session) {
+    private static String describeTurn(TaskRecord task, ManagedSession session) {
         StringBuilder out = new StringBuilder();
-        int depth = ((Number) task.payload().getOrDefault(AgentTurnWorker.DEPTH, 0)).intValue();
-        out.append(depth == 0 ? "turn" : "sub-agent turn (depth " + depth + ")");
+        out.append(session != null && session.parentId() != null ? "sub-agent turn" : "turn");
         if (session != null && session.title() != null && !session.title().isBlank()) {
             out.append(" · ").append(session.title());
         }
@@ -311,19 +301,21 @@ public class TaskMonitor implements TaskListener {
      * Runs {@code body} bound to the namespace the task was submitted in, when there is one to bind —
      * and finds nothing, without touching that namespace's stores, when it no longer exists.
      */
-    private <T> Optional<T> inScopeOf(TaskRecord task, Map<ai.mindconnect.agent.Namespace, Boolean> existing,
+    private <T> Optional<T> inScopeOf(TaskRecord task, Map<ai.mindconnect.agent.scope.Namespace, Boolean> existing,
                                       java.util.function.Supplier<Optional<T>> body) {
         if (scope instanceof ThreadBoundScopeSupplier bound) {
-            Optional<ai.mindconnect.agent.Scope> stamped = ScopeTaskAdvisor.scopeIfAny(task);
+            Optional<RuntimeTask> stamped = RuntimeTask.of(task).filter(known -> known.namespace() != null);
             if (stamped.isEmpty()) return body.get();
-            if (!existing.computeIfAbsent(stamped.get().namespace(), this::exists)) return Optional.empty();
-            return bound.runIn(stamped.get(), body);
+            ai.mindconnect.agent.scope.Namespace namespace = new ai.mindconnect.agent.scope.Namespace(stamped.get().namespace());
+            if (!existing.computeIfAbsent(namespace, this::exists)) return Optional.empty();
+            return bound.runIn(ai.mindconnect.agent.scope.Scope.of(namespace,
+                    stamped.get().user() == null ? null : UserId.of(stamped.get().user())), body);
         }
         return body.get();
     }
 
     /** Whether {@code namespace} is still there; without a namespace service every one is. */
-    private boolean exists(ai.mindconnect.agent.Namespace namespace) {
+    private boolean exists(ai.mindconnect.agent.scope.Namespace namespace) {
         if (namespaces == null) return true;
         try {
             return namespaces.find(namespace).isPresent();
@@ -332,31 +324,27 @@ public class TaskMonitor implements TaskListener {
         }
     }
 
-    private Optional<AgentSession> findSession(SessionId id) {
+    private Optional<ManagedSession> findSession(SessionId id) {
         try {
-            return sessions.findById(id);
+            return runtime.service(SessionManagement.class)
+                    .find(id);
         } catch (RuntimeException e) {
             return Optional.empty();
         }
     }
 
-    private Optional<AgentDefinition> findDefinition(AgentId id) {
+    private Optional<String> agentNameOf(ManagedSession session) {
         try {
-            return definitions.findById(id);
+            return runtime.service(SessionManagement.class).agentOf(session.id()).map(agent -> agent.name());
         } catch (RuntimeException e) {
             return Optional.empty();
         }
     }
 
-    /**
-     * The session a task runs for. The payload carries the id's value; a
-     * payload missing it, or holding a value that is no id, has no session.
-     */
-    private static SessionId sessionIdOf(TaskRecord task) {
-        Object value = task.payload().get(AgentTurnWorker.SESSION_ID);
-        if (value == null) return null;
+    /** The session a task runs for; a task that names none, or a value that is no id, has no session. */
+    private static SessionId sessionIdOf(Optional<RuntimeTask> task) {
         try {
-            return SessionId.of(String.valueOf(value));
+            return task.map(RuntimeTask::sessionId).map(SessionId::of).orElse(null);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -379,7 +367,7 @@ public class TaskMonitor implements TaskListener {
         Optional<TaskRecord> record = queue.get(taskId);
         if (record.isEmpty()) return CancelResult.UNKNOWN;
         if (record.get().status().terminal()) return CancelResult.ALREADY_FINISHED;
-        TaskView view = view(record.get(), new HashMap<>(), new HashMap<>(), new HashMap<>());
+        TaskView view = view(record.get(), new HashMap<>(), new HashMap<>());
         if (view.owner() == null || !view.owner().equals(userId)) return CancelResult.NOT_OWNER;
         return queue.cancel(taskId) ? CancelResult.CANCELLED : CancelResult.ALREADY_FINISHED;
     }

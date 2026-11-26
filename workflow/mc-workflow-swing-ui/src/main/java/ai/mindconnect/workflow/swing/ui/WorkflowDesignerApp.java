@@ -1,6 +1,9 @@
 package ai.mindconnect.workflow.swing.ui;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+
 import javax.swing.*;
+import java.util.List;
 
 /**
  * Entry point for the Workflow Designer Swing application.
@@ -25,7 +28,7 @@ public class WorkflowDesignerApp {
         }
 
         SwingUtilities.invokeLater(() -> {
-            WorkflowDesignerFrame frame = new WorkflowDesignerFrame();
+            WorkflowDesignerFrame frame = new WorkflowDesignerFrame(new JsonMapperFactory(List.of()));
             frame.setVisible(true);
         });
     }

@@ -1,9 +1,10 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpCaller;
 import ai.mindconnect.mcp.gateway.McpGatewayException;
 import ai.mindconnect.mcp.gateway.McpResult;
@@ -54,7 +55,7 @@ class LocalMcpGatewayForgetTest {
 
     private LocalMcpGateway gateway(InMemoryRepository repository) {
         return new LocalMcpGateway(repository, proxy, sessions,
-                new FileMcpDiscoveryStore(storage, ScopeSupplier.fixed(Namespace.DEFAULT)), ScopeSupplier.fixed(Namespace.DEFAULT), "nothing-here",
+                new FileMcpDiscoveryStore(storage, ScopeSupplier.fixed(Namespace.DEFAULT), new JsonMapperFactory(List.of())), ScopeSupplier.fixed(Namespace.DEFAULT), "nothing-here",
                 McpStartPolicy.allowAll());
     }
 

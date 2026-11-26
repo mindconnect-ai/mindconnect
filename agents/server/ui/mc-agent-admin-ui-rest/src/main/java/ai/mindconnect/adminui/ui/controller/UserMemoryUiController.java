@@ -4,10 +4,9 @@ import ai.mindconnect.adminui.ui.component.UserMemoryComponent;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiNode;
@@ -45,15 +44,15 @@ public class UserMemoryUiController {
     /** Null on a runtime without the memory. */
     private final UserMemoryService memory;
     /** For the agents' names; null leaves their ids. */
-    private final AgentDefinitionRepository agents;
+    private final AgentManagement agents;
 
     @Autowired
-    public UserMemoryUiController(ObjectProvider<UserMemoryService> memory,
-                                  ObjectProvider<AgentDefinitionRepository> agents) {
-        this(memory.getIfAvailable(), agents.getIfAvailable());
+    public UserMemoryUiController(ObjectProvider<ai.mindconnect.agent.sdk.AgentRuntime> runtime) {
+        this(runtime.stream().findFirst().flatMap(found -> found.find(UserMemoryService.class)).orElse(null),
+                runtime.stream().findFirst().flatMap(found -> found.find(AgentManagement.class)).orElse(null));
     }
 
-    UserMemoryUiController(UserMemoryService memory, AgentDefinitionRepository agents) {
+    UserMemoryUiController(UserMemoryService memory, AgentManagement agents) {
         this.memory = memory;
         this.agents = agents;
     }
@@ -101,11 +100,12 @@ public class UserMemoryUiController {
         return agentNames(agents);
     }
 
-    static Function<AgentId, String> agentNames(AgentDefinitionRepository agents) {
+    static Function<AgentId, String> agentNames(AgentManagement agents) {
         if (agents == null) return id -> null;
         return id -> {
             try {
-                return agents.findById(id).map(AgentDefinition::name).orElse(null);
+                return agents.find(id)
+                        .map(agent -> agent.definition().name()).orElse(null);
             } catch (RuntimeException e) {
                 return null;   // a name is a nicety; the id stands in
             }

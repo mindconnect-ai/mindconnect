@@ -1,6 +1,6 @@
 package ai.mindconnect.filestore;
 
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -9,13 +9,14 @@ import java.util.ServiceLoader;
 
 /**
  * SPI for file-store backends, discovered via {@link ServiceLoader} — the same
- * pattern as the vector-store backends. {@code filesystem} ships built-in;
- * {@code s3} or {@code db} backends live in sibling modules and register the
- * same way.
+ * pattern as the vector-store backends. {@code s3} or {@code db} backends live
+ * in sibling modules and register this way. The filesystem store is not one:
+ * the runtime builds it with its own mapper factory, which a backend found by
+ * the {@link ServiceLoader} has no way to be given.
  */
 public interface FileStoreBackend {
 
-    /** Machine name ({@code "filesystem"}, {@code "s3"}, {@code "db"}). */
+    /** Machine name ({@code "s3"}, {@code "db"}). */
     String type();
 
     /**

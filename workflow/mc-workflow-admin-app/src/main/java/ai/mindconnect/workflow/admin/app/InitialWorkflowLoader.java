@@ -1,6 +1,7 @@
 package ai.mindconnect.workflow.admin.app;
 
 import ai.mindconnect.initialdata.ImportInitialDataInstaller;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -22,11 +23,11 @@ public class InitialWorkflowLoader implements ApplicationRunner {
     private static final String LOCATION = "classpath:initial-data/workflows/*.json";
 
     private final WorkflowDataRepository workflows;
-    private final JacksonWorkflowSerializer serializer =
-            new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create());
+    private final JacksonWorkflowSerializer serializer;
 
-    public InitialWorkflowLoader(WorkflowDataRepository workflows) {
+    public InitialWorkflowLoader(WorkflowDataRepository workflows, JsonMapperFactory json) {
         this.workflows = workflows;
+        this.serializer = new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create(json));
     }
 
     @Override

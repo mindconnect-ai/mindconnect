@@ -1,7 +1,8 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
 import ai.mindconnect.mcp.gateway.McpTarget;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,7 +75,7 @@ class FileMcpServerRepositoryTest {
                 { "id": "gmail", "target": { "type": "process", "command": ["a"] } }
                 """);
 
-        assertThat(new FileMcpServerRepository(base, ScopeSupplier.fixed(new Namespace("other"))).findAll()).isEmpty();
+        assertThat(new FileMcpServerRepository(base, ScopeSupplier.fixed(new Namespace("other")), new JsonMapperFactory(List.of())).findAll()).isEmpty();
     }
 
     @Test
@@ -157,7 +159,7 @@ class FileMcpServerRepositoryTest {
     }
 
     private FileMcpServerRepository repository() {
-        return new FileMcpServerRepository(base, ScopeSupplier.fixed(ACME));
+        return new FileMcpServerRepository(base, ScopeSupplier.fixed(ACME), new JsonMapperFactory(List.of()));
     }
 
     private void write(String name, String json) throws IOException {

@@ -1,9 +1,9 @@
 package ai.mindconnect.agent.tools.workflow.project;
 
-import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tools.workflow.step.CallerLimits;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.schema.Schema;
 import ai.mindconnect.schema.SchemaValidator;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -35,12 +35,14 @@ final class RunWorkflowTool implements Tool {
     private final ToolCallScope scope;
     private final CallerLimits limits;
     private final List<ProjectWorkflows.ProjectWorkflow> listed;
+    private final JsonMapperFactory json;
 
-    RunWorkflowTool(ToolCallScope scope, CallerLimits limits) {
+    RunWorkflowTool(ToolCallScope scope, CallerLimits limits, JsonMapperFactory json) {
         this.scope = scope;
         this.workingDir = scope == null ? null : scope.workingDir();
         this.limits = limits;
-        this.listed = ProjectWorkflows.list(workingDir);
+        this.json = json;
+        this.listed = ProjectWorkflows.list(workingDir, json);
     }
 
     @Override
@@ -108,7 +110,7 @@ final class RunWorkflowTool implements Tool {
         if (name == null || name.isBlank()) {
             return "Error: name the workflow to run.";
         }
-        ProjectWorkflows.ProjectWorkflow found = ProjectWorkflows.find(workingDir, name).orElse(null);
+        ProjectWorkflows.ProjectWorkflow found = ProjectWorkflows.find(workingDir, name, json).orElse(null);
         if (found == null) {
             return "Error: this project defines no workflow '" + name + "'.";
         }
@@ -128,7 +130,7 @@ final class RunWorkflowTool implements Tool {
         if (scope != null) attributes.put(ToolCallScope.class.getName(), scope);
         attributes.put(CallerLimits.class.getName(), limits);
         try {
-            WorkflowResult result = new WorkflowExecutorService(RestrictedWorkflowContext.create())
+            WorkflowResult result = new WorkflowExecutorService(RestrictedWorkflowContext.create(json))
                     .withEnvironment(Map::of)
                     .executeWorkflow(wf, input, attributes);
             if (result.isError()) {

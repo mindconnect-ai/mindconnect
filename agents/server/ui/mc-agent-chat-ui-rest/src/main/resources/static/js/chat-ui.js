@@ -174,18 +174,14 @@
             return;
         }
         switch (event.type) {
-            case "turn_started":
-                setBadge(row, BADGE_RUNNING);
+            case "session_status":
+                // What goes on in the session now: a turn runs, one waits for an answer, or none does.
+                if (event.status === "BUSY") setBadge(row, BADGE_RUNNING);
+                else if (event.status === "WAITING") setBadge(row, BADGE_NEEDS_INPUT);
+                else setBadge(row, row.dataset.unseen ? BADGE_NEW : "now");
                 break;
-            case "approval_requested":
-                setBadge(row, BADGE_NEEDS_INPUT);
-                break;
-            case "approval_answered":
-                // The turn goes on; the card is gone.
-                if (row.classList.contains("needs-input")) setBadge(row, BADGE_RUNNING);
-                break;
-            case "turn_finished":
-                setBadge(row, row.dataset.unseen ? BADGE_NEW : "now");
+            case "session_deleted":
+                row.remove();
                 break;
             case "session_titled": {
                 const label = row.querySelector(".sui-menu-label");

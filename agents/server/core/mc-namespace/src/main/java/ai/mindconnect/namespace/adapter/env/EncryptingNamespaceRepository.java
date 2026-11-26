@@ -1,6 +1,6 @@
 package ai.mindconnect.namespace.adapter.env;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
@@ -56,6 +56,24 @@ public class EncryptingNamespaceRepository implements NamespaceRepository {
     @Override
     public boolean deleteById(Namespace id) {
         return delegate.deleteById(id);
+    }
+
+    /**
+     * Stores every namespace's variables in the current encryption scheme where an
+     * earlier one wrote them, and says how many records that changed. Once
+     * at start: a record nobody saves would otherwise keep its earlier
+     * ciphertext for good. A value this key does not read stays as it is.
+     */
+    public int rewriteEarlierScheme() {
+        int rewritten = 0;
+        for (NamespaceDefinition namespace : delegate.findAll()) {
+            Map<String, String> environment = encryption.reencryptValuesOfEarlierScheme(namespace.environment());
+            if (!environment.equals(namespace.environment())) {
+                delegate.save(namespace.withEnvironment(environment));
+                rewritten++;
+            }
+        }
+        return rewritten;
     }
 
     /**

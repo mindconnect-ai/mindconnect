@@ -4,10 +4,10 @@ import ai.mindconnect.adminui.ui.page.SkillDetailPage;
 import ai.mindconnect.adminui.ui.page.SkillFormPage;
 import ai.mindconnect.adminui.ui.page.SkillListPage;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
-import ai.mindconnect.agent.runtime.skill.SkillId;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.domain.Skill;
+import ai.mindconnect.agent.skill.domain.SkillId;
+import ai.mindconnect.agent.runtime.infrastructure.UserSkillDirectory;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.ui.model.UiPage;
@@ -47,29 +47,22 @@ import java.util.Optional;
 public class SkillUiController {
 
     private final ObjectProvider<SkillRepository> repositoryProvider;
-    private final ObjectProvider<SkillCatalog> catalogProvider;
+    private final UserSkillDirectory userSkills;
 
     /**
-     * Both dependencies are optional, as the MCP gateway's are on the tools
-     * screen: a host that wires no skill store still gets the screen, reading
-     * whatever files there are and saying plainly that it cannot store one.
+     * The store is optional, as the MCP gateway is on the tools screen: a
+     * host that wires none still gets the screen, reading whatever files
+     * there are and saying plainly that it cannot store one.
      */
-    public SkillUiController(ObjectProvider<SkillRepository> repository,
-                             ObjectProvider<SkillCatalog> catalog) {
+    public SkillUiController(ObjectProvider<SkillRepository> repository, UserSkillDirectory userSkills) {
         this.repositoryProvider = repository;
-        this.catalogProvider = catalog;
+        this.userSkills = userSkills;
     }
 
     /** The store, or one that holds nothing when this host wires none. */
     private SkillRepository repository() {
         SkillRepository stored = repositoryProvider.getIfAvailable();
         return stored == null ? SkillRepository.empty() : stored;
-    }
-
-    /** The catalog, or one with only the file scopes. */
-    private SkillCatalog catalog() {
-        SkillCatalog wired = catalogProvider.getIfAvailable();
-        return wired == null ? SkillCatalog.none() : wired;
     }
 
     /** Whether this installation can store a skill at all. */
@@ -198,7 +191,8 @@ public class SkillUiController {
      */
     private List<Skill> visible(OidcUser user) {
         List<Skill> skills = new java.util.ArrayList<>(repository().findAll());
-        skills.addAll(catalog().userSkills(userIdOf(user)));
+        UserId owner = userIdOf(user);
+        skills.addAll(userSkills.skills(owner == null ? null : owner.value()));
         return List.copyOf(skills);
     }
 

@@ -5,6 +5,8 @@ import ai.mindconnect.agent.SessionId;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,7 +77,7 @@ class ChatFormDuringTurnTest {
     void bothSwitchesLeaveTheTypedTextAlone() {
         var form = new ChatFormComponent(SESSION, AGENT);
 
-        for (var op : new Object[]{form.toStreaming(), form.toIdle()}) {
+        for (var op : new Object[]{form.toStreaming(new JsonMapperFactory(List.of()).create()), form.toIdle(new JsonMapperFactory(List.of()).create())}) {
             JsonNode patch = tree(op);
             assertThat(patch.path("op").asText()).isEqualTo("MERGE");
             assertThat(patch.path("targetId").asText()).isEqualTo(ChatFormComponent.formId(SESSION));
@@ -91,12 +93,12 @@ class ChatFormDuringTurnTest {
             }
         }
 
-        JsonNode streaming = tree(form.toStreaming()).path("attributes");
+        JsonNode streaming = tree(form.toStreaming(new JsonMapperFactory(List.of()).create())).path("attributes");
         assertThat(streaming.path("cssClass").asText()).contains("chat-form--streaming");
         assertThat(streaming.path("content")).isEmpty();
         assertThat(action(streaming.path("actions"), "send").path("enabled").asBoolean()).isFalse();
 
-        JsonNode idle = tree(form.toIdle()).path("attributes");
+        JsonNode idle = tree(form.toIdle(new JsonMapperFactory(List.of()).create())).path("attributes");
         assertThat(idle.path("cssClass").asText()).isEqualTo("chat-form");
         assertThat(idle.path("content")).isNotEmpty();
         assertThat(action(idle.path("actions"), "send").path("onClick").path("url").asText())

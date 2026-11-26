@@ -1,10 +1,5 @@
 package ai.mindconnect.agent.tool;
 
-import ai.mindconnect.agent.EntityId;
-
-import java.util.List;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import java.util.Map;
 
 /**
@@ -24,10 +19,8 @@ import java.util.Map;
  *   <li>{@code callTimeout}, {@code requireConfirmation} (planned, not yet read in v0)</li>
  * </ul>
  *
- * <p>The legacy fields {@code toolType}, {@code toolConfig}, {@code inputSchema}
- * and {@code agentDefinitionId} have been removed. Older persisted JSON containing
- * those keys is tolerated via {@link JsonIgnoreProperties} so existing agent files
- * keep loading.
+ * <p>How a binding stands in an agent file is the file format's business:
+ * {@code AgentToolJson} in {@code mc-agent-management}.
  */
 public record AgentTool(
         /** The binding's own id; unique within its agent. */
@@ -89,37 +82,5 @@ public record AgentTool(
                                String description, Map<String, Object> overrides) {
         return new AgentTool(AgentToolId.random(), name, description,
                 overrides == null ? Map.of() : Map.copyOf(overrides));
-    }
-
-    /**
-     * The persisted shape of a binding, lenient where a hand-written file is:
-     * a missing id gets a fresh one, missing flags take their defaults. Older
-     * files carry an {@code agentDefinitionId}; it is ignored.
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Json(String id, String name, String description, Map<String, Object> overrides,
-                       Boolean enabled, Boolean deferred, Boolean needsApproval, Integer maxResultChars) {
-
-        public AgentTool toTool() {
-            return new AgentTool(
-                    AgentToolId.of(id == null ? EntityId.randomValue() : id),
-                    name, description, overrides,
-                    enabled == null || enabled,
-                    deferred != null && deferred,
-                    needsApproval != null && needsApproval,
-                    maxResultChars);
-        }
-    }
-
-    public Json toJson() {
-        return new Json(id.value(), name, description, overrides, enabled, deferred, needsApproval, maxResultChars);
-    }
-
-    public static List<AgentTool> fromJson(List<Json> tools) {
-        return tools == null ? List.of() : tools.stream().map(t -> t.toTool()).toList();
-    }
-
-    public static List<Json> toJson(List<AgentTool> tools) {
-        return tools == null ? List.of() : tools.stream().map(AgentTool::toJson).toList();
     }
 }

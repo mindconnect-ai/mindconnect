@@ -1,13 +1,13 @@
 package ai.mindconnect.adminui.namespaces;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.Email;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.namespace.domain.Email;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.Scope;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.namespace.service.NamespaceService;
@@ -41,28 +41,39 @@ class NamespaceWriteGuardTest {
             id -> Optional.of(Email.of(id.value() + "@acme.example")), "acme.example", List.of());
 
     /** A store that records what reached it, so a refused write is visible as "nothing did". */
-    private static final class Recording implements AgentDefinitionRepository {
+    private static final class Recording implements AgentManagement {
         final List<String> saved = new ArrayList<>();
         final List<AgentId> deleted = new ArrayList<>();
 
-        @Override public AgentDefinition save(AgentDefinition definition) {
-            saved.add(definition.name());
-            return definition;
+        @Override public ManagedAgent create(ManagedAgent agent) {
+            saved.add(agent.definition().name());
+            return agent;
         }
 
-        @Override public void deleteById(AgentId id) {
+        @Override public ManagedAgent update(AgentId id, long expectedVersion,
+                                             java.util.function.UnaryOperator<ManagedAgent> change) {
+            saved.add(id.value());
+            return null;
+        }
+
+        @Override public ManagedAgent copy(AgentId id) {
+            saved.add(id.value());
+            return null;
+        }
+
+        @Override public void delete(AgentId id) {
             deleted.add(id);
         }
 
-        @Override public Optional<AgentDefinition> findById(AgentId id) {
+        @Override public Optional<ManagedAgent> find(AgentId id) {
             return Optional.empty();
         }
 
-        @Override public Optional<AgentDefinition> findByName(String name) {
+        @Override public Optional<ManagedAgent> findByName(String name) {
             return Optional.empty();
         }
 
-        @Override public List<AgentDefinition> findAll() {
+        @Override public List<ManagedAgent> list() {
             return List.of();
         }
     }
@@ -74,30 +85,32 @@ class NamespaceWriteGuardTest {
         namespaces.invite(ACME, DAVID, Email.of("alice@acme.example"), NamespaceRole.USER);
     }
 
-    private AgentDefinitionRepository guardedFor(Scope scope) {
-        return new GuardedRepositories.Agents(store,
+    private AgentManagement guardedFor(Scope scope) {
+        return new GuardedRepositories.ManagedAgents(store,
                 new NamespaceWriteGuard(namespaces, ScopeSupplier.fixed(scope)));
     }
 
-    private static AgentDefinition agent() {
-        return AgentDefinition.create("helper", "Helps", "Be helpful.", null, null);
+    private static ManagedAgent agent() {
+        return ManagedAgent.of(new ai.mindconnect.agent.runtime.api.domain.AgentDefinition("helper", "Helps",
+                "Be helpful.", ai.mindconnect.agent.runtime.api.domain.ModelSettings.NONE, List.of(), 10,
+                java.util.Map.of()));
     }
 
     @Test
     void anAdminOfTheNamespaceWrites() {
-        guardedFor(Scope.of(ACME, DAVID)).save(agent());
+        guardedFor(Scope.of(ACME, DAVID)).create(agent());
 
         assertThat(store.saved).containsExactly("helper");
     }
 
     @Test
     void aUserOfTheNamespaceDoesNot_andNothingReachesTheStore() {
-        AgentDefinitionRepository guarded = guardedFor(Scope.of(ACME, ALICE));
+        AgentManagement guarded = guardedFor(Scope.of(ACME, ALICE));
 
-        assertThatThrownBy(() -> guarded.save(agent()))
+        assertThatThrownBy(() -> guarded.create(agent()))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("Only an admin of 'acme'");
-        assertThatThrownBy(() -> guarded.deleteById(AgentId.of("a1")))
+        assertThatThrownBy(() -> guarded.delete(AgentId.of("a1")))
                 .isInstanceOf(AccessDeniedException.class);
 
         assertThat(store.saved).isEmpty();
@@ -105,17 +118,63 @@ class NamespaceWriteGuardTest {
     }
 
     @Test
-    void readingIsUntouched_aUserChatsWithTheAgentsOfTheirNamespace() {
-        AgentDefinitionRepository guarded = guardedFor(Scope.of(ACME, ALICE));
+    void theAgentsTheRuntimeGivesOutAreGuardedTheSame_aUserReadsAndDoesNotWrite() {
+        List<String> reached = new ArrayList<>();
+        var managed = new ai.mindconnect.agent.management.api.AgentManagement() {
+            @Override public List<ai.mindconnect.agent.management.api.ManagedAgent> list() {
+                reached.add("list");
+                return List.of();
+            }
+            @Override public Optional<ai.mindconnect.agent.management.api.ManagedAgent> find(
+                    AgentId id) { return Optional.empty(); }
+            @Override public Optional<ai.mindconnect.agent.management.api.ManagedAgent> findByName(String name) {
+                return Optional.empty();
+            }
+            @Override public ai.mindconnect.agent.management.api.ManagedAgent create(
+                    ai.mindconnect.agent.management.api.ManagedAgent agent) {
+                reached.add("create");
+                return agent;
+            }
+            @Override public ai.mindconnect.agent.management.api.ManagedAgent update(
+                    AgentId id, long expectedVersion,
+                    java.util.function.UnaryOperator<ai.mindconnect.agent.management.api.ManagedAgent> change) {
+                reached.add("update");
+                return null;
+            }
+            @Override public ai.mindconnect.agent.management.api.ManagedAgent copy(
+                    AgentId id) {
+                reached.add("copy");
+                return null;
+            }
+            @Override public void delete(AgentId id) {
+                reached.add("delete");
+            }
+        };
+        var guarded = new GuardedRepositories.ManagedAgents(managed,
+                new NamespaceWriteGuard(namespaces, ScopeSupplier.fixed(Scope.of(ACME, ALICE))));
+        var id = AgentId.of("a1");
 
-        assertThat(guarded.findAll()).isEmpty();
+        assertThat(guarded.list()).isEmpty();
+        assertThatThrownBy(() -> guarded.create(null)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guarded.update(id, 1, agent -> agent)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guarded.copy(id)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guarded.delete(id)).isInstanceOf(AccessDeniedException.class);
+
+        assertThat(reached).containsExactly("list");
+    }
+
+    @Test
+    void readingIsUntouched_aUserChatsWithTheAgentsOfTheirNamespace() {
+        AgentManagement guarded = guardedFor(Scope.of(ACME, ALICE));
+
+        assertThat(guarded.list()).isEmpty();
         assertThat(guarded.findByName("helper")).isEmpty();
-        assertThat(guarded.findById(AgentId.of("a1"))).isEmpty();
+        assertThat(guarded.find(AgentId.of("a1"))).isEmpty();
     }
 
     @Test
     void workWithNoUserBehindItPasses_orAnInstallationCouldNotSeedItself() {
-        guardedFor(Scope.of(ACME, null)).save(agent());
+        guardedFor(Scope.of(ACME, null)).create(agent());
 
         assertThat(store.saved).as("the initial data loader, a migration, the runtime warming up")
                 .containsExactly("helper");
@@ -123,7 +182,7 @@ class NamespaceWriteGuardTest {
 
     @Test
     void theOpenDefaultNamespaceMakesEverybodyAnAdmin_soNothingChangesForASingleUserInstall() {
-        guardedFor(Scope.of(Namespace.DEFAULT, ALICE)).save(agent());
+        guardedFor(Scope.of(Namespace.DEFAULT, ALICE)).create(agent());
 
         assertThat(store.saved).containsExactly("helper");
     }

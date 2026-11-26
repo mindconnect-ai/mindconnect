@@ -1,5 +1,7 @@
 package ai.mindconnect.workflow.jackson;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
+import java.util.List;
 import ai.mindconnect.workflow.domain.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.assertj.core.api.Assertions;
@@ -11,7 +13,7 @@ import org.junit.jupiter.api.Test;
  */
 public class WorkflowObjectMapperFactoryTest {
 
-    private final ObjectMapper mapper = WorkflowObjectMapperFactory.create();
+    private final ObjectMapper mapper = WorkflowObjectMapperFactory.create(new JsonMapperFactory(List.of()));
 
     @Test
     public void workflowDataRoundTrip() throws Exception {

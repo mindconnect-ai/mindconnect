@@ -1,10 +1,4 @@
-| `mindconnect.namespace` | `local` | The default namespace: the one start-up work runs in, and open to every signed-in user until `mindconnect.namespace-admins` names its admins — the runtime build, the tool warm-up, the seed loaders. A request or task that names none does **not** land here: with the namespace starter the scope is strict and an unbound thread that touches a store fails instead, because on a server that silence is a leak between namespaces. Bound to `MC_NAMESPACE` in the apps' yaml. |
-| `mindconnect.agent.sub-agents.max-depth` | `5` | How deep a chain of sub-agents may go before a turn is refused. Delegation itself comes from `mc-agent-runtime-feature-subagents`; without that module on the classpath an agent's roster yields no `run_agent`. |
-| `mindconnect.task-queue.retention` | — | How long finished task trees stay readable (ISO-8601, e.g. `PT1H`). Unset keeps them, which is what the Admin UI's task monitor reads. |
-| `mindconnect.task-queue.maintenance-interval` | `PT20S` | How often the queue renews leases, reclaims dead ones and applies the retention. |
-| `mindconnect.task-queue.store` | `memory` | `memory`, or `jdbc` for a store in the runtime's Postgres that several nodes share, each claiming with a lease. `jdbc` needs `mindconnect.persistence=postgres`. |
-| `mindconnect.task-queue.node-id` | host and pid | This node's name on a shared store. |
-| `mindconnect.task-queue.lease` | `PT30S` | How long a claim on a shared store holds before another node may take the task over. |---
+---
 title: Environment variables
 sidebar_position: 10
 ---
@@ -86,17 +80,29 @@ one, the namespace's when it has one, and the server's otherwise; the
 `MINDCONNECT_ENCRYPTION_SECRET_KEY` and are never shown again once saved — the
 tables list names only. Removing a variable lets the next place answer.
 
+Every stored secret — these variables, an LLM config's literal API key, a
+connection's credentials, an OAuth client secret, a vector store's password —
+is encrypted with AES-GCM under that key, with a random nonce per value: the
+same secret stored twice looks different, and a stored value that was changed
+is refused rather than decrypted. A stored value reads `enc:v2:…`. Values
+written before 1.0 read `enc:…` without the `v2:` (AES in ECB mode); they are
+still read with the same key, and the server rewrites them in the new form
+when it starts — in every namespace; the log says how many records that were.
+An earlier version cannot read `enc:v2:` values, so take a backup before the
+first start of 1.0. Changing the key makes every stored secret unreadable —
+there is no key rotation.
+
 The lookup is pluggable: the gateways take an `EnvVarResolver`, the servers
 wire the chain above (`UserEnvVarResolver`, `NamespaceEnvVarResolver`,
 `EnvVarResolver.system()`), a library gets the process environment unless it
-passes `AgentRuntimeBuilder.envVarResolver(…)` — a vault, say — and any Spring
+hands its own to `LlmPlugin` — a vault, say — and any Spring
 host may define an `EnvVarResolver` bean of its own.
 
 ## Core
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `MINDCONNECT_ENCRYPTION_SECRET_KEY` | _(none)_ | **Required.** Encrypts stored LLM credentials. No default on purpose — the app **fails to start** without it. Must be **16, 24 or 32 characters** (used directly as an AES key). |
+| `MINDCONNECT_ENCRYPTION_SECRET_KEY` | _(none)_ | **Required.** Encrypts every stored secret (AES-GCM, see [above](#your-own-and-your-namespaces-variables)). No default on purpose — the app **fails to start** without it. Must be **16, 24 or 32 characters** (used directly as an AES key). |
 | `MC_PERSISTENCE` | `file` | `file` keeps everything under `mindconnect.data.base-dir`; `postgres` keeps it in the database — see [Persistence](./persistence.md#postgres). Since 0.3.0. |
 | `MC_NAMESPACE` | `local` | The namespace this process runs in: file data lives under `<base-dir>/<namespace>/`, Postgres rows carry it in their key. One process serves one namespace. |
 | `MC_NAMESPACE_ADMINS` | _(empty)_ | Who shapes the default namespace — a comma-separated list of e-mail addresses. **Naming anybody closes it:** from then on being signed in is not the same as being let in, and an account listed in no namespace is turned away at `/no-access` (403 for the API) instead of landing in the default one. Empty keeps it open to every signed-in user, who is an admin there — a single-user installation and the dev mode as they always were. |
@@ -113,8 +119,9 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 
 | Property | Default | Notes |
 |----------|---------|-------|
-| `mindconnect.persistence` | `file` | `file` or `postgres` — bound to `MC_PERSISTENCE` in the apps' yaml. |
-| `mindconnect.namespace` | `local` | The default namespace: where a request or thread works that names none — bound to `MC_NAMESPACE` in the apps' yaml. Open to every signed-in user while `namespace-admins` names nobody. |
+| `mindconnect.persistence` | `file` | `file`, `postgres`, or `memory` for a runtime that keeps nothing past the process — bound to `MC_PERSISTENCE` in the apps' yaml. |
+| `mindconnect.migrations.enabled` | `true` | Whether the starter brings every namespace's data up to this version on its first use after start — see [Migrations](./persistence.md#migrations). |
+| `mindconnect.namespace` | `local` | The default namespace: the one start-up work runs in, and open to every signed-in user until `mindconnect.namespace-admins` names its admins — the runtime build, the tool warm-up, the seed loaders. A request or task that names none does **not** land here: with the namespace starter the scope is strict and an unbound thread that touches a store fails instead, because on a server that silence is a leak between namespaces. Bound to `MC_NAMESPACE` in the apps' yaml. |
 | `mindconnect.namespace-admins` | _(empty)_ | The admins of that namespace, as e-mail addresses; naming anybody closes it (see `MC_NAMESPACE_ADMINS`). |
 | `mindconnect.email-domain` | `local` | What a bare name becomes an address with, and the address of an account whose provider gives none. |
 | `mindconnect.time-zone` | the JVM's zone | The time zone of a user who has none of their own yet — an IANA id such as `Europe/Zurich`; a user's own comes from their browser or their profile page (see [the user's time zone](./prompt-renderer.md#the-users-time-zone)). A value that is no zone stops the app from starting. Bound to `MC_TIME_ZONE` in the apps' yaml. |
@@ -126,6 +133,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.tools.disabled` | — | Tools this installation does not offer at all, comma-separated (`bash,process_kill,process_list`). They leave every catalog and never resolve — an agent definition that names one goes without it, and the Admin UI's tool settings cannot switch it back on. `MC_TOOLS_DISABLED` in the `server` profile. |
 | `mindconnect.extensions.disabled` | _(empty)_ | Extensions switched off everywhere, by id, comma-separated — no namespace and no brand can switch them on. `MC_EXTENSIONS_DISABLED` in the `server` profile. |
 | `mindconnect.extensions.strict` | `false` | What a problem with the [extensions](./admin-ui/extensions.md) on the classpath means at start: `false` logs it and starts — two manifests with one id, a manifest that cannot be read, a jar that brings tools without a manifest; `true` refuses to start, for an installation that wants nothing on its classpath it has not been told about. `MC_EXTENSIONS_STRICT` in the `server` profile. |
+| `mindconnect.sessions.delete-directory` | `false` | Whether deleting a session also deletes its own directory (`sessions/<session-id>` under the user's home) with everything an agent wrote there. Off by default: deleting a chat does not take files with it. A directory the user chose is never deleted. |
 | `mindconnect.working-dirs.choice` | `true` | Whether a user may choose a chat's directories. `false`: no folder button in the chat, `workingDir`/`additionalDirs` on `POST /api/sessions`, `PUT /api/sessions/{id}/working-dir` and `GET /api/directories` are refused (`/cd` and `/add-dir` in the CLI too), and every chat works in its own directory under `users.home`. |
 | `mindconnect.agent.instructions.user-dir` | `~/.mindconnect` | Where a user's standing instructions live (`AGENTS.md`, `PROMPT.md` or `CLAUDE.md`), read into every session's system prompt beside the project's own file. The default suits a desktop: one person, one home. A server runs as one service account, so put `{user}` in the value and each user gets a directory of their own. `off` drops the user scope. |
 | `mindconnect.agent.skills.user-dir` | `~/.mindconnect/skills` | Where a user's own [skills](./skills.md) live — `SKILL.md` files they can load in every project, beside the ones this installation stores and the ones a project keeps in `.mindconnect/skills/`. Same shape as the line above: the default suits a desktop, a server puts `{user}` in the value, `off` drops the user scope. `MC_SKILLS_USER_DIR` in the `server` profile. |
@@ -137,6 +145,13 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.file-store.*` | — | File-store backend: `backend`. The `filesystem` backend keeps uploads in `<data.base-dir>/<namespace>/files`. |
 | `mindconnect.cors.allowed-origins` | `*` | Origins that may call the REST endpoints from a browser (`/api`, `/chat/api`, `/v1`), comma-separated. `*` lets every origin call without credentials; a list of origins may also send the session cookie. Both server apps. |
 | `mindconnect.agent.trace.max-per-session` | `50` | LLM call-trace retention per session. |
+| `mindconnect.agent.sub-agents.max-depth` | `5` | How deep a chain of sub-agents may go: a call beyond it fails with an error the calling agent reads. |
+| `mindconnect.agent.stateless.llm-config-name` | _(unset)_ | The LLM config of what the runtime does on its own account — a chat's title, a summary of older turns. Unset, each runs on the model of the agent whose session it is. |
+| `mindconnect.task-queue.retention` | — | How long finished task trees stay readable (ISO-8601, e.g. `PT1H`). Unset keeps them, which is what the Admin UI's task monitor reads. |
+| `mindconnect.task-queue.maintenance-interval` | `PT20S` | How often the queue renews leases, reclaims dead ones and applies the retention. |
+| `mindconnect.task-queue.store` | `memory` | `memory`, or `jdbc` for a store in the runtime's Postgres that several nodes share, each claiming with a lease. `jdbc` needs `mindconnect.persistence=postgres`. |
+| `mindconnect.task-queue.node-id` | host and pid | This node's name on a shared store. |
+| `mindconnect.task-queue.lease` | `PT30S` | How long a claim on a shared store holds before another node may take the task over. |
 | `mindconnect.branding.*` | — | What the Admin UI calls itself: `title`, `document-title`, `logo`, `logo-href`, `favicon`, `theme`, `stylesheets`, `assets-dir` — see [Branding](./admin-ui/index.md#branding-the-app). `MC_BRANDING_TITLE`, `MC_BRANDING_LOGO` and `MC_BRANDING_ASSETS_DIR` in the Admin UI's yaml. |
 
 ## Running on a server

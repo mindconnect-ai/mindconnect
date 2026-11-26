@@ -1,13 +1,14 @@
 package ai.mindconnect.agent.registry.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.domain.RegistrySourceId;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -32,8 +33,8 @@ public class FileRegistrySourceRepository implements RegistrySourceRepository {
     private final Path storageDir;
     private final ScopeSupplier scope;
 
-    public FileRegistrySourceRepository(Path storageDir, ScopeSupplier scope) {
-        ObjectMapper objectMapper = new ObjectMapper()
+    public FileRegistrySourceRepository(Path storageDir, ScopeSupplier scope, JsonMapperFactory json) {
+        ObjectMapper objectMapper = json.create()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         this.storageDir = storageDir;
         this.scope = scope;

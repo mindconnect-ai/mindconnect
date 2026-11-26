@@ -2,6 +2,7 @@ package ai.mindconnect.agent.tools.web;
 
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.RelevantExcerpts;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;
@@ -19,14 +20,15 @@ public class WebSearchTool implements Tool {
     private static final Logger log = LoggerFactory.getLogger(WebSearchTool.class);
     private static final String TAVILY_URL = "https://api.tavily.com/search";
     private static final MediaType JSON = MediaType.get("application/json");
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final String apiKey;
     private final OkHttpClient httpClient;
+    private final ObjectMapper mapper;
 
-    public WebSearchTool(String apiKey, OkHttpClient httpClient) {
+    public WebSearchTool(String apiKey, OkHttpClient httpClient, JsonMapperFactory json) {
         this.apiKey = apiKey;
         this.httpClient = httpClient;
+        this.mapper = json.create();
     }
 
     @Override
@@ -88,7 +90,7 @@ public class WebSearchTool implements Tool {
         boolean includeContent = !Boolean.FALSE.equals(arguments.get("include_content"));
 
         try {
-            String body = MAPPER.writeValueAsString(Map.of(
+            String body = mapper.writeValueAsString(Map.of(
                     "api_key", apiKey,
                     "query", query,
                     "max_results", maxResults,
@@ -123,7 +125,7 @@ public class WebSearchTool implements Tool {
     private static final int CONTENT_CHARS_PER_RESULT = 1_200;
 
     private String formatResults(String json, String query) throws Exception {
-        JsonNode root = MAPPER.readTree(json);
+        JsonNode root = mapper.readTree(json);
         JsonNode results = root.get("results");
         if (results == null || results.isEmpty()) return "No results found.";
 

@@ -1,5 +1,6 @@
 package ai.mindconnect.workflow.persistence.memory;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
@@ -17,10 +18,13 @@ public class InMemoryWorkflowRepositoryFactory implements WorkflowRepositoryFact
 
     private final Path instancesDir;
     private final Supplier<String> partition;
+    private final JsonMapperFactory json;
 
-    public InMemoryWorkflowRepositoryFactory(Path instancesDir, Supplier<String> partition) {
+    /** @param json the host's mapper factory, which the instances' files are written with */
+    public InMemoryWorkflowRepositoryFactory(Path instancesDir, Supplier<String> partition, JsonMapperFactory json) {
         this.instancesDir = instancesDir;
         this.partition = partition;
+        this.json = json;
     }
 
     @Override
@@ -30,6 +34,6 @@ public class InMemoryWorkflowRepositoryFactory implements WorkflowRepositoryFact
 
     @Override
     public WorkflowInstanceRepository workflowInstanceRepository() {
-        return new FileWorkflowInstanceRepository(instancesDir, partition);
+        return new FileWorkflowInstanceRepository(instancesDir, partition, json);
     }
 }

@@ -1,10 +1,10 @@
 package ai.mindconnect.adminui.namespaces;
 
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmPriceRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.agent.skill.port.out.SkillRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -54,7 +54,7 @@ public class NamespaceWriteGuardConfig {
 
             @Override
             public Object postProcessAfterInitialization(Object bean, String name) throws BeansException {
-                if (bean instanceof GuardedRepositories.Agents
+                if (bean instanceof GuardedRepositories.ManagedAgents
                         || bean instanceof GuardedRepositories.LlmConfigs
                         || bean instanceof GuardedRepositories.LlmPrices
                         || bean instanceof GuardedRepositories.Skills
@@ -62,8 +62,8 @@ public class NamespaceWriteGuardConfig {
                         || bean instanceof GuardedRepositories.McpServers) {
                     return bean;
                 }
-                if (bean instanceof AgentDefinitionRepository agents) {
-                    return new GuardedRepositories.Agents(agents, guard());
+                if (bean instanceof AgentManagement managed) {
+                    return new GuardedRepositories.ManagedAgents(managed, guard());
                 }
                 if (bean instanceof LlmConfigRepository configs) {
                     return new GuardedRepositories.LlmConfigs(configs, guard());

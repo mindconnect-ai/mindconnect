@@ -1,14 +1,19 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.converter.ResourceHttpMessageConverter;
+import org.springframework.http.converter.StringHttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -18,6 +23,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -43,8 +50,11 @@ class FilesApiControllerOwnershipTest {
 
     @BeforeEach
     void setUp() {
-        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
+        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")), new JsonMapperFactory(List.of(new IdJsonModule())));
         mvc = MockMvcBuilders.standaloneSetup(new FilesApiController(store))
+                // Spring's own JSON converter knows no module of the installation; the app's mapper does.
+                .setMessageConverters(new ResourceHttpMessageConverter(), new StringHttpMessageConverter(),
+                        new MappingJackson2HttpMessageConverter(new JsonMapperFactory(List.of(new IdJsonModule(), new JavaTimeModule())).create()))
                 .setCustomArgumentResolvers(callers.resolver()).build();
     }
 

@@ -5,6 +5,7 @@ import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ class ToolTestServiceTest {
     void the_test_session_is_released_after_the_call() {
         RecordingRegistry registry = new RecordingRegistry(arguments -> "ran");
 
-        ToolTestService.Result result = new ToolTestService(registry).test(AgentTool.of("mcp_tool"), "{}");
+        ToolTestService.Result result = new ToolTestService(registry, new JsonMapperFactory(List.of())).test(AgentTool.of("mcp_tool"), "{}");
 
         assertThat(result.ok()).isTrue();
         assertThat(registry.released).containsExactly(registry.resolvedIn.sessionId());
@@ -38,7 +39,7 @@ class ToolTestServiceTest {
             throw new IllegalStateException("container did not start");
         });
 
-        ToolTestService.Result result = new ToolTestService(registry).test(AgentTool.of("mcp_tool"), "{}");
+        ToolTestService.Result result = new ToolTestService(registry, new JsonMapperFactory(List.of())).test(AgentTool.of("mcp_tool"), "{}");
 
         assertThat(result.ok()).isFalse();
         assertThat(registry.released).containsExactly(registry.resolvedIn.sessionId());

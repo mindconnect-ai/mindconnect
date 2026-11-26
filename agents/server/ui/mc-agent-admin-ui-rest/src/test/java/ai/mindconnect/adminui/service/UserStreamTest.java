@@ -1,20 +1,8 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
-import ai.mindconnect.agent.runtime.service.stream.UserEvent;
-import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
-import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
@@ -24,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,12 +29,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class UserStreamTest {
 
-    private static final AgentId AGENT_ID = AgentId.random();
     private static final SessionId ALICE_SESSION = SessionId.random();
 
     private LocalTaskQueue queue;
     private TaskMonitor monitor;
-    private UserChannels userChannels;
+    /** The sessions of the installation: what changes about one is what its user's stream tells. */
+    private ai.mindconnect.agent.management.api.SessionManagement sessions;
     private UserStream stream;
     private final CountDownLatch started = new CountDownLatch(1);
     private final CountDownLatch release = new CountDownLatch(1);
@@ -74,7 +61,7 @@ class UserStreamTest {
     @BeforeEach
     void setUp() {
         queue = new LocalTaskQueue(new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
-        queue.register(AgentTurnWorker.TYPE, ctx -> {
+        queue.register("turn", ctx -> {
             started.countDown();
             try {
                 while (!ctx.cancelRequested() && !release.await(20, TimeUnit.MILLISECONDS)) {
@@ -85,17 +72,16 @@ class UserStreamTest {
             }
             return TaskOutcome.done("ok");
         });
-        var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
-        definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
-                "assistants", "bot", "prompt", null, "cfg", 5, null,
-                AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
-        var sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-        sessions.create(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"), ConversationId.random(),
-                "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
-                null, null, null, null, null, null, null));
-        monitor = new TaskMonitor(queue, sessions, definitions);
-        userChannels = new UserChannels();
-        stream = new UserStream(Optional.of(monitor), userChannels, new ObjectMapper());
+        monitor = new TaskMonitor(queue, TaskMonitorTest.runtimeWithAlicesSession(ALICE_SESSION,
+                ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test"))));
+        var stored = new ai.mindconnect.agent.runtime.store.InMemorySessionRepository(ScopeSupplier.local());
+        var messages = new ai.mindconnect.agent.runtime.store.InMemorySessionMessageRepository(ScopeSupplier.local(), java.time.Clock.systemUTC());
+        sessions = new ai.mindconnect.agent.management.RepositorySessionManagement(stored,
+                new ai.mindconnect.agent.runtime.store.DefaultSessionStore(stored, messages),
+                new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ScopeSupplier.local()),
+                ai.mindconnect.agent.management.api.SessionDirectoryPolicy.unrestricted(), List.of(),
+                new ai.mindconnect.agent.management.SessionLifecycle(stored, session -> Optional.empty()));
+        stream = new UserStream(Optional.of(monitor), sessions, new ObjectMapper());
     }
 
     @AfterEach
@@ -124,8 +110,8 @@ class UserStreamTest {
         var emitter = new CapturingEmitter();
         stream.attach(emitter, "alice");
 
-        String id = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE,
-                Map.of(AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0)));
+        String id = queue.submit(TaskSubmission.of("turn",
+                Map.of("sessionId", ALICE_SESSION.value(), "agent", Map.of("name", "Scout"))));
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(emitter.patchArrived.await(5, TimeUnit.SECONDS)).isTrue();
 
@@ -138,15 +124,15 @@ class UserStreamTest {
 
     @Test
     void theBoardFollowsTheNamespaceTheViewerMayStillWorkIn() throws Exception {
-        var remembered = new java.util.concurrent.atomic.AtomicReference<>(Optional.of(new ai.mindconnect.agent.Namespace("acme")));
-        var namespaced = new UserStream(Optional.of(monitor), userChannels, new ObjectMapper(), user -> remembered.get());
+        var remembered = new java.util.concurrent.atomic.AtomicReference<>(Optional.of(new ai.mindconnect.agent.scope.Namespace("acme")));
+        var namespaced = new UserStream(Optional.of(monitor), sessions, new ObjectMapper(), user -> remembered.get());
         try {
             var emitter = new CapturingEmitter();
-            namespaced.attach(emitter, "alice", ai.mindconnect.agent.Namespace.DEFAULT);
+            namespaced.attach(emitter, "alice", ai.mindconnect.agent.scope.Namespace.DEFAULT);
 
-            String acme = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                    AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
-                    ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "acme")));
+            String acme = queue.submit(TaskSubmission.of("turn", Map.of(
+                    "sessionId", ALICE_SESSION.value(), "agent", Map.of("name", "Scout"),
+                    "namespace", "acme")));
             assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(emitter.patchArrived.await(5, TimeUnit.SECONDS)).isTrue();
             String frame = emitter.frames.stream().filter(f -> f.contains("event:patch")).reduce((a, b) -> b).orElseThrow();
@@ -155,9 +141,9 @@ class UserStreamTest {
             // she was removed from acme: the remembered choice no longer counts, the board is the default namespace's
             remembered.set(Optional.empty());
             emitter.frames.clear();
-            String other = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
-                    AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
-                    ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "other")));
+            String other = queue.submit(TaskSubmission.of("turn", Map.of(
+                    "sessionId", ALICE_SESSION.value(), "agent", Map.of("name", "Scout"),
+                    "namespace", "other")));
             waitForFrames(emitter, 1);
             String next = emitter.frames.stream().filter(f -> f.contains("event:patch")).reduce((a, b) -> b).orElseThrow();
             assertThat(next).doesNotContain("task-" + acme).doesNotContain("task-" + other);
@@ -181,14 +167,18 @@ class UserStreamTest {
         stream.attach(alice, "alice");
         stream.attach(bob, "bob");
 
-        ChatTurnId turn = ChatTurnId.random();
-        userChannels.publish(UserId.of("alice"), new UserEvent.TurnStarted(ALICE_SESSION, turn));
+        ai.mindconnect.agent.runtime.api.domain.AgentDefinition helper =
+                new ai.mindconnect.agent.runtime.api.domain.AgentDefinition("helper", "Helps.", "You help.",
+                        ai.mindconnect.agent.runtime.api.domain.ModelSettings.NONE, List.of(), 5, Map.of());
+        SessionId opened = sessions.open(UserId.of("alice"), null,
+                new ai.mindconnect.agent.management.api.SessionAgent.Own(helper, null), null,
+                ai.mindconnect.agent.management.api.SessionDirectories.NONE).id();
         assertThat(alice.userArrived.await(5, TimeUnit.SECONDS)).isTrue();
 
         String frame = alice.frames.stream().filter(f -> f.contains("event:user")).findFirst().orElseThrow();
-        assertThat(frame).contains("\"type\":\"turn_started\"");
-        assertThat(frame).contains("\"sessionId\":\"" + ALICE_SESSION.value() + "\"");
-        assertThat(frame).contains("\"turnId\":\"" + turn.value() + "\"");
+        assertThat(frame).contains("\"type\":\"session_started\"");
+        assertThat(frame).contains("\"sessionId\":\"" + opened.value() + "\"");
+        assertThat(frame).contains("\"sessionType\":\"chat\"");
         assertThat(bob.frames).noneMatch(f -> f.contains("event:user"));
     }
 }

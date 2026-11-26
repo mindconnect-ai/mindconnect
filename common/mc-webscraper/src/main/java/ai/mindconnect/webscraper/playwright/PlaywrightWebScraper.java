@@ -1,5 +1,6 @@
 package ai.mindconnect.webscraper.playwright;
 
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.webscraper.*;
 import com.microsoft.playwright.*;
 import lombok.Getter;
@@ -13,6 +14,12 @@ import java.util.List;
 
 @Slf4j
 public class PlaywrightWebScraper extends AbstractWebScraper{
+
+    private final JsonMapperFactory json;
+
+    public PlaywrightWebScraper(JsonMapperFactory json) {
+        this.json = json;
+    }
 
     public List<WebScraperResults> scrape(List<WebScraperOptions> options) {
 
@@ -29,7 +36,7 @@ public class PlaywrightWebScraper extends AbstractWebScraper{
                 BrowserContext browserContext = browser.newContext(contextOptions);
 
                 for (var option : options) {
-                    PlaywrightWebScraperContext context = new PlaywrightWebScraperContext(browserContext, option);
+                    PlaywrightWebScraperContext context = new PlaywrightWebScraperContext(browserContext, option, json);
                     if (getSaveFunction() != null) {
                         context.setSaveFunction(this.saveFunction);
                     }

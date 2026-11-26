@@ -1,21 +1,11 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryConversationSummaryRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryTodoListRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.auth.VectorStoreAccess;
 import ai.mindconnect.agentrest.service.VectorStoreService;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,23 +45,15 @@ class VectorStoreApiControllerOwnershipTest {
             new VectorStoreTemplate("default", "embeddings", null, Map.of());
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
-    private final InMemoryAgentDefinitionRepository definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
+    private final ai.mindconnect.agentrest.SessionFixture sessions = new ai.mindconnect.agentrest.SessionFixture();
     private final VectorStoreService service = mock(VectorStoreService.class);
 
-    private AgentSessionService sessionService;
-    private AgentDefinition agent;
     private String alicesStore;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        sessionService = new AgentSessionService(definitions, sessions,
-                new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
-                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
-                new InMemoryToolApprovalRepository(), new UserChannels());
-        agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
-        String alicesSession = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
+        String alicesSession = sessions.open("alice", null).id().value();
         alicesStore = VectorStoreAccess.CHAT_STORE_PREFIX + alicesSession;
 
         VectorStoreInstance chatStore = VectorStoreInstance.fromTemplate(
@@ -83,7 +65,7 @@ class VectorStoreApiControllerOwnershipTest {
         when(service.instance("handbook")).thenReturn(Optional.of(knowledgeBase));
 
         VectorStoreApiController controller =
-                new VectorStoreApiController(service, new VectorStoreAccess(new SessionAccess(sessions)));
+                new VectorStoreApiController(service, new VectorStoreAccess(new SessionAccess(sessions.runtime())));
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }
 
@@ -140,7 +122,7 @@ class VectorStoreApiControllerOwnershipTest {
     void aChatStoreNameIsTheChatsUsersEvenBeforeTheStoreIsRegistered() throws Exception {
         when(service.search(any(), any(), anyInt(), anyDouble(), any(), any())).thenReturn(List.of());
         String unregistered = VectorStoreAccess.CHAT_STORE_PREFIX
-                + sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
+                + sessions.open("alice", null).id().value();
 
         callers.actAs("bob");
         mvc.perform(json(put("/api/vector-stores/stores/{name}/documents/{id}", unregistered, "notes"),

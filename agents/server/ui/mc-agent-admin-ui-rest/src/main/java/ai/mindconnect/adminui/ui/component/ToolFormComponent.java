@@ -1,16 +1,17 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.adminui.ui.controller.AgentToolUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.llm.domain.ToolDefinition;
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
+import ai.mindconnect.agent.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -41,17 +42,17 @@ import java.util.Map;
  */
 public final class ToolFormComponent implements UiComponent {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    private final AgentDefinition agent;
+    private final ManagedAgent agent;
     private final AgentTool tool;
     private final ToolRegistry toolRegistry;
+    private final ObjectMapper mapper;
 
     /** Pass {@code null} for the new-tool form. */
-    public ToolFormComponent(AgentDefinition agent, AgentTool tool, ToolRegistry toolRegistry) {
+    public ToolFormComponent(ManagedAgent agent, AgentTool tool, ToolRegistry toolRegistry, JsonMapperFactory json) {
         this.agent = agent;
         this.tool = tool;
         this.toolRegistry = toolRegistry;
+        this.mapper = json.create();
     }
 
     @Override
@@ -63,11 +64,11 @@ public final class ToolFormComponent implements UiComponent {
     public UiNode render() {
         boolean isNew = tool == null;
 
-        // Inline tools (run_agent / run_agents) are handled by AgentChatService,
+        // Inline tools (run_agent / run_agents) are brought by the sub-agent plugin,
         // not the ToolRegistry. They are no longer bound by hand — the roster
         // brings them — but a schema lookup for an old row still finds them.
         Map<String, ToolDefinition> inlineDefs = new LinkedHashMap<>();
-        for (var def : AgentChatService.inlineToolDefinitions()) {
+        for (var def : SubAgentPlugin.delegationTools()) {
             inlineDefs.put(def.name(), def);
         }
 
@@ -81,7 +82,7 @@ public final class ToolFormComponent implements UiComponent {
         // delegation tools, a deferred tool brings tool_search. A definition
         // drops them on the way in, so a row for one would never save.
         toolRegistry.toolNamesByGroup().forEach((g, names) -> names.stream()
-                .filter(n -> !AgentDefinition.DERIVED_TOOLS.contains(n))
+                .filter(n -> !AgentSetting.DERIVED_TOOLS.contains(n))
                 .forEach(n -> byGroup.computeIfAbsent(g, k -> new java.util.TreeSet<>()).add(n)));
         List<UiField.Option> builtinOptions = new ArrayList<>();
         LinkedHashSet<String> registered = new LinkedHashSet<>();
@@ -100,7 +101,7 @@ public final class ToolFormComponent implements UiComponent {
         String overridesJson = "{}";
         if (!isNew && tool.overrides() != null && !tool.overrides().isEmpty()) {
             try {
-                overridesJson = MAPPER.writerWithDefaultPrettyPrinter()
+                overridesJson = mapper.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(tool.overrides());
             } catch (JsonProcessingException ignored) {}
         }
@@ -111,7 +112,7 @@ public final class ToolFormComponent implements UiComponent {
             if (resolved.isPresent()) {
                 schema = resolved.get().parametersSchema();
             } else if (inlineDefs.containsKey(tool.name())) {
-                // run_agent / run_agents: schema lives in AgentChatService.
+                // run_agent / run_agents: the schema is the sub-agent plugin's.
                 schema = inlineDefs.get(tool.name()).parametersSchema();
             }
         }
@@ -137,8 +138,6 @@ public final class ToolFormComponent implements UiComponent {
                                 + "{\"network\":\"bridge\"} (code_execute). "
                                 + "{\"params\":{...}} pins tool parameters: pinned values are hidden "
                                 + "from the LLM and always enforced, e.g. {\"params\":{\"language\":\"python\"}}"))
-                .field(UiField.bool("enabled", "Enabled",
-                        isNew || tool.enabled()).asEditable())
                 .field(UiField.bool("deferred", "Deferred (via tool search only)",
                         !isNew && tool.deferred())
                         .asEditable()
@@ -154,19 +153,18 @@ public final class ToolFormComponent implements UiComponent {
                 .field(UiField.number("maxResultChars", "Max result chars",
                         isNew ? null : tool.maxResultChars())
                         .asEditable()
-                        .hint("Cut this tool's result after N characters at persist time (with a "
-                                + "visible truncation note) — the cut part is really gone. Leave "
-                                + "blank for no per-tool cap; a runtime safety cap of 100k always "
-                                + "applies. For lossless shrinking use the memory strategy's "
-                                + "tool-result compression instead"));
+                        .hint("How many characters of this tool's result the model is shown at a "
+                                + "time, in place of the agent's own limit. A longer result ends "
+                                + "with a line saying how to read on with fetch_tool_result; "
+                                + "nothing is lost. Leave blank for the agent's limit"));
 
         String backHref = "/admin/agents/" + agent.id().value() + "?section=tools"
                 + (isNew ? "" : "&row=" + tool.id().value());
 
         form.action(UiAction.primary("save", "Save").icon("save")
                         .onClick(isNew
-                                ? trigger(on(AgentUiController.class).addTool(agent.id().value(), null, null), id())
-                                : trigger(on(AgentUiController.class)
+                                ? trigger(on(AgentToolUiController.class).addTool(agent.id().value(), null, null), id())
+                                : trigger(on(AgentToolUiController.class)
                                           .updateTool(agent.id().value(), tool.id().value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel")
                         .dispatch("GET", backHref))

@@ -57,6 +57,24 @@ public class EncryptingOAuthProviderRepository implements OAuthProviderRepositor
         delegate.deleteById(id);
     }
 
+    /**
+     * Stores every client secret in the current encryption scheme where an
+     * earlier one wrote it, and says how many records that changed. Once
+     * at start: a record nobody saves would otherwise keep its earlier
+     * ciphertext for good. A value this key does not read stays as it is.
+     */
+    public int rewriteEarlierScheme() {
+        int rewritten = 0;
+        for (OAuthProvider provider : delegate.findAll()) {
+            String secret = encryption.reencryptEarlierScheme(provider.clientSecret());
+            if (!Objects.equals(secret, provider.clientSecret())) {
+                delegate.save(provider.withClientSecret(secret));
+                rewritten++;
+            }
+        }
+        return rewritten;
+    }
+
     private OAuthProvider decrypted(OAuthProvider provider) {
         return provider.clientSecret() == null
                 ? provider

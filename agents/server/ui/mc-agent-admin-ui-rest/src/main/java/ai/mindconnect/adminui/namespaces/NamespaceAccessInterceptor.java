@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.namespaces;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.scope.Namespace;
+import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.security.SecurityCurrentUserResolver;
 import ai.mindconnect.namespace.service.NamespaceService;
