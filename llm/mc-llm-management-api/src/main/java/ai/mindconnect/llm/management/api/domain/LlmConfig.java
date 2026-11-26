@@ -176,6 +176,12 @@ public record LlmConfig(
                 0.0, 0, Map.of(), null, true, delegatesTo, null, null, null, null);
     }
 
+    /** The context window stays unknown: it differs from one OpenAI model to the next. */
+    public static LlmConfig openAi(String name, String model, String apiKey) {
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.OPENAI,
+                model, LlmProvider.OPENAI.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+    }
+
     public static LlmConfig lmStudio(String name, String model, String baseUrl) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.LM_STUDIO,
                 model, baseUrl, "lm-studio", 0.7, 2048, Map.of(), 131_072, false, null, null, null, null, null);

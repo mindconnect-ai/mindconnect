@@ -2,8 +2,6 @@ package ai.mindconnect.llm.demo;
 
 import ai.mindconnect.llm.demo.adapter.openaisdk.OpenAiSdkGateway;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
-import ai.mindconnect.llm.management.api.domain.LlmConfigId;
-import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
@@ -12,7 +10,6 @@ import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
 import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * A chat through a provider of one's own: the config names model and key, the
@@ -34,8 +31,7 @@ public final class OwnProviderDemo {
         }
         String question = args.length > 0 ? String.join(" ", args) : "Name three rivers in Germany.";
 
-        LlmConfig config = new LlmConfig(LlmConfigId.random(), "demo", LlmProvider.OPENAI,
-                "gpt-5.4-mini", null, apiKey, 1.0, 1024, Map.of(), null, false, null, null, null, null, null);
+        LlmConfig config = LlmConfig.openAi("demo", "gpt-5.4-mini", apiKey);
         LlmGateway gateway = new OpenAiSdkGateway();
 
         LlmRequest request = LlmRequest.streaming(config.name(), List.of(

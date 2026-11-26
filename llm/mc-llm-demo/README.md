@@ -27,7 +27,7 @@ the code it will be.
 ```java
 LlmChat chat = LlmGatewayService.builder()
         .providers(OpenAiProviders.all())                  // our providers, one per LlmProvider
-        .config(openAi("agent-default", "gpt-5.4-mini", "${OPENAI_API_KEY}"))
+        .config(LlmConfig.openAi("agent-default", "gpt-5.4-mini", "${OPENAI_API_KEY}"))
         .build();                                          // configs in memory, secrets from the environment
 
 LlmResponse answer = chat.chat("local",
@@ -90,5 +90,3 @@ OpenAI: text, tool calls, a tool round trip and a rate limit, without network or
 
 - A provider needs `mc-llm-provider-spi` only; the SDK brings okhttp, Jackson and
   Kotlin, and only to whoever picks it.
-- `LlmConfig` has factories for many providers but none for OpenAI itself, so the demo
-  calls the 16-argument constructor.
