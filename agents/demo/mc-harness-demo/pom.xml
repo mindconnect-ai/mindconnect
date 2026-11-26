@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-harness-demo</artifactId>
+    <name>mc-harness-demo</name>
+    <packaging>jar</packaging>
+    <description>The agent harness as a ready-made product: sessions, stored agents, tools and capabilities configured, not programmed.</description>
+
+    <!-- Only what this user really needs. Every dependency added here is part of the design. -->
+    <dependencies>
+    </dependencies>
+</project>
