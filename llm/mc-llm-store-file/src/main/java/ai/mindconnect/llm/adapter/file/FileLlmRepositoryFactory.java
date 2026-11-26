@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.file;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmRepositoryFactory;
@@ -13,9 +13,9 @@ public class FileLlmRepositoryFactory implements LlmRepositoryFactory {
 
     private final Path baseDir;
     private final ObjectMapper objectMapper;
-    private final TenantScope scope;
+    private final LlmScopeSupplier scope;
 
-    public FileLlmRepositoryFactory(Path baseDir, ObjectMapper objectMapper, TenantScope scope) {
+    public FileLlmRepositoryFactory(Path baseDir, ObjectMapper objectMapper, LlmScopeSupplier scope) {
         this.baseDir = baseDir;
         this.objectMapper = objectMapper;
         this.scope = scope;

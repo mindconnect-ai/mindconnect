@@ -1,7 +1,6 @@
 package ai.mindconnect.llm.adapter.memory;
 
-import ai.mindconnect.scope.TenantMap;
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
@@ -15,39 +14,44 @@ import java.util.concurrent.ConcurrentHashMap;
 /** In-memory {@link LlmConfigRepository} — process-lifetime storage, no persistence. */
 public class InMemoryLlmConfigRepository implements LlmConfigRepository {
 
-    private final TenantScope scope;
-    private final TenantMap<Map<LlmConfigId, LlmConfig>> store;
+    private final LlmScopeSupplier scope;
+    private final Map<String, Map<LlmConfigId, LlmConfig>> store;
 
-    public InMemoryLlmConfigRepository(TenantScope scope) {
+    public InMemoryLlmConfigRepository(LlmScopeSupplier scope) {
         this.scope = scope;
-        this.store = new TenantMap<>(ConcurrentHashMap::new);
+        this.store = new ConcurrentHashMap<>();
     }
 
     @Override
     public void save(LlmConfig config) {
-        store.of(scope).compute(config.id(), (id, current) -> config.withVersion(Versions.next(
+        namespace().compute(config.id(), (id, current) -> config.withVersion(Versions.next(
                 current == null ? null : current.version(), config.version(), "LlmConfig", id.value())));
     }
 
     @Override
     public Optional<LlmConfig> findById(LlmConfigId id) {
-        return Optional.ofNullable(store.of(scope).get(id));
+        return Optional.ofNullable(namespace().get(id));
     }
 
     @Override
     public Optional<LlmConfig> findByName(String name) {
-        return store.of(scope).values().stream()
+        return namespace().values().stream()
                 .filter(c -> c.name().equals(name))
                 .findFirst();
     }
 
     @Override
     public List<LlmConfig> findAll() {
-        return store.of(scope).values().stream().toList();
+        return namespace().values().stream().toList();
     }
 
     @Override
     public void deleteById(LlmConfigId id) {
-        store.of(scope).remove(id);
+        namespace().remove(id);
+    }
+
+    /** The entries of the namespace the scope names now, empty the first time it asks. */
+    private Map<LlmConfigId, LlmConfig> namespace() {
+        return store.computeIfAbsent(scope.namespace(), namespace -> new ConcurrentHashMap<>());
     }
 }

@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.pg;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.jdbc.Json;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.jackson.LlmJsonModule;
@@ -38,12 +38,12 @@ class PgLlmConfigRepositoryTest {
     void setUp() {
         sql = Sql.of(requirePostgres(), JSON);
         sql.execute("DROP TABLE IF EXISTS mc_llm_config");
-        repo = new PgLlmConfigRepository(sql, TenantScope.fixed(NS)).initSchema();
+        repo = new PgLlmConfigRepository(sql, LlmScopeSupplier.fixed(NS)).initSchema();
     }
 
     @Test
     void aRepositoryBoundToAnotherNamespaceSeesNothing() {
-        PgLlmConfigRepository other = new PgLlmConfigRepository(sql, TenantScope.fixed("other")).initSchema();
+        PgLlmConfigRepository other = new PgLlmConfigRepository(sql, LlmScopeSupplier.fixed("other")).initSchema();
         LlmConfig config = LlmConfig.claude("claude", "claude-sonnet-5", "key");
         repo.save(config);
 
@@ -111,7 +111,7 @@ class PgLlmConfigRepositoryTest {
     @Test
     void initSchemaIsIdempotent() {
         repo.save(LlmConfig.alias("x", "y"));
-        new PgLlmConfigRepository(Sql.of(requirePostgres(), JSON), TenantScope.fixed(NS)).initSchema();
+        new PgLlmConfigRepository(Sql.of(requirePostgres(), JSON), LlmScopeSupplier.fixed(NS)).initSchema();
         assertThat(repo.findAll()).hasSize(1);
     }
 

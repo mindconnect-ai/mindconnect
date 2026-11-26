@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.pg;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
@@ -10,9 +10,9 @@ import ai.mindconnect.llm.management.api.port.out.LlmRepositoryFactory;
 public class PgLlmRepositoryFactory implements LlmRepositoryFactory {
 
     private final Sql sql;
-    private final TenantScope scope;
+    private final LlmScopeSupplier scope;
 
-    public PgLlmRepositoryFactory(Sql sql, TenantScope scope) {
+    public PgLlmRepositoryFactory(Sql sql, LlmScopeSupplier scope) {
         this.sql = sql;
         this.scope = scope;
     }

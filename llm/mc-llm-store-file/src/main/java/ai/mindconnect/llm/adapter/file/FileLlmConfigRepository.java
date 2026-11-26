@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.file;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
@@ -25,10 +25,10 @@ public class FileLlmConfigRepository implements LlmConfigRepository {
 
     private final Documents<LlmConfigId, LlmConfig> configs;
 
-    public FileLlmConfigRepository(Path storageDir, ObjectMapper objectMapper, TenantScope scope) {
+    public FileLlmConfigRepository(Path storageDir, ObjectMapper objectMapper, LlmScopeSupplier scope) {
         this.configs = Documents.of(LlmConfig.class)
                 .path((LlmConfigId id) -> DIR + "/" + id.value() + ".json")
-                .build(() -> FileRepo.open(storageDir, scope.tenant().namespace()), objectMapper);
+                .build(() -> FileRepo.open(storageDir, scope.namespace()), objectMapper);
     }
 
     @Override

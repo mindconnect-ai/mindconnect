@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import okhttp3.OkHttpClient;
 
-import ai.mindconnect.agent.scope.ScopeSupplier;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
@@ -42,7 +42,7 @@ final class OpenAiChat {
     }
 
     LlmChat chat() {
-        InMemoryLlmConfigRepository configs = new InMemoryLlmConfigRepository(ScopeSupplier.local());
+        InMemoryLlmConfigRepository configs = new InMemoryLlmConfigRepository(LlmScopeSupplier.local());
         configs.save(new LlmConfig(LlmConfigId.random(), model, LlmProvider.OPENAI, model, null, apiKey, 0.0,
                 MAX_OUTPUT_TOKENS, Map.of(), null, false, null, null, null, LlmConfigType.CHAT, null));
         // No read timeout: a reasoning model sends its first byte after it has thought.

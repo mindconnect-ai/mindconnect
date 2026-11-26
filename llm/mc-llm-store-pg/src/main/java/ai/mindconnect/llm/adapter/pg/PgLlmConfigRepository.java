@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.pg;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
@@ -27,14 +27,14 @@ import java.util.Optional;
 public final class PgLlmConfigRepository implements LlmConfigRepository {
 
     private final DocumentTable<LlmConfig> configs;
-    private final TenantScope scope;
+    private final LlmScopeSupplier scope;
 
     /** Takes the application's {@link Sql} and with it its JSON mapper, which needs mc-llm-jackson's module. */
-    public PgLlmConfigRepository(Sql sql, TenantScope scope) {
+    public PgLlmConfigRepository(Sql sql, LlmScopeSupplier scope) {
         this.scope = Objects.requireNonNull(scope, "scope");
         this.configs = DocumentTable.of(LlmConfig.class)
                 .table("mc_llm_config")
-                .partitionKey("namespace", "TEXT", c -> scope.tenant().namespace())
+                .partitionKey("namespace", "TEXT", c -> scope.namespace())
                 .id("id", "TEXT", c -> c.id().value())
                 .requiredColumn("name", "TEXT", LlmConfig::name)
                 .index("namespace", "name")
@@ -50,7 +50,7 @@ public final class PgLlmConfigRepository implements LlmConfigRepository {
     /** Checks the version against the row read {@code FOR UPDATE} and stores it one higher, in one transaction. */
     @Override
     public void save(LlmConfig config) {
-        configs.compute(scope.tenant().namespace(), config.id().value(), current ->
+        configs.compute(scope.namespace(), config.id().value(), current ->
                 config.withVersion(ai.mindconnect.common.Versions.next(
                         current.map(LlmConfig::version).orElse(null), config.version(),
                         "LlmConfig", config.id().value())));
@@ -58,21 +58,21 @@ public final class PgLlmConfigRepository implements LlmConfigRepository {
 
     @Override
     public Optional<LlmConfig> findById(LlmConfigId id) {
-        return configs.findById(scope.tenant().namespace(), id.value());
+        return configs.findById(scope.namespace(), id.value());
     }
 
     @Override
     public Optional<LlmConfig> findByName(String name) {
-        return configs.findOne("WHERE namespace = ? AND name = ? ORDER BY updated_at LIMIT 1", scope.tenant().namespace(), name);
+        return configs.findOne("WHERE namespace = ? AND name = ? ORDER BY updated_at LIMIT 1", scope.namespace(), name);
     }
 
     @Override
     public List<LlmConfig> findAll() {
-        return configs.find("WHERE namespace = ? ORDER BY name", scope.tenant().namespace());
+        return configs.find("WHERE namespace = ? ORDER BY name", scope.namespace());
     }
 
     @Override
     public void deleteById(LlmConfigId id) {
-        configs.deleteById(scope.tenant().namespace(), id.value());
+        configs.deleteById(scope.namespace(), id.value());
     }
 }

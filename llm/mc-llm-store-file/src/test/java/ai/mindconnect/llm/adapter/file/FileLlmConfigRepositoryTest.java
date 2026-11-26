@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.file;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.jackson.LlmJsonModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,7 +26,7 @@ class FileLlmConfigRepositoryTest {
 
     @Test
     void a_config_written_with_a_field_this_version_does_not_know_still_loads() throws IOException {
-        FileLlmConfigRepository repo = new FileLlmConfigRepository(dir, strict, TenantScope.fixed("test"));
+        FileLlmConfigRepository repo = new FileLlmConfigRepository(dir, strict, LlmScopeSupplier.fixed("test"));
         LlmConfig stored = LlmConfig.lmStudio("local", "qwen", "http://localhost:1234");
         repo.save(stored);
         Path file = fileOf(stored);

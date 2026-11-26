@@ -53,7 +53,7 @@ public final class InMemoryStorePlugin extends StorePlugin {
     @Override
     protected Stores stores(PluginRegistry registry) {
         ScopeSupplier scope = registry.get(ScopeSupplier.class);
-        InMemoryLlmRepositoryFactory llm = new InMemoryLlmRepositoryFactory(scope);
+        InMemoryLlmRepositoryFactory llm = new InMemoryLlmRepositoryFactory(() -> scope.namespace().value());
         InMemoryWorkflowRepositoryFactory workflows =
                 new InMemoryWorkflowRepositoryFactory(sideDirectory, () -> scope.namespace().value(),
                         registry.get(JsonMapperFactory.class));

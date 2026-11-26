@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.pg;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.management.api.domain.LlmPrice;
@@ -26,14 +26,14 @@ import java.util.Optional;
 public final class PgLlmPriceRepository implements LlmPriceRepository {
 
     private final DocumentTable<LlmPrice> prices;
-    private final TenantScope scope;
+    private final LlmScopeSupplier scope;
 
     /** Takes the application's {@link Sql} and with it its JSON mapper, which needs mc-llm-jackson's module. */
-    public PgLlmPriceRepository(Sql sql, TenantScope scope) {
+    public PgLlmPriceRepository(Sql sql, LlmScopeSupplier scope) {
         this.scope = Objects.requireNonNull(scope, "scope");
         this.prices = DocumentTable.of(LlmPrice.class)
                 .table("mc_llm_price")
-                .partitionKey("namespace", "TEXT", p -> scope.tenant().namespace())
+                .partitionKey("namespace", "TEXT", p -> scope.namespace())
                 .id("id", "TEXT", p -> p.id().value())
                 .requiredColumn("config_name", "TEXT", LlmPrice::configName)
                 .requiredColumn("model", "TEXT", LlmPrice::model)
@@ -54,23 +54,23 @@ public final class PgLlmPriceRepository implements LlmPriceRepository {
 
     @Override
     public Optional<LlmPrice> findById(LlmPriceId id) {
-        return prices.findById(scope.tenant().namespace(), id.value());
+        return prices.findById(scope.namespace(), id.value());
     }
 
     @Override
     public List<LlmPrice> findByConfigName(String configName) {
-        return prices.find("WHERE namespace = ? AND config_name = ?", scope.tenant().namespace(), configName).stream()
+        return prices.find("WHERE namespace = ? AND config_name = ?", scope.namespace(), configName).stream()
                 .sorted(LlmPriceList.CHRONOLOGICAL).toList();
     }
 
     @Override
     public List<LlmPrice> findAll() {
-        return prices.find("WHERE namespace = ?", scope.tenant().namespace()).stream()
+        return prices.find("WHERE namespace = ?", scope.namespace()).stream()
                 .sorted(LlmPriceList.CHRONOLOGICAL).toList();
     }
 
     @Override
     public void deleteById(LlmPriceId id) {
-        prices.deleteById(scope.tenant().namespace(), id.value());
+        prices.deleteById(scope.namespace(), id.value());
     }
 }

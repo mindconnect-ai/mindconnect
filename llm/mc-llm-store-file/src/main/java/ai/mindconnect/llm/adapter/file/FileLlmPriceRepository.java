@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.file;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
 import ai.mindconnect.llm.management.api.domain.LlmPrice;
@@ -23,10 +23,10 @@ public class FileLlmPriceRepository implements LlmPriceRepository {
 
     private final Documents<LlmPriceId, LlmPrice> prices;
 
-    public FileLlmPriceRepository(Path storageDir, ObjectMapper objectMapper, TenantScope scope) {
+    public FileLlmPriceRepository(Path storageDir, ObjectMapper objectMapper, LlmScopeSupplier scope) {
         this.prices = Documents.of(LlmPrice.class)
                 .path((LlmPriceId id) -> DIR + "/" + id.value() + ".json")
-                .build(() -> FileRepo.open(storageDir, scope.tenant().namespace()), objectMapper);
+                .build(() -> FileRepo.open(storageDir, scope.namespace()), objectMapper);
     }
 
     @Override

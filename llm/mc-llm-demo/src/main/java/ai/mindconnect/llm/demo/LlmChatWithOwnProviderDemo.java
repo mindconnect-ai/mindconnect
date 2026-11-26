@@ -11,7 +11,7 @@ import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
 import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 
 import java.util.List;
 import java.util.Map;
@@ -33,7 +33,7 @@ public final class LlmChatWithOwnProviderDemo {
     public static void main(String[] args) {
         // The configs of one namespace. The key stays a placeholder in the store and
         // resolves on every call, here from mc.env.
-        LlmConfigRepository configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
+        LlmConfigRepository configs = new InMemoryLlmConfigRepository(LlmScopeSupplier.fixed("demo"));
         configs.save(LlmConfig.openAi("openai-mini", "gpt-5.4-mini", "${OPENAI_API_KEY}"));
         configs.save(LlmConfig.alias("agent-default", "openai-mini"));
 

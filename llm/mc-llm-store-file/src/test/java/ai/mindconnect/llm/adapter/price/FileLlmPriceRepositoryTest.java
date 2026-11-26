@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.price;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.file.FileLlmPriceRepository;
 import ai.mindconnect.llm.management.api.domain.LlmPrice;
@@ -22,7 +22,7 @@ class FileLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
 
     @Override
     protected LlmPriceRepository repository() {
-        return new FileLlmPriceRepository(dir, TestJson.MAPPER, TenantScope.fixed("test"));
+        return new FileLlmPriceRepository(dir, TestJson.MAPPER, LlmScopeSupplier.fixed("test"));
     }
 
     @Test
@@ -34,7 +34,7 @@ class FileLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
         assertThat(file).exists();
         assertThat(Files.readString(file)).contains("\"validFrom\":\"2026-01-01\"").contains("\"validTo\":\"2026-07-01\"")
                 .contains("\"model\":\"" + MODEL + "\"");
-        assertThat(new FileLlmPriceRepository(dir, TestJson.MAPPER, TenantScope.fixed("other")).findAll()).isEmpty();
+        assertThat(new FileLlmPriceRepository(dir, TestJson.MAPPER, LlmScopeSupplier.fixed("other")).findAll()).isEmpty();
     }
 
     @Test

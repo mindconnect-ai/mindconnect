@@ -15,7 +15,7 @@ import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
 import ai.mindconnect.llm.runtime.api.domain.UnknownLlmConfigException;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +66,7 @@ class LlmChatWithConfigInMemoryTest {
         server.start();
 
         // The configs of one namespace, in memory.
-        configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
+        configs = new InMemoryLlmConfigRepository(LlmScopeSupplier.fixed("demo"));
         chat = new RoutingLlmChatService(configs,
                 new DefaultLlmGatewayRegistry(Map.of(LlmProvider.OPENAI, new OpenAiSdkGateway())),
                 // Placeholders such as ${DEMO_OPENAI_KEY:sk-test} resolve from the process environment.

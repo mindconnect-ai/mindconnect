@@ -5,7 +5,7 @@ import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import java.util.Map;
 import ai.mindconnect.llm.adapter.env.LlmConfigResolver;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.llm.runtime.api.domain.UnknownLlmConfigException;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
@@ -39,7 +39,7 @@ class RoutingLlmTranscriptionServiceTest {
 
     @BeforeEach
     void setUp() {
-        repository = new InMemoryLlmConfigRepository(TenantScope.local());
+        repository = new InMemoryLlmConfigRepository(LlmScopeSupplier.local());
         repository.save(LlmConfig.speechToText("whisper", LlmProvider.OPENAI, "whisper-1",
                 "https://api.openai.com", "key"));
 

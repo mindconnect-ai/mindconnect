@@ -58,7 +58,7 @@ public final class FileStorePlugin extends StorePlugin {
         ScopeSupplier scope = registry.get(ScopeSupplier.class);
         // The host's mapper: the files are written as the host writes JSON.
         ObjectMapper json = registry.get(ObjectMapper.class);
-        FileLlmRepositoryFactory llm = new FileLlmRepositoryFactory(dataDir, json, scope);
+        FileLlmRepositoryFactory llm = new FileLlmRepositoryFactory(dataDir, json, () -> scope.namespace().value());
         FileWorkflowRepositoryFactory workflows =
                 new FileWorkflowRepositoryFactory(dataDir, () -> scope.namespace().value(),
                         registry.get(JsonMapperFactory.class));

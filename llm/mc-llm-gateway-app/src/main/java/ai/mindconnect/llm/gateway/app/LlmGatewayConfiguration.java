@@ -63,7 +63,7 @@ class LlmGatewayConfiguration {
     @ConditionalOnProperty(name = "mindconnect.llm.store", havingValue = "postgres", matchIfMissing = true)
     PgLlmRepositoryFactory pgLlmRepositoryFactory(DataSource dataSource, ScopeSupplier scope) {
         Json json = new Json(Json.defaults().mapper().copy().registerModule(new LlmJsonModule()));
-        return new PgLlmRepositoryFactory(Sql.of(dataSource, json), scope);
+        return new PgLlmRepositoryFactory(Sql.of(dataSource, json), () -> scope.namespace().value());
     }
 
     @Bean
@@ -81,13 +81,13 @@ class LlmGatewayConfiguration {
     @Bean
     @ConditionalOnProperty(name = "mindconnect.llm.store", havingValue = "memory")
     LlmConfigRepository memoryLlmConfigRepository(ScopeSupplier scope) {
-        return new InMemoryLlmConfigRepository(scope);
+        return new InMemoryLlmConfigRepository(() -> scope.namespace().value());
     }
 
     @Bean
     @ConditionalOnProperty(name = "mindconnect.llm.store", havingValue = "memory")
     LlmPriceRepository memoryLlmPriceRepository(ScopeSupplier scope) {
-        return new InMemoryLlmPriceRepository(scope);
+        return new InMemoryLlmPriceRepository(() -> scope.namespace().value());
     }
 
     @Bean

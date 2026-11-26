@@ -23,7 +23,7 @@ class LlmArchitectureTest {
     static final ArchRule gatewayKnowsOnlyCommon = noClasses().that().resideInAPackage("ai.mindconnect.llm..")
             .should().dependOnClassesThat(resideInAPackage("ai.mindconnect..")
                     .and(not(resideInAnyPackage("ai.mindconnect.llm..", "ai.mindconnect.common..",
-                            "ai.mindconnect.scope..", "ai.mindconnect.filerepo..", "ai.mindconnect.jdbc..",
+                            "ai.mindconnect.filerepo..", "ai.mindconnect.jdbc..",
                             "ai.mindconnect.jackson.."))))
             .as("The LLM gateway depends on no area but common/");
 

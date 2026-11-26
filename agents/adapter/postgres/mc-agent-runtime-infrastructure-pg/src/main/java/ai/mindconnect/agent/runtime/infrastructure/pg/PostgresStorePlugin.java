@@ -87,7 +87,7 @@ public final class PostgresStorePlugin extends StorePlugin {
     protected Stores stores(PluginRegistry registry) {
         ScopeSupplier scope = registry.get(ScopeSupplier.class);
         Sql sql = registry.get(Sql.class);
-        PgLlmRepositoryFactory llm = new PgLlmRepositoryFactory(sql, scope);
+        PgLlmRepositoryFactory llm = new PgLlmRepositoryFactory(sql, () -> scope.namespace().value());
         PgWorkflowRepositoryFactory workflows =
                 new PgWorkflowRepositoryFactory(sql, () -> scope.namespace().value(), dataDir,
                         registry.get(JsonMapperFactory.class));

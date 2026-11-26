@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
@@ -20,12 +20,12 @@ class LlmConfigVersioningTest {
 
     @Test
     void theFileStoreChecksVersions(@TempDir Path dir) {
-        versionsAreChecked(new FileLlmConfigRepository(dir, TestJson.MAPPER, TenantScope.fixed("test")));
+        versionsAreChecked(new FileLlmConfigRepository(dir, TestJson.MAPPER, LlmScopeSupplier.fixed("test")));
     }
 
     @Test
     void theInMemoryStoreChecksVersions() {
-        versionsAreChecked(new InMemoryLlmConfigRepository(TenantScope.local()));
+        versionsAreChecked(new InMemoryLlmConfigRepository(LlmScopeSupplier.local()));
     }
 
     private static void versionsAreChecked(LlmConfigRepository repo) {

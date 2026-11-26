@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter.pg;
 
-import ai.mindconnect.scope.TenantScope;
+import ai.mindconnect.llm.management.api.port.out.LlmScopeSupplier;
 import ai.mindconnect.jdbc.Json;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.jackson.LlmJsonModule;
@@ -39,13 +39,13 @@ class PgLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
 
     @Override
     protected LlmPriceRepository repository() {
-        return new PgLlmPriceRepository(sql, TenantScope.fixed(NS)).initSchema();
+        return new PgLlmPriceRepository(sql, LlmScopeSupplier.fixed(NS)).initSchema();
     }
 
     @Test
     void aRepositoryBoundToAnotherNamespaceSeesNothing() {
         LlmPriceRepository mine = repository();
-        LlmPriceRepository other = new PgLlmPriceRepository(sql, TenantScope.fixed("other")).initSchema();
+        LlmPriceRepository other = new PgLlmPriceRepository(sql, LlmScopeSupplier.fixed("other")).initSchema();
         LlmPrice price = price("claude", "2026-01-01", null, "3", "15", null);
         mine.save(price);
 
