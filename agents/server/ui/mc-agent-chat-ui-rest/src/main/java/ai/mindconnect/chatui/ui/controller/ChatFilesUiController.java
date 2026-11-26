@@ -54,7 +54,7 @@ public class ChatFilesUiController {
 
     /** For the model button's label: the model behind the agent's config. */
     private final org.springframework.beans.factory.ObjectProvider<
-            ai.mindconnect.llm.port.out.LlmConfigRepository> llmConfigs;
+            ai.mindconnect.llm.management.api.port.out.LlmConfigRepository> llmConfigs;
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy,
@@ -64,7 +64,7 @@ public class ChatFilesUiController {
                                  ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                                  ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
                                  org.springframework.beans.factory.ObjectProvider<
-                                         ai.mindconnect.llm.port.out.LlmConfigRepository> llmConfigs) {
+                                         ai.mindconnect.llm.management.api.port.out.LlmConfigRepository> llmConfigs) {
         this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;

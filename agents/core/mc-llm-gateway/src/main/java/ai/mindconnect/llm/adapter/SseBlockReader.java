@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 
 import java.io.BufferedReader;
 import java.io.IOException;

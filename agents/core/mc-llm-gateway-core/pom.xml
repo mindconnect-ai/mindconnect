@@ -23,6 +23,14 @@
 
     <dependencies>
         <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-runtime-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-management-api</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>

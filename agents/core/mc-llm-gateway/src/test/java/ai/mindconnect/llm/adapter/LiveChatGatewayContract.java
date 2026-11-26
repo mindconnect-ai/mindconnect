@@ -1,19 +1,19 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.common.Cancellation;
-import ai.mindconnect.llm.domain.FinishReason;
-import ai.mindconnect.llm.domain.LlmCallEvent;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmResponse;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.ToolCall;
-import ai.mindconnect.llm.domain.ToolDefinition;
-import ai.mindconnect.llm.port.out.LlmGateway;
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
+import ai.mindconnect.llm.runtime.api.domain.FinishReason;
+import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmResponse;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
+import ai.mindconnect.llm.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 

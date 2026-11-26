@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.llm.domain.FinishReason;
+import ai.mindconnect.llm.runtime.api.domain.FinishReason;
 
 /**
  * What one SSE block contributed to the answer, as the gateway's stream

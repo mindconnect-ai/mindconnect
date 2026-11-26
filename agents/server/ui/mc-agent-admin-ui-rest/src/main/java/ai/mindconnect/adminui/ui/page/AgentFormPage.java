@@ -3,7 +3,7 @@ package ai.mindconnect.adminui.ui.page;
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.AgentFormComponent;
 import ai.mindconnect.agent.management.api.ManagedAgent;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.ui.model.UiPage;
 
 /**

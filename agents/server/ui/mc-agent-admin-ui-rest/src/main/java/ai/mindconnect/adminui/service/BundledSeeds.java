@@ -5,7 +5,7 @@ import ai.mindconnect.agent.management.format.AgentJson;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.domain.SkillSource;
 import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,14 +1,14 @@
 package ai.mindconnect.llm.service;
 
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.common.Cancellation;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.LlmTransientException;
-import ai.mindconnect.llm.port.in.LlmCallListener;
-import ai.mindconnect.llm.port.in.LlmChat;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.LlmTransientException;
+import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
+import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

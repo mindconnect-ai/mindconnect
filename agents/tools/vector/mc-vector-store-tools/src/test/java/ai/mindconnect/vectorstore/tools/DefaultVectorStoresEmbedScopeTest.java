@@ -2,10 +2,10 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.Scope;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,7 +44,7 @@ class DefaultVectorStoresEmbedScopeTest {
             @Override public void save(LlmConfig config) { }
             @Override public void deleteById(LlmConfigId id) { }
         };
-        LlmEmbeddings embeddings = (config, texts) -> texts.stream().map(t -> new float[]{1f}).toList();
+        LlmEmbedding embeddings = (config, texts) -> texts.stream().map(t -> new float[]{1f}).toList();
         VectorStoreTemplate template = new VectorStoreTemplate("default", "embeddings", "file-ingestion", Map.of());
         DefaultVectorStores stores = new DefaultVectorStores(template, dir, embeddings, configs, bound, new JsonMapperFactory(List.of(new IdJsonModule())));
 

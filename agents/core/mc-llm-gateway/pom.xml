@@ -19,6 +19,11 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-jackson</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-scope</artifactId>
         </dependency>
         <dependency>

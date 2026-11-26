@@ -12,11 +12,11 @@ import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.port.in.LlmChat;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-java-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../mc-java-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-llm-aggregator</artifactId>
+    <packaging>pom</packaging>
+    <description>
+        Multi-module build for the LLM gateway: talking to a model by the name of its
+        config, and managing those configs. Depends on nothing outside llm/.
+    </description>
+
+    <modules>
+        <module>mc-llm-runtime-api</module>
+        <module>mc-llm-management-api</module>
+        <module>mc-llm-jackson</module>
+        <module>mc-llm-arch-tests</module>
+    </modules>
+</project>

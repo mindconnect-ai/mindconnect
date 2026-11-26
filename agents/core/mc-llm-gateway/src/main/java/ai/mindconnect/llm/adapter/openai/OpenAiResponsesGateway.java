@@ -1,6 +1,8 @@
 package ai.mindconnect.llm.adapter.openai;
 
-import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.LlmCallEventBuilder;
@@ -8,20 +10,20 @@ import ai.mindconnect.llm.adapter.LlmHttpError;
 import ai.mindconnect.llm.adapter.LlmWireLog;
 import ai.mindconnect.llm.adapter.SseBlockReader;
 import ai.mindconnect.llm.adapter.ToolCallBuilder;
-import ai.mindconnect.llm.domain.FinishReason;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmContent;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmParameterMap;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.LlmTransientException;
-import ai.mindconnect.llm.domain.MessageRole;
-import ai.mindconnect.llm.domain.ThinkingBlock;
-import ai.mindconnect.llm.domain.ToolCall;
-import ai.mindconnect.llm.domain.ToolDefinition;
-import ai.mindconnect.llm.port.in.LlmCallListener;
-import ai.mindconnect.llm.port.out.LlmGateway;
+import ai.mindconnect.llm.runtime.api.domain.FinishReason;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmContent;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.management.api.domain.LlmParameterMap;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.LlmTransientException;
+import ai.mindconnect.llm.runtime.api.domain.MessageRole;
+import ai.mindconnect.llm.runtime.api.domain.ThinkingBlock;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
+import ai.mindconnect.llm.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -105,7 +107,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
                               Consumer<LlmStreamChunk> handler,
                               Cancellation cancellation,
                               LlmCallListener listener) {
-        LlmConfig resolved = config.resolved(env, encryption);
+        LlmConfig resolved = LlmConfigResolver.resolved(config, env, encryption);
         String endpoint = resolved.provider().baseUrlOr(resolved.baseUrl()) + "|" + Objects.hashCode(resolved.apiKey());
         try {
             stream(resolved, request, handler, cancellation, listener, summariesRefused.contains(endpoint));

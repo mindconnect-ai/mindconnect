@@ -1,13 +1,15 @@
 package ai.mindconnect.llm.adapter.gemini;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmContent;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.LlmRequest;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmContent;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
@@ -32,7 +34,7 @@ class GeminiGatewayContentBlocksTest {
     void textOnlyMessagesAreOneTextPart() throws Exception {
         LlmRequest req = LlmRequest.streaming("gemini", List.of(LlmMessage.user("hi")));
 
-        JsonNode parts = gateway.buildRequestNode(config.resolved(encryption), req)
+        JsonNode parts = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req)
                 .path("contents").path(0).path("parts");
 
         assertThat(parts).hasSize(1);
@@ -47,7 +49,7 @@ class GeminiGatewayContentBlocksTest {
                 new LlmContent.Document("UERG", "application/pdf", "spec.pdf")));
         LlmRequest req = LlmRequest.streaming("gemini", List.of(user));
 
-        JsonNode turn = gateway.buildRequestNode(config.resolved(encryption), req)
+        JsonNode turn = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req)
                 .path("contents").path(0);
         JsonNode parts = turn.path("parts");
 

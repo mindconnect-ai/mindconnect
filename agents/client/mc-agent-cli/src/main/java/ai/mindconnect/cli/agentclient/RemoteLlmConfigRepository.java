@@ -1,9 +1,9 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;

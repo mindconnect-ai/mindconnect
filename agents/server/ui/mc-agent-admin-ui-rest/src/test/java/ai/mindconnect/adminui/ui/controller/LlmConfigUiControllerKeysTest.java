@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.service.LlmConfigService;
 import org.junit.jupiter.api.Test;
 

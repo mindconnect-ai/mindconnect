@@ -15,7 +15,7 @@ import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import com.fasterxml.jackson.databind.ObjectMapper;

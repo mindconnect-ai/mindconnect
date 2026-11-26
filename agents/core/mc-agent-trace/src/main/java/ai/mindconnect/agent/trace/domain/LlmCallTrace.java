@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.trace.domain;
 
-import ai.mindconnect.llm.domain.LlmCallEvent;
+import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
 
 import java.time.Instant;
 import java.util.List;

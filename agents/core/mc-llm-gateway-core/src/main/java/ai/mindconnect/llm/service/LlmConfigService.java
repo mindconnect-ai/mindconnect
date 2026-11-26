@@ -1,9 +1,9 @@
 package ai.mindconnect.llm.service;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 
 import java.util.Objects;
 import java.util.Optional;

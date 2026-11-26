@@ -3,8 +3,8 @@ package ai.mindconnect.llm.adapter.pg;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.port.out.LlmPriceRepository;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepositoryContract;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,7 +102,7 @@ class PgLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
 
         LlmPriceRepository repo = repository();
 
-        LlmPrice old = repo.findById(ai.mindconnect.llm.domain.LlmPriceId.of("old-price")).orElseThrow();
+        LlmPrice old = repo.findById(ai.mindconnect.llm.management.api.domain.LlmPriceId.of("old-price")).orElseThrow();
         assertThat(old.model()).isNull();
         assertThat(old.anyModel()).isTrue();
         assertThat(repo.priceAt("claude", "claude-sonnet-4-6", Instant.parse("2026-09-24T00:00:00Z")))

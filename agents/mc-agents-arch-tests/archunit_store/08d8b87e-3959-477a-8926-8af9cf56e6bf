@@ -123,9 +123,6 @@ ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway has 2 constructors
 ai.mindconnect.llm.adapter.openai.OpenAiTranscriptionGateway has 2 constructors
 ai.mindconnect.llm.adapter.pg.PgLlmConfigRepository has 2 constructors
 ai.mindconnect.llm.adapter.pg.PgLlmPriceRepository has 2 constructors
-ai.mindconnect.llm.domain.LlmConfig has 2 constructors
-ai.mindconnect.llm.domain.LlmStreamChunk$ToolCallDelta has 2 constructors
-ai.mindconnect.llm.domain.ToolCall has 2 constructors
 ai.mindconnect.mail.MailAccounts has 2 constructors
 ai.mindconnect.mail.MailDraft has 3 constructors
 ai.mindconnect.mail.MailPage has 2 constructors

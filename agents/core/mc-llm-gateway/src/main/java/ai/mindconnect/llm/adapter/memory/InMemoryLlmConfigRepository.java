@@ -3,9 +3,9 @@ package ai.mindconnect.llm.adapter.memory;
 import ai.mindconnect.agent.scope.NamespaceMap;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.Versions;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 
 import java.util.List;
 import java.util.Map;

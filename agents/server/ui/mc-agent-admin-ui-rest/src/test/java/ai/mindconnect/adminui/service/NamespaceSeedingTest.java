@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.service;
 
+import ai.mindconnect.llm.jackson.LlmJsonModule;
 import ai.mindconnect.adminui.namespaces.GuardedRepositories;
 import ai.mindconnect.adminui.namespaces.NamespaceWriteGuard;
 import ai.mindconnect.agent.scope.Namespace;
@@ -23,7 +24,7 @@ import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
@@ -64,7 +65,7 @@ class NamespaceSeedingTest {
             "llm-config:seed-test-llm", "agent:host-helper", "agent:crm-assistant", "agent:crm-checker",
             "skill:crm-notes", "workflow:crm-flow");
 
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule())
+    private final ObjectMapper mapper = new ObjectMapper().registerModule(new LlmJsonModule()).registerModule(new JavaTimeModule())
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     /** What is stored, per namespace — outlives a "restart", which only builds the scope and the seeding anew. */
@@ -124,7 +125,7 @@ class NamespaceSeedingTest {
                 ns -> decisions.computeIfAbsent(ns, n -> new InMemoryExtensionActivationRepository()));
         ExtensionService extensions = new ExtensionService(new ExtensionRegistry(List.of(crmExtension())), activations);
 
-        NamespaceSeeder seeder = new NamespaceSeeder(new BundledSeeds(mapper, "classpath*:seed-test/", new JsonMapperFactory(List.of())),
+        NamespaceSeeder seeder = new NamespaceSeeder(new BundledSeeds(mapper, "classpath*:seed-test/", new JsonMapperFactory(List.of(new LlmJsonModule()))),
                 llm, agents, skills, workflows, installed, extensions) {
             @Override
             public Report installMissing(Namespace namespace) {

@@ -1,6 +1,6 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.springframework.beans.factory.annotation.Value;

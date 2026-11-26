@@ -6,10 +6,10 @@ import java.util.function.Function;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.llm.port.in.LlmChat;
+import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 

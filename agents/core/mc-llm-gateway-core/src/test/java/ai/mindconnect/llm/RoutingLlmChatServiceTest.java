@@ -1,9 +1,10 @@
 package ai.mindconnect.llm;
 
-import ai.mindconnect.common.Cancellation;
-import ai.mindconnect.llm.domain.*;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmGateway;
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
+import ai.mindconnect.llm.runtime.api.domain.*;
+import ai.mindconnect.llm.management.api.domain.*;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
 import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-import static ai.mindconnect.llm.domain.LlmProvider.LM_STUDIO;
+import static ai.mindconnect.llm.management.api.domain.LlmProvider.LM_STUDIO;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -44,7 +45,7 @@ class RoutingLlmChatServiceTest {
             public void chatStreaming(LlmConfig cfg, LlmRequest req,
                                       Consumer<LlmStreamChunk> handler,
                                       Cancellation cancellation,
-                                      ai.mindconnect.llm.port.in.LlmCallListener listener) {
+                                      ai.mindconnect.llm.runtime.api.port.out.LlmCallListener listener) {
                 handler.accept(new LlmStreamChunk.TextDelta("Hello "));
                 handler.accept(new LlmStreamChunk.TextDelta("from "));
                 handler.accept(new LlmStreamChunk.TextDelta("LM Studio"));

@@ -2,8 +2,8 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;

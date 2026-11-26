@@ -1,5 +1,8 @@
 package ai.mindconnect.llm.port.out;
 
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
+
 /**
  * Creates the LLM layer's repositories for one persistence backend. One
  * implementation per backend — file, in-memory, Postgres — so that whoever

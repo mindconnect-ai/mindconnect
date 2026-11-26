@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 
 /**
  * What the composer's model button says: the model the chat really runs on,

@@ -8,9 +8,9 @@ import ai.mindconnect.agent.SessionId;
  * Identifies the agent-runtime context that issued an LLM call: which
  * session, turn, and (for sub-agents) which parent turn.
  *
- * <p>Threaded through to the {@link ai.mindconnect.llm.port.in.LlmCallListener}
+ * <p>Threaded through to the {@link ai.mindconnect.llm.runtime.api.port.out.LlmCallListener}
  * the runtime attaches per call. The gateway itself knows nothing about this
- * — it only sees the raw {@link ai.mindconnect.llm.domain.LlmCallEvent},
+ * — it only sees the raw {@link ai.mindconnect.llm.runtime.api.domain.LlmCallEvent},
  * which the runtime then combines with this context into a persisted
  * {@link LlmCallTrace}.
  *

@@ -187,14 +187,14 @@ class IndexDefinitionsTest {
         DefaultVectorStores stores = new DefaultVectorStores(
                 new VectorStoreTemplate("default", "embeddings", null, Map.of()), dir,
                 (config, texts) -> texts.stream().map(t -> new float[]{1f, 0f}).toList(),
-                new ai.mindconnect.llm.port.out.LlmConfigRepository() {
-                    @Override public java.util.Optional<ai.mindconnect.llm.domain.LlmConfig> findById(ai.mindconnect.llm.domain.LlmConfigId id) { return java.util.Optional.empty(); }
-                    @Override public java.util.Optional<ai.mindconnect.llm.domain.LlmConfig> findByName(String name) {
-                        return java.util.Optional.of(ai.mindconnect.llm.domain.LlmConfig.lmStudio(name, "fake", "http://unused"));
+                new ai.mindconnect.llm.management.api.port.out.LlmConfigRepository() {
+                    @Override public java.util.Optional<ai.mindconnect.llm.management.api.domain.LlmConfig> findById(ai.mindconnect.llm.management.api.domain.LlmConfigId id) { return java.util.Optional.empty(); }
+                    @Override public java.util.Optional<ai.mindconnect.llm.management.api.domain.LlmConfig> findByName(String name) {
+                        return java.util.Optional.of(ai.mindconnect.llm.management.api.domain.LlmConfig.lmStudio(name, "fake", "http://unused"));
                     }
-                    @Override public List<ai.mindconnect.llm.domain.LlmConfig> findAll() { return List.of(); }
-                    @Override public void save(ai.mindconnect.llm.domain.LlmConfig config) { }
-                    @Override public void deleteById(ai.mindconnect.llm.domain.LlmConfigId id) { }
+                    @Override public List<ai.mindconnect.llm.management.api.domain.LlmConfig> findAll() { return List.of(); }
+                    @Override public void save(ai.mindconnect.llm.management.api.domain.LlmConfig config) { }
+                    @Override public void deleteById(ai.mindconnect.llm.management.api.domain.LlmConfigId id) { }
                 }, ScopeSupplier.fixed(NS), new JsonMapperFactory(List.of(new IdJsonModule())));
         stores.registry().saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", null, Map.of()));
         VectorStore chat = stores.open("session-s1", "chat-uploads", VectorStoreInstance.Scope.SESSION, "s1", "alice");

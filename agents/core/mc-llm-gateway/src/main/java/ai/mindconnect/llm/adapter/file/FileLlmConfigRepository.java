@@ -4,9 +4,9 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Path;

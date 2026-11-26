@@ -4,7 +4,7 @@ import ai.mindconnect.adminui.ui.page.VectorStoreTemplateFormPage;
 import ai.mindconnect.agentrest.service.VectorStoreService;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.common.StaleVersionException;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;

@@ -3,8 +3,8 @@ package ai.mindconnect.llm.service;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -113,7 +113,7 @@ class LlmPriceServiceTest {
 
     @Test
     void aPriceWithoutAModelIsRefused() {
-        LlmPrice noModel = new LlmPrice(ai.mindconnect.llm.domain.LlmPriceId.random(), "claude", " ",
+        LlmPrice noModel = new LlmPrice(ai.mindconnect.llm.management.api.domain.LlmPriceId.random(), "claude", " ",
                 LocalDate.parse("2026-01-01"), null, "USD", BigDecimal.ONE, BigDecimal.ONE, null);
 
         assertThatThrownBy(() -> service.save(noModel)).hasMessageContaining("needs the model");

@@ -6,8 +6,8 @@ import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
 import ai.mindconnect.llm.service.LlmPriceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
@@ -222,7 +222,7 @@ class LlmPriceUiControllerTest {
 
     @Test
     void editingAPriceStoredWithoutAModelOffersTheCurrentOne() throws Exception {
-        LlmPrice legacy = new LlmPrice(ai.mindconnect.llm.domain.LlmPriceId.random(), "claude", null,
+        LlmPrice legacy = new LlmPrice(ai.mindconnect.llm.management.api.domain.LlmPriceId.random(), "claude", null,
                 LocalDate.parse("2026-01-01"), null, "USD", java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, null);
         prices.save(legacy);
 

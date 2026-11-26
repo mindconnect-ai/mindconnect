@@ -1,11 +1,11 @@
 package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.service.LlmConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +51,7 @@ public class LlmConfigApiController {
 
     /** One provider with the additional-parameter fields its gateway understands. */
     public record ProviderInfo(String name,
-                               List<ai.mindconnect.llm.domain.AdditionalParamSpec> additionalParams) {}
+                               List<ai.mindconnect.llm.management.api.domain.AdditionalParamSpec> additionalParams) {}
 
     @Operation(summary = "List providers and their additional parameters",
             description = "Every supported provider plus the catalog of keys its gateway reads "
@@ -59,7 +59,7 @@ public class LlmConfigApiController {
                     + "values, config type they apply to).")
     @GetMapping("/providers")
     public List<ProviderInfo> providers() {
-        return java.util.Arrays.stream(ai.mindconnect.llm.domain.LlmProvider.values())
+        return java.util.Arrays.stream(ai.mindconnect.llm.management.api.domain.LlmProvider.values())
                 .map(p -> new ProviderInfo(p.name(), p.additionalParams()))
                 .toList();
     }

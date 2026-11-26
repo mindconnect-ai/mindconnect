@@ -1,10 +1,10 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.llm.domain.LlmCallEvent;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.ToolCall;
-import ai.mindconnect.llm.port.in.LlmCallListener;
+import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
+import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;

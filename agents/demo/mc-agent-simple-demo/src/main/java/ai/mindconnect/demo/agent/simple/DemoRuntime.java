@@ -43,8 +43,8 @@ import ai.mindconnect.agent.tools.usermemory.UserMemoryPlugin;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.jackson.JacksonPlugin;
 import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 

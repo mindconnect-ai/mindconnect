@@ -2,13 +2,13 @@ package ai.mindconnect.llm.service;
 
 
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.TranscriptionRequest;
-import ai.mindconnect.llm.domain.TranscriptionResult;
-import ai.mindconnect.llm.port.in.LlmTranscription;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.TranscriptionGateway;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
+import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.TranscriptionGateway;
 
 import java.util.function.Consumer;
 

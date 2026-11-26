@@ -2,13 +2,13 @@ package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.chatui.ui.controller.FormBody;
-import ai.mindconnect.llm.domain.LlmCapability;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.RateLimitConfig;
-import ai.mindconnect.llm.domain.RetryConfig;
+import ai.mindconnect.llm.management.api.domain.LlmCapability;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.domain.RateLimitConfig;
+import ai.mindconnect.llm.management.api.domain.RetryConfig;
 import ai.mindconnect.llm.service.LlmConfigService;
 
 import java.util.Map;
@@ -124,7 +124,7 @@ final class LlmConfigForm {
      * additionalParams, preserving any other provider keys. A blank/absent
      * value removes the key (so "(default)" in the form means "omit it"). Only
      * touches a key when its field is present in the submitted form. Keys are
-     * driven by the provider's {@link ai.mindconnect.llm.domain.AdditionalParamSpec}
+     * driven by the provider's {@link ai.mindconnect.llm.management.api.domain.AdditionalParamSpec}
      * catalog; specs of OTHER providers are dropped so switching the provider
      * never leaves stale parameters behind. Manually-added keys unknown to any
      * catalog pass through untouched.
@@ -135,7 +135,7 @@ final class LlmConfigForm {
                 existing != null ? existing : Map.of());
         java.util.Set<String> mine = provider == null ? java.util.Set.of()
                 : provider.additionalParams().stream()
-                        .map(ai.mindconnect.llm.domain.AdditionalParamSpec::key)
+                        .map(ai.mindconnect.llm.management.api.domain.AdditionalParamSpec::key)
                         .collect(java.util.stream.Collectors.toSet());
         for (LlmProvider p : LlmProvider.values()) {
             for (var spec : p.additionalParams()) {

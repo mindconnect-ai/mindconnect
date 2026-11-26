@@ -1,6 +1,8 @@
 package ai.mindconnect.llm.port.out;
 
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 
 public interface LlmGatewayRegistry {
 

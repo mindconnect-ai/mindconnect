@@ -3,10 +3,10 @@ package ai.mindconnect.llm.adapter.pg;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.domain.LlmPriceId;
-import ai.mindconnect.llm.domain.LlmPriceList;
-import ai.mindconnect.llm.port.out.LlmPriceRepository;
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.domain.LlmPriceId;
+import ai.mindconnect.llm.management.api.domain.LlmPriceList;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 
 import javax.sql.DataSource;
 import java.util.List;

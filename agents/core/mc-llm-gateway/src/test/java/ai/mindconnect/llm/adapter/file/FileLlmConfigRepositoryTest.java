@@ -2,7 +2,8 @@ package ai.mindconnect.llm.adapter.file;
 
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.jackson.LlmJsonModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,8 @@ class FileLlmConfigRepositoryTest {
     Path dir;
 
     /** The builder's mapper, which fails on unknown properties — the strictest a host hands the store. */
-    private final ObjectMapper strict = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper strict = new ObjectMapper().registerModule(new JavaTimeModule())
+            .registerModule(new LlmJsonModule());
 
     @Test
     void a_config_written_with_a_field_this_version_does_not_know_still_loads() throws IOException {

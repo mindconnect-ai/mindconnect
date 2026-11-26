@@ -12,7 +12,7 @@ import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.agent.skill.domain.Skill;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.ui.model.UiAction;

@@ -1,8 +1,8 @@
 package ai.mindconnect.llm.adapter.memory;
 
 import ai.mindconnect.agent.scope.ScopeSupplier;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmPriceRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmRepositoryFactory;
 
 /** The LLM repositories in memory, one store per namespace — nothing survives the process. */

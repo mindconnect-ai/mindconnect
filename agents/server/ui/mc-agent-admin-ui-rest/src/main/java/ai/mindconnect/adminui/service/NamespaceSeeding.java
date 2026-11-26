@@ -8,7 +8,7 @@ import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.jackson.JsonMapperFactory;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;

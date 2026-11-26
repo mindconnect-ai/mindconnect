@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import ai.mindconnect.agent.jackson.IdJsonPlugin;
+import ai.mindconnect.agent.jackson.LlmJsonPlugin;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.scope.Namespace;
@@ -44,7 +45,7 @@ import ai.mindconnect.agent.runtime.llm.LlmGatewayModelPlugin;
 import ai.mindconnect.agent.runtime.store.InMemorySessionStorePlugin;
 import ai.mindconnect.agent.runtime.prompt.PebblePromptPlugin;
 import ai.mindconnect.agent.runtime.engine.service.EnginePlugin;
-import ai.mindconnect.llm.port.in.LlmChat;
+import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 import ai.mindconnect.plugin.DefaultPluginRegistry;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
@@ -200,6 +201,7 @@ public final class AgentRuntimeBuilder {
                 // The mappers, made when first asked for: after every plugin has contributed its modules.
                 new JacksonPlugin(List.of()),
                 new IdJsonPlugin(),
+                new LlmJsonPlugin(),
                 sessionStore));
         if (model != null) {
             plugins.add(model);

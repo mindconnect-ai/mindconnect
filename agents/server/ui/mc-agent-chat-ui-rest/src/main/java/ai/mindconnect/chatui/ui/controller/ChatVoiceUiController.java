@@ -1,9 +1,9 @@
 package ai.mindconnect.chatui.ui.controller;
 
 import ai.mindconnect.chatui.ui.component.ChatFormComponent;
-import ai.mindconnect.llm.domain.TranscriptionRequest;
-import ai.mindconnect.llm.domain.TranscriptionResult;
-import ai.mindconnect.llm.port.in.LlmTranscription;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
+import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.slf4j.Logger;

@@ -1,7 +1,7 @@
 package ai.mindconnect.cli.agentclient;
 
 import ai.mindconnect.agent.sdk.AgentRuntime;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.springframework.stereotype.Component;
 
 /** The clients of local mode: on the runtime the application built. */

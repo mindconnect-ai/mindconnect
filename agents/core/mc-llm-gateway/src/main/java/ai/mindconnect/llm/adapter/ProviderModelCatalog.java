@@ -1,11 +1,13 @@
 package ai.mindconnect.llm.adapter;
 
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.HttpUrl;
@@ -101,7 +103,7 @@ public class ProviderModelCatalog {
                 0, 0, Map.of(), null, false, null, null, null, LlmConfigType.CHAT, null);
         LlmConfig asked = probe;
         try {
-            asked = probe.resolved(environment, encryption);
+            asked = LlmConfigResolver.resolved(probe, environment, encryption);
         } catch (RuntimeException e) {
             // A key that cannot be decrypted (a rotated secret) must not take
             // down the form — the listing simply fails and says why.

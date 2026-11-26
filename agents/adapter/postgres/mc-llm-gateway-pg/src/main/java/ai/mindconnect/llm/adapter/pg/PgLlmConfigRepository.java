@@ -3,9 +3,9 @@ package ai.mindconnect.llm.adapter.pg;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 
 import javax.sql.DataSource;
 import java.util.List;

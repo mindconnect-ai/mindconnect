@@ -1,10 +1,12 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -25,7 +27,7 @@ class LlmConfigResolvedTest {
                 EnvVarResolver.of(Map.of("OPENAI_API_KEY", "sk-server", "LLM_MODEL", "gpt-4o")));
         var cfg = config("${LLM_MODEL}", "https://api.openai.com", "${OPENAI_API_KEY}");
 
-        var r = cfg.resolved(chain, EncryptionHelper.noEncryption());
+        var r = LlmConfigResolver.resolved(cfg, chain, EncryptionHelper.noEncryption());
 
         assertThat(r.apiKey()).isEqualTo("sk-alice");
         assertThat(r.model()).isEqualTo("gpt-4o");
@@ -44,7 +46,7 @@ class LlmConfigResolvedTest {
                 EnvVarResolver.of(Map.of("OPENAI_BASE_URL", "https://api.openai.com", "LLM_MODEL", "gpt-4o")));
         var cfg = config("${LLM_MODEL}", "${OPENAI_BASE_URL}", "${OPENAI_API_KEY}");
 
-        var r = cfg.resolved(chain, EncryptionHelper.noEncryption());
+        var r = LlmConfigResolver.resolved(cfg, chain, EncryptionHelper.noEncryption());
 
         assertThat(r.apiKey()).isEqualTo("sk-alice");
         assertThat(r.baseUrl()).isEqualTo("https://api.openai.com");
@@ -59,25 +61,25 @@ class LlmConfigResolvedTest {
         // verify the happy path using a var that is expected to be absent and
         // supplying a default.
         var cfg = config("gpt-4o", "https://api.openai.com", "${MY_TEST_API_KEY:plain-key}");
-        assertThat(cfg.resolved().apiKey()).isEqualTo("plain-key");
+        assertThat(LlmConfigResolver.resolved(cfg).apiKey()).isEqualTo("plain-key");
     }
 
     @Test
     void resolvedExpandsBaseUrl() {
         var cfg = config("gpt-4o", "${LLM_BASE_URL:https://api.openai.com}", "key");
-        assertThat(cfg.resolved().baseUrl()).isEqualTo("https://api.openai.com");
+        assertThat(LlmConfigResolver.resolved(cfg).baseUrl()).isEqualTo("https://api.openai.com");
     }
 
     @Test
     void resolvedExpandsModel() {
         var cfg = config("${LLM_MODEL:gpt-4o-mini}", "https://api.openai.com", "key");
-        assertThat(cfg.resolved().model()).isEqualTo("gpt-4o-mini");
+        assertThat(LlmConfigResolver.resolved(cfg).model()).isEqualTo("gpt-4o-mini");
     }
 
     @Test
     void resolvedLeavesNonPlaceholderValuesUnchanged() {
         var cfg = config("gpt-4o", "https://api.openai.com", "sk-plain");
-        var r = cfg.resolved();
+        var r = LlmConfigResolver.resolved(cfg);
         assertThat(r.model()).isEqualTo("gpt-4o");
         assertThat(r.baseUrl()).isEqualTo("https://api.openai.com");
         assertThat(r.apiKey()).isEqualTo("sk-plain");
@@ -86,7 +88,7 @@ class LlmConfigResolvedTest {
     @Test
     void resolvedPreservesNonStringFields() {
         var cfg = config("gpt-4o", "https://api.openai.com", "key");
-        var r = cfg.resolved();
+        var r = LlmConfigResolver.resolved(cfg);
         assertThat(r.id()).isEqualTo(cfg.id());
         assertThat(r.provider()).isEqualTo(LlmProvider.OPENAI);
         assertThat(r.defaultTemperature()).isEqualTo(0.7);
@@ -96,7 +98,7 @@ class LlmConfigResolvedTest {
     @Test
     void resolvedThrowsWhenEnvVarAbsentAndNoDefault() {
         var cfg = config("gpt-4o", "https://api.openai.com", "${DEFINITELY_NOT_SET_XYZ}");
-        assertThatThrownBy(cfg::resolved)
+        assertThatThrownBy(() -> LlmConfigResolver.resolved(cfg))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("DEFINITELY_NOT_SET_XYZ");
     }
@@ -109,21 +111,21 @@ class LlmConfigResolvedTest {
         String encrypted = EncryptionHelper.ENC + encryption.encrypt("real-api-key");
 
         var cfg = config("gpt-4o", "https://api.openai.com", encrypted);
-        assertThat(cfg.resolved(encryption).apiKey()).isEqualTo("real-api-key");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("real-api-key");
     }
 
     @Test
     void resolvedWithEncryptionHandlesPlainPrefix() {
         var encryption = new EncryptionHelper("0123456789abcdef");
         var cfg = config("gpt-4o", "https://api.openai.com", "plain:my-key");
-        assertThat(cfg.resolved(encryption).apiKey()).isEqualTo("my-key");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("my-key");
     }
 
     @Test
     void resolvedWithEncryptionHandlesBareKey() {
         var encryption = new EncryptionHelper("0123456789abcdef");
         var cfg = config("gpt-4o", "https://api.openai.com", "sk-bare");
-        assertThat(cfg.resolved(encryption).apiKey()).isEqualTo("sk-bare");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("sk-bare");
     }
 
     @Test
@@ -135,13 +137,13 @@ class LlmConfigResolvedTest {
 
         // Store the encrypted value as a default fallback so resolved() picks it up
         var cfg = config("gpt-4o", "https://api.openai.com", "${ABSENT_VAR:" + encrypted + "}");
-        assertThat(cfg.resolved(encryption).apiKey()).isEqualTo("secret");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("secret");
     }
 
     @Test
     void resolvedWithEncryptionAlsoExpandsBaseUrl() throws Exception {
         var encryption = new EncryptionHelper("0123456789abcdef");
         var cfg = config("gpt-4o", "${MY_BASE_URL:https://custom.api.com}", "key");
-        assertThat(cfg.resolved(encryption).baseUrl()).isEqualTo("https://custom.api.com");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).baseUrl()).isEqualTo("https://custom.api.com");
     }
 }

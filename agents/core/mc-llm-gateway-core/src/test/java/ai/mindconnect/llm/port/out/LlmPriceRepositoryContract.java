@@ -1,7 +1,9 @@
 package ai.mindconnect.llm.port.out;
 
-import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.domain.LlmPriceId;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
+
+import ai.mindconnect.llm.management.api.domain.LlmPrice;
+import ai.mindconnect.llm.management.api.domain.LlmPriceId;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

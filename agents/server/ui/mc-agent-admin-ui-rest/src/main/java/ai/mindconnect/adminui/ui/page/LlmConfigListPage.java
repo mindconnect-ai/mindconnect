@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.LlmConfigListComponent;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiPage;
 
 import java.util.List;

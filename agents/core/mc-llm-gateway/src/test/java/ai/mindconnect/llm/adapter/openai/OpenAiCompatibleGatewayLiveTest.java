@@ -4,9 +4,9 @@ import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.LiveChatGatewayContract;
 import ai.mindconnect.llm.adapter.LiveTestEnvironment;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.port.out.LlmGateway;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.util.Map;

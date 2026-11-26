@@ -96,10 +96,11 @@ import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.in.LlmTranscription;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmPriceRepository;
+import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.StartupScope;
@@ -443,7 +444,8 @@ public class RuntimeEngineAutoConfiguration {
     @Bean ToolRegistry toolRegistry(AgentRuntime r) { return r.service(ToolRegistry.class); }
     @Bean LlmConfigRepository llmConfigRepository(AgentRuntime r) { return r.service(LlmConfigRepository.class); }
     @Bean LlmPriceRepository llmPriceRepository(AgentRuntime r) { return r.service(LlmPriceRepository.class); }
-    @Bean LlmEmbeddings llmEmbeddings(AgentRuntime r) { return r.service(LlmEmbeddings.class); }
+    @Bean LlmEmbedding llmEmbedding(AgentRuntime r) { return r.service(LlmEmbedding.class); }
+    @Bean EmbeddingGateway embeddingGateway(AgentRuntime r) { return r.service(EmbeddingGateway.class); }
     @Bean LlmTranscription llmTranscription(AgentRuntime r) { return r.service(LlmTranscription.class); }
     /** The routing chat by its class too: the config test service asks for the concrete type. */
     @Bean RoutingLlmChatService llmChat(AgentRuntime r) { return r.service(RoutingLlmChatService.class); }

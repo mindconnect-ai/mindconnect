@@ -1,8 +1,8 @@
 package ai.mindconnect.llm.adapter.lmstudio;
 
 import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.domain.LlmCapability;
-import ai.mindconnect.llm.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmCapability;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import com.sun.net.httpserver.HttpServer;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.AfterEach;

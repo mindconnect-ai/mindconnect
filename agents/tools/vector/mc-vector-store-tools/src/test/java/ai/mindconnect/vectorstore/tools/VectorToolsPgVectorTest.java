@@ -4,10 +4,10 @@ import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolEnvironment;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +46,7 @@ class VectorToolsPgVectorTest {
     /** Where every store's chunks live: the embedding index, one table for all namespaces. */
     private static final String TABLE = "mc_embedding";
 
-    private static final LlmEmbeddings FAKE_EMBEDDINGS = (config, texts) -> texts.stream()
+    private static final LlmEmbedding FAKE_EMBEDDINGS = (config, texts) -> texts.stream()
             .map(t -> {
                 if (t.contains("container")) return new float[]{1f, 0f, 0f};
                 if (t.contains("finance")) return new float[]{0f, 1f, 0f};
@@ -78,7 +78,7 @@ class VectorToolsPgVectorTest {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
                 if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
-                if (type == LlmEmbeddings.class) return Optional.of((T) FAKE_EMBEDDINGS);
+                if (type == LlmEmbedding.class) return Optional.of((T) FAKE_EMBEDDINGS);
                 if (type == LlmConfigRepository.class) return Optional.of((T) FAKE_CONFIGS);
                 if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(NS));
                 return Optional.empty();

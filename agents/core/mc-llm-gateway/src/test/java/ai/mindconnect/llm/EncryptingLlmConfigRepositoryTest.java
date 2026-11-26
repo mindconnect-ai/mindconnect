@@ -1,10 +1,10 @@
 package ai.mindconnect.llm;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.Test;
 
 import javax.crypto.Cipher;

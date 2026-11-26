@@ -1,16 +1,16 @@
 package ai.mindconnect.llm;
 
-import ai.mindconnect.common.Cancellation;
-import ai.mindconnect.llm.domain.FinishReason;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.LlmTransientException;
-import ai.mindconnect.llm.port.in.LlmCallListener;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmGateway;
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
+import ai.mindconnect.llm.runtime.api.domain.FinishReason;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.LlmTransientException;
+import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.junit.jupiter.api.BeforeEach;

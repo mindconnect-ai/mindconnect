@@ -9,7 +9,7 @@ import ai.mindconnect.agent.trace.domain.LlmCallTrace;
 import ai.mindconnect.agent.trace.domain.TraceContext;
 import ai.mindconnect.agent.runtime.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
-import ai.mindconnect.llm.domain.LlmCallEvent;
+import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
 
 /**
  * Every provider call of a turn into the application's trace repository,

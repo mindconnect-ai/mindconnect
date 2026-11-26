@@ -1,6 +1,6 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.llm.domain.ToolCall;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

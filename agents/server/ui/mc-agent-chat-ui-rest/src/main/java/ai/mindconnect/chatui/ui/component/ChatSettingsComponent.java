@@ -2,7 +2,7 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 

@@ -4,10 +4,10 @@ import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.llm.adapter.ModelListing;
 import ai.mindconnect.llm.adapter.ProviderModelCatalog;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
-import ai.mindconnect.llm.domain.LlmCapability;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.domain.LlmCapability;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiTrigger;
@@ -138,7 +138,7 @@ public final class LlmConfigFormComponent implements UiComponent {
      *                 all. {@code null} for a provider whose models cannot be listed.
      */
     public static UiField apiKeyField(String value, String formId,
-                                      ai.mindconnect.llm.domain.LlmConfigId configId, String swapUrl) {
+                                      ai.mindconnect.llm.management.api.domain.LlmConfigId configId, String swapUrl) {
         UiField field = UiField.password("apiKey", "API Key", value)
                 .asEditable()
                 .hint("Stored as enc:… — type a key and press Encrypt, or use a ${VAR} placeholder. "
@@ -153,7 +153,7 @@ public final class LlmConfigFormComponent implements UiComponent {
     }
 
     /** The field-groups endpoint for this form — where every in-place swap goes. */
-    public static String swapUrl(String formId, ai.mindconnect.llm.domain.LlmConfigId configId) {
+    public static String swapUrl(String formId, ai.mindconnect.llm.management.api.domain.LlmConfigId configId) {
         return "/admin/api/llm-configs/field-groups?form=" + formId
                 + (configId == null ? "" : "&id=" + configId.value());
     }
@@ -306,15 +306,15 @@ public final class LlmConfigFormComponent implements UiComponent {
 
     /**
      * The provider-specific additional parameters — rendered straight from the
-     * provider's {@link ai.mindconnect.llm.domain.AdditionalParamSpec} catalog,
+     * provider's {@link ai.mindconnect.llm.management.api.domain.AdditionalParamSpec} catalog,
      * filtered by config type, and swapped in place when provider or type
      * changes. An empty group (provider without extra params) keeps the id
      * anchored for the patch but renders nothing visible.
      */
     public static ai.mindconnect.ui.model.UiFieldGroup providerParamsGroup(
-            LlmProvider provider, ai.mindconnect.llm.domain.LlmConfigType type, LlmConfig config) {
+            LlmProvider provider, ai.mindconnect.llm.management.api.domain.LlmConfigType type, LlmConfig config) {
         var specs = provider == null
-                ? List.<ai.mindconnect.llm.domain.AdditionalParamSpec>of()
+                ? List.<ai.mindconnect.llm.management.api.domain.AdditionalParamSpec>of()
                 : provider.additionalParams(type);
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-provider-params",
                 specs.isEmpty() ? null : provider.name() + " parameters");
@@ -344,7 +344,7 @@ public final class LlmConfigFormComponent implements UiComponent {
      * patch has its anchor and the value survives), just not visible.
      */
     public static ai.mindconnect.ui.model.UiFieldGroup aliasGroup(
-            boolean isAlias, String delegatesTo, ai.mindconnect.llm.domain.LlmConfigId selfId, List<LlmConfig> allConfigs) {
+            boolean isAlias, String delegatesTo, ai.mindconnect.llm.management.api.domain.LlmConfigId selfId, List<LlmConfig> allConfigs) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-alias-cfg", null);
         List<UiField.Option> delegateOptions = allConfigs.stream()
                 .filter(c -> selfId == null || !c.id().equals(selfId))
@@ -375,7 +375,7 @@ public final class LlmConfigFormComponent implements UiComponent {
      */
     public static ai.mindconnect.ui.model.UiFieldGroup baseGroup(
             boolean isAlias, String type, String provider, String model, String baseUrl,
-            String apiKey, String formId, ai.mindconnect.llm.domain.LlmConfigId configId,
+            String apiKey, String formId, ai.mindconnect.llm.management.api.domain.LlmConfigId configId,
             ModelChoices models) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-base-cfg", null);
         if (isAlias) group.hidden();
@@ -607,7 +607,7 @@ public final class LlmConfigFormComponent implements UiComponent {
     public UiForm render() {
         boolean isNew = config == null;
         boolean isAlias = !isNew && config.isAlias();
-        ai.mindconnect.llm.domain.LlmConfigId configId = isNew ? null : config.id();
+        ai.mindconnect.llm.management.api.domain.LlmConfigId configId = isNew ? null : config.id();
 
         return UiForm.of(id(), isNew ? "New LLM Config" : "Edit LLM Config: " + config.name())
                 .field(nameField(isNew ? null : config.name()))
@@ -634,7 +634,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                         typeGroup(isNew ? LlmConfigType.CHAT : config.type(), config, null, allConfigs)))
                 .content(withHiddenIf(isAlias, providerParamsGroup(
                         isNew ? null : config.provider(),
-                        isNew ? ai.mindconnect.llm.domain.LlmConfigType.CHAT : config.type(),
+                        isNew ? ai.mindconnect.llm.management.api.domain.LlmConfigType.CHAT : config.type(),
                         config)))
                 .action(UiAction.primary("save", "Save").icon("save")
                         .dispatch(isNew ? "POST" : "PUT",

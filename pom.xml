@@ -117,6 +117,9 @@
         <module>agents/springstarter/mc-agent-starter-extension</module>
         <module>agents/springstarter/mc-agent-starter-workflow</module>
         <module>agents/server/core/mc-credentials</module>
+        <module>llm/mc-llm-runtime-api</module>
+        <module>llm/mc-llm-management-api</module>
+        <module>llm/mc-llm-jackson</module>
         <module>conversation/mc-conversation-core</module>
         <module>conversation/mc-conversation</module>
         <module>agents/responses-api/mc-agent-protocol</module>
@@ -194,6 +197,7 @@
         <module>taskqueue/mc-task-queue-arch-tests</module>
         <module>workflow/mc-workflow-arch-tests</module>
         <module>conversation/mc-conversation-arch-tests</module>
+        <module>llm/mc-llm-arch-tests</module>
         <module>agents/mc-agents-arch-tests</module>
     </modules>
 

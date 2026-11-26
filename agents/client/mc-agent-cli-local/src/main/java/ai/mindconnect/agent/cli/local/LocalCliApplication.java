@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import ai.mindconnect.agent.jackson.IdJsonModule;
+import ai.mindconnect.llm.jackson.LlmJsonModule;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.UserId;
@@ -45,7 +46,7 @@ public final class LocalCliApplication {
         String model = McEnv.get("MC_MODEL", DEFAULT_MODEL);
         Path home = Path.of(System.getProperty("user.home"));
         // Built before the runtime, whose factory does not exist yet; the id module keeps the session files as they were.
-        JsonMapperFactory json = new JsonMapperFactory(List.of(new IdJsonModule()));
+        JsonMapperFactory json = new JsonMapperFactory(List.of(new IdJsonModule(), new LlmJsonModule()));
         LocalRuntime local = new LocalRuntime(home, json);
         try (AgentRuntime runtime = local.builder()
                 .model(new OpenAiChat(apiKey, model, json).chat())

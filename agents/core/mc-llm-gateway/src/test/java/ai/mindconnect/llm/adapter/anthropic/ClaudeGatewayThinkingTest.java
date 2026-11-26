@@ -1,14 +1,16 @@
 package ai.mindconnect.llm.adapter.anthropic;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.ThinkingBlock;
-import ai.mindconnect.llm.domain.ToolCall;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.ThinkingBlock;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
@@ -44,7 +46,7 @@ class ClaudeGatewayThinkingTest {
                 "thinkingDisplay", "summarized"));
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(cfg.resolved(encryption), req);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
 
         assertThat(root.path("thinking").path("type").asText()).isEqualTo("adaptive");
         assertThat(root.path("thinking").path("display").asText()).isEqualTo("summarized");
@@ -58,7 +60,7 @@ class ClaudeGatewayThinkingTest {
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")))
                 .withAdditionalParams(Map.of("effort", "low"));
 
-        JsonNode root = gateway.buildRequestNode(cfg.resolved(encryption), req);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
 
         assertThat(root.path("output_config").path("effort").asText()).isEqualTo("low");
     }
@@ -68,7 +70,7 @@ class ClaudeGatewayThinkingTest {
         LlmConfig cfg = config(Map.of());
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(cfg.resolved(encryption), req);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
 
         assertThat(root.has("thinking")).isFalse();
         assertThat(root.has("output_config")).isFalse();
@@ -80,7 +82,7 @@ class ClaudeGatewayThinkingTest {
         LlmConfig cfg = config(Map.of("thinking", "disabled"));
         LlmRequest req = LlmRequest.streaming("claude", List.of(LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(cfg.resolved(encryption), req);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
 
         assertThat(root.path("thinking").path("type").asText()).isEqualTo("disabled");
         assertThat(root.has("temperature")).isTrue();
@@ -100,7 +102,7 @@ class ClaudeGatewayThinkingTest {
         LlmRequest req = LlmRequest.streaming("claude",
                 List.of(LlmMessage.user("weather?"), assistant));
 
-        JsonNode root = gateway.buildRequestNode(cfg.resolved(encryption), req);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req);
 
         // messages[1] is the assistant turn; its content must be
         // [thinking, tool_use, tool_use] in that exact order.
@@ -124,7 +126,7 @@ class ClaudeGatewayThinkingTest {
         LlmRequest req = LlmRequest.streaming("claude",
                 List.of(LlmMessage.user("weather?"), assistant));
 
-        JsonNode content = gateway.buildRequestNode(cfg.resolved(encryption), req)
+        JsonNode content = gateway.buildRequestNode(LlmConfigResolver.resolved(cfg, encryption), req)
                 .path("messages").path(1).path("content");
 
         assertThat(content.get(0).path("type").asText()).isEqualTo("redacted_thinking");

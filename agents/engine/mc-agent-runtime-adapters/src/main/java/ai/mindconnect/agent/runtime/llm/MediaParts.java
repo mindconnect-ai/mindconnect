@@ -7,9 +7,9 @@ import ai.mindconnect.agent.loop.domain.ContentPart.MediaSource;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
-import ai.mindconnect.llm.domain.LlmCapability;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmContent;
+import ai.mindconnect.llm.management.api.domain.LlmCapability;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmContent;
 
 /**
  * The parts of a user's message as one model reads them in one request.

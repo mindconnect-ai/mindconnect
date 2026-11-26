@@ -18,7 +18,7 @@ import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.StartupScope;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;

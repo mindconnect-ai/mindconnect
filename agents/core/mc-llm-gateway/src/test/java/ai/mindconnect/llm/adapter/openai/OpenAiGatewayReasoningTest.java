@@ -1,17 +1,19 @@
 package ai.mindconnect.llm.adapter.openai;
 
-import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.ToolCallBuilder;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.ToolDefinition;
-import ai.mindconnect.llm.port.in.LlmCallListener;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
 import okhttp3.OkHttpClient;
@@ -50,15 +52,15 @@ class OpenAiGatewayReasoningTest {
 
     @Test
     void reasoningEffortFromTheConfigGoesOnTheWire() throws Exception {
-        JsonNode root = gateway.buildRequestNode(config(Map.of("reasoning_effort", "high")).resolved(encryption), request);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(config(Map.of("reasoning_effort", "high")), encryption), request);
         assertThat(root.path("reasoning_effort").asText()).isEqualTo("high");
     }
 
     @Test
     void noEffortNoField() throws Exception {
-        assertThat(gateway.buildRequestNode(config(Map.of()).resolved(encryption), request)
+        assertThat(gateway.buildRequestNode(LlmConfigResolver.resolved(config(Map.of()), encryption), request)
                 .has("reasoning_effort")).isFalse();
-        assertThat(gateway.buildRequestNode(config(Map.of("reasoning_effort", " ")).resolved(encryption), request)
+        assertThat(gateway.buildRequestNode(LlmConfigResolver.resolved(config(Map.of("reasoning_effort", " ")), encryption), request)
                 .has("reasoning_effort")).isFalse();
     }
 
@@ -66,7 +68,7 @@ class OpenAiGatewayReasoningTest {
     void theRequestOverridesTheConfig() throws Exception {
         LlmRequest perRequest = new LlmRequest("local", List.of(LlmMessage.user("hi")), List.of(),
                 -1, -1, true, Map.of("reasoning_effort", "low"));
-        JsonNode root = gateway.buildRequestNode(config(Map.of("reasoning_effort", "high")).resolved(encryption), perRequest);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(config(Map.of("reasoning_effort", "high")), encryption), perRequest);
         assertThat(root.path("reasoning_effort").asText()).isEqualTo("low");
     }
 
@@ -75,21 +77,21 @@ class OpenAiGatewayReasoningTest {
         LlmConfig nonReasoning = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
                 "gpt-4o", "https://api.openai.com", "sk-test", 0.7, 4096,
                 Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
-        assertThat(gateway.buildRequestNode(nonReasoning.resolved(encryption), request)
+        assertThat(gateway.buildRequestNode(LlmConfigResolver.resolved(nonReasoning, encryption), request)
                 .has("reasoning_effort")).isFalse();
 
         LlmConfig reasoning = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
                 "gpt-5", "https://api.openai.com", "sk-test", 0.7, 4096,
                 Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
-        assertThat(gateway.buildRequestNode(reasoning.resolved(encryption), request)
+        assertThat(gateway.buildRequestNode(LlmConfigResolver.resolved(reasoning, encryption), request)
                 .path("reasoning_effort").asText()).isEqualTo("high");
     }
 
     @Test
     void fromGpt56OnChatCompletionsToolsForceTheEffortToNone() throws Exception {
-        LlmConfig gpt56 = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI_CHAT_COMPLETIONS,
+        LlmConfig gpt56 = LlmConfigResolver.resolved(new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI_CHAT_COMPLETIONS,
                 "gpt-5.6-luna", "https://api.openai.com", "sk-test", 0.7, 4096,
-                Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null).resolved(encryption);
+                Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null), encryption);
         LlmRequest withTools = new LlmRequest("openai", List.of(LlmMessage.user("hi")),
                 List.of(new ToolDefinition("get_time", "now", Map.of("type", "object"))),
                 -1, -1, true, Map.of());
@@ -115,15 +117,15 @@ class OpenAiGatewayReasoningTest {
         LlmConfig nonReasoning = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI_CHAT_COMPLETIONS,
                 "gpt-4o", null, "sk-test", 0.7, 4096,
                 Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
-        assertThat(gateway.buildRequestNode(nonReasoning.resolved(encryption), request)
+        assertThat(gateway.buildRequestNode(LlmConfigResolver.resolved(nonReasoning, encryption), request)
                 .has("reasoning_effort")).isFalse();
         assertThat(gateway.endpointUrl(nonReasoning)).isEqualTo("https://api.openai.com/v1/chat/completions");
         // the summary is a Responses API setting — nothing to offer here
         assertThat(LlmProvider.OPENAI_CHAT_COMPLETIONS.additionalParams())
-                .extracting(ai.mindconnect.llm.domain.AdditionalParamSpec::key)
+                .extracting(ai.mindconnect.llm.management.api.domain.AdditionalParamSpec::key)
                 .contains("reasoning_effort").doesNotContain("reasoning_summary");
         assertThat(LlmProvider.OPENAI.additionalParams())
-                .extracting(ai.mindconnect.llm.domain.AdditionalParamSpec::key)
+                .extracting(ai.mindconnect.llm.management.api.domain.AdditionalParamSpec::key)
                 .contains("reasoning_effort", "reasoning_summary");
     }
 
@@ -172,7 +174,7 @@ class OpenAiGatewayReasoningTest {
                 new Answer(200, "text/event-stream", stream)));
         try {
             List<LlmStreamChunk> chunks = new ArrayList<>();
-            gateway.chatStreaming(miniWithTools(server).resolved(encryption), withTools(), chunks::add,
+            gateway.chatStreaming(LlmConfigResolver.resolved(miniWithTools(server), encryption), withTools(), chunks::add,
                     Cancellation.none(), LlmCallListener.NOOP);
 
             assertThat(bodies).hasSize(2);
@@ -191,7 +193,7 @@ class OpenAiGatewayReasoningTest {
                 "{\"error\":{\"message\":\"Invalid value for messages\",\"param\":\"messages\"}}")));
         try {
             assertThatThrownBy(() -> gateway.chatStreaming(
-                    miniWithTools(server).resolved(encryption), withTools(), chunk -> { },
+                    LlmConfigResolver.resolved(miniWithTools(server), encryption), withTools(), chunk -> { },
                     Cancellation.none(), LlmCallListener.NOOP))
                     .hasMessageContaining("400");
             assertThat(bodies).hasSize(1);

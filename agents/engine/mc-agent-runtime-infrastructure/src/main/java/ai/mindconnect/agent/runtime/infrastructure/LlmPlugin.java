@@ -24,14 +24,16 @@ import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiEmbeddingsGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiTranscriptionGateway;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.port.in.LlmChat;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.in.LlmTranscription;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmGateway;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
+import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.service.RoutingLlmEmbeddingService;
+import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
-import ai.mindconnect.llm.port.out.TranscriptionGateway;
+import ai.mindconnect.llm.management.api.port.out.TranscriptionGateway;
 import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.llm.service.RoutingLlmTranscriptionService;
@@ -99,8 +101,10 @@ public final class LlmPlugin implements Plugin {
         registry.provide(RoutingLlmChatService.class, () -> new RoutingLlmChatService(
                 registry.get(LlmConfigRepository.class), registry.get(LlmGatewayRegistry.class)));
         registry.provide(LlmChat.class, () -> registry.get(RoutingLlmChatService.class));
-        registry.provide(LlmEmbeddings.class, () -> new OpenAiEmbeddingsGateway(registry.get(OkHttpClient.class),
+        registry.provide(EmbeddingGateway.class, () -> new OpenAiEmbeddingsGateway(registry.get(OkHttpClient.class),
                 registry.get(ObjectMapper.class), encryption, registry.get(EnvVarResolver.class)));
+        registry.provide(LlmEmbedding.class, () -> new RoutingLlmEmbeddingService(
+                registry.get(LlmConfigRepository.class), registry.get(EmbeddingGateway.class)));
         registry.provide(TranscriptionGateway.class, () -> new OpenAiTranscriptionGateway(
                 registry.get(OkHttpClient.class), registry.get(ObjectMapper.class), encryption,
                 registry.get(EnvVarResolver.class)));

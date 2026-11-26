@@ -1,8 +1,8 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmTransientException;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.runtime.api.domain.LlmTransientException;
 import org.slf4j.Logger;
 
 /**

@@ -6,8 +6,8 @@ import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

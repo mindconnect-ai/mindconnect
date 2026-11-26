@@ -1,13 +1,13 @@
 package ai.mindconnect.agentrest.service;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.TranscriptionRequest;
-import ai.mindconnect.llm.domain.TranscriptionResult;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.in.LlmTranscription;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
+import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
+import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
@@ -33,11 +33,11 @@ public class LlmConfigTestService {
     private static final Logger log = LoggerFactory.getLogger(LlmConfigTestService.class);
 
     private final RoutingLlmChatService chatService;
-    private final ObjectProvider<LlmEmbeddings> embeddingsProvider;
+    private final ObjectProvider<EmbeddingGateway> embeddingsProvider;
     private final ObjectProvider<LlmTranscription> transcriptionProvider;
 
     public LlmConfigTestService(RoutingLlmChatService chatService,
-                                ObjectProvider<LlmEmbeddings> embeddingsProvider,
+                                ObjectProvider<EmbeddingGateway> embeddingsProvider,
                                 ObjectProvider<LlmTranscription> transcriptionProvider) {
         this.chatService = chatService;
         this.embeddingsProvider = embeddingsProvider;
@@ -99,7 +99,7 @@ public class LlmConfigTestService {
      */
     private Result testEmbedding(LlmConfig config, String message) {
         long t0 = System.currentTimeMillis();
-        LlmEmbeddings embeddings = embeddingsProvider.getIfAvailable();
+        EmbeddingGateway embeddings = embeddingsProvider.getIfAvailable();
         if (embeddings == null) {
             return Result.error("No embeddings gateway configured in this application", 0);
         }

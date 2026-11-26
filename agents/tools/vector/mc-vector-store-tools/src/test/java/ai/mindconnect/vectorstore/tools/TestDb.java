@@ -4,10 +4,10 @@ import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import org.postgresql.ds.PGSimpleDataSource;
 
 import javax.sql.DataSource;
@@ -113,7 +113,7 @@ final class TestDb {
     private static ToolEnvironment environment(Namespace namespace, DataSource dataSource, Path dataDir,
                                                Map<String, String> strings) {
         Sql sql = dataSource == null ? null : Sql.of(dataSource);
-        LlmEmbeddings embeddings = (config, texts) -> texts.stream()
+        LlmEmbedding embeddings = (config, texts) -> texts.stream()
                 .map(t -> t.contains("container") ? new float[]{1f, 0f, 0f} : new float[]{0f, 0f, 1f})
                 .toList();
         LlmConfigRepository configs = new LlmConfigRepository() {
@@ -131,7 +131,7 @@ final class TestDb {
                 if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
                 if (type == Sql.class) return Optional.ofNullable((T) sql);
                 if (type == DataSource.class) return Optional.ofNullable((T) dataSource);
-                if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
+                if (type == LlmEmbedding.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) configs);
                 if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(namespace));
                 return Optional.empty();

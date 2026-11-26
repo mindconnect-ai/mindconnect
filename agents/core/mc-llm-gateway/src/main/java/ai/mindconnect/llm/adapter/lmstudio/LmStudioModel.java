@@ -1,7 +1,7 @@
 package ai.mindconnect.llm.adapter.lmstudio;
 
-import ai.mindconnect.llm.domain.LlmCapability;
-import ai.mindconnect.llm.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmCapability;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 
 import java.util.EnumSet;
 import java.util.Set;

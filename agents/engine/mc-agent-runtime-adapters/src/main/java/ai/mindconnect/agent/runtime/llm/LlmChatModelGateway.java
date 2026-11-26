@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.llm;
 
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -30,17 +30,17 @@ import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
-import ai.mindconnect.common.Cancellation;
-import ai.mindconnect.llm.domain.LlmCallEvent;
-import ai.mindconnect.llm.domain.FinishReason;
-import ai.mindconnect.llm.domain.LlmContent;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.ThinkingBlock;
-import ai.mindconnect.llm.domain.ToolCall;
-import ai.mindconnect.llm.domain.ToolDefinition;
-import ai.mindconnect.llm.port.in.LlmChat;
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
+import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
+import ai.mindconnect.llm.runtime.api.domain.FinishReason;
+import ai.mindconnect.llm.runtime.api.domain.LlmContent;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.ThinkingBlock;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
+import ai.mindconnect.llm.runtime.api.domain.ToolDefinition;
+import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 
 /**
  * {@link ModelGateway} over the LLM gateway's streaming chat. The request's

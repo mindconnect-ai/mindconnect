@@ -1,11 +1,13 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.llm.adapter.LlmHttpError;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmParameterMap;
-import ai.mindconnect.llm.domain.TranscriptionRequest;
-import ai.mindconnect.llm.domain.TranscriptionResult;
-import ai.mindconnect.llm.port.out.TranscriptionGateway;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmParameterMap;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
+import ai.mindconnect.llm.management.api.port.out.TranscriptionGateway;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -92,7 +94,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     @Override
     public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
                                           Consumer<String> onDelta) {
-        LlmConfig cfg = config.resolved(env, encryption);
+        LlmConfig cfg = LlmConfigResolver.resolved(config, env, encryption);
         String baseUrl = cfg.provider().baseUrlOr(cfg.baseUrl());
         LlmParameterMap params = LlmParameterMap.of(cfg, null);
         String responseFormat = param(params, "response_format", "json");

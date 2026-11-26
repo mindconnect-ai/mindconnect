@@ -1,13 +1,15 @@
 package ai.mindconnect.llm.adapter.anthropic;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmContent;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.LlmRequest;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmContent;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
@@ -33,7 +35,7 @@ class ClaudeGatewayContentBlocksTest {
         LlmRequest req = LlmRequest.streaming("claude",
                 List.of(LlmMessage.system("be brief"), LlmMessage.user("hi")));
 
-        JsonNode root = gateway.buildRequestNode(config.resolved(encryption), req);
+        JsonNode root = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req);
 
         assertThat(root.path("system").asText()).isEqualTo("be brief");
         assertThat(root.path("messages").path(0).path("content").isTextual()).isTrue();
@@ -48,7 +50,7 @@ class ClaudeGatewayContentBlocksTest {
                 new LlmContent.Document("UERG", "application/pdf", "spec.pdf")));
         LlmRequest req = LlmRequest.streaming("claude", List.of(user));
 
-        JsonNode message = gateway.buildRequestNode(config.resolved(encryption), req)
+        JsonNode message = gateway.buildRequestNode(LlmConfigResolver.resolved(config, encryption), req)
                 .path("messages").path(0);
         JsonNode content = message.path("content");
 

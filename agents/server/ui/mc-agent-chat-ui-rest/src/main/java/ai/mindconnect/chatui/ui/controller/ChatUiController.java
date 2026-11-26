@@ -79,7 +79,7 @@ public class ChatUiController {
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
     /** What the embedding app adds to the chat — none in a standalone chat app. */
     private final ai.mindconnect.chatui.ui.ChatHostLinks hostLinks;
-    private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository;
+    private final ai.mindconnect.llm.management.api.port.out.LlmConfigRepository llmConfigRepository;
     private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
     /** The server's tree a user may pick a working directory from. */
     private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
@@ -96,7 +96,7 @@ public class ChatUiController {
                              ai.mindconnect.chatui.service.SessionStreams sessionStreams,
                              ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.chatui.ui.ChatHostLinks> hostLinks,
-                             ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
+                             ai.mindconnect.llm.management.api.port.out.LlmConfigRepository llmConfigRepository,
                              ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.management.directory.WorkingDirBrowser> dirBrowser) {
         this.dirBrowser = dirBrowser.getIfAvailable(() ->
@@ -846,7 +846,7 @@ public class ChatUiController {
      */
     private String defaultLlmConfigName() {
         var names = llmConfigRepository.findAll().stream()
-                .map(ai.mindconnect.llm.domain.LlmConfig::name)
+                .map(ai.mindconnect.llm.management.api.domain.LlmConfig::name)
                 .toList();
         return names.stream().filter("agent-default"::equals).findFirst()
                 .or(() -> names.stream().findFirst())

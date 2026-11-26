@@ -12,8 +12,8 @@ import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +62,7 @@ class SessionFileServiceWorkingDirTest {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
                 if (type == JsonMapperFactory.class) return Optional.of((T) new JsonMapperFactory(List.of(new IdJsonModule())));
-                if (type == LlmEmbeddings.class) return Optional.of((T) mock(LlmEmbeddings.class));
+                if (type == LlmEmbedding.class) return Optional.of((T) mock(LlmEmbedding.class));
                 if (type == LlmConfigRepository.class) return Optional.of((T) mock(LlmConfigRepository.class));
                 if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(new Namespace("test")));
                 return Optional.empty();

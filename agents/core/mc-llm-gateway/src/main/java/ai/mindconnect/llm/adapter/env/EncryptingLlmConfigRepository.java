@@ -1,11 +1,11 @@
 package ai.mindconnect.llm.adapter.env;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 
 import java.util.List;
 import java.util.Optional;

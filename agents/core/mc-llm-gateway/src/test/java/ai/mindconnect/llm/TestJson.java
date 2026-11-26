@@ -1,5 +1,6 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.llm.jackson.LlmJsonModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
@@ -9,7 +10,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
  */
 public final class TestJson {
 
-    public static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
+    public static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule())
+            .registerModule(new LlmJsonModule());
 
     private TestJson() {
     }

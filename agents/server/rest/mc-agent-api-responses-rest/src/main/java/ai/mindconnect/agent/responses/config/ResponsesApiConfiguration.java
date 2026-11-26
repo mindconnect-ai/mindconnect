@@ -8,7 +8,7 @@ import ai.mindconnect.agent.responses.ModelResolver;
 import ai.mindconnect.agent.responses.ResponsesMapper;
 import ai.mindconnect.agent.responses.SessionBinder;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;

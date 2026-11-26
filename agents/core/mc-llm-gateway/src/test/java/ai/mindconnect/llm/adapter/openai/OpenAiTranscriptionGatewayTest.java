@@ -2,10 +2,10 @@ package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.TranscriptionRequest;
-import ai.mindconnect.llm.domain.TranscriptionResult;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import okhttp3.OkHttpClient;
@@ -101,7 +101,7 @@ class OpenAiTranscriptionGatewayTest {
                 "whisper-1", config().baseUrl(), "test-key", 0.0, 0,
                 Map.of("language", "en", "prompt", "Mindconnect", "temperature", "0.2"),
                 null, false, null, null, null,
-                ai.mindconnect.llm.domain.LlmConfigType.SPEECH_TO_TEXT, null);
+                ai.mindconnect.llm.management.api.domain.LlmConfigType.SPEECH_TO_TEXT, null);
 
         Map<String, String> fields = gateway()
                 .formFields(withDefaults, recording().withLanguage("de"), "json");
@@ -138,7 +138,7 @@ class OpenAiTranscriptionGatewayTest {
         LlmConfig asText = new LlmConfig(config().id(), "whisper", LlmProvider.OPENAI, "whisper-1",
                 config().baseUrl(), "test-key", 0.0, 0, Map.of("response_format", "text"),
                 null, false, null, null, null,
-                ai.mindconnect.llm.domain.LlmConfigType.SPEECH_TO_TEXT, null);
+                ai.mindconnect.llm.management.api.domain.LlmConfigType.SPEECH_TO_TEXT, null);
 
         TranscriptionResult result = gateway().transcribe(asText, recording());
 

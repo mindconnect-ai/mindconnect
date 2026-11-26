@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.service;
 
+import ai.mindconnect.llm.jackson.LlmJsonModule;
 import ai.mindconnect.adminui.service.MigrationService.FieldDiff;
 import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
 import ai.mindconnect.agent.scope.Namespace;
@@ -9,10 +10,10 @@ import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.workflow.persistence.memory.InMemoryWorkflowDataRepository;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,13 +46,13 @@ class MigrationServiceFileRepoTest {
     private MigrationService service;
 
     private void wire(Path dir, Optional<EncryptionHelper> encryption) {
-        ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
+        ObjectMapper json = new ObjectMapper().registerModule(new LlmJsonModule()).registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, json, ScopeSupplier.fixed(new Namespace("test"))), ENCRYPTION);
         service = new MigrationService(repo,
                 new ai.mindconnect.agent.management.RepositoryAgentManagement(new ai.mindconnect.agent.management.adapter.InMemoryAgentRepository(ai.mindconnect.agent.scope.ScopeSupplier.fixed(new ai.mindconnect.agent.scope.Namespace("test")))), new InMemorySkillRepository(ScopeSupplier.local()), new InMemoryWorkflowDataRepository(),
-                json, encryption, new JsonMapperFactory(List.of()));
+                json, encryption, new JsonMapperFactory(List.of(new LlmJsonModule())));
     }
 
     private static LlmConfig stored(String model, String apiKey) {

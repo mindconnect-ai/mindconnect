@@ -17,9 +17,9 @@ import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
 import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
-import ai.mindconnect.llm.domain.LlmCallEvent;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.port.in.LlmChat;
+import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
 
 class LlmChatModelGatewayTest {
 

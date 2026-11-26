@@ -1,9 +1,11 @@
 package ai.mindconnect.llm;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmCapability;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmProvider;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmCapability;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -92,7 +94,7 @@ class LlmConfigCapabilitiesTest {
         var cfg = config(Set.of(LlmCapability.VISION));
         assertThat(cfg.withApiKey("other").capabilities()).containsExactly(LlmCapability.VISION);
         assertThat(cfg.withContextWindowTokens(1000).capabilities()).containsExactly(LlmCapability.VISION);
-        assertThat(cfg.resolved().capabilities()).containsExactly(LlmCapability.VISION);
+        assertThat(LlmConfigResolver.resolved(cfg).capabilities()).containsExactly(LlmCapability.VISION);
         assertThat(cfg.withCapabilities(Set.of(LlmCapability.AUDIO_INPUT)).capabilities())
                 .containsExactly(LlmCapability.AUDIO_INPUT);
         assertThat(cfg.withCapabilities(null).declaresCapabilities()).isFalse();

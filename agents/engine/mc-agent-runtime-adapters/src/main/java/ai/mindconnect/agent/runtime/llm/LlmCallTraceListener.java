@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.llm;
 
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
-import ai.mindconnect.llm.domain.LlmCallEvent;
+import ai.mindconnect.llm.runtime.api.domain.LlmCallEvent;
 
 /**
  * Hears every provider call as the LLM gateway reports it — the request as

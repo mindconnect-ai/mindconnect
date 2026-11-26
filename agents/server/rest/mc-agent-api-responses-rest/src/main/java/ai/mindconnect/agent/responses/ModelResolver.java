@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.responses;
 
 import ai.mindconnect.agent.management.api.AgentManagement;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 
 /**
  * Turns the {@code model} field of an incoming request into the agent that

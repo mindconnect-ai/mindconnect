@@ -1,8 +1,8 @@
 package ai.mindconnect.llm.adapter;
 
 import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
@@ -122,7 +122,7 @@ class ProviderModelCatalogTest {
 
     @Test
     void aProviderThatNeedsAKeyIsNotAskedWithoutOne() {
-        var answer = catalog.fetch(ai.mindconnect.llm.domain.LlmConfig.mistral("m", "x", null));
+        var answer = catalog.fetch(ai.mindconnect.llm.management.api.domain.LlmConfig.mistral("m", "x", null));
 
         assertThat(answer.available()).isFalse();
         assertThat(answer.error()).contains("no API key");
@@ -142,8 +142,8 @@ class ProviderModelCatalogTest {
         server.start();
         try {
             String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
-            var config = new ai.mindconnect.llm.domain.LlmConfig(
-                    ai.mindconnect.llm.domain.LlmConfigId.random(), "g", LlmProvider.GOOGLE_GEMINI,
+            var config = new ai.mindconnect.llm.management.api.domain.LlmConfig(
+                    ai.mindconnect.llm.management.api.domain.LlmConfigId.random(), "g", LlmProvider.GOOGLE_GEMINI,
                     "gemini-2.5-flash", baseUrl, "AIzaSECRET", 0.7, 8192, java.util.Map.of(), null,
                     false, null, null, null, null, null);
 
@@ -158,7 +158,7 @@ class ProviderModelCatalogTest {
 
     @Test
     void aBaseUrlWithoutSchemeIsReportedInsteadOfThrown() {
-        var answer = catalog.fetch(ai.mindconnect.llm.domain.LlmConfig.ollama("o", "llama3", "localhost:11434"));
+        var answer = catalog.fetch(ai.mindconnect.llm.management.api.domain.LlmConfig.ollama("o", "llama3", "localhost:11434"));
 
         assertThat(answer.available()).isFalse();
         assertThat(answer.error()).contains("http://");
@@ -166,7 +166,7 @@ class ProviderModelCatalogTest {
 
     @Test
     void aKeyAnHttpHeaderCannotCarryIsReportedWithoutQuotingIt() {
-        var answer = catalog.fetch(ai.mindconnect.llm.domain.LlmConfig.claude("c", "claude-opus-5",
+        var answer = catalog.fetch(ai.mindconnect.llm.management.api.domain.LlmConfig.claude("c", "claude-opus-5",
                 "sk-ant-SECRET\n"));
 
         assertThat(answer.available()).isFalse();

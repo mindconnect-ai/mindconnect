@@ -2,9 +2,9 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 

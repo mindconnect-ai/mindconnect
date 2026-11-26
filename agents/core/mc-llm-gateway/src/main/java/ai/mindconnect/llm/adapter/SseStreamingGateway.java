@@ -1,15 +1,17 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
+import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.domain.FinishReason;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.ToolCall;
-import ai.mindconnect.llm.port.in.LlmCallListener;
-import ai.mindconnect.llm.port.out.LlmGateway;
+import ai.mindconnect.llm.runtime.api.domain.FinishReason;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
+import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
+import ai.mindconnect.llm.management.api.port.out.LlmGateway;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -34,7 +36,7 @@ import java.util.function.Consumer;
  * request and how one block is parsed; nothing else differs on the wire.
  *
  * <p>A transient provider error (rate limit, overload) leaves as an
- * {@link ai.mindconnect.llm.domain.LlmTransientException} before anything
+ * {@link ai.mindconnect.llm.runtime.api.domain.LlmTransientException} before anything
  * streamed, which is what lets the retry decorator try again safely.
  */
 public abstract class SseStreamingGateway implements LlmGateway {
@@ -102,7 +104,7 @@ public abstract class SseStreamingGateway implements LlmGateway {
                                     Consumer<LlmStreamChunk> handler,
                                     Cancellation cancellation,
                                     LlmCallListener listener) {
-        config = config.resolved(env, encryption);
+        config = LlmConfigResolver.resolved(config, env, encryption);
         log.debug("{} stream → model={} messages={} tools={}", provider, config.model(),
                 request.messages() == null ? 0 : request.messages().size(),
                 request.tools() == null ? 0 : request.tools().size());

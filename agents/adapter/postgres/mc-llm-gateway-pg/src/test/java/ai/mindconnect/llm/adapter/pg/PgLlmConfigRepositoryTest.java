@@ -3,10 +3,10 @@ package ai.mindconnect.llm.adapter.pg;
 import ai.mindconnect.agent.scope.Namespace;
 import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmConfigType;
-import ai.mindconnect.llm.domain.LlmProvider;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -58,8 +58,8 @@ class PgLlmConfigRepositoryTest {
                 "claude-sonnet-5", "https://api.anthropic.com", "sk-secret", 0.3, 8192,
                 Map.of("top_p", 0.9, "stop", List.of("END")), 200_000, false, null, null, null,
                 LlmConfigType.CHAT,
-                java.util.Set.of(ai.mindconnect.llm.domain.LlmCapability.TOOL_CALLING,
-                        ai.mindconnect.llm.domain.LlmCapability.VISION));
+                java.util.Set.of(ai.mindconnect.llm.management.api.domain.LlmCapability.TOOL_CALLING,
+                        ai.mindconnect.llm.management.api.domain.LlmCapability.VISION));
         repo.save(config);
 
         assertThat(repo.findById(config.id())).contains(config.withVersion(1L));

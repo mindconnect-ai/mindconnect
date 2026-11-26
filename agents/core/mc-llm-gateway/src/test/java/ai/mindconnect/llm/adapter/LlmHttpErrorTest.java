@@ -1,7 +1,7 @@
 package ai.mindconnect.llm.adapter;
 
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.RetryConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.RetryConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

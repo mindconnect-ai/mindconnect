@@ -1,18 +1,20 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.TestJson;
-import ai.mindconnect.llm.domain.FinishReason;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmConfigId;
-import ai.mindconnect.llm.domain.LlmContent;
-import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.domain.LlmRequest;
-import ai.mindconnect.llm.domain.LlmStreamChunk;
-import ai.mindconnect.llm.domain.ThinkingBlock;
-import ai.mindconnect.llm.domain.ToolCall;
-import ai.mindconnect.llm.domain.ToolDefinition;
+import ai.mindconnect.llm.runtime.api.domain.FinishReason;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.runtime.api.domain.LlmContent;
+import ai.mindconnect.llm.runtime.api.domain.LlmMessage;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
+import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
+import ai.mindconnect.llm.runtime.api.domain.ThinkingBlock;
+import ai.mindconnect.llm.runtime.api.domain.ToolCall;
+import ai.mindconnect.llm.runtime.api.domain.ToolDefinition;
 import com.fasterxml.jackson.databind.JsonNode;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
@@ -37,9 +39,9 @@ class OpenAiResponsesGatewayTest {
             new OpenAiResponsesGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
 
     private LlmConfig config(String model, Map<String, Object> params) {
-        return new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
+        return LlmConfigResolver.resolved(new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
                 model, "https://api.openai.com", "sk-test", 0.7, 4096, params, 128_000,
-                false, null, null, null, null, null).resolved(encryption);
+                false, null, null, null, null, null), encryption);
     }
 
     private static final ToolDefinition CALC =
@@ -238,8 +240,8 @@ class OpenAiResponsesGatewayTest {
             List<LlmStreamChunk> chunks = new ArrayList<>();
 
             assertThatThrownBy(() -> gateway.chatStreaming(server.config("gpt-4.1"), textRequest(), chunks::add,
-                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP))
-                    .isInstanceOf(ai.mindconnect.llm.domain.LlmTransientException.class)
+                    ai.mindconnect.llm.runtime.api.domain.Cancellation.none(), ai.mindconnect.llm.runtime.api.port.out.LlmCallListener.NOOP))
+                    .isInstanceOf(ai.mindconnect.llm.runtime.api.domain.LlmTransientException.class)
                     .hasMessageContaining("ended before the response completed");
             assertThat(chunks).noneMatch(c -> c instanceof LlmStreamChunk.Done);
         }
@@ -264,9 +266,9 @@ class OpenAiResponsesGatewayTest {
             LlmConfig config = server.config("gpt-5.6");
 
             gateway.chatStreaming(config, textRequest(), chunks::add,
-                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP);
+                    ai.mindconnect.llm.runtime.api.domain.Cancellation.none(), ai.mindconnect.llm.runtime.api.port.out.LlmCallListener.NOOP);
             gateway.chatStreaming(config, textRequest(), c -> {},
-                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP);
+                    ai.mindconnect.llm.runtime.api.domain.Cancellation.none(), ai.mindconnect.llm.runtime.api.port.out.LlmCallListener.NOOP);
 
             assertThat(chunks).contains(new LlmStreamChunk.TextDelta("ok"));
             assertThat(server.bodies()).hasSize(3);
@@ -284,7 +286,7 @@ class OpenAiResponsesGatewayTest {
             LlmConfig config = server.config("gpt-5.6", Map.of("reasoning_summary", "detailed"));
 
             assertThatThrownBy(() -> gateway.chatStreaming(config, textRequest(), c -> {},
-                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP))
+                    ai.mindconnect.llm.runtime.api.domain.Cancellation.none(), ai.mindconnect.llm.runtime.api.port.out.LlmCallListener.NOOP))
                     .hasMessageContaining("400");
             assertThat(server.bodies()).hasSize(1);
         }

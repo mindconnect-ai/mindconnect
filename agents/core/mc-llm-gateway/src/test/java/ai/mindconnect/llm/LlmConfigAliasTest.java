@@ -1,6 +1,6 @@
 package ai.mindconnect.llm;
 
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;

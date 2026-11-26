@@ -1,10 +1,12 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import ai.mindconnect.llm.service.LlmConfigResolver;
+
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.LlmHttpError;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -26,7 +28,7 @@ import java.util.List;
  * speak. Reuses the config's {@code baseUrl}/{@code apiKey} exactly like the
  * chat gateway, including {@code enc:} credential resolution.
  */
-public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
+public final class OpenAiEmbeddingsGateway implements EmbeddingGateway {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiEmbeddingsGateway.class);
     private static final MediaType JSON = MediaType.get("application/json");
@@ -55,7 +57,7 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
         if (texts.isEmpty()) {
             return List.of();
         }
-        config = config.resolved(env, encryption);
+        config = LlmConfigResolver.resolved(config, env, encryption);
         String baseUrl = config.provider().baseUrlOr(config.baseUrl());
 
         ObjectNode body = objectMapper.createObjectNode();

@@ -6,9 +6,9 @@ import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.jackson.JsonMapperFactory;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
 import ai.mindconnect.vectorstore.embedding.FileEntryStore;
 import ai.mindconnect.vectorstore.pgvector.PgEmbeddingIndex;
@@ -74,7 +74,7 @@ public final class DefaultVectorStores implements VectorStores {
     /** Reads what a namespace kept before 0.9; null when there is nothing to look for. */
     private final LegacyVectorStores legacy;
     private final Host host;
-    private final LlmEmbeddings embeddings;
+    private final LlmEmbedding embeddings;
     private final LlmConfigRepository configs;
     /** Who says which namespace a call works in. */
     private final ScopeSupplier scope;
@@ -91,7 +91,7 @@ public final class DefaultVectorStores implements VectorStores {
     private record Opened(IndexDefinition definition, EmbeddingIndex index, String location) {}
 
     /** Registry and indexes on files, under {@code <baseDir>/<namespace>/}. */
-    DefaultVectorStores(VectorStoreTemplate defaultTemplate, Path baseDir, LlmEmbeddings embeddings,
+    DefaultVectorStores(VectorStoreTemplate defaultTemplate, Path baseDir, LlmEmbedding embeddings,
                         LlmConfigRepository configs, ScopeSupplier scope, JsonMapperFactory json) {
         this(defaultTemplate, fileRegistries(baseDir, json), new LegacyVectorStores(baseDir, null, json),
                 new Host(baseDir, null, null, builtIn(FILE, null, null, null), "file persistence", null, json),
@@ -99,7 +99,7 @@ public final class DefaultVectorStores implements VectorStores {
     }
 
     DefaultVectorStores(VectorStoreTemplate defaultTemplate, Function<Namespace, VectorStoreRegistry> openRegistry,
-                        LegacyVectorStores legacy, Host host, LlmEmbeddings embeddings, LlmConfigRepository configs,
+                        LegacyVectorStores legacy, Host host, LlmEmbedding embeddings, LlmConfigRepository configs,
                         ScopeSupplier scope) {
         this.defaultTemplate = defaultTemplate;
         this.openRegistry = openRegistry;
@@ -119,11 +119,11 @@ public final class DefaultVectorStores implements VectorStores {
      * says {@code file} or {@code vectorStoreUrl} names another database.
      */
     static Optional<VectorStores> fromEnvironment(ToolEnvironment env) {
-        LlmEmbeddings embeddings = env.get(LlmEmbeddings.class).orElse(null);
+        LlmEmbedding embeddings = env.get(LlmEmbedding.class).orElse(null);
         LlmConfigRepository configs = env.get(LlmConfigRepository.class).orElse(null);
         JsonMapperFactory json = env.get(JsonMapperFactory.class).orElse(null);
         if (embeddings == null || configs == null || json == null) {
-            log.warn("Vector tools disabled: LlmEmbeddings {}, LlmConfigRepository {}, JsonMapperFactory {}",
+            log.warn("Vector tools disabled: LlmEmbedding {}, LlmConfigRepository {}, JsonMapperFactory {}",
                     embeddings == null ? "missing" : "ok", configs == null ? "missing" : "ok",
                     json == null ? "missing" : "ok");
             return Optional.empty();
@@ -529,7 +529,7 @@ public final class DefaultVectorStores implements VectorStores {
     }
 
     private List<float[]> embed(VectorStoreInstance instance, List<String> texts) {
-        return embeddings.embed(config(instance), texts);
+        return embeddings.embed(config(instance).name(), texts);
     }
 
     @Override
