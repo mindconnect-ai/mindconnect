@@ -15,8 +15,8 @@
     <name>mc-llm-demo</name>
     <packaging>jar</packaging>
     <description>
-        How a library user calls a model through the LLM gateway's APIs, with a provider
-        of their own built on the official OpenAI Java SDK.
+        How a library user calls a model through the LLM gateway: with our providers, and
+        with a provider of their own built on the official OpenAI Java SDK.
     </description>
 
     <properties>
@@ -38,31 +38,27 @@
             <artifactId>openai-java</artifactId>
             <version>${openai-java.version}</version>
         </dependency>
-        <!-- The tests that call through LlmChat: routing, retry and the in-memory config store. -->
+        <!-- Calling through LlmChat: routing, retry and the in-memory config store. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-gateway</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
-        <!-- Our providers, for the test that calls them through the same gateway. -->
+        <!-- Our providers, for OurProvidersDemo. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-providers</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
         <!-- The providers expect a mapper that knows the LLM types; they leave the choice to the caller. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-jackson</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

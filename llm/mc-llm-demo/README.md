@@ -44,7 +44,8 @@ providers.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, json));
 providers.put(LlmProvider.LM_STUDIO, new OpenAiCompatibleGateway(http, json));
 
 LlmConfigRepository configs = new InMemoryLlmConfigRepository(TenantScope.fixed("demo"));
-configs.save(LlmConfig.openAi("agent-default", "gpt-5.4-mini", "${OPENAI_API_KEY}"));
+configs.save(LlmConfig.openAi("openai-mini", "gpt-5.4-mini", "${OPENAI_API_KEY}"));
+configs.save(LlmConfig.alias("agent-default", "openai-mini"));   // callers keep the name, the model may change
 
 LlmChat chat = new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(providers),
         LlmConfigResolver::resolved);           // ${VAR} placeholders from the process environment
@@ -57,9 +58,15 @@ The caller knows the name of a config, nothing else: no provider, no model, no k
 The namespace is the store's: `TenantScope.fixed` for one, a scope that answers per
 call for a host that serves several. Only the providers you put into the map are
 reachable; a config naming another provider fails at the call.
-[`LlmChatWithOurProvidersTest`](src/test/java/ai/mindconnect/llm/demo/LlmChatWithOurProvidersTest.java)
-runs exactly this against a local server; [`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
+[`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
 wires the same for the REST server.
+
+[`OurProvidersDemo`](src/main/java/ai/mindconnect/llm/demo/OurProvidersDemo.java) is this
+code as a program. Run it (a paid call to OpenAI):
+
+```bash
+OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect.llm.demo.OurProvidersDemo -Dexec.args="Name three rivers in Germany."
+```
 
 ## 2. With a provider of your own
 
@@ -114,10 +121,12 @@ OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainC
 
 `OpenAiSdkGatewayTest` runs the provider against a local server that answers like
 OpenAI: text, tool calls, a tool round trip and a rate limit, without network or cost.
-`LlmChatWithConfigInMemoryTest` does the same through `LlmChat`, with `mc-llm-gateway`
-in test scope only, so the provider itself still needs nothing but the SPI.
+`LlmChatWithConfigInMemoryTest` does the same through `LlmChat`.
 
 ## What this demo shows about the API
 
 - A provider needs `mc-llm-provider-spi` only; the SDK brings okhttp, Jackson and
-  Kotlin, and only to whoever picks it.
+  Kotlin, and only to whoever picks it. (This module carries both ways, so it has both
+  sets of dependencies; `OpenAiSdkGateway` itself imports nothing beyond the SPI and the SDK.)
+- Our providers leave the JSON mapper to the caller: `mc-llm-jackson` and
+  `jackson-datatype-jsr310` are dependencies of whoever wires them.
