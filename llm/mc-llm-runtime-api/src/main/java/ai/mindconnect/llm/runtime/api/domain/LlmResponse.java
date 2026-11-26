@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * The result of a blocking chat call: the stream folded into one text plus the
- * complete tool calls (see {@link ai.mindconnect.llm.management.api.port.out.LlmGateway#chat}).
+ * complete tool calls (see {@link ai.mindconnect.llm.provider.spi.port.out.LlmGateway#chat}).
  *
  * @param text         the assistant's full reply text (may be empty if the
  *                     model only emitted tool calls)

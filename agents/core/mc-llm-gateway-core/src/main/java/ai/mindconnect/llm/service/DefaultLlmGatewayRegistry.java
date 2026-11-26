@@ -2,7 +2,7 @@ package ai.mindconnect.llm.service;
 
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
-import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
 
 import java.util.HashMap;

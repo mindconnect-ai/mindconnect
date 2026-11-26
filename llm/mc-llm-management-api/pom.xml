@@ -15,8 +15,8 @@
     <name>mc-llm-management-api</name>
     <packaging>jar</packaging>
     <description>
-        Managing models: LLM configs and prices, the stores they are kept in and the
-        provider SPI a gateway calls with a resolved config. Depends on the runtime API only.
+        Managing models: LLM configs and prices and the stores they are kept in.
+        Depends on the runtime API and SLF4J only.
     </description>
 
     <dependencies>
@@ -24,6 +24,10 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-runtime-api</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

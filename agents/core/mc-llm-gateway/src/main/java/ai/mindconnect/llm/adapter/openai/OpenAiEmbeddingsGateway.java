@@ -6,7 +6,7 @@ import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.LlmHttpError;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
-import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
+import ai.mindconnect.llm.provider.spi.port.out.EmbeddingGateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;

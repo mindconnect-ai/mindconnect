@@ -1,7 +1,7 @@
 package ai.mindconnect.llm.service;
 
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
+import ai.mindconnect.llm.provider.spi.port.out.EmbeddingGateway;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
 

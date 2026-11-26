@@ -1,6 +1,9 @@
 package ai.mindconnect.llm.management.api.domain;
 
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,7 +47,7 @@ public record LlmPrice(
 
     public static final String DEFAULT_CURRENCY = "USD";
     private static final Pattern CURRENCY = Pattern.compile("[A-Z]{3}");
-    private static final System.Logger log = System.getLogger(LlmPrice.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(LlmPrice.class);
     /** A price without a model is logged once per process — they are leftovers, not news on every read. */
     private static final AtomicBoolean ANY_MODEL_LOGGED = new AtomicBoolean();
 
@@ -55,7 +58,7 @@ public record LlmPrice(
         }
         model = model == null || model.isBlank() ? null : model.strip();
         if (model == null && ANY_MODEL_LOGGED.compareAndSet(false, true)) {
-            log.log(System.Logger.Level.WARNING, "LLM price {0} of config ''{1}'' names no model: it prices every model of that config until "
+            log.warn("LLM price {} of config '{}' names no model: it prices every model of that config until "
                     + "it is saved with one (logged once — there may be more)", id, configName);
         }
         if (validFrom == null) {

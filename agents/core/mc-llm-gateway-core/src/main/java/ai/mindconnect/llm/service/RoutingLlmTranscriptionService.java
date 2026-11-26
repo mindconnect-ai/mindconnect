@@ -8,7 +8,7 @@ import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
 import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.management.api.port.out.TranscriptionGateway;
+import ai.mindconnect.llm.provider.spi.port.out.TranscriptionGateway;
 
 import java.util.function.Consumer;
 

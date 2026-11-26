@@ -23,7 +23,7 @@ import ai.mindconnect.llm.runtime.api.domain.ThinkingBlock;
 import ai.mindconnect.llm.runtime.api.domain.ToolCall;
 import ai.mindconnect.llm.runtime.api.domain.ToolDefinition;
 import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
-import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;

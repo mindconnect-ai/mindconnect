@@ -21,6 +21,7 @@
     <modules>
         <module>mc-llm-runtime-api</module>
         <module>mc-llm-management-api</module>
+        <module>mc-llm-provider-spi</module>
         <module>mc-llm-jackson</module>
         <module>mc-llm-arch-tests</module>
     </modules>

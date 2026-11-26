@@ -8,7 +8,7 @@ import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.management.api.port.out.TranscriptionGateway;
+import ai.mindconnect.llm.provider.spi.port.out.TranscriptionGateway;
 import ai.mindconnect.llm.service.RoutingLlmTranscriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

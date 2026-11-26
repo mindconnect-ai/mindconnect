@@ -6,7 +6,7 @@ import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
 import ai.mindconnect.llm.management.api.domain.RateLimitConfig;
 import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
-import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

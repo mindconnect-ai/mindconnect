@@ -13,7 +13,7 @@ import ai.mindconnect.llm.runtime.api.domain.LlmResponse;
 import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
 import ai.mindconnect.llm.runtime.api.domain.ToolCall;
 import ai.mindconnect.llm.runtime.api.domain.ToolDefinition;
-import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 

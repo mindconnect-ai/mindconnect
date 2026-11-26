@@ -6,7 +6,7 @@ import ai.mindconnect.llm.runtime.api.domain.LlmRequest;
 import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
-import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
+import ai.mindconnect.llm.provider.spi.port.out.EmbeddingGateway;
 import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.springframework.beans.factory.ObjectProvider;

@@ -7,7 +7,7 @@ import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmParameterMap;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
-import ai.mindconnect.llm.management.api.port.out.TranscriptionGateway;
+import ai.mindconnect.llm.provider.spi.port.out.TranscriptionGateway;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import com.fasterxml.jackson.databind.JsonNode;

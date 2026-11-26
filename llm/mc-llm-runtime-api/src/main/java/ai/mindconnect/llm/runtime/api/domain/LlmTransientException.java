@@ -1,7 +1,7 @@
 package ai.mindconnect.llm.runtime.api.domain;
 
 /**
- * Thrown by an {@link ai.mindconnect.llm.management.api.port.out.LlmGateway} when the provider
+ * Thrown by an {@link ai.mindconnect.llm.provider.spi.port.out.LlmGateway} when the provider
  * rejects a request with a <em>transient</em>, retryable error — typically
  * HTTP 429 (rate limit) or 529 (overloaded). These occur <em>before</em> any
  * stream content is produced, so the call can be safely retried.

@@ -25,16 +25,23 @@ class LlmArchitectureTest {
                     .and(not(resideInAPackage("ai.mindconnect.llm.."))))
             .as("The LLM gateway depends on no other area");
 
-    /** Whoever only calls a model takes the runtime API and nothing else with it. */
+    /** Whoever only calls a model takes the runtime API and nothing but a logging facade with it. */
     @ArchTest
     static final ArchRule runtimeApiNeedsOnlyTheJdk = classes().that().resideInAPackage("ai.mindconnect.llm.runtime.api..")
-            .should().onlyDependOnClassesThat(resideInAnyPackage("java..", "ai.mindconnect.llm.runtime.api.."))
-            .as("The LLM runtime API depends on the JDK alone");
+            .should().onlyDependOnClassesThat(resideInAnyPackage("java..", "org.slf4j..", "ai.mindconnect.llm.runtime.api.."))
+            .as("The LLM runtime API depends on the JDK and SLF4J alone");
 
-    /** Whoever manages models, or writes a provider or store, takes the management API and the runtime API. */
+    /** Whoever manages models, or writes a store, takes the management API and the runtime API. */
     @ArchTest
     static final ArchRule managementApiNeedsOnlyTheRuntimeApi = classes().that().resideInAPackage("ai.mindconnect.llm.management.api..")
-            .should().onlyDependOnClassesThat(resideInAnyPackage("java..",
+            .should().onlyDependOnClassesThat(resideInAnyPackage("java..", "org.slf4j..",
                     "ai.mindconnect.llm.runtime.api..", "ai.mindconnect.llm.management.api.."))
-            .as("The LLM management API depends on the JDK and the runtime API alone");
+            .as("The LLM management API depends on the JDK, SLF4J and the runtime API alone");
+
+    /** Whoever writes a provider takes the SPI and the two APIs, nothing that calls or stores. */
+    @ArchTest
+    static final ArchRule providerSpiNeedsOnlyTheApis = classes().that().resideInAPackage("ai.mindconnect.llm.provider.spi..")
+            .should().onlyDependOnClassesThat(resideInAnyPackage("java..", "org.slf4j..", "ai.mindconnect.llm.runtime.api..",
+                    "ai.mindconnect.llm.management.api..", "ai.mindconnect.llm.provider.spi.."))
+            .as("The LLM provider SPI depends on the JDK, SLF4J and the two APIs alone");
 }

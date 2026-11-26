@@ -4,7 +4,7 @@ import ai.mindconnect.llm.runtime.api.domain.Cancellation;
 import ai.mindconnect.llm.runtime.api.domain.*;
 import ai.mindconnect.llm.management.api.domain.*;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.junit.jupiter.api.BeforeEach;

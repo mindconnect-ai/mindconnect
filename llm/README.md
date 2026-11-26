@@ -5,8 +5,9 @@ without the rest of mindconnect: nothing here depends on `agents/` or `common/`.
 
 | Module | Depends on | What it is |
 |--------|------------|------------|
-| `mc-llm-runtime-api` | the JDK | calling a model: request, streamed answer, tool definitions and calls on the wire; `LlmChat`, `LlmEmbedding`, `LlmTranscription` (`port.in`), `LlmCallListener` (`port.out`) |
-| `mc-llm-management-api` | the runtime API | managing models: `LlmConfig`, prices, the stores (`port.out`) and the provider SPI a gateway calls with a resolved config (`LlmGateway`, `EmbeddingGateway`, `TranscriptionGateway`) |
+| `mc-llm-runtime-api` | the JDK, SLF4J | calling a model: request, streamed answer, tool definitions and calls on the wire; `LlmChat`, `LlmEmbedding`, `LlmTranscription` (`port.in`), `LlmCallListener` (`port.out`) |
+| `mc-llm-management-api` | the runtime API, SLF4J | managing models: `LlmConfig`, prices and the stores they are kept in (`port.out`) |
+| `mc-llm-provider-spi` | the management API | what a provider implements, called with the config itself: `LlmGateway`, `EmbeddingGateway`, `TranscriptionGateway` (`port.out`) |
 | `mc-llm-jackson` | the management API, Jackson | the stored JSON form of configs and prices, as a Jackson module |
 | `mc-llm-arch-tests` | — | the area's ArchUnit rules |
 

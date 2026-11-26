@@ -6,7 +6,7 @@ import ai.mindconnect.llm.adapter.LiveChatGatewayContract;
 import ai.mindconnect.llm.adapter.LiveTestEnvironment;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
-import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.util.Map;

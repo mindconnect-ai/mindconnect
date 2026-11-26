@@ -120,6 +120,7 @@
         <module>agents/server/core/mc-credentials</module>
         <module>llm/mc-llm-runtime-api</module>
         <module>llm/mc-llm-management-api</module>
+        <module>llm/mc-llm-provider-spi</module>
         <module>llm/mc-llm-jackson</module>
         <module>conversation/mc-conversation-api</module>
         <module>conversation/mc-conversation</module>

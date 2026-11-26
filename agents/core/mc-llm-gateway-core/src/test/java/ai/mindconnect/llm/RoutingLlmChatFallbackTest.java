@@ -10,7 +10,7 @@ import ai.mindconnect.llm.runtime.api.domain.LlmStreamChunk;
 import ai.mindconnect.llm.runtime.api.domain.LlmTransientException;
 import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.management.api.port.out.LlmGateway;
+import ai.mindconnect.llm.provider.spi.port.out.LlmGateway;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.junit.jupiter.api.BeforeEach;

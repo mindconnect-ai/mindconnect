@@ -96,7 +96,7 @@ import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.management.api.port.out.EmbeddingGateway;
+import ai.mindconnect.llm.provider.spi.port.out.EmbeddingGateway;
 import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
 import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
