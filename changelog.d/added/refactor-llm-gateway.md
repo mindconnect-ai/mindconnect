@@ -1,0 +1,1 @@
+- **llm:** `LlmRuntime.builder()` assembles the LLM gateway for a library user from providers and configs alone, with the configs in memory and `${VAR}` placeholders resolved from the process environment as defaults. `StandardProviders` hands out our providers, one per provider family.

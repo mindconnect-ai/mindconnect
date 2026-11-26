@@ -50,28 +50,23 @@ mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect
 OkHttpClient http = new OkHttpClient();
 ObjectMapper json = new JsonMapperFactory(List.of(new LlmJsonModule(), new JavaTimeModule())).create();
 
-Map<LlmProvider, LlmGateway> providers = new EnumMap<>(LlmProvider.class);
-providers.put(LlmProvider.OPENAI, new OpenAiResponsesGateway(http, json));
-providers.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, json));
-providers.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, json));
-providers.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, json));
-providers.put(LlmProvider.LM_STUDIO, new OpenAiCompatibleGateway(http, json));
-
-LlmConfigRepository configs = new InMemoryLlmConfigRepository(LlmScopeSupplier.fixed("demo"));
-configs.save(LlmConfig.openAi("openai-mini", "gpt-5.4-mini", "${OPENAI_API_KEY}"));
-configs.save(LlmConfig.alias("agent-default", "openai-mini"));   // callers keep the name, the model may change
-
-LlmChat chat = new RoutingLlmChatService(configs, new DefaultLlmGatewayRegistry(providers),
-        LlmConfigResolver::resolved);           // ${VAR} placeholders from the process environment
+LlmChat chat = LlmRuntime.builder()
+        .providers(new StandardProviders(http, json).chat())   // one gateway per provider family
+        .config(LlmConfig.openAi("openai-mini", "gpt-5.4-mini", "${OPENAI_API_KEY}"))
+        .config(LlmConfig.alias("agent-default", "openai-mini"))   // callers keep the name, the model may change
+        .build()                                               // configs in memory, ${VAR} from the environment
+        .chat();
 
 chat.chatStreaming(LlmRequest.streaming("agent-default",
         List.of(LlmMessage.user("Name three rivers in Germany."))), chunk -> ...);
 ```
 
 The caller knows the name of a config, nothing else: no provider, no model, no key.
-The namespace is the store's: `LlmScopeSupplier.fixed` for one, a scope that answers per
-call for a host that serves several. Only the providers you put into the map are
-reachable; a config naming another provider fails at the call.
+The builder keeps the configs in memory for the `local` namespace and resolves `${VAR}`
+from the process environment; `.configs(...)`, `.prices(...)` and `.secrets(...)` replace
+those defaults, with a store whose `LlmScopeSupplier` answers per call for a host that
+serves several namespaces. Only the providers you hand in are reachable; a config naming
+another provider fails at the call.
 [`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
 wires the same for the REST server.
 
