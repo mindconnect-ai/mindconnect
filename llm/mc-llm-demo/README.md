@@ -21,6 +21,14 @@ by name, follows aliases and fallbacks, resolves the secrets and retries rate li
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-llm-providers</artifactId>
 </dependency>
+<dependency>
+    <groupId>ai.mindconnect</groupId>
+    <artifactId>mc-llm-jackson</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.fasterxml.jackson.datatype</groupId>
+    <artifactId>jackson-datatype-jsr310</artifactId>
+</dependency>
 ```
 
 ```java
@@ -49,7 +57,8 @@ The caller knows the name of a config, nothing else: no provider, no model, no k
 The namespace is the store's: `TenantScope.fixed` for one, a scope that answers per
 call for a host that serves several. Only the providers you put into the map are
 reachable; a config naming another provider fails at the call.
-[`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
+[`LlmChatWithOurProvidersTest`](src/test/java/ai/mindconnect/llm/demo/LlmChatWithOurProvidersTest.java)
+runs exactly this against a local server; [`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
 wires the same for the REST server.
 
 ## 2. With a provider of your own
