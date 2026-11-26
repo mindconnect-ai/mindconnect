@@ -44,7 +44,7 @@
             <artifactId>mc-llm-gateway</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Our providers, for OurProvidersDemo. -->
+        <!-- Our providers, for LlmChatDemo. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-llm-providers</artifactId>

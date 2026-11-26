@@ -2,15 +2,15 @@
 
 How a library user calls a model through the LLM gateway, in two ways:
 
-1. **With our providers.** You take the gateway and the providers we ship (OpenAI,
-   Azure, Claude, Gemini, …) and only name a config.
-2. **With a provider of your own.** You implement the provider SPI yourself; here with
-   the official OpenAI Java SDK (`com.openai:openai-java`).
+1. **Through `LlmChat`** ([`LlmChatDemo`](src/main/java/ai/mindconnect/llm/demo/LlmChatDemo.java)):
+   the gateway service with the providers we ship (OpenAI, Azure, Claude, Gemini, …);
+   the caller only names a config. The service finds the config by name, follows
+   aliases and fallbacks, resolves the secrets and retries rate limits.
+2. **Through `LlmGateway`** ([`LlmGatewayDemo`](src/main/java/ai/mindconnect/llm/demo/LlmGatewayDemo.java)):
+   one provider called directly through the provider SPI, here one of your own on the
+   official OpenAI Java SDK (`com.openai:openai-java`); the caller holds the config.
 
-Both ways run against the same gateway service, `mc-llm-gateway`: it finds the config
-by name, follows aliases and fallbacks, resolves the secrets and retries rate limits.
-
-## 1. With our providers
+## 1. Through LlmChat, with our providers
 
 ```xml
 <dependency>
@@ -61,14 +61,14 @@ reachable; a config naming another provider fails at the call.
 [`LlmGatewayConfiguration`](../mc-llm-gateway-app/src/main/java/ai/mindconnect/llm/gateway/app/LlmGatewayConfiguration.java)
 wires the same for the REST server.
 
-[`OurProvidersDemo`](src/main/java/ai/mindconnect/llm/demo/OurProvidersDemo.java) is this
+[`LlmChatDemo`](src/main/java/ai/mindconnect/llm/demo/LlmChatDemo.java) is this
 code as a program. Run it (a paid call to OpenAI):
 
 ```bash
-OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect.llm.demo.OurProvidersDemo -Dexec.args="Name three rivers in Germany."
+OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect.llm.demo.LlmChatDemo -Dexec.args="Name three rivers in Germany."
 ```
 
-## 2. With a provider of your own
+## 2. Through LlmGateway, with a provider of your own
 
 ```xml
 <dependency>
@@ -88,7 +88,7 @@ tool calls for the `LlmCallEvent` and turns rate limits and server errors into
 `LlmTransientException`. The SDK's own retries are off, because retrying is the
 gateway's job.
 
-[`OwnProviderDemo`](src/main/java/ai/mindconnect/llm/demo/OwnProviderDemo.java) calls it
+[`LlmGatewayDemo`](src/main/java/ai/mindconnect/llm/demo/LlmGatewayDemo.java) calls it
 directly with a config:
 
 ```java
@@ -116,7 +116,7 @@ chat.chatStreaming(LlmRequest.streaming("agent-default", messages), chunk -> ...
 Run it (a paid call to OpenAI):
 
 ```bash
-OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect.llm.demo.OwnProviderDemo -Dexec.args="Name three rivers in Germany."
+OPENAI_API_KEY=... mvn -f llm/mc-llm-demo/pom.xml compile exec:java -Dexec.mainClass=ai.mindconnect.llm.demo.LlmGatewayDemo -Dexec.args="Name three rivers in Germany."
 ```
 
 `OpenAiSdkGatewayTest` runs the provider against a local server that answers like

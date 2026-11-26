@@ -29,8 +29,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A chat through our providers: the configs live in an {@link LlmConfigRepository} in
- * memory, and the caller of {@link LlmChat} names a config, nothing else. Which
+ * A chat through the gateway service's {@link LlmChat}, with our providers behind it:
+ * the configs live in an {@link LlmConfigRepository} in memory, and the caller names a
+ * config, nothing else. Which
  * provider, model and key that means is the store's business; here an alias
  * {@code agent-default} points at an OpenAI config, so the model behind the name can
  * change without the caller noticing.
@@ -38,9 +39,9 @@ import java.util.Map;
  * <p>Run with {@code OPENAI_API_KEY} set; the first argument is the question. Every
  * run is a paid call to OpenAI.
  */
-public final class OurProvidersDemo {
+public final class LlmChatDemo {
 
-    private OurProvidersDemo() {
+    private LlmChatDemo() {
     }
 
     public static void main(String[] args) {

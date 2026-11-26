@@ -12,15 +12,16 @@ import ai.mindconnect.llm.runtime.api.port.out.LlmCallListener;
 import java.util.List;
 
 /**
- * A chat through a provider of one's own: the config names model and key, the
- * request names the config, and the answer streams to standard output.
+ * A provider called directly through the {@link LlmGateway} SPI, without the gateway
+ * service: the caller holds the config itself, with model and key, and hands it in
+ * with every request. Here the provider is one of one's own, built on the OpenAI SDK.
  *
  * <p>Run with {@code OPENAI_API_KEY} set; the first argument is the question.
  * Every run is a paid call to OpenAI.
  */
-public final class OwnProviderDemo {
+public final class LlmGatewayDemo {
 
-    private OwnProviderDemo() {
+    private LlmGatewayDemo() {
     }
 
     public static void main(String[] args) {
