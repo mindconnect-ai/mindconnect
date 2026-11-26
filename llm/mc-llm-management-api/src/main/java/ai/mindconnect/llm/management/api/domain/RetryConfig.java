@@ -3,7 +3,7 @@ package ai.mindconnect.llm.management.api.domain;
 
 /**
  * Per-config retry policy for transient provider errors (HTTP 429 rate-limit /
- * 529 overloaded), followed by {@link ai.mindconnect.llm.service.RetryingLlmGateway}.
+ * 529 overloaded), followed by {@link ai.mindconnect.llm.gateway.service.RetryingLlmGateway}.
  * Attached to an {@link LlmConfig} so different models and providers can be
  * tuned independently; a config without one is not retried at all.
  *

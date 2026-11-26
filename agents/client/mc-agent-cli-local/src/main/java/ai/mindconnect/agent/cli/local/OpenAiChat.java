@@ -17,10 +17,10 @@ import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.runtime.api.port.in.LlmChat;
-import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
-import ai.mindconnect.llm.service.RoutingLlmChatService;
+import ai.mindconnect.llm.gateway.service.DefaultLlmGatewayRegistry;
+import ai.mindconnect.llm.gateway.service.RoutingLlmChatService;
 import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.llm.service.LlmConfigResolver;
+import ai.mindconnect.llm.adapter.env.LlmConfigResolver;
 
 /**
  * An LLM gateway that knows one OpenAI model, set up from an API key. The

@@ -229,12 +229,12 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-llm-gateway-core</artifactId>
+                <artifactId>mc-llm-gateway</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-llm-gateway</artifactId>
+                <artifactId>mc-llm-store</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

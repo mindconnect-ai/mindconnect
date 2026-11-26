@@ -8,7 +8,7 @@ import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmPrice;
-import ai.mindconnect.llm.service.LlmPriceService;
+import ai.mindconnect.llm.gateway.service.LlmPriceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +37,7 @@ class LlmPriceUiControllerTest {
     private final LlmPriceUiController controller = new LlmPriceUiController(configs, service, clock,
             EnvVarResolver.none());
     private final LlmConfigUiController configController = new LlmConfigUiController(configs,
-            new ai.mindconnect.llm.service.LlmConfigService(configs, service), EncryptionHelper.noEncryption(),
+            new ai.mindconnect.llm.gateway.service.LlmConfigService(configs, service), EncryptionHelper.noEncryption(),
             new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(EnvVarResolver.class),
             new OkHttpClient(), new ObjectMapper());
 

@@ -5,7 +5,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.management.api.domain.LlmPrice;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
-import ai.mindconnect.llm.port.out.LlmPriceRepositoryContract;
+import ai.mindconnect.llm.gateway.port.out.LlmPriceRepositoryContract;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;

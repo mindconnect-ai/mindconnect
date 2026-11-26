@@ -46,7 +46,7 @@
         <!-- Turns run on the runtime on the plugin kernel, behind the chat service the bridge offers. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-gateway</artifactId>
+            <artifactId>mc-llm-store</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

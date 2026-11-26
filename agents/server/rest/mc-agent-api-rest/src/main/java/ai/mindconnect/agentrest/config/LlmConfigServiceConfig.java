@@ -2,8 +2,8 @@ package ai.mindconnect.agentrest.config;
 
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
-import ai.mindconnect.llm.service.LlmConfigService;
-import ai.mindconnect.llm.service.LlmPriceService;
+import ai.mindconnect.llm.gateway.service.LlmConfigService;
+import ai.mindconnect.llm.gateway.service.LlmPriceService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

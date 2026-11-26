@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.controller;
 
-import ai.mindconnect.llm.service.LlmConfigResolver;
+import ai.mindconnect.llm.adapter.env.LlmConfigResolver;
 
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent.Draft;
@@ -12,7 +12,7 @@ import ai.mindconnect.llm.management.api.domain.LlmPrice;
 import ai.mindconnect.llm.management.api.domain.LlmPriceId;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
-import ai.mindconnect.llm.service.LlmPriceService;
+import ai.mindconnect.llm.gateway.service.LlmPriceService;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPatch;

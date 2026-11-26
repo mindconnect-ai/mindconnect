@@ -1,0 +1,149 @@
+package ai.mindconnect.llm;
+
+import ai.mindconnect.llm.adapter.env.LlmConfigResolver;
+
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.management.api.domain.LlmConfigId;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmProvider;
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.*;
+
+class LlmConfigResolvedTest {
+
+    private static LlmConfig config(String model, String baseUrl, String apiKey) {
+        return new LlmConfig(LlmConfigId.random(), "test", LlmProvider.OPENAI,
+                model, baseUrl, apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+    }
+
+    @Test
+    void resolvedAgainstAChainTakesTheFirstSourceThatKnowsTheName() {
+        var chain = EnvVarResolver.chain(
+                EnvVarResolver.of(Map.of("OPENAI_API_KEY", "sk-alice")),
+                EnvVarResolver.of(Map.of("OPENAI_API_KEY", "sk-server", "LLM_MODEL", "gpt-4o")));
+        var cfg = config("${LLM_MODEL}", "https://api.openai.com", "${OPENAI_API_KEY}");
+
+        var r = LlmConfigResolver.resolved(cfg, chain, EncryptionHelper.noEncryption());
+
+        assertThat(r.apiKey()).isEqualTo("sk-alice");
+        assertThat(r.model()).isEqualTo("gpt-4o");
+    }
+
+    /** A user brings their own key, never their own endpoint for a config whose key may be the installation's. */
+    @Test
+    void personalVariablesReachTheApiKeyOnly() {
+        EnvVarResolver personal = new EnvVarResolver() {
+            final Map<String, String> vars = Map.of("OPENAI_API_KEY", "sk-alice", "OPENAI_BASE_URL", "https://alice.example", "LLM_MODEL", "alices-model");
+            @Override public java.util.Optional<String> get(String name) { return java.util.Optional.ofNullable(vars.get(name)); }
+            @Override public Map<String, String> asMap() { return vars; }
+            @Override public boolean personal() { return true; }
+        };
+        var chain = EnvVarResolver.chain(personal,
+                EnvVarResolver.of(Map.of("OPENAI_BASE_URL", "https://api.openai.com", "LLM_MODEL", "gpt-4o")));
+        var cfg = config("${LLM_MODEL}", "${OPENAI_BASE_URL}", "${OPENAI_API_KEY}");
+
+        var r = LlmConfigResolver.resolved(cfg, chain, EncryptionHelper.noEncryption());
+
+        assertThat(r.apiKey()).isEqualTo("sk-alice");
+        assertThat(r.baseUrl()).isEqualTo("https://api.openai.com");
+        assertThat(r.model()).isEqualTo("gpt-4o");
+    }
+
+    // --- resolved() — env-var expansion only ---
+
+    @Test
+    void resolvedExpandsApiKey() {
+        // We can't inject an env map into LlmConfig.resolved() directly, so we
+        // verify the happy path using a var that is expected to be absent and
+        // supplying a default.
+        var cfg = config("gpt-4o", "https://api.openai.com", "${MY_TEST_API_KEY:plain-key}");
+        assertThat(LlmConfigResolver.resolved(cfg).apiKey()).isEqualTo("plain-key");
+    }
+
+    @Test
+    void resolvedExpandsBaseUrl() {
+        var cfg = config("gpt-4o", "${LLM_BASE_URL:https://api.openai.com}", "key");
+        assertThat(LlmConfigResolver.resolved(cfg).baseUrl()).isEqualTo("https://api.openai.com");
+    }
+
+    @Test
+    void resolvedExpandsModel() {
+        var cfg = config("${LLM_MODEL:gpt-4o-mini}", "https://api.openai.com", "key");
+        assertThat(LlmConfigResolver.resolved(cfg).model()).isEqualTo("gpt-4o-mini");
+    }
+
+    @Test
+    void resolvedLeavesNonPlaceholderValuesUnchanged() {
+        var cfg = config("gpt-4o", "https://api.openai.com", "sk-plain");
+        var r = LlmConfigResolver.resolved(cfg);
+        assertThat(r.model()).isEqualTo("gpt-4o");
+        assertThat(r.baseUrl()).isEqualTo("https://api.openai.com");
+        assertThat(r.apiKey()).isEqualTo("sk-plain");
+    }
+
+    @Test
+    void resolvedPreservesNonStringFields() {
+        var cfg = config("gpt-4o", "https://api.openai.com", "key");
+        var r = LlmConfigResolver.resolved(cfg);
+        assertThat(r.id()).isEqualTo(cfg.id());
+        assertThat(r.provider()).isEqualTo(LlmProvider.OPENAI);
+        assertThat(r.defaultTemperature()).isEqualTo(0.7);
+        assertThat(r.maxOutputTokens()).isEqualTo(4096);
+    }
+
+    @Test
+    void resolvedThrowsWhenEnvVarAbsentAndNoDefault() {
+        var cfg = config("gpt-4o", "https://api.openai.com", "${DEFINITELY_NOT_SET_XYZ}");
+        assertThatThrownBy(() -> LlmConfigResolver.resolved(cfg))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEFINITELY_NOT_SET_XYZ");
+    }
+
+    // --- resolved(EncryptionHelper) — env expansion + decryption ---
+
+    @Test
+    void resolvedWithEncryptionDecryptsEncPrefix() throws Exception {
+        var encryption = new EncryptionHelper("0123456789abcdef"); // 16-byte AES key
+        String encrypted = EncryptionHelper.ENC + encryption.encrypt("real-api-key");
+
+        var cfg = config("gpt-4o", "https://api.openai.com", encrypted);
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("real-api-key");
+    }
+
+    @Test
+    void resolvedWithEncryptionHandlesPlainPrefix() {
+        var encryption = new EncryptionHelper("0123456789abcdef");
+        var cfg = config("gpt-4o", "https://api.openai.com", "plain:my-key");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("my-key");
+    }
+
+    @Test
+    void resolvedWithEncryptionHandlesBareKey() {
+        var encryption = new EncryptionHelper("0123456789abcdef");
+        var cfg = config("gpt-4o", "https://api.openai.com", "sk-bare");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("sk-bare");
+    }
+
+    @Test
+    void resolvedWithEncryptionExpandsEnvVarThenDecrypts() throws Exception {
+        // Simulates: apiKey stored as "${MY_KEY}" in JSON, env var holds enc:… value.
+        // We can't inject env here, so we use the default fallback to carry the enc: value.
+        var encryption = new EncryptionHelper("0123456789abcdef");
+        String encrypted = EncryptionHelper.ENC + encryption.encrypt("secret");
+
+        // Store the encrypted value as a default fallback so resolved() picks it up
+        var cfg = config("gpt-4o", "https://api.openai.com", "${ABSENT_VAR:" + encrypted + "}");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).apiKey()).isEqualTo("secret");
+    }
+
+    @Test
+    void resolvedWithEncryptionAlsoExpandsBaseUrl() throws Exception {
+        var encryption = new EncryptionHelper("0123456789abcdef");
+        var cfg = config("gpt-4o", "${MY_BASE_URL:https://custom.api.com}", "key");
+        assertThat(LlmConfigResolver.resolved(cfg, encryption).baseUrl()).isEqualTo("https://custom.api.com");
+    }
+}

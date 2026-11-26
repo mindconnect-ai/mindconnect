@@ -1,0 +1,61 @@
+package ai.mindconnect.llm.gateway.service;
+
+
+import ai.mindconnect.llm.management.api.port.out.SecretResolver;
+import ai.mindconnect.llm.runtime.api.domain.UnknownLlmConfigException;
+import ai.mindconnect.llm.management.api.domain.LlmConfig;
+import ai.mindconnect.llm.management.api.domain.LlmConfigType;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
+import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
+import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
+import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.provider.spi.port.out.TranscriptionGateway;
+
+import java.util.function.Consumer;
+
+/**
+ * Routes a transcription by config name, the way
+ * {@link RoutingLlmChatService} routes a chat: look the name up, follow an
+ * alias to the config behind it, hand the call to the gateway. Callers name
+ * {@code speech-to-text} and an operator decides what that is.
+ */
+public class RoutingLlmTranscriptionService implements LlmTranscription {
+
+    private final LlmConfigRepository configRepository;
+    private final TranscriptionGateway gateway;
+    private final SecretResolver secrets;
+
+    public RoutingLlmTranscriptionService(LlmConfigRepository configRepository,
+                                          TranscriptionGateway gateway, SecretResolver secrets) {
+        this.configRepository = configRepository;
+        this.gateway = gateway;
+        this.secrets = secrets;
+    }
+
+    @Override
+    public TranscriptionResult transcribe(String configName, TranscriptionRequest request) {
+        return gateway.transcribe(resolveConfig(configName), request);
+    }
+
+    @Override
+    public TranscriptionResult transcribe(String configName, TranscriptionRequest request,
+                                          Consumer<String> onDelta) {
+        return gateway.transcribe(resolveConfig(configName), request, onDelta);
+    }
+
+    /**
+     * The config behind the name, aliases followed and secrets resolved. A config of the wrong type
+     * is refused here rather than at the provider: sending a chat model to the
+     * transcription endpoint fails with a message about the endpoint, which
+     * says nothing about the actual mistake.
+     */
+    private LlmConfig resolveConfig(String configName) {
+        LlmConfig config = configRepository.findResolvedByName(configName)
+                .orElseThrow(() -> new UnknownLlmConfigException(configName));
+        if (config.type() != LlmConfigType.SPEECH_TO_TEXT) {
+            throw new IllegalStateException("LLM config '" + configName + "' is a "
+                    + config.type() + " config, not a speech-to-text one");
+        }
+        return secrets.resolve(config);
+    }
+}

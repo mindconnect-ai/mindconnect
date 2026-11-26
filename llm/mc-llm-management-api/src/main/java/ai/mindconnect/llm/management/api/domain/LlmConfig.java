@@ -44,7 +44,7 @@ public record LlmConfig(
         /**
          * Per-config concurrency limit for in-flight LLM requests. {@code null}
          * (the default) means <em>no limit</em>. Enforced by
-         * {@link ai.mindconnect.llm.service.ThrottlingLlmGateway}. Use it to stay
+         * {@link ai.mindconnect.llm.gateway.service.ThrottlingLlmGateway}. Use it to stay
          * under a provider's rate limit when {@code run_agents} fans out many
          * parallel calls.
          */

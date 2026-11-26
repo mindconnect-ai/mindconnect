@@ -27,18 +27,22 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-gateway-core</artifactId>
+            <artifactId>mc-llm-gateway</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-gateway-core</artifactId>
+            <artifactId>mc-llm-gateway</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-common</artifactId>
         </dependency>
 
         <dependency>

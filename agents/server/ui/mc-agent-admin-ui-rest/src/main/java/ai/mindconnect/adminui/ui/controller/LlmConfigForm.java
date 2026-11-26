@@ -9,7 +9,7 @@ import ai.mindconnect.llm.management.api.domain.LlmConfigType;
 import ai.mindconnect.llm.management.api.domain.LlmProvider;
 import ai.mindconnect.llm.management.api.domain.RateLimitConfig;
 import ai.mindconnect.llm.management.api.domain.RetryConfig;
-import ai.mindconnect.llm.service.LlmConfigService;
+import ai.mindconnect.llm.gateway.service.LlmConfigService;
 
 import java.util.Map;
 

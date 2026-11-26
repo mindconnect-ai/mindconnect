@@ -4,7 +4,7 @@ import ai.mindconnect.agent.scope.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
-import ai.mindconnect.llm.port.out.LlmRepositoryFactory;
+import ai.mindconnect.llm.management.api.port.out.LlmRepositoryFactory;
 
 /** The LLM repositories as Postgres tables in the namespace the scope names per call; each is created with its schema. */
 public class PgLlmRepositoryFactory implements LlmRepositoryFactory {

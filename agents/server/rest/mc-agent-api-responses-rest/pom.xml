@@ -41,7 +41,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-gateway-core</artifactId>
+            <artifactId>mc-llm-gateway</artifactId>
         </dependency>
         <!-- File support: an uploaded or inline file goes to the host's file
              store and is attached to the session the way a chat upload is. -->

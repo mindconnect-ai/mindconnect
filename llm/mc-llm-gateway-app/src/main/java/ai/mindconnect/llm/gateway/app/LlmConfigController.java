@@ -4,7 +4,7 @@ import ai.mindconnect.common.DomainException;
 import ai.mindconnect.llm.management.api.domain.LlmConfig;
 import ai.mindconnect.llm.management.api.domain.LlmConfigId;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.service.LlmConfigService;
+import ai.mindconnect.llm.gateway.service.LlmConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;

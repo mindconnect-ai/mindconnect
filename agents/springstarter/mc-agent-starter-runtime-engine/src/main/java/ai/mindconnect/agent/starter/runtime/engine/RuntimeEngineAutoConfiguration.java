@@ -101,7 +101,7 @@ import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
 import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
 import ai.mindconnect.llm.management.api.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
-import ai.mindconnect.llm.service.RoutingLlmChatService;
+import ai.mindconnect.llm.gateway.service.RoutingLlmChatService;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.StartupScope;
 import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;

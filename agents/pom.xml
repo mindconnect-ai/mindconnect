@@ -43,8 +43,7 @@
         <module>responses-api/mc-agent-protocol</module>
         <module>responses-api/mc-agent-protocol-openai</module>
         <module>responses-api/mc-agent-protocol-runtime</module>
-        <module>core/mc-llm-gateway-core</module>
-        <module>core/mc-llm-gateway</module>
+        <module>core/mc-llm-store</module>
         <module>adapter/postgres/mc-llm-gateway-pg</module>
         <module>adapter/postgres/mc-file-store-pg</module>
         <module>server/core/mc-user-core</module>

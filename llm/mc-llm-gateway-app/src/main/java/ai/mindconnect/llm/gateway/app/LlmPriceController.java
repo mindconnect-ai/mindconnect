@@ -3,7 +3,7 @@ package ai.mindconnect.llm.gateway.app;
 import ai.mindconnect.llm.management.api.domain.LlmPrice;
 import ai.mindconnect.llm.management.api.domain.LlmPriceId;
 import ai.mindconnect.llm.management.api.port.out.LlmPriceRepository;
-import ai.mindconnect.llm.service.LlmPriceService;
+import ai.mindconnect.llm.gateway.service.LlmPriceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;

@@ -3,6 +3,7 @@ package ai.mindconnect.llm.gateway.app;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.llm.runtime.api.domain.LlmTransientException;
+import ai.mindconnect.llm.runtime.api.domain.UnknownLlmConfigException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +22,11 @@ class ApiErrorHandler {
     ProblemDetail domain(DomainException e) {
         HttpStatus status = "NOT_FOUND".equals(e.code()) ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
         return ProblemDetail.forStatusAndDetail(status, e.getMessage());
+    }
+
+    @ExceptionHandler(UnknownLlmConfigException.class)
+    ProblemDetail unknownConfig(UnknownLlmConfigException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

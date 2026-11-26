@@ -8,7 +8,7 @@ import ai.mindconnect.llm.runtime.api.domain.TranscriptionRequest;
 import ai.mindconnect.llm.runtime.api.domain.TranscriptionResult;
 import ai.mindconnect.llm.runtime.api.port.in.LlmEmbedding;
 import ai.mindconnect.llm.runtime.api.port.in.LlmTranscription;
-import ai.mindconnect.llm.service.RoutingLlmChatService;
+import ai.mindconnect.llm.gateway.service.RoutingLlmChatService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
